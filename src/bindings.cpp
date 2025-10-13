@@ -16,19 +16,24 @@ using namespace emscripten;
 using namespace btk::ballistics;
 
 // Wrapper function to convert std::pair to RingInfo
-struct RingInfo {
+struct RingInfo
+{
     Distance inner;
     Distance outer;
-    
+
     // Default constructor for embind
-    RingInfo() : inner(Distance::zero()), outer(Distance::zero()) {}
-    
+    RingInfo() : inner(Distance::zero()), outer(Distance::zero())
+    {
+    }
+
     // Constructor from pair
-    RingInfo(const std::pair<Distance, Distance>& pair) 
-        : inner(pair.first), outer(pair.second) {}
+    RingInfo(const std::pair<Distance, Distance>& pair) : inner(pair.first), outer(pair.second)
+    {
+    }
 };
 
-RingInfo getRingInfoWrapper(const Target& target, int ring) {
+RingInfo getRingInfoWrapper(const Target& target, int ring)
+{
     auto pair = target.getRingInfo(ring);
     return RingInfo(pair);
 }
@@ -308,12 +313,10 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     register_vector<Hit>("HitVector");
     register_vector<ShotResult>("ShotResultVector");
     register_vector<std::string>("StringVector");
-    
+
     // Register RingInfo struct
-    value_object<RingInfo>("RingInfo")
-        .field("inner", &RingInfo::inner)
-        .field("outer", &RingInfo::outer);
-    
+    value_object<RingInfo>("RingInfo").field("inner", &RingInfo::inner).field("outer", &RingInfo::outer);
+
     // Add wrapper function to convert std::pair to RingInfo
     function("getRingInfoWrapper", &getRingInfoWrapper);
 }
