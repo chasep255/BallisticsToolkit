@@ -1,264 +1,202 @@
-# PrecisionSim
+# BallisticsToolkit
 
-A high-performance ballistic simulation library and calculator written in C++ with WebAssembly support.
+A high-performance WebAssembly ballistics calculator for long-range shooting. Provides accurate trajectory calculations with support for multiple drag models, atmospheric conditions, and wind effects.
 
 ## Features
 
-- **High-Performance**: Compile-time optimized units system with no virtual functions or dynamic dispatch
-- **WebAssembly Support**: Run ballistic calculations directly in web browsers
-- **Multiple Interfaces**: CLI calculator, C++ library, and web interface
-- **Accurate Physics**: 3DOF ballistics with G1/G7 drag models and atmospheric effects
-- **Modern C++**: C++17 with constexpr, CRTP, and template metaprogramming
+- **3DOF Ballistics Simulation**: Accurate trajectory modeling with drag, gravity, and Coriolis effects
+- **Multiple Drag Models**: G1 and G7 ballistic coefficients
+- **Atmospheric Modeling**: Temperature, pressure, humidity, and altitude compensation
+- **Wind Effects**: Full 3D wind modeling with adjustable speed and direction
+- **WebAssembly Performance**: Fast, client-side calculations with no server required
+- **Type-Safe Units System**: Compile-time unit checking prevents errors
 
 ## Project Structure
 
 ```
-PrecisionSim/
-├── libballistics/          # Core ballistics library
-│   ├── include/            # Header files
-│   └── src/               # Implementation files
-├── ballistic-calc/         # CLI calculator
-│   ├── include/
-│   └── src/
-├── web-ui/                # WebAssembly web interface
-│   ├── include/
-│   ├── src/
-│   └── web/               # HTML/JS interface files
-└── build-*/               # Build directories
+BallisticsToolkit/
+├── include/          # C++ headers (ballistics engine, units, web interface)
+├── src/              # C++ implementation files
+├── web/              # HTML/JavaScript frontend
+├── CMakeLists.txt    # Build configuration
+└── build_web.sh      # Automated build script
 ```
+
+## Prerequisites
+
+- **Emscripten SDK** - WebAssembly compiler toolchain
+- **CMake** ≥ 3.16
+- **C++17** compiler
+- **Python 3** (for local web server)
+
+### Installing Emscripten
+
+```bash
+# Clone and install Emscripten
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+source ./emsdk_env.sh
+```
+
+Add `source /path/to/emsdk/emsdk_env.sh` to your `.bashrc` to persist the environment.
 
 ## Building
 
-### Prerequisites
-
-- **C++17 compatible compiler** (GCC 7+, Clang 5+, MSVC 2017+)
-- **CMake 3.16+**
-- **Emscripten** (for WebAssembly builds)
-
-### Install Emscripten (Ubuntu/Debian)
+The project uses a simple build script that handles everything:
 
 ```bash
-sudo apt update
-sudo apt install emscripten
+./build_web.sh
 ```
 
-### Native Build
+This will:
+1. Clean previous build artifacts
+2. Configure with CMake using Emscripten
+3. Compile to WebAssembly
+4. Copy all files to `build-wasm/web/`
+5. Start a local web server on port 8001
+
+Open http://localhost:8001 in your browser to use the calculator.
+
+### Manual Build
 
 ```bash
-# Create build directory
-mkdir build-native && cd build-native
+# Clean build
+rm -rf build-wasm
+mkdir build-wasm
+cd build-wasm
 
 # Configure and build
-cmake ..
-make -j$(nproc)
-
-# Run CLI calculator
-./ballistic-calc/ballistic-calc --help
-```
-
-### WebAssembly Build
-
-```bash
-# Create build directory
-mkdir build-wasm && cd build-wasm
-
-# Configure with Emscripten
 emcmake cmake ..
-
-# Build and install WebAssembly modules
 emmake make -j$(nproc)
-emmake make install
 
-# Test web interface (web files are in build-wasm/web/)
+# Files will be in build-wasm/web/
 cd web
-python3 -m http.server 8000
-# Open http://localhost:8000 in your browser
+python3 -m http.server 8001
 ```
 
 ## Usage
 
-### CLI Calculator
-
-```bash
-# Basic trajectory calculation
-./ballistic-calc/ballistic-calc \
-  --weight 85.5 \
-  --drag G7 \
-  --zero 100 \
-  --scope 2 \
-  --bc 0.268 \
-  --mv 2750 \
-  --step 50 \
-  --max-range 1000
-
-# With atmospheric conditions
-./ballistic-calc/ballistic-calc \
-  --weight 85.5 \
-  --drag G7 \
-  --zero 100 \
-  --scope 2 \
-  --bc 0.268 \
-  --mv 2750 \
-  --temp 59 \
-  --pressure 29.92 \
-  --humidity 50 \
-  --altitude 0 \
-  --wind-speed 5 \
-  --wind-direction 90
-```
-
 ### Web Interface
 
-The web interface includes:
-- **Web UI WebAssembly module** (`web_ui_wasm.js`, `web_ui_wasm.wasm`)
-- **HTML interface** (`index.html`, `test.html`)
-- **JavaScript wrapper** (`target_sim.js`)
+The web interface provides a complete ballistics calculator:
 
-1. Build the WebAssembly version (see above)
-2. Serve the `build-wasm/web/` directory with any HTTP server:
+1. **Bullet Parameters**: Weight, diameter, length, BC, and drag function
+2. **Atmospheric Conditions**: Temperature, pressure, humidity, altitude
+3. **Wind Conditions**: Speed and direction
+4. **Shot Parameters**: Muzzle velocity, zero range, scope height, max range
 
-```bash
-# Using Python
-cd build-wasm/web
-python3 -m http.server 8000
+Click "Calculate Trajectory" to generate a ballistics table with:
+- Drop (milliradians)
+- Drift (milliradians)
+- Velocity (fps)
+- Energy (ft-lbf)
+- Time of flight (seconds)
 
-# Using Node.js
-npx serve build-wasm/web
+### API
 
-# Using any web server
-# Copy build-wasm/web/ to your web server directory
-```
+The WebAssembly module exposes a C++ ballistics engine to JavaScript:
 
-3. Open `http://localhost:8000` in your browser
+```javascript
+// Initialize
+const sim = new TargetSim();
+await sim.init();
 
-### C++ Library
+// Configure bullet
+sim.setBullet({
+    weight: 140,           // grains
+    diameter: 0.264,       // inches
+    length: 1.2,           // inches
+    bc: 0.585,            // ballistic coefficient
+    dragFunction: 'G7'     // G1 or G7
+});
 
-```cpp
-#include "ballistics.h"
+// Set atmosphere
+sim.setAtmosphere({
+    temperature: 59,       // °F
+    pressure: 29.92,       // inHg
+    humidity: 50,          // %
+    altitude: 0            // feet
+});
 
-using namespace psim::ballistics;
-
-// Create bullet
-Bullet bullet(Weight::grains(85.5), Distance::inches(0.308), 
-             Distance::inches(1.2), 0.268, DragFunction::G7);
-
-// Set up atmosphere
-Atmosphere atmosphere(Temperature::fahrenheit(59), 
-                     Distance::feet(0), 0.5);
+// Set wind
+sim.setWind({
+    speed: 10,             // mph
+    direction: 90          // degrees (90 = from the side)
+});
 
 // Calculate trajectory
-Velocity mv = Velocity::fps(2750);
-Distance zero_range = Distance::yards(100);
-Distance scope_height = Distance::inches(2);
-Time timestep = Time::seconds(0.001);
+const trajectory = sim.calculateTrajectory({
+    muzzleVelocity: 2700,  // fps
+    zeroRange: 100,        // yards
+    scopeHeight: 2.0,      // inches
+    maxRange: 1000,        // yards
+    step: 50               // yards
+});
 
-auto zeroing_result = Simulator::computeZeroedInitialState(
-    bullet, mv, scope_height, zero_range, atmosphere, 
-    Wind::calm(), timestep);
-
-Trajectory trajectory = Simulator::simulateToDistance(
-    zeroing_result.initial_state, Distance::yards(1000), 
-    Wind::calm(), atmosphere, timestep);
+// Use results
+trajectory.forEach(point => {
+    console.log(`${point.range}yd: ${point.drop.toFixed(2)} mrad drop`);
+});
 ```
 
-## API Reference
+## Technical Details
 
-### Core Classes
+### Ballistics Engine
 
-- **`Bullet`**: Represents bullet physical properties
-- **`FlyingBullet`**: Bullet with position, velocity, and spin
-- **`Atmosphere`**: Atmospheric conditions (temperature, pressure, humidity, altitude)
-- **`Wind`**: Wind conditions with 3D components
-- **`Trajectory`**: Collection of trajectory points with interpolation
-- **`Simulator`**: Static methods for ballistic calculations
+- **3DOF**: 3 Degrees of Freedom (point mass model)
+- **Drag Models**: Standard G1/G7 drag functions
+- **Atmospheric Density**: Calculated from temperature, pressure, humidity, and altitude
+- **Integration**: Runge-Kutta 4th order with adaptive timestep
+- **Coordinate System**: Right-handed (X=downrange, Y=crossrange, Z=vertical)
 
 ### Units System
 
-The library uses a compile-time optimized units system:
+Type-safe units with zero runtime overhead:
 
 ```cpp
-// Distance
-Distance d = Distance::yards(100);
-double yards = d.yards();
-double meters = d.meters();
+Distance range = Distance::yards(1000);
+Velocity mv = Velocity::fps(2700);
+Temperature temp = Temperature::fahrenheit(59);
 
-// Velocity
-Velocity v = Velocity::fps(2750);
-double fps = v.fps();
-double mps = v.mps();
-
-// Temperature
-Temperature t = Temperature::fahrenheit(59);
-double f = t.fahrenheit();
-double c = t.celsius();
-
-// And many more: Weight, Pressure, Angle, Time, etc.
+// Compile-time type checking prevents errors
+// Distance d = Velocity::fps(100);  // Won't compile!
 ```
 
-### Vector3D Types
+### Performance
 
-Generic 3D vectors for any unit type:
+- **Compile-time optimized**: `constexpr` wherever possible
+- **No virtual functions**: Zero dynamic dispatch overhead
+- **Enum-based dispatch**: Fast drag function selection
+- **WebAssembly**: Near-native performance in the browser
 
-```cpp
-Position3D pos = Position3D(Distance::yards(100), Distance::yards(0), Distance::yards(0));
-Velocity3D vel = Velocity3D(Velocity::fps(2750), Velocity::fps(0), Velocity::fps(0));
+## Code Style
 
-// Vector operations
-double magnitude = vel.magnitude();
-Velocity3D normalized = vel.normalized();
-double dot_product = pos.dot(vel);
+- **Namespaces**: `psim::ballistics`, `psim::web_ui`
+- **Opening braces**: Next line (Allman style)
+- **Access specifiers**: Inline with members
+- **Standard**: C++17
+
+Format code with:
+```bash
+./format.sh src/ include/
 ```
-
-## Performance
-
-- **Compile-time optimization**: All unit conversions are resolved at compile time
-- **No virtual functions**: Zero runtime overhead
-- **constexpr**: Many calculations can be done at compile time
-- **Template metaprogramming**: Type-safe operations with zero runtime cost
-- **WebAssembly**: Near-native performance in web browsers
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run the build and tests
-5. Submit a pull request
-
-### Code Style
-
-The project uses `clang-format` with custom style rules:
-
-```bash
-# Format all files
-./format.sh .
-
-# Format specific file
-./format.sh src/ballistics.cpp
-```
-
-### Building and Testing
-
-```bash
-# Native build and test
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-./ballistic-calc/ballistic-calc --help
-
-# WebAssembly build
-mkdir build-wasm && cd build-wasm
-emcmake cmake ..
-emmake make -j$(nproc)
-emmake make install DESTDIR=../web-ui
-```
+4. Run `./build_web.sh` to test
+5. Format code with `./format.sh`
+6. Submit a pull request
 
 ## License
 
-[Add your license here]
+This project is open source. See LICENSE for details.
 
 ## Acknowledgments
 
-- Based on the original Python Target-Simulator project
-- Uses standard ballistic formulas and drag models
-- WebAssembly compilation via Emscripten
+- G1/G7 drag models from U.S. Army ballistics tables
+- Atmospheric model based on ICAO Standard Atmosphere

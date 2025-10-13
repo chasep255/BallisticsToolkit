@@ -12,11 +12,11 @@ class TargetSim {
      * @param {string} wasmPath - Path to the WebAssembly file
      * @returns {Promise} - Promise that resolves when module is loaded
      */
-    async init(wasmPath = 'web_ui_wasm.wasm') {
+    async init(wasmPath = 'ballistics_wasm.wasm') {
         return new Promise((resolve, reject) => {
             // Load the Emscripten module
             const script = document.createElement('script');
-            script.src = 'web_ui_wasm.js';
+            script.src = 'ballistics_wasm.js';
             script.onload = async () => {
                 // The module should be available as 'WebUI' (from EXPORT_NAME)
                 if (typeof WebUI !== 'undefined') {
