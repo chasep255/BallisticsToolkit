@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ballistic Calculator - BallisticsToolkit</title>
+    <link rel="stylesheet" href="../common.css">
+</head>
+<body>
+    <div class="nav-header">
+        <div class="nav-content">
+            <a href="../index.html" class="nav-logo">🎯 BallisticsToolkit</a>
+            <div class="nav-links">
+                <a href="../index.html">Home</a>
+                <a href="ballistic-calc.html" class="active">Ballistic Calculator</a>
+                <a href="../target-sim/target-sim.html">Target Simulator</a>
+            </div>
+        </div>
+    </div>
+    <div class="calc-container">
+        <h1>📊 Ballistic Calculator</h1>
+        
+
+        <!-- Parameters Bar -->
+        <div class="params-bar">
+            <div class="param-item">
+                <label for="weight" title="Bullet weight in grains">Weight (grains)</label>
+                <input type="number" id="weight" value="140" step="0.1" title="Bullet weight in grains">
+            </div>
+            <div class="param-item">
+                <label for="diameter" title="Bullet diameter in inches">Diameter (in)</label>
+                <input type="number" id="diameter" value="0.264" step="0.001" title="Bullet diameter in inches">
+            </div>
+            <div class="param-item">
+                <label for="length" title="Bullet length in inches">Length (in)</label>
+                <input type="number" id="length" value="1.4" step="0.1" title="Bullet length in inches">
+            </div>
+            <div class="param-item">
+                <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
+                <input type="number" id="bc" value="0.311" step="0.001" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">
+            </div>
+            <div class="param-item">
+                <label for="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">Drag</label>
+                <select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">
+                    <option value="G7" selected>G7</option>
+                    <option value="G1">G1</option>
+                </select>
+            </div>
+            <div class="param-item">
+                <label for="muzzleVelocity" title="Muzzle velocity in feet per second">MV (fps)</label>
+                <input type="number" id="muzzleVelocity" value="2750" step="10" title="Muzzle velocity in feet per second">
+            </div>
+            <div class="param-item">
+                <label for="zeroRange" title="Zero range in yards - where the bullet will hit the crosshairs">Zero (yd)</label>
+                <input type="number" id="zeroRange" value="100" step="10" title="Zero range in yards - where the bullet will hit the crosshairs">
+            </div>
+            <div class="param-item">
+                <label for="scopeHeight" title="Height of scope centerline above bore in inches">Scope (in)</label>
+                <input type="number" id="scopeHeight" value="2" step="0.1" title="Height of scope centerline above bore in inches">
+            </div>
+            <div class="param-item">
+                <label for="temperature" title="Temperature in degrees Fahrenheit">Temp (°F)</label>
+                <input type="number" id="temperature" value="59" step="1" title="Temperature in degrees Fahrenheit">
+            </div>
+            <div class="param-item">
+                <label for="humidity" title="Relative humidity percentage">Humidity (%)</label>
+                <input type="number" id="humidity" value="50" step="1" min="0" max="100" title="Relative humidity percentage">
+            </div>
+            <div class="param-item">
+                <label for="altitude" title="Altitude in feet above sea level">Alt (ft)</label>
+                <input type="number" id="altitude" value="0" step="100" title="Altitude in feet above sea level">
+            </div>
+            <div class="param-item">
+                <label for="windSpeed" title="Wind speed in miles per hour">Wind (mph)</label>
+                <input type="number" id="windSpeed" value="0" step="1" title="Wind speed in miles per hour">
+            </div>
+            <div class="param-item">
+                <label for="windDirection" title="Wind direction using 12-hour clock (3 = from right, 9 = from left, 12 = from rear, 6 = from front)">Wind Dir</label>
+                <input type="number" id="windDirection" value="3" step="1" min="1" max="12" title="Wind direction using 12-hour clock (3 = from right, 9 = from left, 12 = from rear, 6 = from front)">
+            </div>
+            <div class="param-item">
+                <label for="maxRange" title="Maximum range for trajectory calculation in yards">Max Range (yd)</label>
+                <input type="number" id="maxRange" value="1000" step="100" title="Maximum range for trajectory calculation in yards">
+            </div>
+            <div class="param-item">
+                <label for="step" title="Step size for trajectory calculation in yards">Step (yd)</label>
+                <input type="number" id="step" value="50" step="10" title="Step size for trajectory calculation in yards">
+            </div>
+            <div class="param-item">
+                <label for="angleUnits" title="Units for displaying drop and drift angles">Angle Units</label>
+                <select id="angleUnits" title="Units for displaying drop and drift angles">
+                    <option value="mrad" selected>mrad</option>
+                    <option value="moa">MOA</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="text-align: center;">
+            <button id="calculateBtn" onclick="calculateTrajectory()">Calculate Trajectory</button>
+        </div>
+
+        <!-- Results Table -->
+        <div id="results" style="margin-top: 30px; display: none;">
+            <table id="trajectoryTable" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <thead>
+                    <tr>
+                        <th>Range (yds)</th>
+                        <th>Drop</th>
+                        <th>Drift</th>
+                        <th>Velocity (fps)</th>
+                        <th>Energy (ft-lbf)</th>
+                        <th>Time (s)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <p>Calculating trajectory...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+    </div>
+
+    <script src="../ballistics_wasm.js"></script>
+    <script src="ballistic-calc.js"></script>
+    <script>
+        let ballisticsCalculator = null;
+
+        // Initialize WebAssembly module
+        async function initBallisticsCalculator() {
+            try {
+                const btk = await BallisticsToolkit();
+                ballisticsCalculator = new BallisticsCalculator(btk);
+                console.log('BallisticsCalculator WebAssembly module loaded successfully');
+            } catch (error) {
+                console.error('Failed to load BallisticsCalculator WebAssembly module:', error);
+                showError('Failed to load ballistic calculator. Please refresh the page.');
+            }
+        }
+
+
+
+        // Calculate trajectory
+        async function calculateTrajectory() {
+            if (!ballisticsCalculator) {
+                showError('Ballistic calculator not loaded. Please refresh the page.');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                hideError();
+
+                // Get form values
+                const bullet = {
+                    weight: parseFloat(document.getElementById('weight').value),
+                    diameter: parseFloat(document.getElementById('diameter').value),
+                    length: parseFloat(document.getElementById('length').value),
+                    bc: parseFloat(document.getElementById('bc').value),
+                    dragFunction: document.getElementById('dragFunction').value
+                };
+
+                const atmosphere = {
+                    temperature: parseFloat(document.getElementById('temperature').value),
+                    humidity: parseFloat(document.getElementById('humidity').value),
+                    altitude: parseFloat(document.getElementById('altitude').value)
+                };
+
+                const wind = {
+                    speed: parseFloat(document.getElementById('windSpeed').value),
+                    direction: parseFloat(document.getElementById('windDirection').value)
+                };
+
+                const shot = {
+                    muzzleVelocity: parseFloat(document.getElementById('muzzleVelocity').value),
+                    zeroRange: parseFloat(document.getElementById('zeroRange').value),
+                    scopeHeight: parseFloat(document.getElementById('scopeHeight').value),
+                    maxRange: parseFloat(document.getElementById('maxRange').value),
+                    step: parseFloat(document.getElementById('step').value)
+                };
+
+
+                // Set up simulator
+                ballisticsCalculator.setBullet(bullet);
+                ballisticsCalculator.setAtmosphere(atmosphere);
+                ballisticsCalculator.setWind(wind);
+
+                // Calculate trajectory
+                const trajectory = ballisticsCalculator.calculateTrajectory(shot);
+
+                // Display results
+                displayResults(trajectory);
+
+            } catch (error) {
+                console.error('Error calculating trajectory:', error);
+                showError('Error calculating trajectory: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display trajectory results
+        function displayResults(trajectory) {
+            const tableBody = document.getElementById('trajectoryTable').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = '';
+
+            const angleUnits = document.getElementById('angleUnits').value;
+            
+            // Update table headers to show selected units
+            const headers = document.querySelectorAll('#trajectoryTable th');
+            if (angleUnits === 'mrad') {
+                headers[1].textContent = 'Drop (mrad)';
+                headers[2].textContent = 'Drift (mrad)';
+            } else { // moa
+                headers[1].textContent = 'Drop (MOA)';
+                headers[2].textContent = 'Drift (MOA)';
+            }
+
+            trajectory.forEach(point => {
+                const row = tableBody.insertRow();
+                
+                // Range (yards)
+                row.insertCell(0).textContent = point.range.toFixed(0);
+                
+                // Drop values - convert to selected units
+                const dropMrad = point.dropMoa * 0.2909; // Convert MOA to mrad
+                const dropAngleMrad = ballisticsCalculator.btk.Angle.mrad(dropMrad);
+                const dropMoa = dropAngleMrad.getMoa();
+                
+                let dropValue;
+                if (angleUnits === 'mrad') {
+                    dropValue = dropMrad.toFixed(2);
+                } else { // moa
+                    dropValue = dropMoa.toFixed(2);
+                }
+                row.insertCell(1).textContent = dropValue;
+                
+                // Drift values - convert to selected units
+                const driftMrad = point.drift;
+                const driftAngleMrad = ballisticsCalculator.btk.Angle.mrad(driftMrad);
+                const driftMoa = driftAngleMrad.getMoa();
+                
+                let driftValue;
+                if (angleUnits === 'mrad') {
+                    driftValue = driftMrad.toFixed(2);
+                } else { // moa
+                    driftValue = driftMoa.toFixed(2);
+                }
+                row.insertCell(2).textContent = driftValue;
+                
+                // Velocity (fps)
+                row.insertCell(3).textContent = point.velocity.toFixed(0);
+                
+                // Energy (ft-lbf)
+                row.insertCell(4).textContent = point.energy.toFixed(0);
+                
+                // Time
+                row.insertCell(5).textContent = point.time.toFixed(3);
+            });
+
+            // Show the results table
+            document.getElementById('results').style.display = 'block';
+        }
+
+
+        // Show/hide loading indicator
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Hide error message
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+
+        // Initialize when page loads
+        window.addEventListener('load', function() {
+            initBallisticsCalculator();
+        });
+
+    </script>
+    <script src="../common.js"></script>
+</body>
+</html>
