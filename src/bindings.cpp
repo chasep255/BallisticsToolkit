@@ -15,11 +15,31 @@
 using namespace emscripten;
 using namespace btk::ballistics;
 
+// Wrapper function to convert std::pair to RingInfo
+struct RingInfo {
+    Distance inner;
+    Distance outer;
+    
+    // Default constructor for embind
+    RingInfo() : inner(Distance::zero()), outer(Distance::zero()) {}
+    
+    // Constructor from pair
+    RingInfo(const std::pair<Distance, Distance>& pair) 
+        : inner(pair.first), outer(pair.second) {}
+};
+
+RingInfo getRingInfoWrapper(const Target& target, int ring) {
+    auto pair = target.getRingInfo(ring);
+    return RingInfo(pair);
+}
+
 EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 {
     // Unit types - only static factory methods
     class_<Distance>("Distance")
         .class_function("meters", &Distance::meters)
+        .class_function("centimeters", &Distance::centimeters)
+        .class_function("millimeters", &Distance::millimeters)
         .class_function("yards", &Distance::yards)
         .class_function("feet", &Distance::feet)
         .class_function("inches", &Distance::inches)
@@ -29,18 +49,22 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
         .class_function("nan", &Distance::nan)
         // Instance getters
         .function("getMeters", select_overload<double() const>(&Distance::meters))
+        .function("getCentimeters", select_overload<double() const>(&Distance::centimeters))
+        .function("getMillimeters", select_overload<double() const>(&Distance::millimeters))
         .function("getYards", select_overload<double() const>(&Distance::yards))
         .function("getFeet", select_overload<double() const>(&Distance::feet))
         .function("getInches", select_overload<double() const>(&Distance::inches));
 
     class_<Weight>("Weight")
         .class_function("grains", &Weight::grains)
+        .class_function("grams", &Weight::grams)
         .class_function("pounds", &Weight::pounds)
         .class_function("kilograms", &Weight::kilograms)
         .class_function("zero", &Weight::zero)
         .class_function("nan", &Weight::nan)
         // Instance getters
         .function("getGrains", select_overload<double() const>(&Weight::grains))
+        .function("getGrams", select_overload<double() const>(&Weight::grams))
         .function("getPounds", select_overload<double() const>(&Weight::pounds))
         .function("getKilograms", select_overload<double() const>(&Weight::kilograms));
 
@@ -284,4 +308,12 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     register_vector<Hit>("HitVector");
     register_vector<ShotResult>("ShotResultVector");
     register_vector<std::string>("StringVector");
+    
+    // Register RingInfo struct
+    value_object<RingInfo>("RingInfo")
+        .field("inner", &RingInfo::inner)
+        .field("outer", &RingInfo::outer);
+    
+    // Add wrapper function to convert std::pair to RingInfo
+    function("getRingInfoWrapper", &getRingInfoWrapper);
 }

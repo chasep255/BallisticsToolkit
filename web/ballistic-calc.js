@@ -155,6 +155,10 @@ class BallisticsCalculator {
                 const dropMeters = bulletHeightMeters - scopeHeightMeters;
                 const dropMrad = range > 0 ? (dropMeters / rangeMeters) * 1000 : 0;
                 
+                // Convert mrad to MOA using C++ units system
+                const dropAngleMrad = this.Module.Angle.mrad(dropMrad);
+                const dropMoa = dropAngleMrad.getMoa();
+                
                 const driftMeters = position.y.getMeters(); // Y is crosswind drift
                 const driftMrad = range > 0 ? (driftMeters / rangeMeters) * 1000 : 0;
                 
@@ -171,6 +175,7 @@ class BallisticsCalculator {
                 trajectoryData.push({
                     range: range,
                     drop: dropMrad,
+                    dropMoa: dropMoa,
                     drift: driftMrad,
                     driftText: driftText,
                     velocity: velocity.getFps(),

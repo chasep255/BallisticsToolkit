@@ -96,7 +96,6 @@ class TargetSimulator {
         
         // Zoom controls
         document.getElementById('resetZoom').addEventListener('click', () => this.resetZoom());
-        document.getElementById('resetZoomTarget').addEventListener('click', () => this.resetZoom());
         
         // Canvas interactions
         this.canvas.addEventListener('wheel', (e) => this.onMouseWheel(e));
@@ -132,12 +131,6 @@ class TargetSimulator {
             }
         }
 
-        // Validate pressure if provided
-        const pressure = document.getElementById('pressure').value;
-        if (pressure && (isNaN(parseFloat(pressure)) || parseFloat(pressure) < 0)) {
-            alert('Invalid pressure value');
-            return false;
-        }
 
         return true;
     }
@@ -202,8 +195,6 @@ class TargetSimulator {
         const altitude = parseFloat(document.getElementById('altitude').value);
         const temperature = parseFloat(document.getElementById('temperature').value);
         const humidity = parseFloat(document.getElementById('humidity').value);
-        const pressure = document.getElementById('pressure').value;
-
         // Create bullet
         const bullet = new this.Module.Bullet(
             this.Module.Weight.grains(0), // Weight not used in 3DOF
@@ -217,13 +208,8 @@ class TargetSimulator {
         // Create atmosphere
         const temp = this.Module.Temperature.fahrenheit(temperature);
         const alt = this.Module.Distance.feet(altitude);
-        let press;
-        if (pressure && pressure.trim() !== '') {
-            press = this.Module.Pressure.psi(parseFloat(pressure) * 0.491154); // Convert inHg to psi
-        } else {
-            // Use standard pressure at altitude if not specified
-            press = this.Module.Pressure.zero(); // This will be calculated automatically
-        }
+        // Use automatic pressure calculation at altitude
+        const press = this.Module.Pressure.zero(); // This will be calculated automatically
         
         const atmosphere = new this.Module.Atmosphere(temp, alt, humidity, press);
 
@@ -232,6 +218,9 @@ class TargetSimulator {
         if (!target) {
             throw new Error(`Unknown target: ${targetName}`);
         }
+
+        // Update ring sizes display
+        this.updateRingSizesDisplay(target);
 
         // Create simulator
         const rifleAccuracyMrad = this.Module.Angle.moa(rifleAccuracy).getMrad();
@@ -353,7 +342,8 @@ class TargetSimulator {
         const target = this.simulator.getTarget();
         
         // Calculate scale
-        const referenceDiameter = target.ringDiameter(8).getInches() * 2; // 8-ring diameter
+        const ring8Info = this.Module.getRingInfoWrapper(target, 8);
+        const referenceDiameter = ring8Info.inner.getInches() * 2; // 8-ring diameter
         const baseScale = Math.min(this.canvas.width, this.canvas.height) * 0.85 / referenceDiameter;
         this.targetScale = baseScale * this.zoomFactor;
 
@@ -372,7 +362,8 @@ class TargetSimulator {
         ];
 
         for (const spec of ringSpecs) {
-            const radiusInches = target.ringDiameter(spec.ring).getInches() / 2;
+            const ringInfo = this.Module.getRingInfoWrapper(target, spec.ring);
+            const radiusInches = ringInfo.inner.getInches() / 2;
             const radiusPixels = radiusInches * this.targetScale;
 
             // Draw filled circle
@@ -514,6 +505,9 @@ class TargetSimulator {
             this.redrawTarget();
         }
 
+        // Update mouse position display
+        this.updateMousePosition(e.offsetX, e.offsetY);
+
         // Check for tooltip
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -607,6 +601,83 @@ class TargetSimulator {
         } else {
             this.elements.liveScore.textContent = `Estimated Avg Match Score: --- | Shots: 0/${totalShotsAllMatches}`;
         }
+    }
+
+    updateRingSizesDisplay(target) {
+        const ringSizesBox = document.getElementById('ringSizesBox');
+        const ringSizesContent = document.getElementById('ringSizesContent');
+        if (!ringSizesBox || !ringSizesContent) return;
+
+        try {
+            // Get ring info from the target using wrapper function
+            const ring10 = this.Module.getRingInfoWrapper(target, 10);
+            const ring9 = this.Module.getRingInfoWrapper(target, 9);
+            const ring8 = this.Module.getRingInfoWrapper(target, 8);
+            const ring7 = this.Module.getRingInfoWrapper(target, 7);
+            const ring6 = this.Module.getRingInfoWrapper(target, 6);
+            const ring5 = this.Module.getRingInfoWrapper(target, 5);
+            const ring4 = this.Module.getRingInfoWrapper(target, 4);
+            const ring3 = this.Module.getRingInfoWrapper(target, 3);
+            const ring2 = this.Module.getRingInfoWrapper(target, 2);
+            const ring1 = this.Module.getRingInfoWrapper(target, 1);
+
+            // Build ring sizes display, only showing non-zero rings
+            let ringSizesHtml = '';
+            const rings = [
+                { num: 10, info: ring10 },
+                { num: 9, info: ring9 },
+                { num: 8, info: ring8 },
+                { num: 7, info: ring7 },
+                { num: 6, info: ring6 },
+                { num: 5, info: ring5 },
+                { num: 4, info: ring4 },
+                { num: 3, info: ring3 },
+                { num: 2, info: ring2 },
+                { num: 1, info: ring1 }
+            ];
+            
+            rings.forEach(ring => {
+                const diameter = ring.info.inner.getInches();
+                if (diameter > 0) {
+                    ringSizesHtml += `<div>${ring.num}: ${diameter.toFixed(2)}"</div>`;
+                }
+            });
+            
+            ringSizesContent.innerHTML = ringSizesHtml;
+            
+            // Show the ring sizes box
+            ringSizesBox.style.display = 'block';
+        } catch (error) {
+            ringSizesContent.textContent = 'Error loading ring sizes';
+            console.error('Error updating ring sizes:', error);
+        }
+    }
+
+    updateMousePosition(canvasX, canvasY) {
+        const mousePositionBox = document.getElementById('mousePositionBox');
+        const mousePositionContent = document.getElementById('mousePositionContent');
+        if (!mousePositionBox || !mousePositionContent) return;
+
+        // Show the mouse position box
+        mousePositionBox.style.display = 'block';
+
+        // Convert canvas coordinates to target coordinates (inches)
+        // Use the same center calculation as drawTarget()
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        
+        // Apply zoom and pan transformations (same as drawTarget)
+        const worldX = (canvasX - centerX - this.panX) / (this.zoomFactor * this.targetScale);
+        const worldY = (canvasY - centerY - this.panY) / (this.zoomFactor * this.targetScale);
+        
+        // Convert to inches (assuming 1 unit = 1 inch at scale 1.0)
+        const inchesX = worldX;
+        const inchesY = -worldY; // Flip Y axis (canvas Y increases downward)
+        
+        // Update display
+        mousePositionContent.innerHTML = `
+            ${inchesX.toFixed(1)}", ${inchesY.toFixed(1)}"
+        `;
     }
 
     showResultsInLog() {
