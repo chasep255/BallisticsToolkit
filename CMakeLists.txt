@@ -34,11 +34,8 @@ target_include_directories(ballistics_wasm PRIVATE include)
 
 # Copy web files to build/web directory
 add_custom_command(TARGET ballistics_wasm POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/web
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/web ${CMAKE_BINARY_DIR}/web
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:ballistics_wasm> ${CMAKE_BINARY_DIR}/web/
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/ballistics_wasm.wasm ${CMAKE_BINARY_DIR}/web/
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/web/index.html ${CMAKE_BINARY_DIR}/web/
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/web/target_sim.js ${CMAKE_BINARY_DIR}/web/
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/web/test.html ${CMAKE_BINARY_DIR}/web/
-    COMMENT "Copying WebAssembly files to web directory"
+    COMMENT "Copying web files and WebAssembly"
 )
