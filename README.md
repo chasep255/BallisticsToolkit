@@ -12,7 +12,8 @@ Professional web-based ballistics calculator and match simulation suite for long
 - **Wind Correction** - Full 3D wind modeling with intuitive clock-based direction
 - **Client-Side Performance** - WebAssembly for fast calculations, no server needed
 - **Comprehensive Output** - Drop, drift, velocity, energy, and time of flight
-- **Cookie Persistence** - Saves your inputs for next session
+- **Interactive Tooltips** - Helpful hover descriptions for all parameters
+- **Flexible Units** - Display angles in milliradians or MOA
 
 ### 🎲 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
@@ -25,17 +26,17 @@ Professional web-based ballistics calculator and match simulation suite for long
 ## Quick Start
 
 ### Ballistic Calculator
-Visit the [live calculator](https://chasep255.github.io/BallisticsToolkit/) and enter your:
+Visit the [live calculator](https://chasep255.github.io/BallisticsToolkit/ballistic-calc/ballistic-calc.html) and enter your:
 
 1. **Bullet specs** - Weight, diameter, BC, drag function
 2. **Conditions** - Temperature, pressure, humidity, altitude  
 3. **Wind** - Speed and direction (12=pushes forward, 3=pushes right, 6=pushes backward, 9=pushes left)
 4. **Shot data** - Muzzle velocity, zero range, scope height
 
-Results display drop and drift corrections in milliradians for precise long-range adjustments.
+Results display drop and drift corrections in your choice of milliradians or MOA for precise long-range adjustments.
 
 ### Target Simulator
-Navigate to the [Target Simulator](https://chasep255.github.io/BallisticsToolkit/target-sim.html) for match simulation:
+Navigate to the [Target Simulator](https://chasep255.github.io/BallisticsToolkit/target-sim/target-sim.html) for match simulation:
 
 1. **Bullet Parameters** - BC, muzzle velocity, diameter, drag function
 2. **Match Setup** - Target selection, range, shots per match, number of matches
