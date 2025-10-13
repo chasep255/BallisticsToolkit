@@ -12,8 +12,6 @@ Professional web-based ballistics calculator and match simulation suite for long
 - **Wind Correction** - Full 3D wind modeling with intuitive clock-based direction
 - **Client-Side Performance** - WebAssembly for fast calculations, no server needed
 - **Comprehensive Output** - Drop, drift, velocity, energy, and time of flight
-- **Interactive Tooltips** - Helpful hover descriptions for all parameters
-- **Flexible Units** - Display angles in milliradians or MOA
 
 ### 🎲 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
@@ -21,7 +19,6 @@ Professional web-based ballistics calculator and match simulation suite for long
 - **Realistic Variability** - Muzzle velocity, wind, and rifle accuracy modeling
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
 - **Match Scoring** - Complete NRA scoring with X-counts and group size analysis
-- **Professional Logging** - Terminal-style log with detailed shot data
 
 ## Quick Start
 

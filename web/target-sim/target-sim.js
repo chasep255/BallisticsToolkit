@@ -325,10 +325,10 @@ class TargetSimulator {
 
         const target = this.simulator.getTarget();
         
-        // Calculate scale
+        // Calculate scale based on container width
         const ring8Info = this.btk.getRingInfoWrapper(target, 8);
         const referenceDiameter = ring8Info.inner.getInches() * 2; // 8-ring diameter
-        const baseScale = Math.min(this.canvas.width, this.canvas.height) * 0.85 / referenceDiameter;
+        const baseScale = this.canvas.width * 0.85 / referenceDiameter; // Use width for scaling
         this.targetScale = baseScale * this.zoomFactor;
 
         // Calculate center with pan
