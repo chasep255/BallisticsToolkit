@@ -12,15 +12,16 @@ namespace btk
         // Atmosphere implementation
         Atmosphere::Atmosphere()
             : temperature_(Temperature::fahrenheit(constants::TEMPERATURE_STANDARD_FAHRENHEIT)),
-              altitude_(Distance::feet(0)), humidity_(0.5), pressure_(nullptr)
+              altitude_(Distance::feet(0)), humidity_(0.5),
+              pressure_(calculateStandardPressure(Distance::feet(0)))
         {
         }
 
         Atmosphere::Atmosphere(const Temperature& temperature, const Distance& altitude, double humidity,
-                               std::shared_ptr<Pressure> pressure)
-            : temperature_(temperature), altitude_(altitude), humidity_(humidity), pressure_(pressure)
+                               const Pressure& pressure)
+            : temperature_(temperature), altitude_(altitude), humidity_(humidity),
+              pressure_(pressure.pascals() > 0 ? pressure : calculateStandardPressure(altitude))
         {
-
             if(humidity < 0.0 || humidity > 1.0)
             {
                 throw std::invalid_argument("Humidity must be between 0.0 and 1.0");
@@ -29,16 +30,7 @@ namespace btk
 
         const Pressure& Atmosphere::getPressure() const
         {
-            if(pressure_)
-            {
-                return *pressure_;
-            }
-            else
-            {
-                // Calculate standard pressure for altitude
-                static Pressure standard_pressure = calculateStandardPressure(altitude_);
-                return standard_pressure;
-            }
+            return pressure_;
         }
 
         double Atmosphere::getAirDensity() const
@@ -91,7 +83,7 @@ namespace btk
                 constants::TEMPERATURE_STANDARD_KELVIN + constants::TEMPERATURE_LAPSE_RATE * altitude_m;
             Temperature temp = Temperature::kelvin(temperature_k);
 
-            return Atmosphere(temp, altitude, 0.5, nullptr);
+            return Atmosphere(temp, altitude, 0.5, Pressure::pascals(0));
         }
 
         std::string Atmosphere::toString() const

@@ -26,7 +26,7 @@ namespace btk::ballistics
          * @param pressure Barometric pressure (nullptr for standard pressure at altitude)
          */
         Atmosphere(const Temperature& temperature, const Distance& altitude, double humidity,
-                   std::shared_ptr<Pressure> pressure = nullptr);
+                   const Pressure& pressure = Pressure::pascals(0));
 
         // Getters
         const Temperature& getTemperature() const
@@ -73,7 +73,7 @@ namespace btk::ballistics
         Temperature temperature_;
         Distance altitude_;
         double humidity_;                    // 0.0 to 1.0
-        std::shared_ptr<Pressure> pressure_; // nullptr means use standard pressure for altitude
+        Pressure pressure_;
 
         /**
          * @brief Calculate standard pressure for given altitude

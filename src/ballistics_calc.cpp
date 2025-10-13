@@ -43,8 +43,8 @@ namespace btk::ballistics_calc
         Distance altitude = Distance::feet(altitude_feet);
         double humidity = humidity_percent / 100.0; // Convert percentage to decimal
         
-        // Create pressure as shared_ptr
-        auto pressure = std::make_shared<Pressure>(Pressure::pascals(pressure_inhg * 3386.39)); // Convert inHg to Pa
+        // Create pressure directly
+        Pressure pressure = Pressure::pascals(pressure_inhg * 3386.39); // Convert inHg to Pa
         
         atmosphere_ = std::make_unique<Atmosphere>(temp, altitude, humidity, pressure);
     }
