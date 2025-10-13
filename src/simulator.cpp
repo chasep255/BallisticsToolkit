@@ -101,7 +101,7 @@ namespace btk::ballistics
     }
 
     // Calculate total acceleration components
-    Acceleration3D Simulator::calculateAcceleration(const FlyingBullet& state,
+    Acceleration3D Simulator::calculateAcceleration(const Bullet& state,
                                                    const Atmosphere& atmosphere,
                                                    const Wind& wind)
     {
@@ -140,7 +140,7 @@ namespace btk::ballistics
     }
 
     // RK2 time step implementation
-    FlyingBullet Simulator::timeStep(const FlyingBullet& state, const Time& dt, const Wind& wind,
+    Bullet Simulator::timeStep(const Bullet& state, const Time& dt, const Wind& wind,
                                      const Atmosphere& atmosphere)
     {
         // Get current state vectors
@@ -163,7 +163,7 @@ namespace btk::ballistics
         double z_half = position.z.meters() + vz_half * (dt_s * 0.5);
 
         // 3. Create midpoint state and recompute acceleration
-        FlyingBullet midpoint_state(state, Distance::meters(x_half), Distance::meters(y_half), Distance::meters(z_half),
+        Bullet midpoint_state(state, Distance::meters(x_half), Distance::meters(y_half), Distance::meters(z_half),
                                     Velocity::mps(vx_half), Velocity::mps(vy_half), Velocity::mps(vz_half),
                                     state.getSpinRate());
 
@@ -185,11 +185,11 @@ namespace btk::ballistics
         // Create new state using Vector3D constructor
         Position3D position_new(Distance::meters(x_new), Distance::meters(y_new), Distance::meters(z_new));
         Velocity3D velocity_new(Velocity::mps(vx_new), Velocity::mps(vy_new), Velocity::mps(vz_new));
-        return FlyingBullet(state, position_new, velocity_new, spin_new);
+        return Bullet(state, position_new, velocity_new, spin_new);
     }
 
     // Compute zeroed initial state
-    ZeroingResult Simulator::computeZeroedInitialState(
+    Bullet Simulator::computeZeroedInitialState(
         const Bullet& bullet, const Velocity& muzzle_velocity, const Distance& scope_height, const Distance& zero_range,
         const Atmosphere& atmosphere, const Wind& wind, const Time& dt, int max_iterations, const Distance& tolerance)
     {
@@ -206,21 +206,23 @@ namespace btk::ballistics
 
             // Start at bore height (z=0)
             Position3D position_init(Distance::meters(0.0), Distance::meters(0.0), Distance::meters(0.0));
-            FlyingBullet test_state(bullet, position_init, velocity_init, AngularVelocity::rpm(0.0));
+            Bullet test_state(bullet, position_init, velocity_init, AngularVelocity::rpm(0.0));
 
             // Simulate slightly past zero range to ensure we can interpolate
             Distance target_dist = zero_range * 1.1;
             Trajectory trajectory = simulateToDistance(test_state, target_dist, wind, atmosphere, dt, Time::seconds(5.0));
 
             // Get state at zero range using interpolation
-            auto point_at_zero = trajectory.atDistance(zero_range);
-            if(!point_at_zero)
+            TrajectoryPoint point_at_zero = trajectory.atDistance(zero_range);
+            
+            // Check if the point is valid (not NaN time)
+            if(std::isnan(point_at_zero.getTime().seconds()))
             {
                 break;
             }
 
             // Want: bullet height at zero_range equals scope height (line of sight)
-            Distance height_error = point_at_zero->getState().getPositionZ() - scope_height;
+            Distance height_error = point_at_zero.getState().getPositionZ() - scope_height;
 
             // Check if we're close enough
             if(std::abs(height_error.meters()) < tolerance.meters())
@@ -240,13 +242,13 @@ namespace btk::ballistics
             muzzle_velocity * std::sin(best_angle.radians())
         );
         Position3D position_final(Distance::meters(0.0), Distance::meters(0.0), Distance::meters(0.0));
-        FlyingBullet initial_state(bullet, position_final, velocity_final, AngularVelocity::rpm(0.0));
+        Bullet initial_state(bullet, position_final, velocity_final, AngularVelocity::rpm(0.0));
 
-        return {initial_state, best_angle};
+        return initial_state;
     }
 
     // Simulate trajectory to target distance
-    Trajectory Simulator::simulateToDistance(const FlyingBullet& initial_state, const Distance& target_distance,
+    Trajectory Simulator::simulateToDistance(const Bullet& initial_state, const Distance& target_distance,
                                              const Wind& wind, const Atmosphere& atmosphere, const Time& dt,
                                              const Time& max_time)
     {
@@ -255,7 +257,7 @@ namespace btk::ballistics
         // Add initial point
         trajectory.addPoint(Time::seconds(0.0), initial_state);
 
-        FlyingBullet current_state = initial_state;
+        Bullet current_state = initial_state;
         Time current_time = Time::seconds(0.0);
 
         while(current_time < max_time)

@@ -13,7 +13,7 @@ namespace btk::ballistics
      */
     struct ZeroingResult
     {
-        FlyingBullet initial_state;
+        Bullet initial_state;
         Angle elevation_angle;
     };
 
@@ -35,7 +35,7 @@ namespace btk::ballistics
          * @param atmosphere Atmospheric conditions
          * @return New flying bullet state after time step
          */
-        static FlyingBullet timeStep(const FlyingBullet& state, const Time& dt, const Wind& wind,
+        static Bullet timeStep(const Bullet& state, const Time& dt, const Wind& wind,
                                      const Atmosphere& atmosphere);
 
         /**
@@ -53,7 +53,7 @@ namespace btk::ballistics
          * @return Complete trajectory
          * @throws std::runtime_error if simulation fails
          */
-        static Trajectory simulateToDistance(const FlyingBullet& initial_state, const Distance& target_distance,
+        static Trajectory simulateToDistance(const Bullet& initial_state, const Distance& target_distance,
                                              const Wind& wind, const Atmosphere& atmosphere,
                                              const Time& dt = Time::seconds(0.001),
                                              const Time& max_time = Time::seconds(60.0));
@@ -70,10 +70,10 @@ namespace btk::ballistics
          * @param dt Time step (default: 0.001 seconds)
          * @param max_iterations Maximum iterations (default: 20)
          * @param tolerance Convergence tolerance (default: 0.001 meters)
-         * @return ZeroingResult with initial state and elevation angle
+         * @return Bullet with zeroed initial state
          * @throws std::runtime_error if convergence fails
          */
-        static ZeroingResult computeZeroedInitialState(
+        static Bullet computeZeroedInitialState(
             const Bullet& bullet, const Velocity& muzzle_velocity, const Distance& scope_height,
             const Distance& zero_range, const Atmosphere& atmosphere, const Wind& wind = Wind::calm(),
             const Time& dt = Time::seconds(0.001), int max_iterations = 20,
@@ -101,7 +101,7 @@ namespace btk::ballistics
          * @param wind Wind conditions
          * @return Acceleration3D with x, y, z components
          */
-        static Acceleration3D calculateAcceleration(const FlyingBullet& state,
+        static Acceleration3D calculateAcceleration(const Bullet& state,
                                                    const Atmosphere& atmosphere,
                                                    const Wind& wind);
 

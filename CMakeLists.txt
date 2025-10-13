@@ -13,22 +13,24 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# WebAssembly linker flags
+# WebAssembly linker flags for embind
 set(CMAKE_EXECUTABLE_SUFFIX ".js")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','stackAlloc','stackSave','stackRestore']")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_FUNCTIONS=['_malloc','_free','_ballistics_calc_create','_ballistics_calc_destroy','_ballistics_calc_set_bullet','_ballistics_calc_set_atmosphere','_ballistics_calc_set_wind','_ballistics_calc_calculate_trajectory','_ballistics_calc_free_trajectory','_ballistics_calc_get_trajectory_point','_ballistics_calc_get_trajectory_point_count']")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORTED_FUNCTIONS=['_malloc','_free']")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s ALLOW_MEMORY_GROWTH=1")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s MODULARIZE=1")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORT_NAME='WebUI'")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORT_NAME='BallisticsToolkit'")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s DISABLE_EXCEPTION_CATCHING=0")
-
-# WebAssembly executable
+# WebAssembly executable with embind
 add_executable(ballistics_wasm
+    src/bindings.cpp
     src/atmosphere.cpp
     src/trajectory.cpp
     src/simulator.cpp
-    src/ballistics_calc.cpp
 )
+
+# Link embind library
+target_link_libraries(ballistics_wasm embind)
 
 target_include_directories(ballistics_wasm PRIVATE include)
 

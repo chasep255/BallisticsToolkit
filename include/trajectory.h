@@ -20,14 +20,14 @@ namespace btk::ballistics
          * @param time Time at this point
          * @param state Flying bullet state at this point
          */
-        TrajectoryPoint(const Time& time, const FlyingBullet& state);
+        TrajectoryPoint(const Time& time, const Bullet& state);
 
         // Getters
         const Time& getTime() const
         {
             return time_;
         }
-        const FlyingBullet& getState() const
+        const Bullet& getState() const
         {
             return state_;
         }
@@ -51,7 +51,7 @@ namespace btk::ballistics
 
         private:
         Time time_;
-        FlyingBullet state_;
+        Bullet state_;
     };
 
     /**
@@ -71,7 +71,7 @@ namespace btk::ballistics
          * @param time Time at this point
          * @param state Flying bullet state at this point
          */
-        void addPoint(const Time& time, const FlyingBullet& state);
+        void addPoint(const Time& time, const Bullet& state);
 
         /**
          * @brief Get the number of points in the trajectory
@@ -102,9 +102,9 @@ namespace btk::ballistics
          * @brief Get the trajectory point at a specific distance
          *
          * @param distance Distance along trajectory
-         * @return Trajectory point at the given distance (interpolated), or std::nullopt if not found
+         * @return Trajectory point at the given distance (interpolated), or TrajectoryPoint with NaN time if not found
          */
-        std::optional<TrajectoryPoint> atDistance(const Distance& distance) const;
+        TrajectoryPoint atDistance(const Distance& distance) const;
 
         /**
          * @brief Get the trajectory point at a specific time
@@ -165,7 +165,7 @@ namespace btk::ballistics
          * @param distance Target distance
          * @return Interpolated flying bullet state
          */
-        FlyingBullet interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2,
+        Bullet interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2,
                                  const Distance& distance) const;
     };
 

@@ -11,7 +11,7 @@ namespace btk
     {
 
         // TrajectoryPoint implementation
-        TrajectoryPoint::TrajectoryPoint(const Time& time, const FlyingBullet& state) : time_(time), state_(state)
+        TrajectoryPoint::TrajectoryPoint(const Time& time, const Bullet& state) : time_(time), state_(state)
         {
         }
 
@@ -48,7 +48,7 @@ namespace btk
         {
         }
 
-        void Trajectory::addPoint(const Time& time, const FlyingBullet& state)
+        void Trajectory::addPoint(const Time& time, const Bullet& state)
         {
             points_.emplace_back(time, state);
         }
@@ -62,11 +62,11 @@ namespace btk
             return points_[index];
         }
 
-        std::optional<TrajectoryPoint> Trajectory::atDistance(const Distance& distance) const
+        TrajectoryPoint Trajectory::atDistance(const Distance& distance) const
         {
             if(points_.empty())
             {
-                return std::nullopt;
+                return TrajectoryPoint(Time::nan(), Bullet(Weight::zero(), Distance::zero(), Distance::zero(), 0.0));
             }
 
             double target_distance_m = distance.meters();
@@ -88,7 +88,7 @@ namespace btk
                     );
                     
                     // Interpolate state
-                    FlyingBullet interp_state = interpolate(points_[i], points_[i + 1], distance);
+                    Bullet interp_state = interpolate(points_[i], points_[i + 1], distance);
                     
                     return TrajectoryPoint(interp_time, interp_state);
                 }
@@ -100,7 +100,9 @@ namespace btk
                 return points_.back();
             }
 
-            return std::nullopt;
+            // Return TrajectoryPoint with NaN time to signal invalid
+            Bullet dummyBullet(Weight::zero(), Distance::zero(), Distance::zero(), 0.0);
+            return TrajectoryPoint(Time::nan(), dummyBullet);
         }
 
         std::optional<TrajectoryPoint> Trajectory::atTime(const Time& time) const
@@ -123,8 +125,8 @@ namespace btk
                     // Linear interpolation between the two points
                     double t = (target_time_s - time1) / (time2 - time1);
 
-                    const FlyingBullet& state1 = points_[i].getState();
-                    const FlyingBullet& state2 = points_[i + 1].getState();
+                    const Bullet& state1 = points_[i].getState();
+                    const Bullet& state2 = points_[i + 1].getState();
 
                     // Interpolate position
                     Distance x =
@@ -150,7 +152,7 @@ namespace btk
                         state1.getSpinRate().radians_per_second() +
                         t * (state2.getSpinRate().radians_per_second() - state1.getSpinRate().radians_per_second()));
 
-                    FlyingBullet interp_state(state1, x, y, z, vx, vy, vz, spin);
+                    Bullet interp_state(state1, x, y, z, vx, vy, vz, spin);
                     
                     return TrajectoryPoint(time, interp_state);
                 }
@@ -219,7 +221,7 @@ namespace btk
                 return Angle::radians(0.0);
             }
 
-            const FlyingBullet& impact_state = points_.back().getState();
+            const Bullet& impact_state = points_.back().getState();
             double vx = impact_state.getVelocityX().mps();
             double vz = impact_state.getVelocityZ().mps();
 
@@ -241,7 +243,7 @@ namespace btk
             return oss.str();
         }
 
-        FlyingBullet Trajectory::interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2,
+        Bullet Trajectory::interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2,
                                              const Distance& distance) const
         {
             double dist1 = point1.getDistance().meters();
@@ -256,8 +258,8 @@ namespace btk
 
             double t = (target_dist - dist1) / (dist2 - dist1);
 
-            const FlyingBullet& state1 = point1.getState();
-            const FlyingBullet& state2 = point2.getState();
+            const Bullet& state1 = point1.getState();
+            const Bullet& state2 = point2.getState();
 
             // Interpolate position
             Distance x = Distance::meters(state1.getPositionX().meters() +
@@ -280,7 +282,7 @@ namespace btk
                 state1.getSpinRate().radians_per_second() +
                 t * (state2.getSpinRate().radians_per_second() - state1.getSpinRate().radians_per_second()));
 
-            return FlyingBullet(state1, x, y, z, vx, vy, vz, spin);
+            return Bullet(state1, x, y, z, vx, vy, vz, spin);
         }
 
     } // namespace ballistics

@@ -85,6 +85,17 @@ namespace btk::ballistics
         {
             return Derived(value);
         }
+        
+        // Static factory methods for common values
+        static constexpr Derived zero()
+        {
+            return Derived(0.0);
+        }
+        
+        static constexpr Derived nan()
+        {
+            return Derived(std::numeric_limits<double>::quiet_NaN());
+        }
 
         protected:
         explicit constexpr UnitBase(double value) : value_(value)
