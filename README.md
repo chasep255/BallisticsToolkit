@@ -26,7 +26,7 @@ Professional web-based ballistics calculator and match simulation suite for long
 ## Quick Start
 
 ### Ballistic Calculator
-Visit the [live calculator](https://chasep255.github.io/BallisticsToolkit/ballistic-calc/ballistic-calc.html) and enter your:
+Visit the [Ballistic Calculator](https://chasep255.github.io/BallisticsToolkit/ballistic-calc/ballistic-calc.html) and enter your:
 
 1. **Bullet specs** - Weight, diameter, BC, drag function
 2. **Conditions** - Temperature, pressure, humidity, altitude  
