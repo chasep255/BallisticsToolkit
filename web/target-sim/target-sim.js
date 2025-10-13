@@ -67,7 +67,6 @@ class TargetSimulator {
             stopBtn: document.getElementById('stopBtn'),
             status: document.getElementById('status'),
             liveScore: document.getElementById('liveScore'),
-            logContent: document.getElementById('logContent'),
             canvas: document.getElementById('targetCanvas'),
             tooltip: document.getElementById('tooltip')
         };
@@ -120,7 +119,7 @@ class TargetSimulator {
             rifleAccuracy: parseFloat(document.getElementById('rifleAccuracy').value),
             altitude: parseFloat(document.getElementById('altitude').value),
             temperature: parseFloat(document.getElementById('temperature').value),
-            humidity: parseFloat(document.getElementById('humidity').value)
+            humidity: parseFloat(document.getElementById('humidity').value) / 100.0
         };
 
         // Validate all inputs
@@ -159,9 +158,6 @@ class TargetSimulator {
             
             // Start simulation
             this.isRunning = true;
-            this.addLogText(`\n${'═'.repeat(60)}\n`);
-            this.addLogText(`🎯 MATCH ${this.currentMatch} STARTING\n`);
-            this.addLogText(`${'═'.repeat(60)}\n`);
             this.fireNextShot();
             
         } catch (error) {
@@ -194,7 +190,7 @@ class TargetSimulator {
         const rifleAccuracy = parseFloat(document.getElementById('rifleAccuracy').value);
         const altitude = parseFloat(document.getElementById('altitude').value);
         const temperature = parseFloat(document.getElementById('temperature').value);
-        const humidity = parseFloat(document.getElementById('humidity').value);
+        const humidity = parseFloat(document.getElementById('humidity').value) / 100.0;
         // Create bullet
         const bullet = new this.btk.Bullet(
             this.btk.Weight.grains(0), // Weight not used in 3DOF
@@ -266,7 +262,6 @@ class TargetSimulator {
 
             // Update display
             this.drawShotImpact(shot);
-            this.logShot(shot, this.currentShot);
             this.updateLiveScore();
 
             // Check if match is complete
@@ -288,7 +283,6 @@ class TargetSimulator {
         // Get match result
         const result = this.simulator.getMatchResult();
         this.allResults.push(result);
-        this.logMatchResult(this.currentMatch, result);
 
         // Clear shots for next match
         this.simulator.clearShots();
@@ -304,9 +298,6 @@ class TargetSimulator {
             this.elements.status.textContent = `Match ${this.currentMatch}/${this.totalMatches}`;
 
             // Log match header
-            this.addLogText(`\n${'═'.repeat(60)}\n`);
-            this.addLogText(`🎯 MATCH ${this.currentMatch} STARTING\n`);
-            this.addLogText(`${'═'.repeat(60)}\n`);
 
             // Schedule next shot
             setTimeout(() => this.fireNextShot(), 50);
@@ -320,12 +311,10 @@ class TargetSimulator {
         this.elements.stopBtn.disabled = true;
 
         // Show results in log
-        this.showResultsInLog();
     }
 
     clearResults() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.elements.logContent.innerHTML = '';
         this.currentShots = [];
         this.allShots = [];
         this.shotItems.clear();
@@ -545,38 +534,8 @@ class TargetSimulator {
         this.elements.tooltip.style.display = 'none';
     }
 
-    addLogText(text) {
-        // Create a span element for better formatting control
-        const span = document.createElement('span');
-        span.textContent = text;
-        this.elements.logContent.appendChild(span);
-        this.elements.logContent.scrollTop = this.elements.logContent.scrollHeight;
-    }
 
-    logShot(shot, shotNum) {
-        const scoreDisplay = shot.isX ? `${shot.score}x` : shot.score.toString();
-        const xPos = shot.impactX.getInches().toFixed(2);
-        const yPos = shot.impactY.getInches().toFixed(2);
-        const mv = shot.actualMv.getFps().toFixed(0);
-        const iv = shot.impactVelocity.getFps().toFixed(0);
-        
-        let text = `Shot ${shotNum.toString().padStart(2)}: `;
-        text += `X=${xPos}" Y=${yPos}" `;
-        text += `Score=${scoreDisplay} `;
-        text += `MV=${mv} IV=${iv} `;
-        text += `Wind=(${shot.windDownrange.getMph().toFixed(1)},${shot.windCrossrange.getMph().toFixed(1)},${shot.windVertical.getMph().toFixed(1)}) mph\n`;
-        this.addLogText(text);
-    }
 
-    logMatchResult(matchNum, result) {
-        let text = `\n${'─'.repeat(50)}\n`;
-        text += `🎯 Match ${matchNum} Summary\n`;
-        text += `${'─'.repeat(50)}\n`;
-        text += `  Total Score: ${result.totalScore}-${result.xCount}x\n`;
-        text += `  Group Size: ${result.groupSize.getInches().toFixed(2)}"\n`;
-        text += `\n`;
-        this.addLogText(text);
-    }
 
     updateLiveScore() {
         if (this.allShots.length === 0) {
@@ -689,51 +648,6 @@ class TargetSimulator {
         `;
     }
 
-    showResultsInLog() {
-        if (!this.allResults || this.allResults.length === 0) {
-            return;
-        }
-
-        const totalShots = this.allResults.reduce((sum, result) => sum + result.shots.length, 0);
-        const scores = this.allResults.map(result => result.totalScore);
-        const xCounts = this.allResults.map(result => result.xCount);
-        const groupSizes = this.allResults.map(result => result.groupSize.getInches());
-
-        let text = '='.repeat(60) + '\n';
-        text += 'FINAL SUMMARY\n';
-        text += '='.repeat(60) + '\n';
-        text += `Matches Simulated: ${this.allResults.length}\n`;
-        text += `Total Shots: ${totalShots}\n\n`;
-
-        text += 'SCORE STATISTICS:\n';
-        text += `  Mean:   ${this.mean(scores).toFixed(1)}\n`;
-        text += `  Median: ${this.median(scores).toFixed(1)}\n`;
-        text += `  StdDev: ${this.stdDev(scores).toFixed(2)}\n`;
-        text += `  Min:    ${Math.min(...scores)}\n`;
-        text += `  Max:    ${Math.max(...scores)}\n\n`;
-
-        text += 'X-COUNT STATISTICS:\n';
-        text += `  Mean:   ${this.mean(xCounts).toFixed(1)}\n`;
-        text += `  Median: ${this.median(xCounts).toFixed(1)}\n`;
-        text += `  StdDev: ${this.stdDev(xCounts).toFixed(2)}\n`;
-        text += `  Min:    ${Math.min(...xCounts)}\n`;
-        text += `  Max:    ${Math.max(...xCounts)}\n\n`;
-
-        text += 'GROUP SIZE STATISTICS (inches):\n';
-        text += `  Mean:   ${this.mean(groupSizes).toFixed(2)}\n`;
-        text += `  Median: ${this.median(groupSizes).toFixed(2)}\n`;
-        text += `  StdDev: ${this.stdDev(groupSizes).toFixed(2)}\n`;
-        text += `  Min:    ${Math.min(...groupSizes).toFixed(2)}\n`;
-        text += `  Max:    ${Math.max(...groupSizes).toFixed(2)}\n\n`;
-
-        text += 'INDIVIDUAL MATCH RESULTS:\n';
-        text += '-'.repeat(40) + '\n';
-        this.allResults.forEach((result, i) => {
-            text += `Match ${i + 1}: ${result.totalScore}-${result.xCount}x (Group: ${result.groupSize.getInches().toFixed(2)}")\n`;
-        });
-
-        this.addLogText('\n' + text);
-    }
 
     mean(arr) {
         return arr.reduce((sum, val) => sum + val, 0) / arr.length;

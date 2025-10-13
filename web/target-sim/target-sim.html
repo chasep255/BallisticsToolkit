@@ -8,23 +8,27 @@
     <style>
         html, body {
             height: 100vh;
-            overflow: hidden; /* prevent page scroll */
+            overflow: auto; /* allow scrolling when needed */
         }
         body {
             display: flex;
             flex-direction: column;
         }
         .container {
-            display: flex;
-            flex-direction: column;
-            flex: 1; /* fill remaining space under the nav */
-            height: auto; /* let flex control the height */
-            gap: 6px;
-            padding: 6px;
-            max-width: 100vw;
+            max-width: 1200px;
             width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             box-sizing: border-box;
-            overflow: hidden;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
         }
 
         /* Top parameters bar - double stacked */
@@ -46,11 +50,27 @@
             display: none; /* Hide the header controls completely */
         }
 
-        .main-content { display:flex; flex:1; gap:8px; min-height:0; overflow:hidden; }
+        .main-content { 
+            display: flex; 
+            gap: 20px; 
+            margin-top: 20px;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+        }
 
-        /* Right Panel - Target and Log */
-        .main-panel { flex:1; display:flex; gap:10px; min-width:0; min-height:0; }
-        .target-panel { flex:1.6; background:white; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); padding:10px; display:flex; flex-direction:column; min-width:0; min-height:0; }
+        /* Target Panel */
+        .target-panel { 
+            flex: 1; 
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            min-width: 0; 
+            min-height: 0; 
+        }
         
         .target-status-bar {
             display: flex;
@@ -72,7 +92,18 @@
         .live-score { background:#28a745; color:white; padding:4px 8px; border-radius:4px; font-weight:600; font-size:12px; }
         .status { background:#e9ecef; color:#495057; padding:3px 8px; border-radius:4px; font-size:11px; }
         
-        .target-container { flex:1; position:relative; border:2px solid #333; border-radius:4px; overflow:hidden; background:white; aspect-ratio:1/1; }
+        .target-container { 
+            flex: 1; 
+            position: relative; 
+            border: 2px solid #333; 
+            border-radius: 4px; 
+            overflow: hidden; 
+            background: white; 
+            aspect-ratio: 1/1; 
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+        }
         
         .ring-sizes-box {
             position: absolute;
@@ -129,18 +160,48 @@
         #targetCanvas { width:100%; height:100%; cursor:grab; }
         #targetCanvas:active { cursor:grabbing; }
 
-        .log-panel { flex:1.4; background:white; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); display:flex; flex-direction:column; min-width:280px; min-height:0; }
-        .log-header { padding:10px 14px; background:#2d3748; color:#e2e8f0; font-weight:600; font-size:13px; border-radius:8px 8px 0 0; }
-        .log-content { flex:1; padding:6px; font-family:'Consolas','Monaco','Courier New',monospace; font-size:12px; line-height:1.35; overflow-y:auto; background:#1e1e1e; color:#d4d4d4; white-space:pre-wrap; border-radius:0 0 8px 8px; min-height:0; }
 
-        .log-content span { display:block; margin-bottom:2px; }
-        .log-content span:contains("Shot") { color:#4fc3f7; }
-        .log-content span:contains("Summary") { color:#81c784; font-weight:bold; }
-        .log-content span:contains("MATCH") { color:#ffb74d; font-weight:bold; }
 
         .tooltip { position:absolute; background:#2c3e50; color:white; padding:10px; border-radius:4px; font-size:12px; pointer-events:none; z-index:1000; max-width:300px; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
         .loading { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.8); color:white; padding:20px; border-radius:8px; z-index:1000; }
         .loading.show { display:block; }
+
+        /* Mobile responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                min-height: auto;
+                padding: 4px;
+                gap: 4px;
+            }
+            
+            .main-content {
+                flex-direction: column;
+                gap: 4px;
+            }
+            
+            .target-panel {
+                min-height: 300px;
+            }
+            
+            .params-bar {
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                gap: 4px;
+            }
+            
+            .param-item {
+                min-width: 100px;
+            }
+            
+            .param-item label {
+                font-size: 10px;
+            }
+            
+            .param-item input, .param-item select {
+                padding: 4px 6px;
+                font-size: 11px;
+            }
+        }
+
 
     </style>
 </head>
@@ -157,6 +218,8 @@
     </div>
 
     <div class="container">
+        <h1>🎯 Target Simulator</h1>
+        
         <!-- Top Parameters Bar -->
         <div class="params-bar">
             <div class="param-item"><label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label><input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics"></div>
@@ -167,59 +230,50 @@
             <div class="param-item"><label for="range" title="Target range in yards">Range (yd)</label><input type="number" id="range" value="600" step="50" min="100" max="1000" title="Target range in yards"></div>
             <div class="param-item"><label for="shots" title="Number of shots per match">Shots/Match</label><input type="number" id="shots" value="60" step="10" min="10" max="200" title="Number of shots per match"></div>
             <div class="param-item"><label for="matches" title="Number of matches to simulate">Matches</label><input type="number" id="matches" value="10" step="1" min="1" max="100" title="Number of matches to simulate"></div>
-            <div class="param-item"><label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV StdDev (fps)</label><input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps"></div>
-            <div class="param-item"><label for="windSd" title="Crosswind (left/right) component standard deviation in mph - orthogonal to bullet path">Crosswind StdDev (mph)</label><input type="number" id="windSd" value="1.0" step="0.1" min="0" max="20" title="Crosswind (left/right) component standard deviation in mph - orthogonal to bullet path"></div>
-            <div class="param-item"><label for="headwindSd" title="Head/Tail wind component standard deviation in mph - parallel to bullet path">H/T Wind StdDev (mph)</label><input type="number" id="headwindSd" value="0.0" step="0.1" min="0" max="20" title="Head/Tail wind component standard deviation in mph - parallel to bullet path"></div>
-            <div class="param-item"><label for="updraftSd" title="Vertical wind component standard deviation in mph - up/down air movement">Vertical StdDev (mph)</label><input type="number" id="updraftSd" value="0.0" step="0.1" min="0" max="20" title="Vertical wind component standard deviation in mph - up/down air movement"></div>
+            <div class="param-item"><label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label><input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps"></div>
+            <div class="param-item"><label for="windSd" title="Crosswind (left/right) component standard deviation in mph - orthogonal to bullet path">Cross Wind σ (mph)</label><input type="number" id="windSd" value="1.0" step="0.1" min="0" max="20" title="Crosswind (left/right) component standard deviation in mph - orthogonal to bullet path"></div>
+            <div class="param-item"><label for="headwindSd" title="Head/Tail wind component standard deviation in mph - parallel to bullet path">H/T Wind σ (mph)</label><input type="number" id="headwindSd" value="0.0" step="0.1" min="0" max="20" title="Head/Tail wind component standard deviation in mph - parallel to bullet path"></div>
+            <div class="param-item"><label for="updraftSd" title="Vertical wind component standard deviation in mph - up/down air movement">Vert Wind σ (mph)</label><input type="number" id="updraftSd" value="0.0" step="0.1" min="0" max="20" title="Vertical wind component standard deviation in mph - up/down air movement"></div>
             <div class="param-item"><label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label><input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)"></div>
             <div class="param-item"><label for="altitude" title="Altitude in feet above sea level">Alt (ft)</label><input type="number" id="altitude" value="0" step="100" min="0" max="10000" title="Altitude in feet above sea level"></div>
             <div class="param-item"><label for="temperature" title="Temperature in degrees Fahrenheit">Temp (°F)</label><input type="number" id="temperature" value="59" step="1" min="-50" max="120" title="Temperature in degrees Fahrenheit"></div>
-            <div class="param-item"><label for="humidity" title="Relative humidity (0.0 = 0%, 1.0 = 100%)">Humidity</label><input type="number" id="humidity" value="0.5" step="0.1" min="0" max="1" title="Relative humidity (0.0 = 0%, 1.0 = 100%)"></div>
+            <div class="param-item"><label for="humidity" title="Relative humidity percentage">Humidity (%)</label><input type="number" id="humidity" value="50" step="1" min="0" max="100" title="Relative humidity percentage"></div>
         </div>
 
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Right Panel: Target and Log -->
-            <div class="main-panel">
-                <!-- Target Panel -->
-                <div class="target-panel">
-                    <div class="target-status-bar">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <button id="runBtn" class="btn btn-primary">Run Simulation</button>
-                            <button id="stopBtn" class="btn btn-secondary" disabled>Stop</button>
-                            <div id="status" class="status">Ready</div>
-                        </div>
-                        
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <div id="liveScore" class="live-score">Estimated Avg Match Score: --- | Shots: 0/0</div>
-                            <div class="target-controls">
-                                <button id="resetZoom" class="btn btn-secondary">Reset Zoom</button>
-                                <small style="color: #666;">(Mouse wheel to zoom, drag to pan)</small>
-                            </div>
-                        </div>
+            <!-- Target Panel -->
+            <div class="target-panel">
+                <div class="target-status-bar">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button id="runBtn" class="btn btn-primary">Run Simulation</button>
+                        <button id="stopBtn" class="btn btn-secondary" disabled>Stop</button>
+                        <div id="status" class="status">Ready</div>
                     </div>
-                    <div class="target-container">
-                        <div id="ringSizesBox" class="ring-sizes-box" style="display: none;">
-                            <div class="ring-sizes-title">Ring Sizes</div>
-                            <div id="ringSizesContent" class="ring-sizes-content">
-                                Select a target to see ring sizes
-                            </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div id="liveScore" class="live-score">Estimated Avg Match Score: --- | Shots: 0/0</div>
+                        <div class="target-controls">
+                            <button id="resetZoom" class="btn btn-secondary">Reset Zoom</button>
+                            <small style="color: #666;">(Mouse wheel to zoom, drag to pan)</small>
                         </div>
-                        <div id="mousePositionBox" class="mouse-position-box" style="display: none;">
-                            <div class="mouse-position-title">Mouse Position</div>
-                            <div id="mousePositionContent" class="mouse-position-content">
-                                X: 0.00"<br>Y: 0.00"
-                            </div>
-                        </div>
-                        <canvas id="targetCanvas" width="600" height="600"></canvas>
                     </div>
                 </div>
-
-                <!-- Log Panel -->
-                <div class="log-panel">
-                    <div class="log-header">Simulation Log</div>
-                    <div id="logContent" class="log-content"></div>
+                <div class="target-container">
+                    <div id="ringSizesBox" class="ring-sizes-box" style="display: none;">
+                        <div class="ring-sizes-title">Ring Sizes</div>
+                        <div id="ringSizesContent" class="ring-sizes-content">
+                            Select a target to see ring sizes
+                        </div>
+                    </div>
+                    <div id="mousePositionBox" class="mouse-position-box" style="display: none;">
+                        <div class="mouse-position-title">Mouse Position</div>
+                        <div id="mousePositionContent" class="mouse-position-content">
+                            X: 0.00"<br>Y: 0.00"
+                        </div>
+                    </div>
+                    <canvas id="targetCanvas" width="600" height="600"></canvas>
                 </div>
             </div>
         </div>
@@ -230,11 +284,19 @@
         <div>Loading WebAssembly...</div>
     </div>
 
+
     <!-- Tooltip -->
     <div id="tooltip" class="tooltip" style="display: none;"></div>
 
     <script src="../common.js"></script>
     <script src="../ballistics_wasm.js"></script>
     <script src="target-sim.js"></script>
+    
+    <script>
+        // Simple mobile warning
+        if (window.innerWidth <= 768) {
+            alert('⚠️ Mobile Device Detected\n\nThe Target Simulator is optimized for desktop use. You may experience smaller displays and difficult interactions on mobile devices.\n\nFor the best experience, we recommend using a desktop or tablet device.');
+        }
+    </script>
 </body>
 </html>
