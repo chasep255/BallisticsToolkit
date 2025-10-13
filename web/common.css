@@ -156,7 +156,7 @@ body {
 
 .params-bar {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 8px 12px;
     padding: 8px 10px;
     background: #f8f9fa;
@@ -167,7 +167,7 @@ body {
 }
 
 .param-item {
-    min-width: 120px;
+    min-width: 140px;
 }
 
 .param-item label {
@@ -195,7 +195,7 @@ input:focus, select:focus {
 
 /* App-specific container styles */
 .app-container {
-    max-width: 1200px;
+    max-width: 1600px;
     margin: 0 auto;
     background: white;
     padding: 30px;
