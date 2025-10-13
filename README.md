@@ -192,6 +192,26 @@ Format code with:
 5. Format code with `./format.sh`
 6. Submit a pull request
 
+## Deployment
+
+### GitHub Pages
+
+This project is configured to automatically deploy to GitHub Pages on every push to `master`.
+
+**Setup (one-time):**
+1. Go to your repository Settings → Pages
+2. Under "Source", select "GitHub Actions"
+3. Push to master - the site will build and deploy automatically
+
+Your site will be available at: `https://chasep255.github.io/BallisticsToolkit/`
+
+The `.github/workflows/deploy.yml` workflow:
+- Installs Emscripten
+- Builds the WebAssembly
+- Deploys to GitHub Pages
+
+No manual build or deployment needed - just push!
+
 ## License
 
 This project is open source. See LICENSE for details.
