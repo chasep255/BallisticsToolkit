@@ -72,7 +72,7 @@ namespace btk::ballistics
         private:
         Temperature temperature_;
         Distance altitude_;
-        double humidity_;                    // 0.0 to 1.0
+        double humidity_; // 0.0 to 1.0
         Pressure pressure_;
 
         /**

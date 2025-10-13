@@ -166,7 +166,7 @@ namespace btk::ballistics
          * @return Interpolated flying bullet state
          */
         Bullet interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2,
-                                 const Distance& distance) const;
+                           const Distance& distance) const;
     };
 
 } // namespace btk::ballistics

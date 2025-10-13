@@ -81,15 +81,15 @@ namespace btk
                 {
                     // Interpolate between the two points
                     double t = (target_distance_m - dist1) / (dist2 - dist1);
-                    
+
                     // Interpolate time
-                    Time interp_time = Time::seconds(
-                        points_[i].getTime().seconds() + t * (points_[i + 1].getTime().seconds() - points_[i].getTime().seconds())
-                    );
-                    
+                    Time interp_time =
+                        Time::seconds(points_[i].getTime().seconds() +
+                                      t * (points_[i + 1].getTime().seconds() - points_[i].getTime().seconds()));
+
                     // Interpolate state
                     Bullet interp_state = interpolate(points_[i], points_[i + 1], distance);
-                    
+
                     return TrajectoryPoint(interp_time, interp_state);
                 }
             }
@@ -153,7 +153,7 @@ namespace btk
                         t * (state2.getSpinRate().radians_per_second() - state1.getSpinRate().radians_per_second()));
 
                     Bullet interp_state(state1, x, y, z, vx, vy, vz, spin);
-                    
+
                     return TrajectoryPoint(time, interp_state);
                 }
             }
@@ -244,7 +244,7 @@ namespace btk
         }
 
         Bullet Trajectory::interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2,
-                                             const Distance& distance) const
+                                       const Distance& distance) const
         {
             double dist1 = point1.getDistance().meters();
             double dist2 = point2.getDistance().meters();

@@ -27,6 +27,10 @@ add_executable(ballistics_wasm
     src/atmosphere.cpp
     src/trajectory.cpp
     src/simulator.cpp
+    src/target.cpp
+    src/scoring.cpp
+    src/nra_targets.cpp
+    src/match_simulator.cpp
 )
 
 # Link embind library

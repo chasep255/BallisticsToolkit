@@ -2,16 +2,17 @@
 #include <emscripten/val.h>
 
 // Include all our C++ headers
-#include "units.h"
-#include "bullet.h"
 #include "atmosphere.h"
-#include "trajectory.h"
+#include "bullet.h"
 #include "simulator.h"
+#include "trajectory.h"
+#include "units.h"
 
 using namespace emscripten;
 using namespace btk::ballistics;
 
-EMSCRIPTEN_BINDINGS(ballistics_toolkit) {
+EMSCRIPTEN_BINDINGS(ballistics_toolkit)
+{
     // Unit types - only static factory methods
     class_<Distance>("Distance")
         .class_function("meters", &Distance::meters)
@@ -98,9 +99,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit) {
         .function("magnitude", &Velocity3D::magnitude);
 
     // Bullet class
-    enum_<DragFunction>("DragFunction")
-        .value("G1", DragFunction::G1)
-        .value("G7", DragFunction::G7);
+    enum_<DragFunction>("DragFunction").value("G1", DragFunction::G1).value("G7", DragFunction::G7);
 
     class_<Bullet>("Bullet")
         .constructor<Weight, Distance, Distance, double, DragFunction>()

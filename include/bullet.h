@@ -14,7 +14,7 @@ namespace btk::ballistics
      *
      * A bullet can have either a G1 or G7 BC, but not both. The drag_function
      * attribute indicates which one is being used.
-     * 
+     *
      * The bullet can also represent a flying bullet with position, velocity, and spin state.
      */
     class Bullet
@@ -33,8 +33,7 @@ namespace btk::ballistics
                          DragFunction drag_function = DragFunction::G7)
             : weight_(weight), diameter_(diameter), length_(length), bc_(bc), drag_function_(drag_function),
               position_(Distance::zero(), Distance::zero(), Distance::zero()),
-              velocity_(Velocity::zero(), Velocity::zero(), Velocity::zero()),
-              spin_rate_(AngularVelocity::zero()),
+              velocity_(Velocity::zero(), Velocity::zero(), Velocity::zero()), spin_rate_(AngularVelocity::zero()),
               has_flight_state_(false)
         {
         }
@@ -49,9 +48,9 @@ namespace btk::ballistics
          */
         constexpr Bullet(const Bullet& bullet, const Position3D& position, const Velocity3D& velocity,
                          const AngularVelocity& spin_rate)
-            : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), 
-              bc_(bullet.bc_), drag_function_(bullet.drag_function_),
-              position_(position), velocity_(velocity), spin_rate_(spin_rate), has_flight_state_(true)
+            : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_),
+              drag_function_(bullet.drag_function_), position_(position), velocity_(velocity), spin_rate_(spin_rate),
+              has_flight_state_(true)
         {
         }
 
@@ -70,9 +69,8 @@ namespace btk::ballistics
         constexpr Bullet(const Bullet& bullet, const Distance& position_x, const Distance& position_y,
                          const Distance& position_z, const Velocity& velocity_x, const Velocity& velocity_y,
                          const Velocity& velocity_z, const AngularVelocity& spin_rate)
-            : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), 
-              bc_(bullet.bc_), drag_function_(bullet.drag_function_),
-              position_(position_x, position_y, position_z),
+            : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_),
+              drag_function_(bullet.drag_function_), position_(position_x, position_y, position_z),
               velocity_(velocity_x, velocity_y, velocity_z), spin_rate_(spin_rate), has_flight_state_(true)
         {
         }
@@ -111,11 +109,13 @@ namespace btk::ballistics
 
         std::string toString() const
         {
-            if (has_flight_state_) {
+            if(has_flight_state_)
+            {
                 return std::to_string(weight_.grains()) + "gr, BC=" + std::to_string(bc_) +
-                       (drag_function_ == DragFunction::G1 ? " (G1)" : " (G7)") + 
-                       " at " + position_.toString() + " m";
-            } else {
+                       (drag_function_ == DragFunction::G1 ? " (G1)" : " (G7)") + " at " + position_.toString() + " m";
+            }
+            else
+            {
                 return std::to_string(weight_.grains()) + "gr, BC=" + std::to_string(bc_) +
                        (drag_function_ == DragFunction::G1 ? " (G1)" : " (G7)");
             }
@@ -123,16 +123,18 @@ namespace btk::ballistics
 
         std::string toDetailedString() const
         {
-            if (has_flight_state_) {
-                return "Bullet(" + std::to_string(weight_.grains()) + "gr, " + std::to_string(diameter_.inches()) + "\", " +
-                       std::to_string(length_.inches()) + "\", BC=" + std::to_string(bc_) +
-                       (drag_function_ == DragFunction::G1 ? ", G1" : ", G7") + 
-                       ", pos=" + position_.toString() + " m, " +
-                       "vel=" + velocity_.toString() + " m/s, " +
+            if(has_flight_state_)
+            {
+                return "Bullet(" + std::to_string(weight_.grains()) + "gr, " + std::to_string(diameter_.inches()) +
+                       "\", " + std::to_string(length_.inches()) + "\", BC=" + std::to_string(bc_) +
+                       (drag_function_ == DragFunction::G1 ? ", G1" : ", G7") + ", pos=" + position_.toString() +
+                       " m, " + "vel=" + velocity_.toString() + " m/s, " +
                        "spin=" + std::to_string(spin_rate_.radians_per_second()) + " rad/s)";
-            } else {
-                return "Bullet(" + std::to_string(weight_.grains()) + "gr, " + std::to_string(diameter_.inches()) + "\", " +
-                       std::to_string(length_.inches()) + "\", BC=" + std::to_string(bc_) +
+            }
+            else
+            {
+                return "Bullet(" + std::to_string(weight_.grains()) + "gr, " + std::to_string(diameter_.inches()) +
+                       "\", " + std::to_string(length_.inches()) + "\", BC=" + std::to_string(bc_) +
                        (drag_function_ == DragFunction::G1 ? ", G1)" : ", G7)");
             }
         }
@@ -151,7 +153,7 @@ namespace btk::ballistics
         {
             return velocity_;
         }
-        
+
         // Individual component getters (for compatibility)
         constexpr const Distance& getPositionX() const
         {
@@ -210,20 +212,18 @@ namespace btk::ballistics
             return Angle::radians(std::atan2(velocity_.y.mps(), velocity_.x.mps()));
         }
 
-
         private:
         Weight weight_;
         Distance diameter_;
         Distance length_;
         double bc_;
         DragFunction drag_function_;
-        
+
         // Flight state (only valid if has_flight_state_ is true)
         Position3D position_;
         Velocity3D velocity_;
         AngularVelocity spin_rate_;
         bool has_flight_state_;
     };
-
 
 } // namespace btk::ballistics

@@ -2,16 +2,21 @@
 #include <emscripten/val.h>
 
 // Include all our C++ headers
-#include "units.h"
-#include "bullet.h"
 #include "atmosphere.h"
-#include "trajectory.h"
+#include "bullet.h"
+#include "match_simulator.h"
+#include "nra_targets.h"
+#include "scoring.h"
 #include "simulator.h"
+#include "target.h"
+#include "trajectory.h"
+#include "units.h"
 
 using namespace emscripten;
 using namespace btk::ballistics;
 
-EMSCRIPTEN_BINDINGS(ballistics_toolkit) {
+EMSCRIPTEN_BINDINGS(ballistics_toolkit)
+{
     // Unit types - only static factory methods
     class_<Distance>("Distance")
         .class_function("meters", &Distance::meters)
@@ -74,6 +79,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit) {
         .class_function("degrees", &Angle::degrees)
         .class_function("radians", &Angle::radians)
         .class_function("mrad", &Angle::mrad)
+        .class_function("moa", &Angle::moa)
         .class_function("oclock", &Angle::oclock)
         .class_function("zero", &Angle::zero)
         .class_function("nan", &Angle::nan)
@@ -81,6 +87,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit) {
         .function("getDegrees", select_overload<double() const>(&Angle::degrees))
         .function("getRadians", select_overload<double() const>(&Angle::radians))
         .function("getMrad", select_overload<double() const>(&Angle::mrad))
+        .function("getMoa", select_overload<double() const>(&Angle::moa))
         .function("getOclock", select_overload<double() const>(&Angle::oclock));
 
     class_<Time>("Time")
@@ -125,9 +132,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit) {
         .function("magnitude", &Velocity3D::magnitude);
 
     // Bullet class
-    enum_<DragFunction>("DragFunction")
-        .value("G1", DragFunction::G1)
-        .value("G7", DragFunction::G7);
+    enum_<DragFunction>("DragFunction").value("G1", DragFunction::G1).value("G7", DragFunction::G7);
 
     class_<Bullet>("Bullet")
         .constructor<Weight, Distance, Distance, double, DragFunction>()
@@ -201,6 +206,82 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit) {
         .class_function("simulateToDistance", &Simulator::simulateToDistance)
         .class_function("computeZeroedInitialState", &Simulator::computeZeroedInitialState);
 
+    // Target class
+    class_<Target>("Target")
+        .constructor<const std::string&, const Distance&, const Distance&, const Distance&, const Distance&,
+                     const Distance&, const Distance&, const Distance&, const std::string&>()
+        .function("getName", &Target::getName)
+        .function("getDescription", &Target::getDescription)
+        .function("getXRingDiameter", &Target::getXRingDiameter)
+        .function("ringDiameter", &Target::ringDiameter)
+        .function("scoreHit", &Target::scoreHit)
+        .function("isXRing", &Target::isXRing)
+        .function("getRingInfo", &Target::getRingInfo)
+        .function("toString", &Target::toString);
+
+    // Hit struct
+    value_object<Hit>("Hit").field("x", &Hit::x).field("y", &Hit::y);
+
+    // AccuracyMetrics struct
+    value_object<AccuracyMetrics>("AccuracyMetrics")
+        .field("count", &AccuracyMetrics::count)
+        .field("groupSize", &AccuracyMetrics::group_size)
+        .field("centerX", &AccuracyMetrics::center_x)
+        .field("centerY", &AccuracyMetrics::center_y)
+        .field("meanRadius", &AccuracyMetrics::mean_radius)
+        .field("radialStdDev", &AccuracyMetrics::radial_std_dev);
+
+    // Scoring functions
+    function("calculateGroupSize", &calculateGroupSize);
+    function("calculateCenterOfGroup", &calculateCenterOfGroup);
+    function("calculateRadialStandardDeviation", &calculateRadialStandardDeviation);
+    function("calculateMeanRadius", &calculateMeanRadius);
+    function("calculateAccuracyMetrics", &calculateAccuracyMetrics);
+    function("hitsToScoreString", &hitsToScoreString);
+
+    // NRA Targets
+    class_<NRATargets>("NRATargets")
+        .class_function("getTarget", &NRATargets::getTarget)
+        .class_function("listTargets", &NRATargets::listTargets)
+        .class_function("hasTarget", &NRATargets::hasTarget);
+
+    // ShotResult struct
+    value_object<ShotResult>("ShotResult")
+        .field("impactX", &ShotResult::impact_x)
+        .field("impactY", &ShotResult::impact_y)
+        .field("score", &ShotResult::score)
+        .field("isX", &ShotResult::is_x)
+        .field("actualMv", &ShotResult::actual_mv)
+        .field("actualBc", &ShotResult::actual_bc)
+        .field("windDownrange", &ShotResult::wind_downrange)
+        .field("windCrossrange", &ShotResult::wind_crossrange)
+        .field("windVertical", &ShotResult::wind_vertical)
+        .field("releaseAngleH", &ShotResult::release_angle_h)
+        .field("releaseAngleV", &ShotResult::release_angle_v)
+        .field("impactVelocity", &ShotResult::impact_velocity);
+
+    // MatchResult struct
+    value_object<MatchResult>("MatchResult")
+        .field("shots", &MatchResult::shots)
+        .field("totalScore", &MatchResult::total_score)
+        .field("xCount", &MatchResult::x_count)
+        .field("groupSize", &MatchResult::group_size);
+
+    // MatchSimulator class
+    class_<MatchSimulator>("MatchSimulator")
+        .constructor<const Bullet&, const Velocity&, const Target&, const Distance&, const Atmosphere&, const Velocity&,
+                     const Velocity&, const Velocity&, const Velocity&, const Angle&, double>()
+        .function("fireShot", &MatchSimulator::fireShot)
+        .function("getMatchResult", &MatchSimulator::getMatchResult)
+        .function("clearShots", &MatchSimulator::clearShots)
+        .function("getShotCount", &MatchSimulator::getShotCount)
+        .function("getTarget", &MatchSimulator::getTarget)
+        .function("getBullet", &MatchSimulator::getBullet)
+        .function("getBulletDiameter", &MatchSimulator::getBulletDiameter);
+
     // Register value arrays for easier JavaScript usage
     register_vector<TrajectoryPoint>("TrajectoryPointVector");
+    register_vector<Hit>("HitVector");
+    register_vector<ShotResult>("ShotResultVector");
+    register_vector<std::string>("StringVector");
 }

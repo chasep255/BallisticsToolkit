@@ -12,8 +12,7 @@ namespace btk
         // Atmosphere implementation
         Atmosphere::Atmosphere()
             : temperature_(Temperature::fahrenheit(constants::TEMPERATURE_STANDARD_FAHRENHEIT)),
-              altitude_(Distance::feet(0)), humidity_(0.5),
-              pressure_(calculateStandardPressure(Distance::feet(0)))
+              altitude_(Distance::feet(0)), humidity_(0.5), pressure_(calculateStandardPressure(Distance::feet(0)))
         {
         }
 

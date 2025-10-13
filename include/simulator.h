@@ -35,8 +35,7 @@ namespace btk::ballistics
          * @param atmosphere Atmospheric conditions
          * @return New flying bullet state after time step
          */
-        static Bullet timeStep(const Bullet& state, const Time& dt, const Wind& wind,
-                                     const Atmosphere& atmosphere);
+        static Bullet timeStep(const Bullet& state, const Time& dt, const Wind& wind, const Atmosphere& atmosphere);
 
         /**
          * @brief Integrate forward until target distance is reached and return a trajectory
@@ -73,11 +72,11 @@ namespace btk::ballistics
          * @return Bullet with zeroed initial state
          * @throws std::runtime_error if convergence fails
          */
-        static Bullet computeZeroedInitialState(
-            const Bullet& bullet, const Velocity& muzzle_velocity, const Distance& scope_height,
-            const Distance& zero_range, const Atmosphere& atmosphere, const Wind& wind = Wind::calm(),
-            const Time& dt = Time::seconds(0.001), int max_iterations = 20,
-            const Distance& tolerance = Distance::meters(0.001));
+        static Bullet computeZeroedInitialState(const Bullet& bullet, const Velocity& muzzle_velocity,
+                                                const Distance& scope_height, const Distance& zero_range,
+                                                const Atmosphere& atmosphere, const Wind& wind = Wind::calm(),
+                                                const Time& dt = Time::seconds(0.001), int max_iterations = 20,
+                                                const Distance& tolerance = Distance::meters(0.001));
 
         private:
         /**
@@ -101,9 +100,8 @@ namespace btk::ballistics
          * @param wind Wind conditions
          * @return Acceleration3D with x, y, z components
          */
-        static Acceleration3D calculateAcceleration(const Bullet& state,
-                                                   const Atmosphere& atmosphere,
-                                                   const Wind& wind);
+        static Acceleration3D calculateAcceleration(const Bullet& state, const Atmosphere& atmosphere,
+                                                    const Wind& wind);
 
         /**
          * @brief Return (acceleration, mass) drag coefficients via binary search

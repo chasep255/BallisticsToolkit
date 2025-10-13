@@ -85,13 +85,13 @@ namespace btk::ballistics
         {
             return Derived(value);
         }
-        
+
         // Static factory methods for common values
         static constexpr Derived zero()
         {
             return Derived(0.0);
         }
-        
+
         static constexpr Derived nan()
         {
             return Derived(std::numeric_limits<double>::quiet_NaN());
@@ -101,7 +101,7 @@ namespace btk::ballistics
         explicit constexpr UnitBase(double value) : value_(value)
         {
         }
-        
+
         double value_;
     };
 
@@ -705,7 +705,8 @@ namespace btk::ballistics
             // 9 o'clock = pushes left (from right) = 90°
             // Formula: (18 - value) * 30° mod 360°
             double degrees = ((18.0 - value) * 30.0);
-            if (degrees >= 360.0) degrees -= 360.0;
+            if(degrees >= 360.0)
+                degrees -= 360.0;
             return Angle(degrees * M_PI / 180.0);
         }
 
@@ -920,7 +921,8 @@ namespace btk::ballistics
         UnitType y;
         UnitType z;
 
-        constexpr Vector3D() : x(UnitType::fromBaseValue(0.0)), y(UnitType::fromBaseValue(0.0)), z(UnitType::fromBaseValue(0.0))
+        constexpr Vector3D()
+            : x(UnitType::fromBaseValue(0.0)), y(UnitType::fromBaseValue(0.0)), z(UnitType::fromBaseValue(0.0))
         {
         }
 
@@ -1002,7 +1004,8 @@ namespace btk::ballistics
         // Vector operations
         constexpr double magnitude() const
         {
-            return std::sqrt(x.baseValue() * x.baseValue() + y.baseValue() * y.baseValue() + z.baseValue() * z.baseValue());
+            return std::sqrt(x.baseValue() * x.baseValue() + y.baseValue() * y.baseValue() +
+                             z.baseValue() * z.baseValue());
         }
 
         constexpr Vector3D normalized() const
@@ -1017,7 +1020,8 @@ namespace btk::ballistics
 
         constexpr double dot(const Vector3D& other) const
         {
-            return x.baseValue() * other.x.baseValue() + y.baseValue() * other.y.baseValue() + z.baseValue() * other.z.baseValue();
+            return x.baseValue() * other.x.baseValue() + y.baseValue() * other.y.baseValue() +
+                   z.baseValue() * other.z.baseValue();
         }
 
         // For cross product, we need to return a vector of the same type
@@ -1033,15 +1037,15 @@ namespace btk::ballistics
             double by = other.y.baseValue();
             double bz = other.z.baseValue();
 
-            return Vector3D(UnitType::meters(ay * bz - az * by),
-                           UnitType::meters(az * bx - ax * bz),
-                           UnitType::meters(ax * by - ay * bx));
+            return Vector3D(UnitType::meters(ay * bz - az * by), UnitType::meters(az * bx - ax * bz),
+                            UnitType::meters(ax * by - ay * bx));
         }
 
         // String representation
         std::string toString() const
         {
-            return "(" + std::to_string(x.baseValue()) + ", " + std::to_string(y.baseValue()) + ", " + std::to_string(z.baseValue()) + ")";
+            return "(" + std::to_string(x.baseValue()) + ", " + std::to_string(y.baseValue()) + ", " +
+                   std::to_string(z.baseValue()) + ")";
         }
     };
 
