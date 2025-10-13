@@ -17,7 +17,7 @@
             </div>
         </div>
     </div>
-    <div class="calc-container">
+    <div class="app-container">
         <h1>📊 Ballistic Calculator</h1>
         
 
@@ -96,12 +96,12 @@
         </div>
 
         <div style="text-align: center;">
-            <button id="calculateBtn" onclick="calculateTrajectory()">Calculate Trajectory</button>
+            <button id="calculateBtn" class="btn btn-primary" onclick="calculateTrajectory()">Calculate Trajectory</button>
         </div>
 
         <!-- Results Table -->
-        <div id="results" style="margin-top: 30px; display: none;">
-            <table id="trajectoryTable" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <div id="results" class="results" style="display: none;">
+            <table id="trajectoryTable">
                 <thead>
                     <tr>
                         <th>Range (yds)</th>

@@ -93,12 +93,18 @@ class TargetSimulator {
         this.elements.stopBtn.addEventListener('click', () => this.stopSimulation());
         
         
-        // Canvas interactions
+        // Canvas interactions (mouse)
         this.canvas.addEventListener('wheel', (e) => this.onMouseWheel(e));
         this.canvas.addEventListener('mousedown', (e) => this.onCanvasMouseDown(e));
         this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this.onCanvasMouseUp(e));
         this.canvas.addEventListener('mouseleave', () => this.onCanvasMouseLeave());
+
+        // Canvas interactions (pointer/touch)
+        this.canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+        this.canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
+        this.canvas.addEventListener('pointerup', (e) => this.onPointerUp(e));
+        this.canvas.addEventListener('pointercancel', (e) => this.onPointerUp(e));
     }
 
     validateInputs() {
@@ -496,6 +502,56 @@ class TargetSimulator {
         }
         
         this.hideTooltip();
+    }
+
+    // Pointer/touch handlers for drag + pinch zoom
+    onPointerDown(e) {
+        this.canvas.setPointerCapture(e.pointerId);
+        this.activePointers = this.activePointers || new Map();
+        this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (this.activePointers.size === 1) {
+            this.isDragging = true;
+            this.lastMouseX = e.clientX;
+            this.lastMouseY = e.clientY;
+        } else if (this.activePointers.size === 2) {
+            this.isDragging = false;
+            const pts = Array.from(this.activePointers.values());
+            this.pinchStartDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+            this.pinchStartZoom = this.zoomFactor;
+        }
+    }
+
+    onPointerMove(e) {
+        if (!this.activePointers || !this.activePointers.has(e.pointerId)) return;
+        const prev = this.activePointers.get(e.pointerId);
+        const curr = { x: e.clientX, y: e.clientY };
+        this.activePointers.set(e.pointerId, curr);
+
+        if (this.activePointers.size === 1 && this.isDragging) {
+            const dx = curr.x - this.lastMouseX;
+            const dy = curr.y - this.lastMouseY;
+            this.panX += dx;
+            this.panY += dy;
+            this.lastMouseX = curr.x;
+            this.lastMouseY = curr.y;
+            this.redrawTarget();
+        } else if (this.activePointers.size === 2 && this.pinchStartDist) {
+            const pts = Array.from(this.activePointers.values());
+            const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+            const scale = dist / this.pinchStartDist;
+            this.zoomFactor = Math.max(0.1, Math.min(10.0, this.pinchStartZoom * scale));
+            this.redrawTarget();
+        }
+    }
+
+    onPointerUp(e) {
+        if (this.activePointers) {
+            this.activePointers.delete(e.pointerId);
+        }
+        if (!this.activePointers || this.activePointers.size === 0) {
+            this.isDragging = false;
+            this.pinchStartDist = null;
+        }
     }
 
     showTooltip(e, shot) {
