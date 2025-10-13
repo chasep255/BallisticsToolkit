@@ -675,8 +675,9 @@ class TargetSimulator {
         const centerY = this.canvas.height / 2;
         
         // Apply zoom and pan transformations (same as drawTarget)
-        const worldX = (canvasX - centerX - this.panX) / (this.zoomFactor * this.targetScale);
-        const worldY = (canvasY - centerY - this.panY) / (this.zoomFactor * this.targetScale);
+        // Note: this.targetScale already includes zoomFactor, so don't multiply again
+        const worldX = (canvasX - centerX - this.panX) / this.targetScale;
+        const worldY = (canvasY - centerY - this.panY) / this.targetScale;
         
         // Convert to inches (assuming 1 unit = 1 inch at scale 1.0)
         const inchesX = worldX;
