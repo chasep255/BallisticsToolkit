@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BallisticsToolkit - Professional Long Range Shooting Tools</title>
+    <title>BallisticsToolkit</title>
     <link rel="stylesheet" href="style.css">
     <style>
         body {
@@ -20,12 +20,10 @@
         .hero h1 {
             font-size: 3em;
             margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
         .hero p {
-            font-size: 1.3em;
-            opacity: 0.95;
+            font-size: 1.2em;
         }
 
         .tools-grid {
@@ -39,12 +37,6 @@
             background: white;
             border-radius: 8px;
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            transition: transform 0.2s;
-        }
-
-        .tool-card:hover {
-            transform: translateY(-5px);
         }
 
         .tool-card h2 {
@@ -55,24 +47,6 @@
         .tool-card p {
             color: #666;
             margin-bottom: 20px;
-        }
-
-        .tool-status {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: bold;
-        }
-
-        .status-available {
-            background: #4ade80;
-            color: white;
-        }
-
-        .status-coming-soon {
-            background: #fbbf24;
-            color: white;
         }
 
         .tool-card a {
@@ -87,35 +61,22 @@
             text-decoration: underline;
         }
 
-        .features {
-            background: white;
-            border-radius: 8px;
-            padding: 40px;
-            margin-top: 40px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        .status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: bold;
         }
 
-        .features h2 {
-            text-align: center;
-            color: #667eea;
-            margin-bottom: 30px;
+        .status-available {
+            background: #4ade80;
+            color: white;
         }
 
-        .feature-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-        }
-
-        .feature-item {
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-
-        .feature-item h3 {
-            margin-bottom: 10px;
+        .status-wip {
+            background: #fbbf24;
+            color: white;
         }
 
         footer {
@@ -143,64 +104,27 @@
 
     <div class="container">
         <div class="hero">
-            <h1>Professional Long Range Tools</h1>
-            <p>WebAssembly-powered ballistics calculations in your browser</p>
+            <h1>BallisticsToolkit</h1>
+            <p>WebAssembly ballistics calculations</p>
         </div>
 
         <div class="tools-grid">
             <div class="tool-card">
-                <h2>📊 Ballistic Calculator</h2>
-                <p>Calculate trajectory, drop, drift, velocity, and energy for any bullet and atmospheric conditions. Supports G1/G7 drag models.</p>
-                <span class="tool-status status-available">✓ Available</span>
-                <div><a href="ballistic-calc.html">Open Calculator →</a></div>
+                <h2>Ballistic Calculator</h2>
+                <p>3DOF trajectory calculator with G1/G7 drag models, atmospheric compensation, and wind effects.</p>
+                <span class="status status-available">Available</span>
+                <div><a href="ballistic-calc.html">Open →</a></div>
             </div>
 
-            <div class="tool-card" style="opacity: 0.7;">
-                <h2>🎲 Monte Carlo Simulator</h2>
-                <p>Analyze shooting precision with Monte Carlo simulations. Model input variations and predict hit probability.</p>
-                <span class="tool-status status-coming-soon">Coming Soon</span>
-            </div>
-
-            <div class="tool-card" style="opacity: 0.7;">
-                <h2>🎮 Target Practice</h2>
-                <p>Interactive shooting simulator with virtual targets. Practice wind reading and holdovers.</p>
-                <span class="tool-status status-coming-soon">Coming Soon</span>
-            </div>
-        </div>
-
-        <div class="features">
-            <h2>Why BallisticsToolkit?</h2>
-            <div class="feature-list">
-                <div class="feature-item">
-                    <h3>⚡ Fast</h3>
-                    <p>WebAssembly delivers near-native performance in your browser.</p>
-                </div>
-                <div class="feature-item">
-                    <h3>🔒 Private</h3>
-                    <p>All calculations run locally. Your data never leaves your device.</p>
-                </div>
-                <div class="feature-item">
-                    <h3>📱 Mobile</h3>
-                    <p>Works on desktop, tablet, or phone. Take it to the range!</p>
-                </div>
-                <div class="feature-item">
-                    <h3>🎯 Accurate</h3>
-                    <p>3DOF ballistics with G1/G7 drag models and atmospheric compensation.</p>
-                </div>
-                <div class="feature-item">
-                    <h3>🔬 Type-Safe</h3>
-                    <p>Built in C++17 with compile-time unit checking.</p>
-                </div>
-                <div class="feature-item">
-                    <h3>🆓 Open Source</h3>
-                    <p>MIT licensed. View, contribute, or fork the code.</p>
-                </div>
+            <div class="tool-card">
+                <h2>Monte Carlo Simulator</h2>
+                <p>Statistical analysis of shooting precision with input variation modeling and hit probability calculations.</p>
+                <span class="status status-wip">Work in Progress</span>
             </div>
         </div>
 
         <footer>
-            <p>Built with C++17, WebAssembly, and ❤️</p>
-            <p><a href="https://github.com/chasep255/BallisticsToolkit">View on GitHub</a></p>
+            <p><a href="https://github.com/chasep255/BallisticsToolkit">GitHub</a></p>
         </footer>
     </div>
 </body>
