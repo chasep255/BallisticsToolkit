@@ -4,71 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BallisticsToolkit - Professional Long Range Shooting Tools</title>
+    <link rel="stylesheet" href="style.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        header {
+        .hero {
             text-align: center;
             padding: 60px 20px;
             color: white;
         }
 
-        h1 {
-            font-size: 3.5em;
+        .hero h1 {
+            font-size: 3em;
             margin-bottom: 20px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
-        .tagline {
+        .hero p {
             font-size: 1.3em;
             opacity: 0.95;
-            margin-bottom: 40px;
         }
 
         .tools-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
+            gap: 20px;
             margin-top: 40px;
         }
 
         .tool-card {
             background: white;
-            border-radius: 12px;
+            border-radius: 8px;
             padding: 30px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            transition: transform 0.3s, box-shadow 0.3s;
-            text-decoration: none;
-            color: inherit;
-            display: block;
+            transition: transform 0.2s;
         }
 
         .tool-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
         }
 
         .tool-card h2 {
             color: #667eea;
-            font-size: 1.8em;
             margin-bottom: 15px;
         }
 
@@ -81,7 +61,7 @@
             display: inline-block;
             padding: 5px 12px;
             border-radius: 20px;
-            font-size: 0.85em;
+            font-size: 0.9em;
             font-weight: bold;
         }
 
@@ -95,17 +75,29 @@
             color: white;
         }
 
+        .tool-card a {
+            display: inline-block;
+            margin-top: 10px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .tool-card a:hover {
+            text-decoration: underline;
+        }
+
         .features {
             background: white;
-            border-radius: 12px;
+            border-radius: 8px;
             padding: 40px;
             margin-top: 40px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
 
         .features h2 {
-            color: #667eea;
             text-align: center;
+            color: #667eea;
             margin-bottom: 30px;
         }
 
@@ -116,20 +108,14 @@
         }
 
         .feature-item {
-            padding: 15px;
+            padding: 20px;
             background: #f8f9fa;
             border-radius: 8px;
             border-left: 4px solid #667eea;
         }
 
         .feature-item h3 {
-            color: #333;
-            margin-bottom: 8px;
-        }
-
-        .feature-item p {
-            color: #666;
-            font-size: 0.95em;
+            margin-bottom: 10px;
         }
 
         footer {
@@ -141,48 +127,44 @@
 
         footer a {
             color: white;
-            text-decoration: underline;
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 2.5em;
-            }
-
-            .tagline {
-                font-size: 1.1em;
-            }
-
-            .tools-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
 <body>
+    <div class="nav-header">
+        <div class="nav-content">
+            <a href="index.html" class="nav-logo">🎯 BallisticsToolkit</a>
+            <div class="nav-links">
+                <a href="index.html" class="active">Home</a>
+                <a href="ballistic-calc.html">Ballistic Calculator</a>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
-        <header>
-            <h1>🎯 BallisticsToolkit</h1>
-            <p class="tagline">Professional WebAssembly-powered tools for precision long-range shooting</p>
-        </header>
+        <div class="hero">
+            <h1>Professional Long Range Tools</h1>
+            <p>WebAssembly-powered ballistics calculations in your browser</p>
+        </div>
 
         <div class="tools-grid">
-            <a href="ballistic-calc.html" class="tool-card">
+            <div class="tool-card">
                 <h2>📊 Ballistic Calculator</h2>
-                <p>Calculate trajectory, drop, drift, velocity, and energy for any bullet and atmospheric conditions. Supports G1/G7 drag models with full wind compensation.</p>
-                <span class="tool-status status-available">✓ Available Now</span>
-            </a>
-
-            <div class="tool-card" style="opacity: 0.7; cursor: not-allowed;">
-                <h2>🎲 Monte Carlo Simulator</h2>
-                <p>Analyze shooting precision with Monte Carlo simulations. Model input variations, environmental factors, and predict hit probability at any range.</p>
-                <span class="tool-status status-coming-soon">⏳ Coming Soon</span>
+                <p>Calculate trajectory, drop, drift, velocity, and energy for any bullet and atmospheric conditions. Supports G1/G7 drag models.</p>
+                <span class="tool-status status-available">✓ Available</span>
+                <div><a href="ballistic-calc.html">Open Calculator →</a></div>
             </div>
 
-            <div class="tool-card" style="opacity: 0.7; cursor: not-allowed;">
+            <div class="tool-card" style="opacity: 0.7;">
+                <h2>🎲 Monte Carlo Simulator</h2>
+                <p>Analyze shooting precision with Monte Carlo simulations. Model input variations and predict hit probability.</p>
+                <span class="tool-status status-coming-soon">Coming Soon</span>
+            </div>
+
+            <div class="tool-card" style="opacity: 0.7;">
                 <h2>🎮 Target Practice</h2>
-                <p>Interactive shooting simulator with virtual targets. Practice wind reading, holdovers, and elevation adjustments in realistic scenarios.</p>
-                <span class="tool-status status-coming-soon">⏳ Coming Soon</span>
+                <p>Interactive shooting simulator with virtual targets. Practice wind reading and holdovers.</p>
+                <span class="tool-status status-coming-soon">Coming Soon</span>
             </div>
         </div>
 
@@ -190,35 +172,35 @@
             <h2>Why BallisticsToolkit?</h2>
             <div class="feature-list">
                 <div class="feature-item">
-                    <h3>⚡ Blazing Fast</h3>
-                    <p>WebAssembly delivers near-native performance directly in your browser. No servers, no waiting.</p>
+                    <h3>⚡ Fast</h3>
+                    <p>WebAssembly delivers near-native performance in your browser.</p>
                 </div>
                 <div class="feature-item">
-                    <h3>🔒 Privacy First</h3>
-                    <p>All calculations run locally on your device. Your data never leaves your browser.</p>
+                    <h3>🔒 Private</h3>
+                    <p>All calculations run locally. Your data never leaves your device.</p>
                 </div>
                 <div class="feature-item">
-                    <h3>📱 Works Everywhere</h3>
-                    <p>Desktop, tablet, or phone. Works offline once loaded. Take it to the range!</p>
+                    <h3>📱 Mobile</h3>
+                    <p>Works on desktop, tablet, or phone. Take it to the range!</p>
                 </div>
                 <div class="feature-item">
-                    <h3>🎯 Professional Grade</h3>
-                    <p>3DOF ballistics engine with G1/G7 drag models and full atmospheric compensation.</p>
+                    <h3>🎯 Accurate</h3>
+                    <p>3DOF ballistics with G1/G7 drag models and atmospheric compensation.</p>
                 </div>
                 <div class="feature-item">
                     <h3>🔬 Type-Safe</h3>
-                    <p>Built in C++17 with compile-time unit checking. No unit conversion errors, ever.</p>
+                    <p>Built in C++17 with compile-time unit checking.</p>
                 </div>
                 <div class="feature-item">
                     <h3>🆓 Open Source</h3>
-                    <p>MIT licensed. View the code, contribute, or fork for your own use.</p>
+                    <p>MIT licensed. View, contribute, or fork the code.</p>
                 </div>
             </div>
         </div>
 
         <footer>
             <p>Built with C++17, WebAssembly, and ❤️</p>
-            <p><a href="https://github.com/chasep255/BallisticsToolkit" target="_blank">View on GitHub</a></p>
+            <p><a href="https://github.com/chasep255/BallisticsToolkit">View on GitHub</a></p>
         </footer>
     </div>
 </body>

@@ -4,43 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ballistic Calculator - BallisticsToolkit</title>
+    <link rel="stylesheet" href="style.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f5f5f5;
-        }
-
-        .nav-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 15px 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-
-        .nav-header a {
-            color: white;
-            text-decoration: none;
-            font-size: 1.1em;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .nav-header a:hover {
-            opacity: 0.9;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
         .container {
             background: white;
             padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
         }
         h1 {
             color: #333;
@@ -131,10 +100,16 @@
 </head>
 <body>
     <div class="nav-header">
-        <a href="index.html">← Back to BallisticsToolkit</a>
+        <div class="nav-content">
+            <a href="index.html" class="nav-logo">🎯 BallisticsToolkit</a>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="ballistic-calc.html" class="active">Ballistic Calculator</a>
+            </div>
+        </div>
     </div>
     <div class="container">
-        <h1>🎯 TargetSim - WebAssembly Ballistic Calculator</h1>
+        <h1>📊 Ballistic Calculator</h1>
         
         <div class="form-section">
             <h3>Bullet Parameters</h3>
