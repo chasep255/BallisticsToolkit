@@ -169,8 +169,9 @@
                     <input type="number" id="windSpeed" value="0" step="1">
                 </div>
                 <div class="form-group">
-                    <label for="windDirection">Wind Direction (degrees)</label>
-                    <input type="number" id="windDirection" value="0" step="1" min="0" max="360">
+                    <label for="windDirection">Wind Direction (clock position)</label>
+                    <input type="number" id="windDirection" value="3" step="1" min="1" max="12">
+                    <small style="color: #666; font-size: 12px;">12=pushes forward, 3=pushes right, 6=pushes backward, 9=pushes left</small>
                 </div>
             </div>
         </div>
@@ -315,7 +316,7 @@
                 const row = tableBody.insertRow();
                 row.insertCell(0).textContent = point.range.toFixed(0);
                 row.insertCell(1).textContent = point.drop.toFixed(2);
-                row.insertCell(2).textContent = point.drift.toFixed(2);
+                row.insertCell(2).textContent = point.driftText;
                 row.insertCell(3).textContent = point.velocity.toFixed(0);
                 row.insertCell(4).textContent = point.energy.toFixed(0);
                 row.insertCell(5).textContent = point.time.toFixed(3);

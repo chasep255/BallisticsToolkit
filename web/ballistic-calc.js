@@ -80,11 +80,11 @@ class BallisticsCalculator {
      * Set wind conditions
      * @param {Object} wind - Wind parameters
      * @param {number} wind.speed - Wind speed in mph
-     * @param {number} wind.direction - Wind direction in degrees (0=from left, 90=from front, 180=from right, 270=from rear)
+     * @param {number} wind.direction - Wind direction in clock mode (3=from right, 6=from front, 9=from left, 12=from rear)
      */
     setWind(wind) {
         const speed = this.Module.Velocity.mph(wind.speed);
-        const direction = this.Module.Angle.degrees(wind.direction);
+        const direction = this.Module.Angle.oclock(wind.direction);
         
         this.wind = new this.Module.Wind(speed, direction);
     }
@@ -158,6 +158,12 @@ class BallisticsCalculator {
                 const driftMeters = position.y.getMeters(); // Y is crosswind drift
                 const driftMrad = range > 0 ? (driftMeters / rangeMeters) * 1000 : 0;
                 
+                // Convert drift to Left/Right text
+                // In the coordinate system: positive Y = right drift, negative Y = left drift
+                const driftText = driftMrad > 0.01 ? `Right ${driftMrad.toFixed(2)}` : 
+                                 driftMrad < -0.01 ? `Left ${Math.abs(driftMrad).toFixed(2)}` : 
+                                 '0.00';
+                
                 // Get velocity and energy
                 const velocity = state.getTotalVelocity();
                 const energy = this.calculateEnergy(this.bullet.getWeight(), velocity);
@@ -166,6 +172,7 @@ class BallisticsCalculator {
                     range: range,
                     drop: dropMrad,
                     drift: driftMrad,
+                    driftText: driftText,
                     velocity: velocity.getFps(),
                     energy: energy.getFootPounds(),
                     time: time.getSeconds()

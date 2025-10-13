@@ -74,12 +74,14 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit) {
         .class_function("degrees", &Angle::degrees)
         .class_function("radians", &Angle::radians)
         .class_function("mrad", &Angle::mrad)
+        .class_function("oclock", &Angle::oclock)
         .class_function("zero", &Angle::zero)
         .class_function("nan", &Angle::nan)
         // Instance getters
         .function("getDegrees", select_overload<double() const>(&Angle::degrees))
         .function("getRadians", select_overload<double() const>(&Angle::radians))
-        .function("getMrad", select_overload<double() const>(&Angle::mrad));
+        .function("getMrad", select_overload<double() const>(&Angle::mrad))
+        .function("getOclock", select_overload<double() const>(&Angle::oclock));
 
     class_<Time>("Time")
         .class_function("seconds", &Time::seconds)

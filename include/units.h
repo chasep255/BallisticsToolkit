@@ -696,6 +696,18 @@ namespace btk::ballistics
         {
             return Angle(value * 2.0 * M_PI);
         }
+        static constexpr Angle oclock(double value)
+        {
+            // Clock mode for wind EFFECT (where wind pushes bullet):
+            // 12 o'clock = pushes forward (tailwind from rear) = 180°
+            // 3 o'clock = pushes right (from left) = 270°
+            // 6 o'clock = pushes backward (headwind from front) = 0° or 360°
+            // 9 o'clock = pushes left (from right) = 90°
+            // Formula: (18 - value) * 30° mod 360°
+            double degrees = ((18.0 - value) * 30.0);
+            if (degrees >= 360.0) degrees -= 360.0;
+            return Angle(degrees * M_PI / 180.0);
+        }
 
         // Getter methods
         constexpr double radians() const
@@ -737,6 +749,11 @@ namespace btk::ballistics
         constexpr double turns() const
         {
             return value_ / (2.0 * M_PI);
+        }
+        constexpr double oclock() const
+        {
+            // Convert radians to clock position: degrees / 30°
+            return (value_ * 180.0 / M_PI) / 30.0;
         }
 
         private:
