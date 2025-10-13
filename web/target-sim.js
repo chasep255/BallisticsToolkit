@@ -609,7 +609,8 @@ class TargetSimulator {
         if (!ringSizesBox || !ringSizesContent) return;
 
         try {
-            // Get ring info from the target using wrapper function
+            // Get X ring diameter directly
+            const xRingDiameter = target.getXRingDiameter();
             const ring10 = this.Module.getRingInfoWrapper(target, 10);
             const ring9 = this.Module.getRingInfoWrapper(target, 9);
             const ring8 = this.Module.getRingInfoWrapper(target, 8);
@@ -623,6 +624,13 @@ class TargetSimulator {
 
             // Build ring sizes display, only showing non-zero rings
             let ringSizesHtml = '';
+            
+            // Add X ring if it exists
+            const xDiameter = xRingDiameter.getInches();
+            if (xDiameter > 0) {
+                ringSizesHtml += `<div>X: ${xDiameter.toFixed(2)}"</div>`;
+            }
+            
             const rings = [
                 { num: 10, info: ring10 },
                 { num: 9, info: ring9 },
