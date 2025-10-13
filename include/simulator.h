@@ -5,7 +5,7 @@
 #include "trajectory.h"
 #include "units.h"
 
-namespace psim::ballistics
+namespace btk::ballistics
 {
 
     /**
@@ -115,4 +115,4 @@ namespace psim::ballistics
         static constexpr std::tuple<double, double> dragFunction(double vp_fps, DragFunction drag_type);
     };
 
-} // namespace psim::ballistics
+} // namespace btk::ballistics

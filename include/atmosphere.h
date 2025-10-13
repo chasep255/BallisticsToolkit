@@ -3,7 +3,7 @@
 #include "units.h"
 #include <memory>
 
-namespace psim::ballistics
+namespace btk::ballistics
 {
 
     /**
@@ -145,4 +145,4 @@ namespace psim::ballistics
         Velocity vertical_;
     };
 
-} // namespace psim::ballistics
+} // namespace btk::ballistics

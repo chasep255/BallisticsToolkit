@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <tuple>
 
-namespace psim::ballistics
+namespace btk::ballistics
 {
 
     // G7 drag function data: (velocity_fps, acceleration, mass)
@@ -277,4 +277,4 @@ namespace psim::ballistics
         return trajectory;
     }
 
-} // namespace psim::ballistics
+} // namespace btk::ballistics

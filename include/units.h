@@ -3,7 +3,7 @@
 #include <cmath>
 #include <string>
 
-namespace psim::ballistics
+namespace btk::ballistics
 {
 
     /**
@@ -1029,4 +1029,4 @@ namespace psim::ballistics
     using Velocity3D = Vector3D<Velocity>;
     using Acceleration3D = Vector3D<Acceleration>;
 
-} // namespace psim::ballistics
+} // namespace btk::ballistics

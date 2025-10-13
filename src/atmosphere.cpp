@@ -4,7 +4,7 @@
 #include <iomanip>
 #include <sstream>
 
-namespace psim
+namespace btk
 {
     namespace ballistics
     {
@@ -170,4 +170,4 @@ namespace psim
         }
 
     } // namespace ballistics
-} // namespace psim
+} // namespace btk

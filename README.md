@@ -100,20 +100,20 @@ The WebAssembly module exposes a C++ ballistics engine to JavaScript:
 
 ```javascript
 // Initialize
-const sim = new TargetSim();
-await sim.init();
+const calc = new BallisticsCalculator();
+await calc.init();
 
 // Configure bullet
-sim.setBullet({
+calc.setBullet({
     weight: 140,           // grains
-    diameter: 0.264,       // inches
+    diameter: 0.223,       // inches
     length: 1.2,           // inches
     bc: 0.585,            // ballistic coefficient
     dragFunction: 'G7'     // G1 or G7
 });
 
 // Set atmosphere
-sim.setAtmosphere({
+calc.setAtmosphere({
     temperature: 59,       // °F
     pressure: 29.92,       // inHg
     humidity: 50,          // %
@@ -121,13 +121,13 @@ sim.setAtmosphere({
 });
 
 // Set wind
-sim.setWind({
+calc.setWind({
     speed: 10,             // mph
     direction: 90          // degrees (90 = from the side)
 });
 
 // Calculate trajectory
-const trajectory = sim.calculateTrajectory({
+const trajectory = calc.calculateTrajectory({
     muzzleVelocity: 2700,  // fps
     zeroRange: 100,        // yards
     scopeHeight: 2.0,      // inches
@@ -173,7 +173,7 @@ Temperature temp = Temperature::fahrenheit(59);
 
 ## Code Style
 
-- **Namespaces**: `psim::ballistics`, `psim::web_ui`
+- **Namespaces**: `btk::ballistics`, `btk::ballistics_calc`
 - **Opening braces**: Next line (Allman style)
 - **Access specifiers**: Inline with members
 - **Standard**: C++17

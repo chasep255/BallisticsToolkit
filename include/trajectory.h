@@ -5,7 +5,7 @@
 #include <optional>
 #include <vector>
 
-namespace psim::ballistics
+namespace btk::ballistics
 {
 
     /**
@@ -169,4 +169,4 @@ namespace psim::ballistics
                                  const Distance& distance) const;
     };
 
-} // namespace psim::ballistics
+} // namespace btk::ballistics

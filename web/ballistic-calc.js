@@ -1,9 +1,9 @@
 /**
- * JavaScript wrapper for TargetSim WebAssembly module
+ * JavaScript wrapper for Ballistics Calculator WebAssembly module
  */
-class TargetSim {
+class BallisticsCalculator {
     constructor() {
-        this.simulator = null;
+        this.solver = null;
         this.Module = null;
     }
 
@@ -29,7 +29,7 @@ class TargetSim {
                             return path;
                         }
                     });
-                    this.simulator = this.Module._createSimulator();
+                    this.solver = this.Module._ballistics_calc_create();
                     resolve();
                 } else {
                     reject(new Error('WebAssembly module not found'));
@@ -51,7 +51,7 @@ class TargetSim {
      */
     setBullet(bullet) {
         const dragFunction = bullet.dragFunction === 'G1' ? 0 : 1;
-        this.Module._setBullet(this.simulator, bullet.weight, bullet.diameter, bullet.length, bullet.bc, dragFunction);
+        this.Module._ballistics_calc_set_bullet(this.solver, bullet.weight, bullet.diameter, bullet.length, bullet.bc, dragFunction);
     }
 
     /**
@@ -63,7 +63,7 @@ class TargetSim {
      * @param {number} atmosphere.altitude - Altitude in feet
      */
     setAtmosphere(atmosphere) {
-        this.Module._setAtmosphere(this.simulator, atmosphere.temperature, atmosphere.pressure, 
+        this.Module._ballistics_calc_set_atmosphere(this.solver, atmosphere.temperature, atmosphere.pressure, 
                                   atmosphere.humidity, atmosphere.altitude);
     }
 
@@ -74,7 +74,7 @@ class TargetSim {
      * @param {number} wind.direction - Wind direction in degrees (0=from left, 90=from front, 180=from right, 270=from rear)
      */
     setWind(wind) {
-        this.Module._setWind(this.simulator, wind.speed, wind.direction);
+        this.Module._ballistics_calc_set_wind(this.solver, wind.speed, wind.direction);
     }
 
     /**
@@ -88,11 +88,11 @@ class TargetSim {
      * @returns {Object} - Trajectory data
      */
     calculateTrajectory(shot) {
-        const trajectoryPtr = this.Module._calculateTrajectory(
-            this.simulator, shot.muzzleVelocity, shot.zeroRange, shot.scopeHeight, shot.maxRange, shot.step
+        const trajectoryPtr = this.Module._ballistics_calc_calculate_trajectory(
+            this.solver, shot.muzzleVelocity, shot.zeroRange, shot.scopeHeight, shot.maxRange, shot.step
         );
 
-        const pointCount = this.Module._getTrajectoryPointCount(trajectoryPtr);
+        const pointCount = this.Module._ballistics_calc_get_trajectory_point_count(trajectoryPtr);
         const trajectory = [];
 
         // Use stack allocation (no need for malloc/free!)
@@ -107,7 +107,7 @@ class TargetSim {
         for (let i = 0; i < pointCount; i++) {
             const range = i * shot.step;
 
-            const success = this.Module._getTrajectoryPoint(
+            const success = this.Module._ballistics_calc_get_trajectory_point(
                 trajectoryPtr, range, dropPtr, driftPtr, velocityPtr, energyPtr, timePtr
             );
 
@@ -125,7 +125,7 @@ class TargetSim {
         }
 
         this.Module.stackRestore(stackTop);
-        this.Module._freeTrajectory(trajectoryPtr);
+        this.Module._ballistics_calc_free_trajectory(trajectoryPtr);
         return trajectory;
     }
 
@@ -143,7 +143,7 @@ class TargetSim {
         const energyPtr = bufferPtr + 24;
         const timePtr = bufferPtr + 32;
 
-        const success = this.Module._getTrajectoryPoint(
+        const success = this.Module._ballistics_calc_get_trajectory_point(
             this.trajectoryPtr, range, dropPtr, driftPtr, velocityPtr, energyPtr, timePtr
         );
 
@@ -167,16 +167,16 @@ class TargetSim {
      * Clean up resources
      */
     destroy() {
-        if (this.simulator) {
-            this.Module._destroySimulator(this.simulator);
-            this.simulator = null;
+        if (this.solver) {
+            this.Module._ballistics_calc_destroy(this.solver);
+            this.solver = null;
         }
     }
 }
 
 // Export for use in modules
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = TargetSim;
+    module.exports = BallisticsCalculator;
 } else if (typeof window !== 'undefined') {
-    window.TargetSim = TargetSim;
+    window.BallisticsCalculator = BallisticsCalculator;
 }

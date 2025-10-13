@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace psim::ballistics
+namespace btk::ballistics
 {
 
     /**
@@ -56,4 +56,4 @@ namespace psim::ballistics
         inline constexpr double PI = 3.14159265358979323846; // pi
 
     } // namespace constants
-} // namespace psim::ballistics
+} // namespace btk::ballistics

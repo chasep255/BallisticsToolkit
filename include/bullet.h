@@ -6,7 +6,7 @@
 #include <string>
 #include <tuple>
 
-namespace psim::ballistics
+namespace btk::ballistics
 {
 
     /**
@@ -223,4 +223,4 @@ namespace psim::ballistics
         AngularVelocity spin_rate_;
     };
 
-} // namespace psim::ballistics
+} // namespace btk::ballistics

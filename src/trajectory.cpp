@@ -5,7 +5,7 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace psim
+namespace btk
 {
     namespace ballistics
     {
@@ -284,4 +284,4 @@ namespace psim
         }
 
     } // namespace ballistics
-} // namespace psim
+} // namespace btk

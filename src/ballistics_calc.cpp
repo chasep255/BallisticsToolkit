@@ -1,9 +1,8 @@
-#include "web_ui.h"
-#include "ballistics.h"
+#include "ballistics_calc.h"
 #include <cmath>
 #include <vector>
 
-namespace psim::web_ui
+namespace btk::ballistics_calc
 {
 
     // Trajectory point structure for WebAssembly
@@ -23,10 +22,10 @@ namespace psim::web_ui
         std::vector<TrajectoryPoint> points;
     };
 
-    void TargetSimulator::initializeBullet(double weight_grains, double diameter_inches, double length_inches,
+    void BallisticsCalculator::initializeBullet(double weight_grains, double diameter_inches, double length_inches,
                                           double bc, int drag_function)
     {
-        using namespace psim::ballistics;
+        using namespace btk::ballistics;
         
         Weight weight = Weight::grains(weight_grains);
         Distance diameter = Distance::inches(diameter_inches);
@@ -36,9 +35,9 @@ namespace psim::web_ui
         bullet_ = std::make_unique<Bullet>(weight, diameter, length, bc, drag_func);
     }
 
-    void TargetSimulator::setAtmosphere(double temperature_f, double pressure_inhg, double humidity_percent, double altitude_feet)
+    void BallisticsCalculator::setAtmosphere(double temperature_f, double pressure_inhg, double humidity_percent, double altitude_feet)
     {
-        using namespace psim::ballistics;
+        using namespace btk::ballistics;
         
         Temperature temp = Temperature::fahrenheit(temperature_f);
         Distance altitude = Distance::feet(altitude_feet);
@@ -50,9 +49,9 @@ namespace psim::web_ui
         atmosphere_ = std::make_unique<Atmosphere>(temp, altitude, humidity, pressure);
     }
 
-    void TargetSimulator::setWind(double wind_speed_mph, double wind_direction_deg)
+    void BallisticsCalculator::setWind(double wind_speed_mph, double wind_direction_deg)
     {
-        using namespace psim::ballistics;
+        using namespace btk::ballistics;
         
         Velocity speed = Velocity::mph(wind_speed_mph);
         Angle direction = Angle::degrees(wind_direction_deg);
@@ -60,10 +59,10 @@ namespace psim::web_ui
         wind_ = std::make_unique<Wind>(speed, direction);
     }
 
-    void* TargetSimulator::calculateTrajectory(double muzzle_velocity_fps, double zero_range_yards, double scope_height_inches,
+    void* BallisticsCalculator::calculateTrajectory(double muzzle_velocity_fps, double zero_range_yards, double scope_height_inches,
                                               double max_range_yards, double step_yards)
     {
-        using namespace psim::ballistics;
+        using namespace btk::ballistics;
         
         if(!bullet_ || !atmosphere_ || !wind_)
         {
@@ -125,12 +124,12 @@ namespace psim::web_ui
         return trajectory_data;
     }
 
-    void TargetSimulator::freeTrajectory(void* trajectory_data)
+    void BallisticsCalculator::freeTrajectory(void* trajectory_data)
     {
         delete static_cast<TrajectoryData*>(trajectory_data);
     }
 
-    int TargetSimulator::getTrajectoryPoint(void* trajectory_data, double range_yards, double* drop_mrad, double* drift_mrad,
+    int BallisticsCalculator::getTrajectoryPoint(void* trajectory_data, double range_yards, double* drop_mrad, double* drift_mrad,
                                            double* velocity_fps, double* energy_ftlbf, double* time_sec)
     {
         TrajectoryData* data = static_cast<TrajectoryData*>(trajectory_data);
@@ -156,7 +155,7 @@ namespace psim::web_ui
         return 0;
     }
 
-    int TargetSimulator::getTrajectoryPointCount(void* trajectory_data)
+    int BallisticsCalculator::getTrajectoryPointCount(void* trajectory_data)
     {
         TrajectoryData* data = static_cast<TrajectoryData*>(trajectory_data);
         return data ? data->points.size() : 0;
@@ -165,46 +164,46 @@ namespace psim::web_ui
     // C-style interface implementation
     extern "C"
     {
-        void* createSimulator()
+        void* ballistics_calc_create()
         {
-            return new TargetSimulator();
+            return new BallisticsCalculator();
         }
 
-        void destroySimulator(void* simulator)
+        void ballistics_calc_destroy(void* solver)
         {
-            delete static_cast<TargetSimulator*>(simulator);
+            delete static_cast<BallisticsCalculator*>(solver);
         }
 
-        void setBullet(void* simulator, double weight_grains, double diameter_inches, double length_inches,
-                      double bc, int drag_function)
+        void ballistics_calc_set_bullet(void* solver, double weight_grains, double diameter_inches, double length_inches,
+                                         double bc, int drag_function)
         {
-            static_cast<TargetSimulator*>(simulator)->initializeBullet(weight_grains, diameter_inches, length_inches, bc, drag_function);
+            static_cast<BallisticsCalculator*>(solver)->initializeBullet(weight_grains, diameter_inches, length_inches, bc, drag_function);
         }
 
-        void setAtmosphere(void* simulator, double temperature_f, double pressure_inhg, 
-                          double humidity_percent, double altitude_feet)
+        void ballistics_calc_set_atmosphere(void* solver, double temperature_f, double pressure_inhg, 
+                                             double humidity_percent, double altitude_feet)
         {
-            static_cast<TargetSimulator*>(simulator)->setAtmosphere(temperature_f, pressure_inhg, humidity_percent, altitude_feet);
+            static_cast<BallisticsCalculator*>(solver)->setAtmosphere(temperature_f, pressure_inhg, humidity_percent, altitude_feet);
         }
 
-        void setWind(void* simulator, double wind_speed_mph, double wind_direction_deg)
+        void ballistics_calc_set_wind(void* solver, double wind_speed_mph, double wind_direction_deg)
         {
-            static_cast<TargetSimulator*>(simulator)->setWind(wind_speed_mph, wind_direction_deg);
+            static_cast<BallisticsCalculator*>(solver)->setWind(wind_speed_mph, wind_direction_deg);
         }
 
-        void* calculateTrajectory(void* simulator, double muzzle_velocity_fps, double zero_range_yards,
-                                 double scope_height_inches, double max_range_yards, double step_yards)
+        void* ballistics_calc_calculate_trajectory(void* solver, double muzzle_velocity_fps, double zero_range_yards,
+                                                     double scope_height_inches, double max_range_yards, double step_yards)
         {
-            return static_cast<TargetSimulator*>(simulator)->calculateTrajectory(muzzle_velocity_fps, zero_range_yards, scope_height_inches, max_range_yards, step_yards);
+            return static_cast<BallisticsCalculator*>(solver)->calculateTrajectory(muzzle_velocity_fps, zero_range_yards, scope_height_inches, max_range_yards, step_yards);
         }
 
-        void freeTrajectory(void* trajectory_data)
+        void ballistics_calc_free_trajectory(void* trajectory_data)
         {
             delete static_cast<TrajectoryData*>(trajectory_data);
         }
 
-        int getTrajectoryPoint(void* trajectory_data, double range_yards, double* drop_mrad, double* drift_mrad,
-                              double* velocity_fps, double* energy_ftlbf, double* time_sec)
+        int ballistics_calc_get_trajectory_point(void* trajectory_data, double range_yards, double* drop_mrad, double* drift_mrad,
+                                                   double* velocity_fps, double* energy_ftlbf, double* time_sec)
         {
             TrajectoryData* data = static_cast<TrajectoryData*>(trajectory_data);
             if(!data)
@@ -229,11 +228,11 @@ namespace psim::web_ui
             return 0;
         }
 
-        int getTrajectoryPointCount(void* trajectory_data)
+        int ballistics_calc_get_trajectory_point_count(void* trajectory_data)
         {
             TrajectoryData* data = static_cast<TrajectoryData*>(trajectory_data);
             return data ? data->points.size() : 0;
         }
     }
 
-} // namespace psim::web_ui
+} // namespace btk::ballistics_calc
