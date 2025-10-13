@@ -65,7 +65,6 @@ class TargetSimulator {
         this.elements = {
             runBtn: document.getElementById('runBtn'),
             stopBtn: document.getElementById('stopBtn'),
-            status: document.getElementById('status'),
             liveScore: document.getElementById('liveScore'),
             canvas: document.getElementById('targetCanvas'),
             tooltip: document.getElementById('tooltip')
@@ -93,8 +92,6 @@ class TargetSimulator {
         this.elements.runBtn.addEventListener('click', () => this.runSimulation());
         this.elements.stopBtn.addEventListener('click', () => this.stopSimulation());
         
-        // Zoom controls
-        document.getElementById('resetZoom').addEventListener('click', () => this.resetZoom());
         
         // Canvas interactions
         this.canvas.addEventListener('wheel', (e) => this.onMouseWheel(e));
@@ -154,7 +151,6 @@ class TargetSimulator {
             // Update UI
             this.elements.runBtn.disabled = true;
             this.elements.stopBtn.disabled = false;
-            this.elements.status.textContent = 'Starting simulation...';
             
             // Start simulation
             this.isRunning = true;
@@ -169,7 +165,6 @@ class TargetSimulator {
 
     stopSimulation() {
         this.isRunning = false;
-        this.elements.status.textContent = 'Simulation stopped';
         this.elements.runBtn.disabled = false;
         this.elements.stopBtn.disabled = true;
     }
@@ -215,8 +210,6 @@ class TargetSimulator {
             throw new Error(`Unknown target: ${targetName}`);
         }
 
-        // Update ring sizes display
-        this.updateRingSizesDisplay(target);
 
         // Create simulator
         const rifleAccuracyMrad = this.btk.Angle.moa(rifleAccuracy).getMrad();
@@ -295,7 +288,6 @@ class TargetSimulator {
             this.currentMatch++;
             this.currentShot = 0;
             this.currentShots = [];
-            this.elements.status.textContent = `Match ${this.currentMatch}/${this.totalMatches}`;
 
             // Log match header
 
@@ -306,11 +298,8 @@ class TargetSimulator {
 
     finishSimulation() {
         this.isRunning = false;
-        this.elements.status.textContent = 'Simulation complete!';
         this.elements.runBtn.disabled = false;
         this.elements.stopBtn.disabled = true;
-
-        // Show results in log
     }
 
     clearResults() {
@@ -438,12 +427,6 @@ class TargetSimulator {
         }
     }
 
-    resetZoom() {
-        this.zoomFactor = 1.0;
-        this.panX = 0;
-        this.panY = 0;
-        this.redrawTarget();
-    }
 
     onMouseWheel(e) {
         e.preventDefault();
@@ -562,63 +545,6 @@ class TargetSimulator {
         }
     }
 
-    updateRingSizesDisplay(target) {
-        const ringSizesBox = document.getElementById('ringSizesBox');
-        const ringSizesContent = document.getElementById('ringSizesContent');
-        if (!ringSizesBox || !ringSizesContent) return;
-
-        try {
-            // Get X ring diameter directly
-            const xRingDiameter = target.getXRingDiameter();
-            const ring10 = this.btk.getRingInfoWrapper(target, 10);
-            const ring9 = this.btk.getRingInfoWrapper(target, 9);
-            const ring8 = this.btk.getRingInfoWrapper(target, 8);
-            const ring7 = this.btk.getRingInfoWrapper(target, 7);
-            const ring6 = this.btk.getRingInfoWrapper(target, 6);
-            const ring5 = this.btk.getRingInfoWrapper(target, 5);
-            const ring4 = this.btk.getRingInfoWrapper(target, 4);
-            const ring3 = this.btk.getRingInfoWrapper(target, 3);
-            const ring2 = this.btk.getRingInfoWrapper(target, 2);
-            const ring1 = this.btk.getRingInfoWrapper(target, 1);
-
-            // Build ring sizes display, only showing non-zero rings
-            let ringSizesHtml = '';
-            
-            // Add X ring if it exists
-            const xDiameter = xRingDiameter.getInches();
-            if (xDiameter > 0) {
-                ringSizesHtml += `<div>X: ${xDiameter.toFixed(2)}"</div>`;
-            }
-            
-            const rings = [
-                { num: 10, info: ring10 },
-                { num: 9, info: ring9 },
-                { num: 8, info: ring8 },
-                { num: 7, info: ring7 },
-                { num: 6, info: ring6 },
-                { num: 5, info: ring5 },
-                { num: 4, info: ring4 },
-                { num: 3, info: ring3 },
-                { num: 2, info: ring2 },
-                { num: 1, info: ring1 }
-            ];
-            
-            rings.forEach(ring => {
-                const diameter = ring.info.inner.getInches();
-                if (diameter > 0) {
-                    ringSizesHtml += `<div>${ring.num}: ${diameter.toFixed(2)}"</div>`;
-                }
-            });
-            
-            ringSizesContent.innerHTML = ringSizesHtml;
-            
-            // Show the ring sizes box
-            ringSizesBox.style.display = 'block';
-        } catch (error) {
-            ringSizesContent.textContent = 'Error loading ring sizes';
-            console.error('Error updating ring sizes:', error);
-        }
-    }
 
     updateMousePosition(canvasX, canvasY) {
         const mousePositionBox = document.getElementById('mousePositionBox');
