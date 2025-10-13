@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAssembly Test</title>
+</head>
+<body>
+    <h1>WebAssembly Module Test</h1>
+    <div id="status">Loading...</div>
+    <div id="output"></div>
+
+    <script>
+        async function testWebAssembly() {
+            const status = document.getElementById('status');
+            const output = document.getElementById('output');
+            
+            try {
+                status.textContent = 'Loading WebAssembly module...';
+                
+                // Load the WebAssembly module
+                const script = document.createElement('script');
+                script.src = 'web_ui_wasm.js';
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+                
+                status.textContent = 'WebAssembly module loaded successfully!';
+                
+                // Check what's available
+                output.innerHTML = '<h3>Available functions:</h3>';
+                output.innerHTML += '<pre>' + JSON.stringify(Object.keys(WebUI), null, 2) + '</pre>';
+                
+                // Test basic functionality
+                if (WebUI._malloc && WebUI._free) {
+                    output.innerHTML += '<p>✓ Basic memory management functions available</p>';
+                } else {
+                    output.innerHTML += '<p>✗ Memory management functions not found</p>';
+                }
+                
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                output.innerHTML = '<p>Failed to load WebAssembly module</p>';
+            }
+        }
+        
+        // Run the test when page loads
+        window.addEventListener('load', testWebAssembly);
+    </script>
+</body>
+</html>
