@@ -5,7 +5,7 @@
 
 class TargetSimulator {
     constructor() {
-        this.Module = null;
+        this.btk = null;
         this.simulator = null;
         this.currentShots = [];
         this.allShots = [];
@@ -44,7 +44,7 @@ class TargetSimulator {
             document.getElementById('loading').classList.add('show');
             
             // Initialize WebAssembly module
-            this.Module = await BallisticsToolkit();
+            this.btk = await BallisticsToolkit();
             
             // Hide loading
             document.getElementById('loading').classList.remove('show');
@@ -196,25 +196,25 @@ class TargetSimulator {
         const temperature = parseFloat(document.getElementById('temperature').value);
         const humidity = parseFloat(document.getElementById('humidity').value);
         // Create bullet
-        const bullet = new this.Module.Bullet(
-            this.Module.Weight.grains(0), // Weight not used in 3DOF
-            this.Module.Distance.inches(diameter),
-            this.Module.Distance.inches(0), // Length not used
+        const bullet = new this.btk.Bullet(
+            this.btk.Weight.grains(0), // Weight not used in 3DOF
+            this.btk.Distance.inches(diameter),
+            this.btk.Distance.inches(0), // Length not used
             bc,
             document.getElementById('dragFunction').value === 'G1' ? 
-                this.Module.DragFunction.G1 : this.Module.DragFunction.G7
+                this.btk.DragFunction.G1 : this.btk.DragFunction.G7
         );
 
         // Create atmosphere
-        const temp = this.Module.Temperature.fahrenheit(temperature);
-        const alt = this.Module.Distance.feet(altitude);
+        const temp = this.btk.Temperature.fahrenheit(temperature);
+        const alt = this.btk.Distance.feet(altitude);
         // Use automatic pressure calculation at altitude
-        const press = this.Module.Pressure.zero(); // This will be calculated automatically
+        const press = this.btk.Pressure.zero(); // This will be calculated automatically
         
-        const atmosphere = new this.Module.Atmosphere(temp, alt, humidity, press);
+        const atmosphere = new this.btk.Atmosphere(temp, alt, humidity, press);
 
         // Get target
-        const target = this.Module.NRATargets.getTarget(targetName);
+        const target = this.btk.NRATargets.getTarget(targetName);
         if (!target) {
             throw new Error(`Unknown target: ${targetName}`);
         }
@@ -223,19 +223,19 @@ class TargetSimulator {
         this.updateRingSizesDisplay(target);
 
         // Create simulator
-        const rifleAccuracyMrad = this.Module.Angle.moa(rifleAccuracy).getMrad();
+        const rifleAccuracyMrad = this.btk.Angle.moa(rifleAccuracy).getMrad();
         
-        this.simulator = new this.Module.MatchSimulator(
+        this.simulator = new this.btk.MatchSimulator(
             bullet,
-            this.Module.Velocity.fps(mv),
+            this.btk.Velocity.fps(mv),
             target,
-            this.Module.Distance.yards(range),
+            this.btk.Distance.yards(range),
             atmosphere,
-            this.Module.Velocity.fps(mvSd),
-            this.Module.Velocity.mph(windSd),
-            this.Module.Velocity.mph(headwindSd),
-            this.Module.Velocity.mph(updraftSd),
-            this.Module.Angle.mrad(rifleAccuracyMrad),
+            this.btk.Velocity.fps(mvSd),
+            this.btk.Velocity.mph(windSd),
+            this.btk.Velocity.mph(headwindSd),
+            this.btk.Velocity.mph(updraftSd),
+            this.btk.Angle.mrad(rifleAccuracyMrad),
             0.001 // timestep
         );
 
@@ -342,7 +342,7 @@ class TargetSimulator {
         const target = this.simulator.getTarget();
         
         // Calculate scale
-        const ring8Info = this.Module.getRingInfoWrapper(target, 8);
+        const ring8Info = this.btk.getRingInfoWrapper(target, 8);
         const referenceDiameter = ring8Info.inner.getInches() * 2; // 8-ring diameter
         const baseScale = Math.min(this.canvas.width, this.canvas.height) * 0.85 / referenceDiameter;
         this.targetScale = baseScale * this.zoomFactor;
@@ -362,7 +362,7 @@ class TargetSimulator {
         ];
 
         for (const spec of ringSpecs) {
-            const ringInfo = this.Module.getRingInfoWrapper(target, spec.ring);
+            const ringInfo = this.btk.getRingInfoWrapper(target, spec.ring);
             const radiusInches = ringInfo.inner.getInches() / 2;
             const radiusPixels = radiusInches * this.targetScale;
 
@@ -611,16 +611,16 @@ class TargetSimulator {
         try {
             // Get X ring diameter directly
             const xRingDiameter = target.getXRingDiameter();
-            const ring10 = this.Module.getRingInfoWrapper(target, 10);
-            const ring9 = this.Module.getRingInfoWrapper(target, 9);
-            const ring8 = this.Module.getRingInfoWrapper(target, 8);
-            const ring7 = this.Module.getRingInfoWrapper(target, 7);
-            const ring6 = this.Module.getRingInfoWrapper(target, 6);
-            const ring5 = this.Module.getRingInfoWrapper(target, 5);
-            const ring4 = this.Module.getRingInfoWrapper(target, 4);
-            const ring3 = this.Module.getRingInfoWrapper(target, 3);
-            const ring2 = this.Module.getRingInfoWrapper(target, 2);
-            const ring1 = this.Module.getRingInfoWrapper(target, 1);
+            const ring10 = this.btk.getRingInfoWrapper(target, 10);
+            const ring9 = this.btk.getRingInfoWrapper(target, 9);
+            const ring8 = this.btk.getRingInfoWrapper(target, 8);
+            const ring7 = this.btk.getRingInfoWrapper(target, 7);
+            const ring6 = this.btk.getRingInfoWrapper(target, 6);
+            const ring5 = this.btk.getRingInfoWrapper(target, 5);
+            const ring4 = this.btk.getRingInfoWrapper(target, 4);
+            const ring3 = this.btk.getRingInfoWrapper(target, 3);
+            const ring2 = this.btk.getRingInfoWrapper(target, 2);
+            const ring1 = this.btk.getRingInfoWrapper(target, 1);
 
             // Build ring sizes display, only showing non-zero rings
             let ringSizesHtml = '';
