@@ -15,7 +15,7 @@ Professional web-based ballistics calculator and match simulation suite for long
 
 ### 🎲 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
-- **NRA Target Library** - All 12 standard targets (SR, MR, LR, F-Class)
+- **NRA Target Library** - 14 NRA targets (10 standard + 4 F-Class variants)
 - **Realistic Variability** - Muzzle velocity, wind, and rifle accuracy modeling
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
 - **Match Scoring** - Complete NRA scoring with X-counts and group size analysis
@@ -27,7 +27,7 @@ Visit the [Ballistic Calculator](https://chasep255.github.io/BallisticsToolkit/b
 
 1. **Bullet specs** - Weight, diameter, BC, drag function
 2. **Conditions** - Temperature, pressure, humidity, altitude  
-3. **Wind** - Speed and direction (12=pushes forward, 3=pushes right, 6=pushes backward, 9=pushes left)
+3. **Wind** - Speed and direction using 12-hour clock (12=tailwind, 3=right crosswind, 6=headwind, 9=left crosswind)
 4. **Shot data** - Muzzle velocity, zero range, scope height
 
 Results display drop and drift corrections in your choice of milliradians or MOA for precise long-range adjustments.
@@ -63,7 +63,7 @@ Opens local server at http://localhost:8001
 
 ## Technical Details
 
-- **Engine**: 3DOF ballistics simulation with Runge-Kutta integration
+- **Engine**: 3DOF ballistics simulation with 2nd-order Runge-Kutta (RK2) midpoint method
 - **Language**: C++17 compiled to WebAssembly with Emscripten
 - **Frontend**: Vanilla JavaScript with modern CSS, no frameworks
 - **Match Scoring**: Complete NRA scoring system with statistical analysis
