@@ -37,6 +37,17 @@
     text-decoration: none;
 }
 
+.page-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.main-logo {
+    height: 80px;
+    width: auto;
+    max-width: 100%;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f5f5f5;
