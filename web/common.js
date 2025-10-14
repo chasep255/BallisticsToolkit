@@ -23,16 +23,17 @@ function setActiveNavLink()
 }
 
 // Generate common navigation
-function generateNavigation()
+function generateNavigation(currentPageName)
 {
-  const currentPage = window.location.pathname;
-  const isHome = currentPage.endsWith('index.html') || currentPage.endsWith('/') || currentPage.endsWith('/web/');
-  const isBallisticCalc = currentPage.includes('ballistic-calc');
-  const isTargetSim = currentPage.includes('target-sim');
-  const isAbout = currentPage.includes('about.html');
+  // Determine path prefix based on current page
+  const isRootPage = currentPageName === 'index' || currentPageName === 'about';
+  const pathPrefix = isRootPage ? '' : '../';
 
-  // Determine path prefix
-  const pathPrefix = isHome ? '' : '../';
+  // Determine active states
+  const isHome = currentPageName === 'index';
+  const isBallisticCalc = currentPageName === 'ballistic-calc';
+  const isTargetSim = currentPageName === 'target-sim';
+  const isAbout = currentPageName === 'about';
 
   const navHTML = `
         <div class="nav-content">
@@ -65,8 +66,11 @@ function setupCommonPageStructure()
     body.insertBefore(navHeader, body.firstChild);
   }
 
+  // Get page name from data attribute on body tag
+  const currentPageName = body.dataset.page || 'index';
+
   // Generate navigation content
-  navHeader.innerHTML = generateNavigation();
+  navHeader.innerHTML = generateNavigation(currentPageName);
 }
 
 // Initialize common functionality when DOM is loaded
