@@ -17,8 +17,54 @@ function setActiveNavLink() {
     });
 }
 
+// Generate common navigation
+function generateNavigation() {
+    const currentPage = window.location.pathname;
+    const isHome = currentPage.endsWith('index.html') || currentPage.endsWith('/') || currentPage.endsWith('/web/');
+    const isBallisticCalc = currentPage.includes('ballistic-calc');
+    const isTargetSim = currentPage.includes('target-sim');
+    const isAbout = currentPage.includes('about.html');
+    
+    // Determine path prefix
+    const pathPrefix = isHome ? '' : '../';
+    
+    const navHTML = `
+        <div class="nav-content">
+            <a href="${pathPrefix}index.html" class="nav-logo">🎯 BallisticsToolkit</a>
+            <div class="nav-links">
+                <a href="${pathPrefix}index.html" ${isHome ? 'class="active"' : ''}>Home</a>
+                <a href="${pathPrefix}ballistic-calc/ballistic-calc.html" ${isBallisticCalc ? 'class="active"' : ''}>Ballistic Calculator</a>
+                <a href="${pathPrefix}target-sim/target-sim.html" ${isTargetSim ? 'class="active"' : ''}>Target Simulator</a>
+                <a href="${pathPrefix}about.html" ${isAbout ? 'class="active"' : ''}>About</a>
+            </div>
+        </div>
+    `;
+    
+    return navHTML;
+}
+
+// Common page template structure
+function setupCommonPageStructure() {
+    // Ensure all pages have the basic structure
+    const body = document.body;
+    if (!body) return;
+    
+    // Check if nav-header exists, if not create it
+    let navHeader = document.querySelector('.nav-header');
+    if (!navHeader) {
+        navHeader = document.createElement('div');
+        navHeader.className = 'nav-header';
+        body.insertBefore(navHeader, body.firstChild);
+    }
+    
+    // Generate navigation content
+    navHeader.innerHTML = generateNavigation();
+}
+
 // Initialize common functionality when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Setup common page structure and navigation
+    setupCommonPageStructure();
     setActiveNavLink();
 });
 
@@ -91,6 +137,43 @@ const Utils = {
                 } else {
                     input.value = data[key];
                 }
+            }
+        });
+    },
+    
+    // Setup help modal functionality
+    setupHelpModal: function(helpBtnId, helpModalId) {
+        const helpBtn = document.getElementById(helpBtnId);
+        const helpModal = document.getElementById(helpModalId);
+        const closeBtn = helpModal ? helpModal.querySelector('.help-close') : null;
+
+        if (!helpBtn || !helpModal || !closeBtn) {
+            console.warn('Help modal elements not found:', { helpBtnId, helpModalId });
+            return;
+        }
+
+        // Open modal
+        helpBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            helpModal.style.display = 'flex';
+        });
+
+        // Close modal
+        closeBtn.addEventListener('click', () => {
+            helpModal.style.display = 'none';
+        });
+
+        // Close modal when clicking outside
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) {
+                helpModal.style.display = 'none';
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && helpModal.style.display === 'flex') {
+                helpModal.style.display = 'none';
             }
         });
     }

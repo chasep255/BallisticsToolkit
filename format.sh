@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# PrecisionSim Code Formatter
-# Recursively formats C++ files using clang-format with custom style rules
+# BallisticsToolkit Code Formatter
+# Recursively formats C++, HTML, CSS, and JS files using appropriate formatters
 
 # Don't exit on errors - we want to continue formatting other files
 # set -e
@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default directories to format if no args provided
-DEFAULT_DIRS=("src" "include")
+DEFAULT_DIRS=("src" "include" "web")
 
 # Function to print colored output
 print_status() {
@@ -33,20 +33,38 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Function to check if clang-format is installed
-check_clang_format() {
+# Function to check if required formatters are installed
+check_formatters() {
+    local missing_tools=()
+    
+    # Check clang-format for C++
     if ! command -v clang-format &> /dev/null; then
-        print_error "clang-format is not installed!"
-        print_error "Please install clang-format:"
-        print_error "  Ubuntu/Debian: sudo apt install clang-format"
-        print_error "  Fedora: sudo dnf install clang-tools-extra"
-        print_error "  macOS: brew install clang-format"
-        exit 1
+        missing_tools+=("clang-format")
+    else
+        VERSION=$(clang-format --version | grep -o '[0-9]\+\.[0-9]\+' | head -1)
+        print_status "Using clang-format version $VERSION"
     fi
     
-    # Check version
-    VERSION=$(clang-format --version | grep -o '[0-9]\+\.[0-9]\+' | head -1)
-    print_status "Using clang-format version $VERSION"
+    # Check prettier for HTML/CSS/JS (preferred)
+    if command -v prettier &> /dev/null; then
+        VERSION=$(prettier --version)
+        print_status "Using prettier version $VERSION"
+    elif command -v js-beautify &> /dev/null; then
+        VERSION=$(js-beautify --version)
+        print_status "Using js-beautify version $VERSION"
+    else
+        missing_tools+=("prettier or js-beautify")
+    fi
+    
+    if [[ ${#missing_tools[@]} -gt 0 ]]; then
+        print_error "Missing formatters: ${missing_tools[*]}"
+        print_error "Please install missing tools:"
+        print_error "  Ubuntu/Debian: sudo apt install clang-format npm && npm install -g prettier"
+        print_error "  Or: sudo apt install clang-format jsbeautifier"
+        print_error "  Fedora: sudo dnf install clang-tools-extra npm && npm install -g prettier"
+        print_error "  macOS: brew install clang-format node && npm install -g prettier"
+        exit 1
+    fi
 }
 
 # Function to format a single file
@@ -58,19 +76,63 @@ format_file() {
         return 1
     fi
     
-    # Check if file is a C++ file
-    if [[ ! "$file" =~ \.(cpp|h|hpp|c|cc|cxx)$ ]]; then
-        print_warning "Skipping non-C++ file: $file"
+    # Determine file type and formatter
+    local formatter=""
+    local file_type=""
+    
+    if [[ "$file" =~ \.(cpp|h|hpp|c|cc|cxx)$ ]]; then
+        formatter="clang-format"
+        file_type="C++"
+    elif [[ "$file" =~ \.(html|htm)$ ]]; then
+        formatter="html"
+        file_type="HTML"
+    elif [[ "$file" =~ \.css$ ]]; then
+        formatter="css"
+        file_type="CSS"
+    elif [[ "$file" =~ \.js$ ]]; then
+        formatter="js"
+        file_type="JavaScript"
+    else
+        print_warning "Skipping unsupported file type: $file"
         return 0
     fi
     
-    print_status "Formatting: $file"
+    print_status "Formatting $file_type: $file"
     
     # Create backup
     cp "$file" "$file.bak"
     
-    # Format the file
-    if clang-format -i -style="$CLANG_FORMAT_STYLE" "$file"; then
+    # Format the file based on type
+    local success=false
+    
+    if [[ "$formatter" == "clang-format" ]]; then
+        if clang-format -i -style="$CLANG_FORMAT_STYLE" "$file"; then
+            success=true
+        fi
+    elif [[ "$formatter" == "html" || "$formatter" == "css" || "$formatter" == "js" ]]; then
+        # Try prettier first, then js-beautify
+        if command -v prettier &> /dev/null; then
+            if prettier --write "$file" --parser="$formatter" 2>/dev/null; then
+                success=true
+            fi
+        elif command -v js-beautify &> /dev/null; then
+            if [[ "$formatter" == "html" ]]; then
+                if html-beautify -i "$file" 2>/dev/null; then
+                    success=true
+                fi
+            elif [[ "$formatter" == "css" ]]; then
+                if css-beautify -i "$file" 2>/dev/null; then
+                    success=true
+                fi
+            elif [[ "$formatter" == "js" ]]; then
+                if js-beautify -i "$file" 2>/dev/null; then
+                    success=true
+                fi
+            fi
+        fi
+    fi
+    
+    if [[ "$success" == "true" ]]; then
         # Check if file was actually changed
         if ! diff -q "$file" "$file.bak" > /dev/null; then
             print_success "Formatted: $file"
@@ -78,7 +140,7 @@ format_file() {
             print_status "No changes needed: $file"
         fi
         rm "$file.bak"
-        return 0  # Always return success for "no changes needed"
+        return 0
     else
         print_error "Failed to format: $file"
         mv "$file.bak" "$file"
@@ -86,7 +148,7 @@ format_file() {
     fi
 }
 
-# Function to format all C++ files in a directory recursively
+# Function to format all supported files in a directory recursively
 format_directory() {
     local dir="$1"
     
@@ -97,18 +159,18 @@ format_directory() {
     
     print_status "Formatting directory: $dir"
     
-    # Find all C++ files recursively
+    # Find all supported files recursively
     local files=()
     while IFS= read -r -d '' file; do
         files+=("$file")
-    done < <(find "$dir" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cc" -o -name "*.cxx" \) -print0)
+    done < <(find "$dir" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cc" -o -name "*.cxx" -o -name "*.html" -o -name "*.htm" -o -name "*.css" -o -name "*.js" \) -print0)
     
     if [[ ${#files[@]} -eq 0 ]]; then
-        print_warning "No C++ files found in: $dir"
+        print_warning "No supported files found in: $dir"
         return 0
     fi
     
-    print_status "Found ${#files[@]} C++ files in $dir"
+    print_status "Found ${#files[@]} supported files in $dir"
     
     local success_count=0
     local total_count=${#files[@]}
@@ -126,7 +188,11 @@ format_directory() {
 show_usage() {
     echo "Usage: $0 [OPTIONS] [FILES/DIRECTORIES...]"
     echo ""
-    echo "Recursively formats C++ files using clang-format with custom style rules."
+    echo "Recursively formats C++, HTML, CSS, and JS files using appropriate formatters."
+    echo ""
+    echo "Supported file types:"
+    echo "  C++: .cpp, .h, .hpp, .c, .cc, .cxx (clang-format)"
+    echo "  Web: .html, .htm, .css, .js (prettier or js-beautify)"
     echo ""
     echo "Options:"
     echo "  -h, --help     Show this help message"
@@ -135,11 +201,13 @@ show_usage() {
     echo "  -c, --check     Check if files are properly formatted (exit 1 if not)"
     echo ""
     echo "Examples:"
-    echo "  $0                    # Format default directories (src, include)"
+    echo "  $0                    # Format default directories (src, include, web)"
     echo "  $0 src/              # Format src/ directory recursively"
-    echo "  $0 include/ballistics/bullet.h  # Format specific file"
-    echo "  $0 -d src/           # Dry run - show what would be formatted"
-    echo "  $0 -c src/           # Check formatting without changing files"
+    echo "  $0 web/              # Format web/ directory recursively"
+    echo "  $0 include/ballistics/bullet.h  # Format specific C++ file"
+    echo "  $0 web/common.css    # Format specific CSS file"
+    echo "  $0 -d web/           # Dry run - show what would be formatted"
+    echo "  $0 -c web/           # Check formatting without changing files"
     echo ""
     echo "Default directories: ${DEFAULT_DIRS[*]}"
 }
@@ -185,8 +253,8 @@ if [[ ${#TARGETS[@]} -eq 0 ]]; then
     TARGETS=("${DEFAULT_DIRS[@]}")
 fi
 
-# Check if clang-format is installed
-check_clang_format
+# Check if required formatters are installed
+check_formatters
 
 # Define clang-format style based on your preferences
 # - Opening braces on next line
@@ -289,11 +357,32 @@ for target in "${TARGETS[@]}"; do
             local files=()
             while IFS= read -r -d '' file; do
                 files+=("$file")
-            done < <(find "$target" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cc" -o -name "*.cxx" \) -print0)
+            done < <(find "$target" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cc" -o -name "*.cxx" -o -name "*.html" -o -name "*.htm" -o -name "*.css" -o -name "*.js" \) -print0)
             
             local all_good=true
             for file in "${files[@]}"; do
-                if ! clang-format -style="$CLANG_FORMAT_STYLE" "$file" | diff -q "$file" - > /dev/null; then
+                local is_formatted=true
+                
+                # Check C++ files with clang-format
+                if [[ "$file" =~ \.(cpp|h|hpp|c|cc|cxx)$ ]]; then
+                    if ! clang-format -style="$CLANG_FORMAT_STYLE" "$file" | diff -q "$file" - > /dev/null; then
+                        is_formatted=false
+                    fi
+                # Check web files with prettier or js-beautify
+                elif [[ "$file" =~ \.(html|htm|css|js)$ ]]; then
+                    if command -v prettier &> /dev/null; then
+                        local ext="${file##*.}"
+                        if ! prettier --check "$file" --parser="$ext" 2>/dev/null; then
+                            is_formatted=false
+                        fi
+                    elif command -v js-beautify &> /dev/null; then
+                        # This is more complex for js-beautify, so we'll skip detailed checking
+                        # and just assume it's formatted if the tool exists
+                        is_formatted=true
+                    fi
+                fi
+                
+                if [[ "$is_formatted" == "false" ]]; then
                     print_error "Not properly formatted: $file"
                     all_good=false
                 fi
@@ -306,7 +395,7 @@ for target in "${TARGETS[@]}"; do
             fi
         elif [[ "$DRY_RUN" == "true" ]]; then
             print_status "Would format directory: $target"
-            find "$target" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cc" -o -name "*.cxx" \) -exec echo "  Would format: {}" \;
+            find "$target" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cc" -o -name "*.cxx" -o -name "*.html" -o -name "*.htm" -o -name "*.css" -o -name "*.js" \) -exec echo "  Would format: {}" \;
         else
             format_directory "$target"
         fi

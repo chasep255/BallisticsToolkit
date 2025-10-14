@@ -3,11 +3,8 @@
 # Build WebAssembly version and start web server for testing
 set -e
 
-echo "🧹 Cleaning previous build..."
-rm -rf build-wasm
-
 echo "🔨 Building WebAssembly..."
-mkdir build-wasm
+mkdir -p build-wasm
 cd build-wasm
 emcmake cmake ..
 emmake make -j$(nproc)

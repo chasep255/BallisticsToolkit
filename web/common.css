@@ -140,7 +140,6 @@ body {
     box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
 }
 
-/* Parameter panels - consistent styling for both apps */
 .form-section {
     margin-bottom: 30px;
     padding: 20px;
@@ -153,6 +152,40 @@ body {
     margin-top: 0;
     color: #555;
 }
+
+/* Content section styling */
+.content-section {
+    margin-bottom: 30px;
+}
+
+/* Feature boxes for about page */
+.feature-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.feature-box {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 3px solid #007bff;
+    flex: 1 1 300px;
+    min-width: 250px;
+}
+
+.feature-box h3 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+}
+
+.feature-box p {
+    margin: 0;
+    font-size: 0.9em;
+    color: #555;
+}
+
 
 .params-bar {
     display: grid;
@@ -385,4 +418,106 @@ footer {
 
 footer a {
     color: white;
+}
+
+/* Help Modal Styles */
+.help-modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.help-modal-content {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    max-width: 600px;
+    max-height: 80vh;
+    width: 90%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.help-modal-header {
+    background: #007bff;
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.help-modal-header h2 {
+    margin: 0;
+    font-size: 1.2em;
+}
+
+.help-close {
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.help-close:hover {
+    opacity: 0.7;
+}
+
+.help-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.help-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 3px solid #007bff;
+}
+
+.help-section h3 {
+    margin: 0 0 10px 0;
+    color: #007bff;
+    font-size: 1.1em;
+}
+
+.help-section p {
+    margin: 5px 0;
+    line-height: 1.4;
+}
+
+.param-help {
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+.help-section ul {
+    margin: 10px 0;
+    padding-left: 20px;
+}
+
+.help-section li {
+    margin: 5px 0;
+}
+
+/* Mobile responsive for help modal */
+@media (max-width: 768px) {
+    .help-modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+    
+    .help-modal-body {
+        padding: 15px;
+    }
 }

@@ -44,7 +44,7 @@ Watch realistic shot impacts on NRA targets with detailed logging and statistica
 
 ## Building from Source
 
-Requires Emscripten SDK, CMake ≥ 3.16, and Python 3.
+Requires Emscripten SDK, CMake ≥ 3.16, and Python 3 (Web Server).
 
 ```bash
 # Install Emscripten

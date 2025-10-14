@@ -52,6 +52,7 @@ class TargetSimulator {
             // Initialize UI
             this.initializeUI();
             this.setupEventListeners();
+            Utils.setupHelpModal('helpBtn', 'helpModal');
             
             console.log('Target Simulator initialized successfully');
         } catch (error) {
@@ -77,13 +78,32 @@ class TargetSimulator {
         // Set canvas size
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
+        
+        // Populate target dropdown from C++
+        this.populateTargetDropdown();
     }
 
     resizeCanvas() {
         const container = this.canvas.parentElement;
         const rect = container.getBoundingClientRect();
-        this.canvas.width = rect.width;
-        this.canvas.height = rect.height;
+        
+        // Check if we're on mobile
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+            // On mobile, be more conservative to ensure it fits
+            const maxSize = Math.min(rect.width - 20, rect.height - 20, window.innerWidth - 40);
+            const size = Math.max(maxSize, 250); // Minimum size of 250px on mobile
+            this.canvas.width = size;
+            this.canvas.height = size;
+        } else {
+            // On desktop, make canvas as large as possible
+            const maxSize = Math.min(rect.width, rect.height, window.innerWidth - 100, window.innerHeight - 200);
+            const size = Math.max(maxSize, 300); // Minimum size of 300px
+            this.canvas.width = size;
+            this.canvas.height = size;
+        }
+        
         this.redrawTarget();
     }
 
@@ -105,6 +125,57 @@ class TargetSimulator {
         this.canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
         this.canvas.addEventListener('pointerup', (e) => this.onPointerUp(e));
         this.canvas.addEventListener('pointercancel', (e) => this.onPointerUp(e));
+    }
+
+
+    populateTargetDropdown() {
+        try {
+            // Get the target dropdown element
+            const targetSelect = document.getElementById('target');
+            
+            // Clear existing options
+            targetSelect.innerHTML = '';
+            
+            // Get available targets from C++
+            const availableTargets = this.btk.NRATargets.listTargets();
+            
+            // Add each target as an option
+            availableTargets.forEach(targetName => {
+                const option = document.createElement('option');
+                option.value = targetName;
+                option.textContent = targetName;
+                targetSelect.appendChild(option);
+            });
+            
+            // Set default selection to MR-1FCA if available, otherwise first target
+            const defaultTarget = availableTargets.includes('MR-1FCA') ? 'MR-1FCA' : availableTargets[0];
+            if (defaultTarget) {
+                targetSelect.value = defaultTarget;
+            }
+            
+            console.log(`Loaded ${availableTargets.length} targets from C++:`, availableTargets);
+        } catch (error) {
+            console.error('Failed to populate target dropdown:', error);
+            // Fallback to hardcoded targets if C++ call fails
+            this.populateTargetDropdownFallback();
+        }
+    }
+
+    populateTargetDropdownFallback() {
+        const targetSelect = document.getElementById('target');
+        const fallbackTargets = [
+            'SR', 'SR-3', 'SR-1', 'SR-21', 'MR-63', 'MR-65', 'MR-1', 'MR-31', 'MR-52', 
+            'LR', 'MR-63FCA', 'MR-65FCA', 'MR-1FCA', 'LR-FCA'
+        ];
+        
+        targetSelect.innerHTML = '';
+        fallbackTargets.forEach(targetName => {
+            const option = document.createElement('option');
+            option.value = targetName;
+            option.textContent = targetName;
+            if (targetName === 'MR-1FCA') option.selected = true;
+            targetSelect.appendChild(option);
+        });
     }
 
     validateInputs() {
