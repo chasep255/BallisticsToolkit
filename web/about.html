@@ -6,7 +6,33 @@
     <title>About - BallisticsToolkit</title>
     <link rel="stylesheet" href="common.css">
     <style>
-        /* Tech details styling - specific to about page */
+        .feature-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .feature-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 3px solid #007bff;
+            flex: 1 1 300px;
+            min-width: 250px;
+        }
+
+        .feature-box h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+
+        .feature-box p {
+            margin: 0;
+            font-size: 1em;
+            color: #555;
+        }
+
         .tech-list {
             display: flex;
             flex-wrap: wrap;
@@ -30,6 +56,16 @@
             display: block;
             margin-bottom: 5px;
         }
+
+        /* Overview section styling */
+        .overview-intro {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            margin-bottom: 25px;
+        }
+
     </style>
 </head>
 <body>
@@ -42,9 +78,9 @@
         
         <div class="content-section">
             <h2>Project Overview</h2>
-            <p>The Ballistics Toolkit is a comprehensive suite of ballistic calculation tools designed for precision shooting applications. Built with modern web technologies and WebAssembly, it provides accurate trajectory calculations and realistic target simulation.</p>
-            
-            <p>This toolkit combines the power of C++ ballistic algorithms with the accessibility of web applications, offering both a ballistic calculator for trajectory analysis and a Monte Carlo target simulator for accuracy assessment.</p>
+            <div class="overview-intro">
+                <p><strong>The Ballistics Toolkit</strong> is a comprehensive suite of precision shooting tools that brings professional-grade ballistic calculations to your browser. Built with modern web technologies and WebAssembly, it provides accurate trajectory calculations and realistic target simulation without requiring any software installation.</p>
+            </div>
         </div>
         
         <div class="content-section">
@@ -79,12 +115,11 @@
         
         <div class="content-section">
             <h2>Technical Details</h2>
-            <p>The Ballistics Toolkit is built using:</p>
             <ul class="tech-list">
                 <li class="tech-item"><strong>Backend</strong>C++ with custom units library for type-safe calculations</li>
                 <li class="tech-item"><strong>WebAssembly</strong>Emscripten compilation for browser compatibility</li>
                 <li class="tech-item"><strong>Frontend</strong>Vanilla JavaScript with modern CSS Grid and Flexbox</li>
-                <li class="tech-item"><strong>Algorithms</strong>4th-order Runge-Kutta integration for trajectory calculations</li>
+                <li class="tech-item"><strong>Algorithms</strong>2nd-order Runge-Kutta (RK2) integration for trajectory calculations</li>
                 <li class="tech-item"><strong>Drag Models</strong>G1 and G7 standard drag functions</li>
                 <li class="tech-item"><strong>Atmosphere</strong>ICAO Standard Atmosphere with environmental corrections</li>
             </ul>
@@ -97,14 +132,9 @@
                 <p><strong>Issues & Bug Reports:</strong> Please use the GitHub Issues page for bug reports and feature requests</p>
                 <p><strong>Contributions:</strong> Pull requests are welcome! Please read the contributing guidelines first</p>
                 <p><strong>Documentation:</strong> Complete API documentation and usage examples are available in the repository</p>
+                <p><strong>License:</strong> MIT License</p>
             </div>
         </div>
-        
-        <div class="content-section">
-            <h2>License</h2>
-            <p>This project is open source and available under the MIT License. You are free to use, modify, and distribute the code for both personal and commercial purposes.</p>
-        </div>
-        
     </div>
     
     <script src="common.js"></script>

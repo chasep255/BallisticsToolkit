@@ -153,39 +153,6 @@ body {
     color: #555;
 }
 
-/* Content section styling */
-.content-section {
-    margin-bottom: 30px;
-}
-
-/* Feature boxes for about page */
-.feature-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin: 20px 0;
-}
-
-.feature-box {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 5px;
-    border-left: 3px solid #007bff;
-    flex: 1 1 300px;
-    min-width: 250px;
-}
-
-.feature-box h3 {
-    margin: 0 0 10px 0;
-    color: #2c3e50;
-}
-
-.feature-box p {
-    margin: 0;
-    font-size: 0.9em;
-    color: #555;
-}
-
 
 .params-bar {
     display: grid;
