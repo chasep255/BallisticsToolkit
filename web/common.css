@@ -9,6 +9,34 @@
     box-sizing: border-box;
 }
 
+/* ==========================================================================
+   LOGO & BRANDING
+   ========================================================================== */
+.nav-logo {
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-weight: 700;
+    font-size: 1.2em;
+}
+
+.nav-logo-img {
+    height: 40px;
+    width: auto;
+    flex-shrink: 0;
+}
+
+.nav-logo-text {
+    white-space: nowrap;
+}
+
+.nav-logo:hover {
+    color: #3498db;
+    text-decoration: none;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f5f5f5;

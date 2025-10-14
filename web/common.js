@@ -37,7 +37,10 @@ function generateNavigation(currentPageName)
 
   const navHTML = `
         <div class="nav-content">
-            <a href="${pathPrefix}index.html" class="nav-logo">🎯 BallisticsToolkit</a>
+            <a href="${pathPrefix}index.html" class="nav-logo">
+                <img src="${pathPrefix}ballistics-toolkit-icon.png" alt="BallisticsToolkit" class="nav-logo-img">
+                <span class="nav-logo-text">Ballistics Toolkit</span>
+            </a>
             <div class="nav-links">
                 <a href="${pathPrefix}index.html" ${isHome ? 'class="active"' : ''}>Home</a>
                 <a href="${pathPrefix}ballistic-calc/ballistic-calc.html" ${isBallisticCalc ? 'class="active"' : ''}>Ballistic Calculator</a>
