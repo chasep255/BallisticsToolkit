@@ -477,6 +477,73 @@ footer a {
     margin: 5px 0;
 }
 
+/* Content section wrapper */
+.content-section {
+    margin-bottom: 30px;
+}
+
+/* Feature grid pattern (for about page and future use) */
+.feature-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.feature-box {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 3px solid #007bff;
+    flex: 1 1 300px;
+    min-width: 250px;
+}
+
+.feature-box h3 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+}
+
+.feature-box p {
+    margin: 0;
+    font-size: 1em;
+    color: #555;
+}
+
+/* Tech list pattern (for about page) */
+.tech-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin: 20px 0;
+    list-style: none;
+    padding: 0;
+}
+
+.tech-item {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 3px solid #28a745;
+    flex: 1 1 300px;
+    min-width: 250px;
+}
+
+.tech-item strong {
+    color: #2c3e50;
+    display: block;
+    margin-bottom: 5px;
+}
+
+/* Highlight box pattern */
+.highlight-box {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+    margin-bottom: 25px;
+}
+
 /* Mobile responsive for help modal */
 @media (max-width: 768px) {
     .help-modal-content {
