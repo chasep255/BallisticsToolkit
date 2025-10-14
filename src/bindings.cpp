@@ -4,9 +4,9 @@
 // Include all our C++ headers
 #include "atmosphere.h"
 #include "bullet.h"
+#include "match.h"
 #include "match_simulator.h"
 #include "nra_targets.h"
-#include "scoring.h"
 #include "simulator.h"
 #include "target.h"
 #include "trajectory.h"
@@ -248,25 +248,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
         .function("getRingInfo", &Target::getRingInfo)
         .function("toString", &Target::toString);
 
-    // Hit struct
-    value_object<Hit>("Hit").field("x", &Hit::x).field("y", &Hit::y);
-
-    // AccuracyMetrics struct
-    value_object<AccuracyMetrics>("AccuracyMetrics")
-        .field("count", &AccuracyMetrics::count)
-        .field("groupSize", &AccuracyMetrics::group_size)
-        .field("centerX", &AccuracyMetrics::center_x)
-        .field("centerY", &AccuracyMetrics::center_y)
-        .field("meanRadius", &AccuracyMetrics::mean_radius)
-        .field("radialStdDev", &AccuracyMetrics::radial_std_dev);
-
-    // Scoring functions
-    function("calculateGroupSize", &calculateGroupSize);
-    function("calculateCenterOfGroup", &calculateCenterOfGroup);
-    function("calculateRadialStandardDeviation", &calculateRadialStandardDeviation);
-    function("calculateMeanRadius", &calculateMeanRadius);
-    function("calculateAccuracyMetrics", &calculateAccuracyMetrics);
-    function("hitsToScoreString", &hitsToScoreString);
+    // Removed legacy Hit value_object and AccuracyMetrics/legacy scoring bindings
 
     // NRA Targets
     class_<NRATargets>("NRATargets")
@@ -295,6 +277,30 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
         .field("totalScore", &MatchResult::total_score)
         .field("xCount", &MatchResult::x_count)
         .field("groupSize", &MatchResult::group_size);
+
+    // Hit class
+    class_<Hit>("Hit")
+        .constructor<>()
+        .constructor<const Distance&, const Distance&, int, bool>()
+        .function("getX", &Hit::getX)
+        .function("getY", &Hit::getY)
+        .function("getScore", &Hit::getScore)
+        .function("isX", &Hit::isX);
+
+    // Match class
+    class_<Match>("Match")
+        .constructor<>()
+        .function("addHit", select_overload<std::pair<int, bool>(const Distance&, const Distance&, const Target&, const Distance&)>(&Match::addHit))
+        .function("getHits", &Match::getHits)
+        .function("size", &Match::size)
+        .function("clear", &Match::clear)
+        .function("getGroupSize", &Match::getGroupSize)
+        .function("getCenter", &Match::getCenter)
+        .function("getMeanRadius", &Match::getMeanRadius)
+        .function("getRadialStandardDeviation", &Match::getRadialStandardDeviation)
+        .function("getTotalScore", &Match::getTotalScore)
+        .function("getXCount", &Match::getXCount)
+        .function("getHitCount", &Match::getHitCount);
 
     // MatchSimulator class
     class_<MatchSimulator>("MatchSimulator")

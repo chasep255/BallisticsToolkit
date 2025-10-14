@@ -2,6 +2,7 @@
 
 #include "atmosphere.h"
 #include "bullet.h"
+#include "match.h"
 #include "simulator.h"
 #include "target.h"
 #include "units.h"
@@ -112,7 +113,7 @@ namespace btk::ballistics
          */
         size_t getShotCount() const
         {
-            return shots_.size();
+            return match_.getHitCount();
         }
 
         /**
@@ -157,8 +158,8 @@ namespace btk::ballistics
         Bullet zeroed_state_;
         Angle zero_angle_;
 
-        // Track all shots
-        std::vector<ShotResult> shots_;
+        // Track all shots using Match class
+        Match match_;
 
         // Random number generator
         mutable std::mt19937 rng_;

@@ -131,7 +131,6 @@ namespace btk::ballistics
             ShotResult shot(Distance::inches(999.0), Distance::inches(999.0), 0, false, mv, bullet_.getBc(),
                             Velocity::mph(headwind_mph), Velocity::mph(crosswind_mph), Velocity::mph(updraft_mph),
                             release_angle_h, release_angle_v, Velocity::zero());
-            shots_.push_back(shot);
             return shot;
         }
 
@@ -140,60 +139,41 @@ namespace btk::ballistics
         Distance impact_y = impact_point.getState().getPosition().z;        // Z is vertical
         Velocity impact_velocity = impact_point.getState().getVelocity().x; // Forward velocity at impact
 
-        // Score the shot
-        int score = target_.scoreHit(impact_x, impact_y, bullet_diameter_);
-        bool is_x = target_.isXRing(impact_x, impact_y, bullet_diameter_);
+        // Score the shot and add to match
+        auto [score, is_x] = match_.addHit(impact_x, impact_y, target_, bullet_diameter_);
 
         ShotResult shot(impact_x, impact_y, score, is_x, mv, bullet_.getBc(), Velocity::mph(headwind_mph),
                         Velocity::mph(crosswind_mph), Velocity::mph(updraft_mph), release_angle_h, release_angle_v,
                         impact_velocity);
 
-        shots_.push_back(shot);
         return shot;
     }
 
     MatchResult MatchSimulator::getMatchResult() const
     {
-        if(shots_.empty())
+        if(match_.getHitCount() == 0)
         {
             return MatchResult();
         }
 
-        int total_score = 0;
-        int x_count = 0;
-        for(const auto& shot : shots_)
+        // Get all shots from match
+        const auto& hits = match_.getHits();
+        std::vector<ShotResult> shots;
+        for(const auto& hit : hits)
         {
-            total_score += shot.score;
-            if(shot.is_x)
-                x_count++;
+            // Create ShotResult from Hit (we don't have all the detailed info)
+            ShotResult shot(hit.getX(), hit.getY(), hit.getScore(), hit.isX(), 
+                          Velocity::zero(), 0.0, Velocity::zero(), Velocity::zero(), 
+                          Velocity::zero(), Angle::zero(), Angle::zero(), Velocity::zero());
+            shots.push_back(shot);
         }
 
-        // Calculate group size (extreme spread)
-        Distance group_size = Distance::zero();
-        if(shots_.size() >= 2)
-        {
-            double max_distance = 0.0;
-            for(size_t i = 0; i < shots_.size(); ++i)
-            {
-                for(size_t j = i + 1; j < shots_.size(); ++j)
-                {
-                    double x1 = shots_[i].impact_x.inches();
-                    double y1 = shots_[i].impact_y.inches();
-                    double x2 = shots_[j].impact_x.inches();
-                    double y2 = shots_[j].impact_y.inches();
-                    double distance = std::sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
-                    max_distance = std::max(max_distance, distance);
-                }
-            }
-            group_size = Distance::inches(max_distance);
-        }
-
-        return MatchResult(shots_, total_score, x_count, group_size);
+        return MatchResult(shots, match_.getTotalScore(), match_.getXCount(), match_.getGroupSize());
     }
 
     void MatchSimulator::clearShots()
     {
-        shots_.clear();
+        match_.clear();
     }
 
 } // namespace btk::ballistics

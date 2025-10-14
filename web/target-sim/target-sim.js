@@ -405,12 +405,12 @@ class TargetSimulator {
         const bulletDiameter = this.simulator.getBulletDiameter().getInches();
         const holeRadius = (bulletDiameter / 2) * this.targetScale;
 
-        // Draw bullet hole (red circle with black outline)
+        // Draw bullet hole (red circle with red outline)
         this.ctx.beginPath();
         this.ctx.arc(xPixels, yPixels, holeRadius, 0, 2 * Math.PI);
         this.ctx.fillStyle = 'red';
         this.ctx.fill();
-        this.ctx.strokeStyle = 'black';
+        this.ctx.strokeStyle = 'red';
         this.ctx.lineWidth = 1;
         this.ctx.stroke();
 

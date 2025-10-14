@@ -48,6 +48,34 @@ namespace btk::ballistics
             return Derived(scalar / unit.value_);
         }
 
+        // Distance * Distance operator for squaring
+        friend constexpr Derived operator*(const Derived& unit1, const Derived& unit2)
+        {
+            return Derived(unit1.value_ * unit2.value_);
+        }
+
+        // Compound assignment operators
+        constexpr Derived& operator+=(const Derived& other)
+        {
+            value_ += other.value_;
+            return static_cast<Derived&>(*this);
+        }
+        constexpr Derived& operator-=(const Derived& other)
+        {
+            value_ -= other.value_;
+            return static_cast<Derived&>(*this);
+        }
+        constexpr Derived& operator*=(double scalar)
+        {
+            value_ *= scalar;
+            return static_cast<Derived&>(*this);
+        }
+        constexpr Derived& operator/=(double scalar)
+        {
+            value_ /= scalar;
+            return static_cast<Derived&>(*this);
+        }
+
         // Comparison operators
         constexpr bool operator==(const Derived& other) const
         {
@@ -74,6 +102,21 @@ namespace btk::ballistics
             return value_ >= other.value_;
         }
 
+        constexpr bool isZero() const
+        {
+            return *this == 0;
+        }
+
+        constexpr bool isNan() const
+        {
+            return std::isnan(value_);
+        }
+
+        constexpr bool isFinite() const
+        {
+            return std::isfinite(value_);
+        }
+
         // Access to base unit value
         constexpr double baseValue() const
         {
@@ -96,6 +139,7 @@ namespace btk::ballistics
         {
             return Derived(std::numeric_limits<double>::quiet_NaN());
         }
+
 
         protected:
         explicit constexpr UnitBase(double value) : value_(value)

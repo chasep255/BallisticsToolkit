@@ -29,7 +29,7 @@ namespace btk
         {
             // KE = 0.5 * m * v^2
             double mass_kg = state_.getWeight().kilograms();
-            double velocity_mps = state_.getTotalVelocity().mps();
+            double velocity_mps = state_.getTotalVelocity().baseValue();
             double energy_joules = 0.5 * mass_kg * velocity_mps * velocity_mps;
             return Energy::joules(energy_joules);
         }
@@ -56,9 +56,8 @@ namespace btk
         const TrajectoryPoint& Trajectory::getPoint(size_t index) const
         {
             if(index >= points_.size())
-            {
                 throw std::out_of_range("Trajectory point index out of range");
-            }
+            
             return points_[index];
         }
 
@@ -69,40 +68,51 @@ namespace btk
                 return TrajectoryPoint(Time::nan(), Bullet(Weight::zero(), Distance::zero(), Distance::zero(), 0.0));
             }
 
-            double target_distance_m = distance.meters();
-
-            // Find the two points that bracket the target distance
-            for(size_t i = 0; i < points_.size() - 1; ++i)
-            {
-                double dist1 = points_[i].getDistance().meters();
-                double dist2 = points_[i + 1].getDistance().meters();
-
-                if(target_distance_m >= dist1 && target_distance_m <= dist2)
-                {
-                    // Interpolate between the two points
-                    double t = (target_distance_m - dist1) / (dist2 - dist1);
-
-                    // Interpolate time
-                    Time interp_time =
-                        Time::seconds(points_[i].getTime().seconds() +
-                                      t * (points_[i + 1].getTime().seconds() - points_[i].getTime().seconds()));
-
-                    // Interpolate state
-                    Bullet interp_state = interpolate(points_[i], points_[i + 1], distance);
-
-                    return TrajectoryPoint(interp_time, interp_state);
-                }
-            }
-
             // Check if target distance is beyond the last point
-            if(target_distance_m >= points_.back().getDistance().meters())
+            if(distance >= points_.back().getDistance())
             {
                 return points_.back();
             }
 
-            // Return TrajectoryPoint with NaN time to signal invalid
-            Bullet dummyBullet(Weight::zero(), Distance::zero(), Distance::zero(), 0.0);
-            return TrajectoryPoint(Time::nan(), dummyBullet);
+            // Check if target distance is before the first point
+            if(distance <= points_.front().getDistance())
+            {
+                return points_.front();
+            }
+
+            // Binary search for the two points that bracket the target distance
+            size_t left = 0;
+            size_t right = points_.size() - 1;
+
+            while(left < right - 1)
+            {
+                size_t mid = left + (right - left) / 2;
+                Distance mid_distance = points_[mid].getDistance();
+
+                if(distance < mid_distance)
+                {
+                    right = mid;
+                }
+                else
+                {
+                    left = mid;
+                }
+            }
+
+            // Now left and right are the two points that bracket the target distance
+            const auto& dist1 = points_[left].getDistance();
+            const auto& dist2 = points_[right].getDistance();
+
+            // Interpolate between the two points
+            double t = (distance - dist1).baseValue() / (dist2 - dist1).baseValue();
+
+            // Interpolate time
+            Time interp_time = points_[left].getTime() + t * (points_[right].getTime() - points_[left].getTime());
+
+            // Interpolate state
+            Bullet interp_state = interpolate(points_[left], points_[right], distance);
+
+            return TrajectoryPoint(interp_time, interp_state);
         }
 
         std::optional<TrajectoryPoint> Trajectory::atTime(const Time& time) const
@@ -112,90 +122,85 @@ namespace btk
                 return std::nullopt;
             }
 
-            double target_time_s = time.seconds();
-
-            // Find the two points that bracket the target time
-            for(size_t i = 0; i < points_.size() - 1; ++i)
+            // Boundary checks
+            if(time <= points_.front().getTime())
             {
-                double time1 = points_[i].getTime().seconds();
-                double time2 = points_[i + 1].getTime().seconds();
-
-                if(target_time_s >= time1 && target_time_s <= time2)
-                {
-                    // Linear interpolation between the two points
-                    double t = (target_time_s - time1) / (time2 - time1);
-
-                    const Bullet& state1 = points_[i].getState();
-                    const Bullet& state2 = points_[i + 1].getState();
-
-                    // Interpolate position
-                    Distance x =
-                        Distance::meters(state1.getPositionX().meters() +
-                                         t * (state2.getPositionX().meters() - state1.getPositionX().meters()));
-                    Distance y =
-                        Distance::meters(state1.getPositionY().meters() +
-                                         t * (state2.getPositionY().meters() - state1.getPositionY().meters()));
-                    Distance z =
-                        Distance::meters(state1.getPositionZ().meters() +
-                                         t * (state2.getPositionZ().meters() - state1.getPositionZ().meters()));
-
-                    // Interpolate velocity
-                    Velocity vx = Velocity::mps(state1.getVelocityX().mps() +
-                                                t * (state2.getVelocityX().mps() - state1.getVelocityX().mps()));
-                    Velocity vy = Velocity::mps(state1.getVelocityY().mps() +
-                                                t * (state2.getVelocityY().mps() - state1.getVelocityY().mps()));
-                    Velocity vz = Velocity::mps(state1.getVelocityZ().mps() +
-                                                t * (state2.getVelocityZ().mps() - state1.getVelocityZ().mps()));
-
-                    // Interpolate spin rate
-                    AngularVelocity spin = AngularVelocity::radians_per_second(
-                        state1.getSpinRate().radians_per_second() +
-                        t * (state2.getSpinRate().radians_per_second() - state1.getSpinRate().radians_per_second()));
-
-                    Bullet interp_state(state1, x, y, z, vx, vy, vz, spin);
-
-                    return TrajectoryPoint(time, interp_state);
-                }
+                return points_.front();
             }
-
-            // Check if target time is beyond the last point
-            if(target_time_s >= points_.back().getTime().seconds())
+            if(time >= points_.back().getTime())
             {
                 return points_.back();
             }
 
-            return std::nullopt;
+            // Binary search to find bracketing indices [left, right]
+            size_t left = 0;
+            size_t right = points_.size() - 1;
+            while(left < right - 1)
+            {
+                size_t mid = left + (right - left) / 2;
+                const auto& mid_time = points_[mid].getTime();
+                if(time < mid_time)
+                {
+                    right = mid;
+                }
+                else
+                {
+                    left = mid;
+                }
+            }
+
+            // Interpolate between points_[left] and points_[right] by time
+            const auto& time1 = points_[left].getTime();
+            const auto& time2 = points_[right].getTime();
+
+            double t = (time - time1).baseValue() / (time2 - time1).baseValue();
+
+            const Bullet& state1 = points_[left].getState();
+            const Bullet& state2 = points_[right].getState();
+
+            // Interpolate position
+            Distance x = state1.getPositionX() + t * (state2.getPositionX() - state1.getPositionX());
+            Distance y = state1.getPositionY() + t * (state2.getPositionY() - state1.getPositionY());
+            Distance z = state1.getPositionZ() + t * (state2.getPositionZ() - state1.getPositionZ());
+
+            // Interpolate velocity
+            Velocity vx = state1.getVelocityX() + t * (state2.getVelocityX() - state1.getVelocityX());
+            Velocity vy = state1.getVelocityY() + t * (state2.getVelocityY() - state1.getVelocityY());
+            Velocity vz = state1.getVelocityZ() + t * (state2.getVelocityZ() - state1.getVelocityZ());
+
+            // Interpolate spin rate
+            AngularVelocity spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
+
+            Bullet interp_state(state1, x, y, z, vx, vy, vz, spin);
+
+            return TrajectoryPoint(time, interp_state);
         }
 
         Distance Trajectory::getTotalDistance() const
         {
             if(points_.empty())
-            {
-                return Distance::meters(0.0);
-            }
+                return Distance::zero();
+            
             return points_.back().getDistance();
         }
 
         Time Trajectory::getTotalTime() const
         {
             if(points_.empty())
-            {
-                return Time::seconds(0.0);
-            }
+                return Time::zero();
+            
             return points_.back().getTime();
         }
 
         Distance Trajectory::getMaximumHeight() const
         {
             if(points_.empty())
-            {
-                return Distance::meters(0.0);
-            }
+                return Distance::zero();
 
             double max_height = 0.0;
             for(const auto& point : points_)
             {
-                double height = point.getState().getPositionZ().meters();
+                double height = point.getState().getPositionZ().baseValue();
                 if(height > max_height)
                 {
                     max_height = height;
@@ -208,22 +213,19 @@ namespace btk
         Velocity Trajectory::getImpactVelocity() const
         {
             if(points_.empty())
-            {
-                return Velocity::mps(0.0);
-            }
+                return Velocity::zero();
+            
             return points_.back().getVelocity();
         }
 
         Angle Trajectory::getImpactAngle() const
         {
             if(points_.empty())
-            {
-                return Angle::radians(0.0);
-            }
+                return Angle::zero();
 
             const Bullet& impact_state = points_.back().getState();
-            double vx = impact_state.getVelocityX().mps();
-            double vz = impact_state.getVelocityZ().mps();
+            double vx = impact_state.getVelocityX().baseValue();
+            double vz = impact_state.getVelocityZ().baseValue();
 
             // Impact angle is the angle below horizontal
             double angle_rad = std::atan2(-vz, vx); // Negative vz because it's downward
@@ -246,41 +248,26 @@ namespace btk
         Bullet Trajectory::interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2,
                                        const Distance& distance) const
         {
-            double dist1 = point1.getDistance().meters();
-            double dist2 = point2.getDistance().meters();
-            double target_dist = distance.meters();
+            const auto& dist1 = point1.getDistance();
+            const auto& dist2 = point2.getDistance();
 
-            if(std::abs(dist2 - dist1) < 1e-9)
-            {
-                // Points are at the same distance, return the first one
-                return point1.getState();
-            }
-
-            double t = (target_dist - dist1) / (dist2 - dist1);
+            double t = (distance - dist1).baseValue() / (dist2 - dist1).baseValue();
 
             const Bullet& state1 = point1.getState();
             const Bullet& state2 = point2.getState();
 
             // Interpolate position
-            Distance x = Distance::meters(state1.getPositionX().meters() +
-                                          t * (state2.getPositionX().meters() - state1.getPositionX().meters()));
-            Distance y = Distance::meters(state1.getPositionY().meters() +
-                                          t * (state2.getPositionY().meters() - state1.getPositionY().meters()));
-            Distance z = Distance::meters(state1.getPositionZ().meters() +
-                                          t * (state2.getPositionZ().meters() - state1.getPositionZ().meters()));
+            Distance x = state1.getPositionX() + t * (state2.getPositionX() - state1.getPositionX());
+            Distance y = state1.getPositionY() + t * (state2.getPositionY() - state1.getPositionY());
+            Distance z = state1.getPositionZ() + t * (state2.getPositionZ() - state1.getPositionZ());
 
             // Interpolate velocity
-            Velocity vx = Velocity::mps(state1.getVelocityX().mps() +
-                                        t * (state2.getVelocityX().mps() - state1.getVelocityX().mps()));
-            Velocity vy = Velocity::mps(state1.getVelocityY().mps() +
-                                        t * (state2.getVelocityY().mps() - state1.getVelocityY().mps()));
-            Velocity vz = Velocity::mps(state1.getVelocityZ().mps() +
-                                        t * (state2.getVelocityZ().mps() - state1.getVelocityZ().mps()));
+            Velocity vx = state1.getVelocityX() + t * (state2.getVelocityX() - state1.getVelocityX());
+            Velocity vy = state1.getVelocityY() + t * (state2.getVelocityY() - state1.getVelocityY());
+            Velocity vz = state1.getVelocityZ() + t * (state2.getVelocityZ() - state1.getVelocityZ());
 
             // Interpolate spin rate
-            AngularVelocity spin = AngularVelocity::radians_per_second(
-                state1.getSpinRate().radians_per_second() +
-                t * (state2.getSpinRate().radians_per_second() - state1.getSpinRate().radians_per_second()));
+            AngularVelocity spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
 
             return Bullet(state1, x, y, z, vx, vy, vz, spin);
         }

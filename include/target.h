@@ -37,7 +37,7 @@ namespace btk::ballistics
                const Distance& x_ring = Distance::zero(), const std::string& description = "");
 
         /**
-         * @brief Get diameter of specified ring
+         * @brief Get diameter of specified ring (0-6, where 6=X, 5=10, etc.)
          */
         Distance ringDiameter(int ring) const;
 
@@ -80,16 +80,16 @@ namespace btk::ballistics
         }
         Distance getXRingDiameter() const
         {
-            return x_ring_diameter_;
+            return ring_diameters_[6];
         }
 
         std::string toString() const;
 
         private:
+        
         std::string name_;
-        Distance x_ring_diameter_;
         std::string description_;
-        std::map<int, Distance> rings_; // ring number -> diameter
+        Distance ring_diameters_[7];
     };
 
 } // namespace btk::ballistics
