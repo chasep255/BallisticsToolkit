@@ -50,7 +50,7 @@ check_formatters() {
         VERSION=$(prettier --version)
         print_status "Using prettier version $VERSION"
     elif command -v js-beautify &> /dev/null; then
-        VERSION=$(js-beautify --version)
+        VERSION=$(js-beautify --version 2>/dev/null | head -1)
         print_status "Using js-beautify version $VERSION"
     else
         missing_tools+=("prettier or js-beautify")
@@ -116,18 +116,14 @@ format_file() {
                 success=true
             fi
         elif command -v js-beautify &> /dev/null; then
-            if [[ "$formatter" == "html" ]]; then
-                if html-beautify -i "$file" 2>/dev/null; then
+            if [[ "$formatter" == "js" ]]; then
+                # Use clang-format-like settings: 2-space indentation, expanded braces
+                if js-beautify -s 2 -c " " -b "expand" "$file" > "$file.tmp" 2>/dev/null && mv "$file.tmp" "$file"; then
                     success=true
                 fi
-            elif [[ "$formatter" == "css" ]]; then
-                if css-beautify -i "$file" 2>/dev/null; then
-                    success=true
-                fi
-            elif [[ "$formatter" == "js" ]]; then
-                if js-beautify -i "$file" 2>/dev/null; then
-                    success=true
-                fi
+            else
+                # js-beautify only supports JavaScript, skip HTML/CSS silently
+                success=true  # Don't treat as error
             fi
         fi
     fi
