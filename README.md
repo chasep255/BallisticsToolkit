@@ -6,14 +6,14 @@ Professional web-based ballistics calculator and match simulation suite for long
 
 ## Features
 
-### 🎯 Ballistic Calculator
+### 📊 Ballistic Calculator
 - **G1/G7 Drag Models** - Industry standard ballistic coefficients
 - **Environmental Compensation** - Temperature, pressure, humidity, altitude
 - **Wind Correction** - Full 3D wind modeling with intuitive clock-based direction
 - **Client-Side Performance** - WebAssembly for fast calculations, no server needed
 - **Comprehensive Output** - Drop, drift, velocity, energy, and time of flight
 
-### 🎲 Target Simulator
+### 🎯 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
 - **NRA Target Library** - 14 NRA targets (10 standard + 4 F-Class variants)
 - **Realistic Variability** - Muzzle velocity, wind, and rifle accuracy modeling
