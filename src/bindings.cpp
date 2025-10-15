@@ -256,27 +256,21 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .class_function("listTargets", &NRATargets::listTargets)
     .class_function("hasTarget", &NRATargets::hasTarget);
 
-  // ShotResult struct
-  value_object<ShotResult>("ShotResult")
-    .field("impactX", &ShotResult::impact_x)
-    .field("impactY", &ShotResult::impact_y)
-    .field("score", &ShotResult::score)
-    .field("isX", &ShotResult::is_x)
-    .field("actualMv", &ShotResult::actual_mv)
-    .field("actualBc", &ShotResult::actual_bc)
-    .field("windDownrange", &ShotResult::wind_downrange)
-    .field("windCrossrange", &ShotResult::wind_crossrange)
-    .field("windVertical", &ShotResult::wind_vertical)
-    .field("releaseAngleH", &ShotResult::release_angle_h)
-    .field("releaseAngleV", &ShotResult::release_angle_v)
-    .field("impactVelocity", &ShotResult::impact_velocity);
+  // SimulatedShot struct
+  value_object<SimulatedShot>("SimulatedShot")
+    .field("impactX", &SimulatedShot::impact_x)
+    .field("impactY", &SimulatedShot::impact_y)
+    .field("score", &SimulatedShot::score)
+    .field("isX", &SimulatedShot::is_x)
+    .field("actualMv", &SimulatedShot::actual_mv)
+    .field("actualBc", &SimulatedShot::actual_bc)
+    .field("windDownrange", &SimulatedShot::wind_downrange)
+    .field("windCrossrange", &SimulatedShot::wind_crossrange)
+    .field("windVertical", &SimulatedShot::wind_vertical)
+    .field("releaseAngleH", &SimulatedShot::release_angle_h)
+    .field("releaseAngleV", &SimulatedShot::release_angle_v)
+    .field("impactVelocity", &SimulatedShot::impact_velocity);
 
-  // MatchResult struct
-  value_object<MatchResult>("MatchResult")
-    .field("shots", &MatchResult::shots)
-    .field("totalScore", &MatchResult::total_score)
-    .field("xCount", &MatchResult::x_count)
-    .field("groupSize", &MatchResult::group_size);
 
   // Hit class
   class_<Hit>("Hit")
@@ -309,17 +303,19 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .constructor<const Bullet&, const Velocity&, const Target&, const Distance&, const Atmosphere&, const Velocity&,
                  const Velocity&, const Velocity&, const Velocity&, const Angle&, double>()
     .function("fireShot", &MatchSimulator::fireShot)
-    .function("getMatchResult", &MatchSimulator::getMatchResult)
+    .function("getMatch", &MatchSimulator::getMatch)
     .function("clearShots", &MatchSimulator::clearShots)
     .function("getShotCount", &MatchSimulator::getShotCount)
     .function("getTarget", &MatchSimulator::getTarget)
     .function("getBullet", &MatchSimulator::getBullet)
-    .function("getBulletDiameter", &MatchSimulator::getBulletDiameter);
+    .function("getBulletDiameter", &MatchSimulator::getBulletDiameter)
+    .function("getShots", &MatchSimulator::getShots)
+    .function("getShot", &MatchSimulator::getShot);
 
   // Register value arrays for easier JavaScript usage
   register_vector<TrajectoryPoint>("TrajectoryPointVector");
   register_vector<Hit>("HitVector");
-  register_vector<ShotResult>("ShotResultVector");
+  register_vector<SimulatedShot>("SimulatedShotVector");
   register_vector<std::string>("StringVector");
 
   // Register RingInfo struct

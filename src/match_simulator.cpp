@@ -4,10 +4,15 @@
 #include <algorithm>
 #include <cmath>
 
+static double clipToThreeSigma(double value, double mean, double sd)
+{
+  return std::max(mean - 3 * sd, std::min(mean + 3 * sd, value));
+}
+
 namespace btk::ballistics
 {
 
-  ShotResult::ShotResult(const Distance& impact_x, const Distance& impact_y, int score, bool is_x,
+  SimulatedShot::SimulatedShot(const Distance& impact_x, const Distance& impact_y, int score, bool is_x,
                          const Velocity& actual_mv, double actual_bc, const Velocity& wind_downrange,
                          const Velocity& wind_crossrange, const Velocity& wind_vertical, const Angle& release_angle_h,
                          const Angle& release_angle_v, const Velocity& impact_velocity)
@@ -17,11 +22,6 @@ namespace btk::ballistics
   {
   }
 
-  MatchResult::MatchResult(const std::vector<ShotResult>& shots, int total_score, int x_count,
-                           const Distance& group_size)
-    : shots(shots), total_score(total_score), x_count(x_count), group_size(group_size)
-  {
-  }
 
   MatchSimulator::MatchSimulator(const Bullet& bullet, const Velocity& nominal_mv, const Target& target,
                                  const Distance& target_range, const Atmosphere& atmosphere, const Velocity& mv_sd,
@@ -29,8 +29,8 @@ namespace btk::ballistics
                                  const Angle& rifle_accuracy, double timestep)
     : bullet_(bullet), nominal_mv_(nominal_mv), target_(target), target_range_(target_range), atmosphere_(atmosphere),
       mv_sd_(mv_sd), wind_speed_sd_(wind_speed_sd), headwind_sd_(headwind_sd), updraft_sd_(updraft_sd),
-      rifle_accuracy_(rifle_accuracy), timestep_(timestep), bullet_diameter_(bullet.getDiameter()),
-      zeroed_state_(Weight::zero(), Distance::zero(), Distance::zero(), 0.0), zero_angle_(Angle::zero()),
+      rifle_accuracy_(rifle_accuracy), timestep_(timestep),
+      zeroed_state_(Weight::zero(), Distance::zero(), Distance::zero(), 0.0),
       rng_(std::random_device{}())
   {
     // Zero the rifle once at initialization
@@ -43,14 +43,12 @@ namespace btk::ballistics
                                                          calm_wind, dt, 1000, Distance::meters(1e-6));
   }
 
-  ShotResult MatchSimulator::fireShot()
+  SimulatedShot MatchSimulator::fireShot()
   {
     // Apply muzzle velocity variation (clipped to 3-sigma)
     double mv_sd_fps = mv_sd_.fps();
     std::normal_distribution<double> mv_dist(nominal_mv_.fps(), mv_sd_fps);
-    double mv_fps = mv_dist(rng_);
-    // Clip to 3-sigma range
-    mv_fps = std::max(nominal_mv_.fps() - 3 * mv_sd_fps, std::min(nominal_mv_.fps() + 3 * mv_sd_fps, mv_fps));
+    double mv_fps = clipToThreeSigma(mv_dist(rng_), nominal_mv_.fps(), mv_sd_fps);
     Velocity mv = Velocity::fps(mv_fps);
 
     // Use original bullet (no BC variation for now)
@@ -60,27 +58,24 @@ namespace btk::ballistics
     // Crosswind (left/right)
     double crosswind_sd_mph = wind_speed_sd_.mph();
     std::normal_distribution<double> crosswind_dist(0.0, crosswind_sd_mph);
-    double crosswind_mph = crosswind_dist(rng_);
-    crosswind_mph = std::max(-3 * crosswind_sd_mph, std::min(3 * crosswind_sd_mph, crosswind_mph));
+    double crosswind_mph = clipToThreeSigma(crosswind_dist(rng_), 0.0, crosswind_sd_mph);
 
     // Head/tail wind (downrange)
     double headwind_sd_mph = headwind_sd_.mph();
     std::normal_distribution<double> headwind_dist(0.0, headwind_sd_mph);
-    double headwind_mph = headwind_dist(rng_);
-    headwind_mph = std::max(-3 * headwind_sd_mph, std::min(3 * headwind_sd_mph, headwind_mph));
+    double headwind_mph = clipToThreeSigma(headwind_dist(rng_), 0.0, headwind_sd_mph);
 
     // Up/down draft (vertical)
     double updraft_sd_mph = updraft_sd_.mph();
     std::normal_distribution<double> updraft_dist(0.0, updraft_sd_mph);
-    double updraft_mph = updraft_dist(rng_);
-    updraft_mph = std::max(-3 * updraft_sd_mph, std::min(3 * updraft_sd_mph, updraft_mph));
+    double updraft_mph = clipToThreeSigma(updraft_dist(rng_), 0.0, updraft_sd_mph);
 
     // Create 3D wind vector
-    // For now, use horizontal wind only (crosswind + headwind combined)
-    double total_horizontal_mph = std::sqrt(crosswind_mph * crosswind_mph + headwind_mph * headwind_mph);
-    double wind_direction_deg = std::atan2(crosswind_mph, headwind_mph) * 180.0 / M_PI;
-    Wind varied_wind =
-      Wind(Velocity::mph(total_horizontal_mph), Angle::degrees(wind_direction_deg), Velocity::mph(updraft_mph));
+    Wind varied_wind = Wind(
+      Velocity::mph(std::sqrt(crosswind_mph * crosswind_mph + headwind_mph * headwind_mph)),
+      Angle::degrees(std::atan2(crosswind_mph, headwind_mph) * 180.0 / M_PI),
+      Velocity::mph(updraft_mph)
+    );
 
     // Create initial state with varied MV
     // Start from zeroed angle and position
@@ -127,10 +122,11 @@ namespace btk::ballistics
     if(std::isnan(impact_point.getTime().seconds()))
     {
       // Shouldn't happen, but handle gracefully
-      ShotResult shot(Distance::inches(999.0), Distance::inches(999.0), 0, false, mv, bullet_.getBc(),
+      SimulatedShot simulatedShot(Distance::inches(999.0), Distance::inches(999.0), 0, false, mv, bullet_.getBc(),
                       Velocity::mph(headwind_mph), Velocity::mph(crosswind_mph), Velocity::mph(updraft_mph),
                       release_angle_h, release_angle_v, Velocity::zero());
-      return shot;
+      shots_.push_back(simulatedShot);
+      return simulatedShot;
     }
 
     // Get impact position and velocity
@@ -139,39 +135,23 @@ namespace btk::ballistics
     Velocity impact_velocity = impact_point.getState().getVelocity().x; // Forward velocity at impact
 
     // Score the shot and add to match
-    auto [score, is_x] = match_.addHit(impact_x, impact_y, target_, bullet_diameter_);
+    auto [score, is_x] = match_.addHit(impact_x, impact_y, target_, bullet_.getDiameter());
 
-    ShotResult shot(impact_x, impact_y, score, is_x, mv, bullet_.getBc(), Velocity::mph(headwind_mph),
+    SimulatedShot simulatedShot(impact_x, impact_y, score, is_x, mv, bullet_.getBc(), Velocity::mph(headwind_mph),
                     Velocity::mph(crosswind_mph), Velocity::mph(updraft_mph), release_angle_h, release_angle_v,
                     impact_velocity);
 
-    return shot;
+    // Store shot result for diagnostics
+    shots_.push_back(simulatedShot);
+
+    return simulatedShot;
   }
 
-  MatchResult MatchSimulator::getMatchResult() const
-  {
-    if(match_.getHitCount() == 0)
-    {
-      return MatchResult();
-    }
-
-    // Get all shots from match
-    const auto& hits = match_.getHits();
-    std::vector<ShotResult> shots;
-    for(const auto& hit : hits)
-    {
-      // Create ShotResult from Hit (we don't have all the detailed info)
-      ShotResult shot(hit.getX(), hit.getY(), hit.getScore(), hit.isX(), Velocity::zero(), 0.0, Velocity::zero(),
-                      Velocity::zero(), Velocity::zero(), Angle::zero(), Angle::zero(), Velocity::zero());
-      shots.push_back(shot);
-    }
-
-    return MatchResult(shots, match_.getTotalScore(), match_.getXCount(), match_.getGroupSize());
-  }
 
   void MatchSimulator::clearShots()
   {
     match_.clear();
+    shots_.clear();
   }
 
 } // namespace btk::ballistics

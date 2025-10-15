@@ -16,7 +16,6 @@ class TargetSimulator
     this.totalShots = 0;
     this.totalMatches = 0;
     this.isRunning = false;
-    this.allResults = [];
 
     // Target display
     this.canvas = null;
@@ -360,13 +359,13 @@ class TargetSimulator
     try
     {
       // Fire shot
-      const shot = this.simulator.fireShot();
+      const simulatedShot = this.simulator.fireShot();
       this.currentShot++;
-      this.currentShots.push(shot);
-      this.allShots.push(shot);
+      this.currentShots.push(simulatedShot);
+      this.allShots.push(simulatedShot);
 
       // Update display
-      this.drawShotImpact(shot);
+      this.drawShotImpact(simulatedShot);
       this.updateLiveScore();
 
       // Check if match is complete
@@ -391,10 +390,6 @@ class TargetSimulator
 
   finishMatch()
   {
-    // Get match result
-    const result = this.simulator.getMatchResult();
-    this.allResults.push(result);
-
     // Clear shots for next match
     this.simulator.clearShots();
 
@@ -432,7 +427,6 @@ class TargetSimulator
     this.shotItems.clear();
     this.currentMatch = 0;
     this.currentShot = 0;
-    this.allResults = [];
   }
 
   drawTarget()
@@ -530,7 +524,7 @@ class TargetSimulator
     this.ctx.stroke();
   }
 
-  drawShotImpact(shot)
+  drawShotImpact(simulatedShot)
   {
     if (!this.simulator)
     {
@@ -538,8 +532,8 @@ class TargetSimulator
     }
 
     // Convert shot position to canvas coordinates
-    const xPixels = this.targetCenterX + (shot.impactX.getInches() * this.targetScale);
-    const yPixels = this.targetCenterY - (shot.impactY.getInches() * this.targetScale); // Flip Y axis
+    const xPixels = this.targetCenterX + (simulatedShot.impactX.getInches() * this.targetScale);
+    const yPixels = this.targetCenterY - (simulatedShot.impactY.getInches() * this.targetScale); // Flip Y axis
 
     // Use actual bullet diameter scaled to pixels
     const bulletDiameter = this.simulator.getBulletDiameter().getInches();
@@ -556,7 +550,7 @@ class TargetSimulator
 
     // Store shot for tooltip
     const shotId = `${xPixels},${yPixels}`;
-    this.shotItems.set(shotId, shot);
+    this.shotItems.set(shotId, simulatedShot);
   }
 
   redrawTarget()
@@ -569,9 +563,9 @@ class TargetSimulator
     this.drawTarget();
 
     // Redraw all shots
-    for (const shot of this.allShots)
+    for (const simulatedShot of this.allShots)
     {
-      this.drawShotImpact(shot);
+      this.drawShotImpact(simulatedShot);
     }
   }
 
@@ -643,13 +637,13 @@ class TargetSimulator
     const y = e.clientY - rect.top;
 
     // Find shot under cursor
-    for (const [shotId, shot] of this.shotItems)
+    for (const [shotId, simulatedShot] of this.shotItems)
     {
       const [shotX, shotY] = shotId.split(',').map(Number);
       const distance = Math.sqrt((x - shotX) ** 2 + (y - shotY) ** 2);
       if (distance < 10)
       { // Within 10 pixels
-        this.showTooltip(e, shot);
+        this.showTooltip(e, simulatedShot);
         return;
       }
     }
@@ -725,16 +719,16 @@ class TargetSimulator
     }
   }
 
-  showTooltip(e, shot)
+  showTooltip(e, simulatedShot)
   {
     const tooltip = this.elements.tooltip;
     tooltip.innerHTML = `
             <div><strong>Shot Details:</strong></div>
-            <div>Impact: X=${shot.impactX.getInches().toFixed(2)}" Y=${shot.impactY.getInches().toFixed(2)}"</div>
-            <div>Score: ${shot.score}${shot.isX ? 'x' : ''}</div>
-            <div>MV: ${shot.actualMv.getFps().toFixed(0)} fps | IV: ${shot.impactVelocity.getFps().toFixed(0)} fps</div>
-            <div>Wind: (${shot.windDownrange.getMph().toFixed(1)}, ${shot.windCrossrange.getMph().toFixed(1)}, ${shot.windVertical.getMph().toFixed(1)}) mph</div>
-            <div>Release: (${shot.releaseAngleH.getMoa().toFixed(2)}, ${shot.releaseAngleV.getMoa().toFixed(2)}) MOA</div>
+            <div>Impact: X=${simulatedShot.impactX.getInches().toFixed(2)}" Y=${simulatedShot.impactY.getInches().toFixed(2)}"</div>
+            <div>Score: ${simulatedShot.score}${simulatedShot.isX ? 'x' : ''}</div>
+            <div>MV: ${simulatedShot.actualMv.getFps().toFixed(0)} fps | IV: ${simulatedShot.impactVelocity.getFps().toFixed(0)} fps</div>
+            <div>Wind: (${simulatedShot.windDownrange.getMph().toFixed(1)}, ${simulatedShot.windCrossrange.getMph().toFixed(1)}, ${simulatedShot.windVertical.getMph().toFixed(1)}) mph</div>
+            <div>Release: (${simulatedShot.releaseAngleH.getMoa().toFixed(2)}, ${simulatedShot.releaseAngleV.getMoa().toFixed(2)}) MOA</div>
         `;
     tooltip.style.display = 'block';
     tooltip.style.left = (e.pageX + 15) + 'px';
@@ -758,8 +752,8 @@ class TargetSimulator
       return;
     }
 
-    const totalScore = this.allShots.reduce((sum, shot) => sum + shot.score, 0);
-    const xCount = this.allShots.filter(shot => shot.isX).length;
+    const totalScore = this.allShots.reduce((sum, simulatedShot) => sum + simulatedShot.score, 0);
+    const xCount = this.allShots.filter(simulatedShot => simulatedShot.isX).length;
     const shotsFired = this.allShots.length;
     const totalShotsAllMatches = this.totalShots * this.totalMatches;
 

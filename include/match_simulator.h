@@ -14,9 +14,9 @@ namespace btk::ballistics
 {
 
   /**
-   * @brief Result of a single shot
+   * @brief Result of a single simulated shot
    */
-  struct ShotResult
+  struct SimulatedShot
   {
     Distance impact_x;        // Horizontal impact position (positive = right)
     Distance impact_y;        // Vertical impact position (positive = up)
@@ -31,32 +31,19 @@ namespace btk::ballistics
     Angle release_angle_v;    // Vertical release angle
     Velocity impact_velocity; // Velocity at target impact
 
-    ShotResult()
+    SimulatedShot()
       : impact_x(Distance::zero()), impact_y(Distance::zero()), score(0), is_x(false), actual_mv(Velocity::zero()),
         actual_bc(0.0), wind_downrange(Velocity::zero()), wind_crossrange(Velocity::zero()),
         wind_vertical(Velocity::zero()), release_angle_h(Angle::zero()), release_angle_v(Angle::zero()),
         impact_velocity(Velocity::zero())
     {
     }
-    ShotResult(const Distance& impact_x, const Distance& impact_y, int score, bool is_x, const Velocity& actual_mv,
+    SimulatedShot(const Distance& impact_x, const Distance& impact_y, int score, bool is_x, const Velocity& actual_mv,
                double actual_bc, const Velocity& wind_downrange, const Velocity& wind_crossrange,
                const Velocity& wind_vertical, const Angle& release_angle_h, const Angle& release_angle_v,
                const Velocity& impact_velocity);
   };
 
-  /**
-   * @brief Result of a simulated match
-   */
-  struct MatchResult
-  {
-    std::vector<ShotResult> shots;
-    int total_score = 0;
-    int x_count = 0;
-    Distance group_size = Distance::zero();
-
-    MatchResult() = default;
-    MatchResult(const std::vector<ShotResult>& shots, int total_score, int x_count, const Distance& group_size);
-  };
 
   /**
    * @brief Match simulator that zeros once and fires multiple shots
@@ -92,16 +79,19 @@ namespace btk::ballistics
     /**
      * @brief Fire a single shot with variability
      *
-     * @return ShotResult with impact location and score
+     * @return SimulatedShot with impact location and score
      */
-    ShotResult fireShot();
+    SimulatedShot fireShot();
 
     /**
-     * @brief Get current match result from fired shots
+     * @brief Get the underlying Match object for statistics
      *
-     * @return MatchResult with statistics
+     * @return Reference to the Match object
      */
-    MatchResult getMatchResult() const;
+    const Match& getMatch() const
+    {
+      return match_;
+    }
 
     /**
      * @brief Clear all fired shots
@@ -135,9 +125,25 @@ namespace btk::ballistics
     /**
      * @brief Get the bullet diameter
      */
-    const Distance& getBulletDiameter() const
+    Distance getBulletDiameter() const
     {
-      return bullet_diameter_;
+      return bullet_.getDiameter();
+    }
+
+    /**
+     * @brief Get all shot results with diagnostics
+     */
+    const std::vector<SimulatedShot>& getShots() const
+    {
+      return shots_;
+    }
+
+    /**
+     * @brief Get a specific shot by index
+     */
+    const SimulatedShot& getShot(size_t index) const
+    {
+      return shots_[index];
     }
 
     private:
@@ -152,14 +158,15 @@ namespace btk::ballistics
     Velocity updraft_sd_;
     Angle rifle_accuracy_;
     double timestep_;
-    Distance bullet_diameter_;
 
     // Zeroed state computed once at initialization
     Bullet zeroed_state_;
-    Angle zero_angle_;
 
     // Track all shots using Match class
     Match match_;
+    
+    // Store detailed shot diagnostics
+    std::vector<SimulatedShot> shots_;
 
     // Random number generator
     mutable std::mt19937 rng_;
