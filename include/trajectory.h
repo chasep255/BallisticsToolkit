@@ -1,7 +1,8 @@
 #pragma once
 
 #include "bullet.h"
-#include "units.h"
+#include "vector.h"
+#include "conversions.h"
 #include <optional>
 #include <vector>
 
@@ -17,40 +18,33 @@ namespace btk::ballistics
     /**
      * @brief Initialize trajectory point
      *
-     * @param time Time at this point
+     * @param time Time at this point in s
      * @param state Flying bullet state at this point
      */
-    TrajectoryPoint(const Time& time, const Bullet& state);
+    TrajectoryPoint(double time, const Bullet& state);
 
-    // Getters
-    const Time& getTime() const
-    {
-      return time_;
-    }
-    const Bullet& getState() const
-    {
-      return state_;
-    }
+    // Getters (all return SI base units)
+    double getTime() const { return time_; } // s
+    const Bullet& getState() const { return state_; }
 
     /**
      * @brief Get distance traveled at this point
      */
-    Distance getDistance() const;
+    double getDistance() const; // m
 
     /**
      * @brief Get velocity at this point
      */
-    Velocity getVelocity() const;
+    double getVelocity() const; // m/s
 
     /**
      * @brief Get kinetic energy at this point
      */
-    Energy getKineticEnergy() const;
+    double getKineticEnergy() const; // J
 
-    std::string toString() const;
 
     private:
-    Time time_;
+    double time_; // s
     Bullet state_;
   };
 
@@ -68,10 +62,10 @@ namespace btk::ballistics
     /**
      * @brief Add a point to the trajectory
      *
-     * @param time Time at this point
+     * @param time Time at this point in s
      * @param state Flying bullet state at this point
      */
-    void addPoint(const Time& time, const Bullet& state);
+    void addPoint(double time, const Bullet& state);
 
     /**
      * @brief Get the number of points in the trajectory
@@ -101,43 +95,43 @@ namespace btk::ballistics
     /**
      * @brief Get the trajectory point at a specific distance
      *
-     * @param distance Distance along trajectory
+     * @param distance Distance along trajectory in m
      * @return Trajectory point at the given distance (interpolated), or TrajectoryPoint with NaN time if not found
      */
-    TrajectoryPoint atDistance(const Distance& distance) const;
+    TrajectoryPoint atDistance(double distance) const;
 
     /**
      * @brief Get the trajectory point at a specific time
      *
-     * @param time Time along trajectory
+     * @param time Time along trajectory in s
      * @return Trajectory point at the given time (interpolated), or std::nullopt if not found
      */
-    std::optional<TrajectoryPoint> atTime(const Time& time) const;
+    std::optional<TrajectoryPoint> atTime(double time) const;
 
     /**
      * @brief Get the total distance of the trajectory
      */
-    Distance getTotalDistance() const;
+    double getTotalDistance() const; // m
 
     /**
      * @brief Get the total time of flight
      */
-    Time getTotalTime() const;
+    double getTotalTime() const; // s
 
     /**
      * @brief Get the maximum height reached
      */
-    Distance getMaximumHeight() const;
+    double getMaximumHeight() const; // m
 
     /**
      * @brief Get the impact velocity
      */
-    Velocity getImpactVelocity() const;
+    double getImpactVelocity() const; // m/s
 
     /**
      * @brief Get the impact angle (angle below horizontal)
      */
-    Angle getImpactAngle() const;
+    double getImpactAngle() const; // rad
 
     /**
      * @brief Clear all points from the trajectory
@@ -152,7 +146,6 @@ namespace btk::ballistics
       return points_.empty();
     }
 
-    std::string toString() const;
 
     private:
     std::vector<TrajectoryPoint> points_;
@@ -162,10 +155,10 @@ namespace btk::ballistics
      *
      * @param point1 First point
      * @param point2 Second point
-     * @param distance Target distance
+     * @param distance Target distance in m
      * @return Interpolated flying bullet state
      */
-    Bullet interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2, const Distance& distance) const;
+    Bullet interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2, double distance) const;
   };
 
 } // namespace btk::ballistics

@@ -1,4 +1,5 @@
 #include "ballistics_calc.h"
+#include "conversions.h"
 #include <cmath>
 #include <vector>
 
@@ -27,12 +28,12 @@ namespace btk::ballistics_calc
   {
     using namespace btk::ballistics;
 
-    Weight weight = Weight::grains(weight_grains);
-    Distance diameter = Distance::inches(diameter_inches);
-    Distance length = Distance::inches(length_inches);
+    double weight_kg = Conversions::grainsToKg(weight_grains);
+    double diameter_m = Conversions::inchesToMeters(diameter_inches);
+    double length_m = Conversions::inchesToMeters(length_inches);
     DragFunction drag_func = (drag_function == 0) ? DragFunction::G1 : DragFunction::G7;
 
-    bullet_ = std::make_unique<Bullet>(weight, diameter, length, bc, drag_func);
+    bullet_ = std::make_unique<Bullet>(weight_kg, diameter_m, length_m, bc, drag_func);
   }
 
   void BallisticsCalculator::setAtmosphere(double temperature_f, double pressure_inhg, double humidity_percent,
@@ -40,24 +41,24 @@ namespace btk::ballistics_calc
   {
     using namespace btk::ballistics;
 
-    Temperature temp = Temperature::fahrenheit(temperature_f);
-    Distance altitude = Distance::feet(altitude_feet);
+    double temp_k = Conversions::fahrenheitToKelvin(temperature_f);
+    double altitude_m = Conversions::feetToMeters(altitude_feet);
     double humidity = humidity_percent / 100.0; // Convert percentage to decimal
 
     // Create pressure directly
-    Pressure pressure = Pressure::pascals(pressure_inhg * 3386.39); // Convert inHg to Pa
+    double pressure_pa = Conversions::inHgToPascals(pressure_inhg);
 
-    atmosphere_ = std::make_unique<Atmosphere>(temp, altitude, humidity, pressure);
+    atmosphere_ = std::make_unique<Atmosphere>(temp_k, altitude_m, humidity, pressure_pa);
   }
 
   void BallisticsCalculator::setWind(double wind_speed_mph, double wind_direction_deg)
   {
     using namespace btk::ballistics;
 
-    Velocity speed = Velocity::mph(wind_speed_mph);
-    Angle direction = Angle::degrees(wind_direction_deg);
+    double speed_mps = Conversions::mphToMps(wind_speed_mph);
+    double direction_rad = Conversions::degreesToRadians(wind_direction_deg);
 
-    wind_ = std::make_unique<Wind>(speed, direction);
+    wind_ = std::make_unique<Wind>(speed_mps, direction_rad);
   }
 
   void* BallisticsCalculator::calculateTrajectory(double muzzle_velocity_fps, double zero_range_yards,

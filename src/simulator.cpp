@@ -1,5 +1,6 @@
 #include "simulator.h"
 #include "constants.h"
+#include "conversions.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -79,175 +80,159 @@ namespace btk::ballistics
   }
 
   // Calculate drag retardation
-  Acceleration Simulator::calculateDragRetardation(const Bullet& bullet, const Velocity& velocity,
-                                                   const Atmosphere& atmosphere)
+  double Simulator::calculateDragRetardation(const Bullet& bullet, double velocity, const Atmosphere& atmosphere)
   {
     // Convert velocity to fps for drag function
-    double v_fps = velocity.fps();
+    double v_fps = Conversions::mpsToFps(velocity);
 
     // Get drag coefficients
     auto [acceleration, mass] = findDragCoefficients(v_fps, bullet.getDragFunction());
 
     if(acceleration <= 0.0 || mass <= 0.0)
     {
-      return Acceleration::mps2(0.0);
+      return 0.0;
     }
 
-    double density_ratio = atmosphere.getAirDensity() / constants::AIR_DENSITY_STANDARD.kgpm3();
+    double density_ratio = atmosphere.getAirDensity() / Constants::AIR_DENSITY_STANDARD;
     double retardation_fps_per_sec = acceleration * std::pow(v_fps, mass) * density_ratio / bullet.getBc();
 
-    // Convert from fps/s to m/s² using unit conversion
-    return Acceleration::fps2(retardation_fps_per_sec);
+    // Convert from fps/s to m/s²
+    return Conversions::fpsToMps(retardation_fps_per_sec);
   }
 
   // Calculate total acceleration components
-  Acceleration3D Simulator::calculateAcceleration(const Bullet& state, const Atmosphere& atmosphere, const Wind& wind)
+  Vector3D Simulator::calculateAcceleration(const Bullet& state, const Atmosphere& atmosphere, const Vector3D& wind)
   {
     // Get velocity vector
-    Velocity3D velocity = state.getVelocity();
+    Vector3D velocity = state.getVelocity();
 
     // Calculate total velocity magnitude
-    Velocity total_velocity = velocity.magnitude();
+    double total_velocity = velocity.magnitude();
 
     // Calculate drag retardation
-    Acceleration drag_retardation = calculateDragRetardation(state, total_velocity, atmosphere);
-
-    // Get wind components and create wind velocity vector
-    auto [wind_x_mps, wind_y_mps, wind_z_mps] = wind.getComponents();
-    Velocity3D wind_velocity(Velocity::mps(wind_x_mps), Velocity::mps(wind_y_mps), Velocity::mps(wind_z_mps));
+    double drag_retardation = calculateDragRetardation(state, total_velocity, atmosphere);
 
     // Calculate relative velocity (bullet velocity - wind velocity)
-    Velocity3D relative_velocity = velocity - wind_velocity;
-    Velocity v_rel_total = relative_velocity.magnitude();
+    Vector3D relative_velocity = velocity - wind;
+    double v_rel_total = relative_velocity.magnitude();
 
-    if(v_rel_total.mps() > 0.0)
+    if(v_rel_total > 0.0)
     {
       // Apply drag retardation in direction of relative velocity using vector operations
-      Vector3D<double> drag_dir = relative_velocity.direction();
-      Acceleration3D drag_accel = -drag_retardation * drag_dir;
-      Acceleration3D gravity(Acceleration::mps2(0.0), Acceleration::mps2(0.0), -constants::GRAVITY);
+      Vector3D drag_dir = relative_velocity.normalized();
+      Vector3D drag_accel = -drag_retardation * drag_dir;
+      Vector3D gravity(0.0, 0.0, -Constants::GRAVITY);
       
       return drag_accel + gravity;
     }
     else
     {
       // No relative velocity, only gravity
-      return Acceleration3D(Acceleration::mps2(0.0), Acceleration::mps2(0.0), -constants::GRAVITY);
+      return Vector3D(0.0, 0.0, -Constants::GRAVITY);
     }
   }
 
   // RK2 time step implementation
-  Bullet Simulator::timeStep(const Bullet& state, const Time& dt, const Wind& wind, const Atmosphere& atmosphere)
+  Bullet Simulator::timeStep(const Bullet& state, double dt, const Vector3D& wind, const Atmosphere& atmosphere)
   {
     // Get current state vectors
-    Position3D position = state.getPosition();
-    Velocity3D velocity = state.getVelocity();
+    Vector3D position = state.getPosition();
+    Vector3D velocity = state.getVelocity();
 
     // Calculate initial acceleration
-    Acceleration3D accel = calculateAcceleration(state, atmosphere, wind);
+    Vector3D accel = calculateAcceleration(state, atmosphere, wind);
 
     // True RK2 (midpoint method):
-    // 1. Compute midpoint velocities using unit operations
-    Time half_dt = dt * 0.5;
-    Velocity vx_half = velocity.x + accel.x * half_dt;
-    Velocity vy_half = velocity.y + accel.y * half_dt;
-    Velocity vz_half = velocity.z + accel.z * half_dt;
+    // 1. Compute midpoint velocities
+    double half_dt = dt * 0.5;
+    Vector3D v_half = velocity + accel * half_dt;
 
-    // 2. Compute midpoint positions using unit operations
-    Distance x_half = position.x + vx_half * half_dt;
-    Distance y_half = position.y + vy_half * half_dt;
-    Distance z_half = position.z + vz_half * half_dt;
+    // 2. Compute midpoint positions
+    Vector3D pos_half = position + v_half * half_dt;
 
     // 3. Create midpoint state and recompute acceleration
-    Bullet midpoint_state(state, x_half, y_half, z_half, vx_half, vy_half, vz_half, state.getSpinRate());
+    Bullet midpoint_state(state, pos_half, v_half, state.getSpinRate());
 
     // 4. Recompute acceleration at midpoint
-    Acceleration3D accel_mid = calculateAcceleration(midpoint_state, atmosphere, wind);
+    Vector3D accel_mid = calculateAcceleration(midpoint_state, atmosphere, wind);
 
-    // 5. Use midpoint acceleration for final step using unit operations
-    Distance x_new = position.x + vx_half * dt;
-    Distance y_new = position.y + vy_half * dt;
-    Distance z_new = position.z + vz_half * dt;
-
-    Velocity vx_new = velocity.x + accel_mid.x * dt;
-    Velocity vy_new = velocity.y + accel_mid.y * dt;
-    Velocity vz_new = velocity.z + accel_mid.z * dt;
+    // 5. Use midpoint acceleration for final step
+    Vector3D pos_new = position + v_half * dt;
+    Vector3D vel_new = velocity + accel_mid * dt;
 
     // No spin decay (constant spin rate)
-    AngularVelocity spin_new = state.getSpinRate();
+    double spin_new = state.getSpinRate();
 
     // Create new state using Vector3D constructor
-    Position3D position_new(x_new, y_new, z_new);
-    Velocity3D velocity_new(vx_new, vy_new, vz_new);
-    return Bullet(state, position_new, velocity_new, spin_new);
+    return Bullet(state, pos_new, vel_new, spin_new);
   }
 
   // Compute zeroed initial state
-  Bullet Simulator::computeZeroedInitialState(const Bullet& bullet, const Velocity& muzzle_velocity,
-                                              const Distance& scope_height, const Distance& zero_range,
-                                              const Atmosphere& atmosphere, const Wind& wind, const Time& dt,
-                                              int max_iterations, const Distance& tolerance)
+  Bullet Simulator::computeZeroedInitialState(const Bullet& bullet, double muzzle_velocity,
+                                              double scope_height, double zero_range,
+                                              const Atmosphere& atmosphere, const Vector3D& wind, double dt,
+                                              int max_iterations, double tolerance)
   {
-    Angle best_angle = Angle::mrad(0.0);
+    double best_angle = 0.0; // radians
 
     for(int i = 0; i < max_iterations; ++i)
     {
       // Create initial velocity vector with elevation angle
-      Velocity3D velocity_init(muzzle_velocity * std::cos(best_angle.radians()), Velocity::mps(0.0),
-                               muzzle_velocity * std::sin(best_angle.radians()));
+      Vector3D velocity_init(muzzle_velocity * std::cos(best_angle), 0.0,
+                               muzzle_velocity * std::sin(best_angle));
 
       // Start at bore height (z=0)
-      Position3D position_init(Distance::zero(), Distance::zero(), Distance::zero());
-      Bullet test_state(bullet, position_init, velocity_init, AngularVelocity::rpm(0.0));
+      Vector3D position_init(0.0, 0.0, 0.0);
+      Bullet test_state(bullet, position_init, velocity_init, 0.0);
 
       // Simulate slightly past zero range to ensure we can interpolate
-      Distance target_dist = zero_range * 1.1;
-      Trajectory trajectory = simulateToDistance(test_state, target_dist, wind, atmosphere, dt, Time::seconds(5.0));
+      double target_dist = zero_range * 1.1;
+      Trajectory trajectory = simulateToDistance(test_state, target_dist, wind, atmosphere, dt, 5.0);
 
       // Get state at zero range using interpolation
       TrajectoryPoint point_at_zero = trajectory.atDistance(zero_range);
 
       // Check if the point is valid (not NaN time)
-      if(std::isnan(point_at_zero.getTime().seconds()))
+      if(std::isnan(point_at_zero.getTime()))
       {
         break;
       }
 
       // Want: bullet height at zero_range equals scope height (line of sight)
-      Distance height_error = point_at_zero.getState().getPositionZ() - scope_height;
+      double height_error = point_at_zero.getState().getPositionZ() - scope_height;
 
       // Check if we're close enough
-      if(std::abs(height_error.meters()) < tolerance.meters())
+      if(std::abs(height_error) < tolerance)
       {
         break;
       }
 
       // Simple gradient step on angle
-      Angle angle_correction = Angle::mrad(-(height_error / zero_range) * 1000.0);
+      double angle_correction = -(height_error / zero_range);
       best_angle = best_angle + angle_correction * 0.5;
     }
 
     // Create final initial state at bore height (z=0)
-    Velocity3D velocity_final(muzzle_velocity * std::cos(best_angle.radians()), Velocity::mps(0.0),
-                              muzzle_velocity * std::sin(best_angle.radians()));
-    Position3D position_final(Distance::zero(), Distance::zero(), Distance::zero());
-    Bullet initial_state(bullet, position_final, velocity_final, AngularVelocity::rpm(0.0));
+    Vector3D velocity_final(muzzle_velocity * std::cos(best_angle), 0.0,
+                              muzzle_velocity * std::sin(best_angle));
+    Vector3D position_final(0.0, 0.0, 0.0);
+    Bullet initial_state(bullet, position_final, velocity_final, 0.0);
 
     return initial_state;
   }
 
   // Simulate trajectory to target distance
-  Trajectory Simulator::simulateToDistance(const Bullet& initial_state, const Distance& target_distance,
-                                           const Wind& wind, const Atmosphere& atmosphere, const Time& dt,
-                                           const Time& max_time)
+  Trajectory Simulator::simulateToDistance(const Bullet& initial_state, double target_distance,
+                                           const Vector3D& wind, const Atmosphere& atmosphere, double dt,
+                                           double max_time)
   {
     Trajectory trajectory;
 
     // Add initial point
-    trajectory.addPoint(Time::seconds(0.0), initial_state);
+    trajectory.addPoint(0.0, initial_state);
 
     Bullet current_state = initial_state;
-    Time current_time = Time::seconds(0.0);
+    double current_time = 0.0;
 
     while(current_time < max_time)
     {
@@ -259,10 +244,8 @@ namespace btk::ballistics
       trajectory.addPoint(current_time, current_state);
 
       // Check if we've reached the target distance (continue 1% past for interpolation)
-      if(current_state.getPositionX() >= target_distance * 1.01)
-      {
+      if(current_state.getPositionX() > target_distance)
         break;
-      }
     }
 
     return trajectory;

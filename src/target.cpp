@@ -1,5 +1,7 @@
 #include "target.h"
+#include "conversions.h"
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -7,34 +9,33 @@
 namespace btk::ballistics
 {
 
-  Target::Target(const std::string& name, const Distance& ring_10, const Distance& ring_9, const Distance& ring_8,
-                 const Distance& ring_7, const Distance& ring_6, const Distance& ring_5, const Distance& x_ring,
+  Target::Target(const std::string& name, double ring_10, double ring_9, double ring_8,
+                 double ring_7, double ring_6, double ring_5, double x_ring,
                  const std::string& description)
     : name_(name), description_(description), ring_diameters_{ring_5, ring_6, ring_7, ring_8, ring_9, ring_10, x_ring}
   {
   }
 
-  Distance Target::ringDiameter(int ring) const
+  double Target::ringDiameter(int ring) const
   {
     if(ring >= 5 && ring <= 11)
       return ring_diameters_[ring - 5];
 
-    return Distance::nan();
+    return std::numeric_limits<double>::quiet_NaN();
   }
 
-  int Target::scoreHit(const Distance& x_position, const Distance& y_position, const Distance& bullet_diameter) const
+  int Target::scoreHit(double x_position, double y_position, double bullet_diameter) const
   {
     // Calculate distance from center
-    Distance distance = Distance::fromBaseValue(
-      std::sqrt(x_position.squared() + y_position.squared()));
-    Distance bullet_radius = bullet_diameter / 2.0;
+    double distance = std::sqrt(x_position * x_position + y_position * y_position);
+    double bullet_radius = bullet_diameter / 2.0;
 
     // Check scoring rings in descending order (10, 9, 8, 7, 6, 5)
     // to find the highest score
     for(int ring : {10, 9, 8, 7, 6, 5})
     {
-      Distance diameter = ring_diameters_[ring - 5];
-      Distance ring_radius = diameter / 2.0;
+      double diameter = ring_diameters_[ring - 5];
+      double ring_radius = diameter / 2.0;
       if(distance <= ring_radius + bullet_radius)
         return ring;
     }
@@ -42,39 +43,23 @@ namespace btk::ballistics
     return 0; // Miss
   }
 
-  bool Target::isXRing(const Distance& x_position, const Distance& y_position, const Distance& bullet_diameter) const
+  bool Target::isXRing(double x_position, double y_position, double bullet_diameter) const
   {
-    Distance distance = Distance::fromBaseValue(
-      std::sqrt(x_position.squared() + y_position.squared()));
-    Distance bullet_radius = bullet_diameter / 2.0;
-    Distance x_ring_radius = ring_diameters_[6] / 2.0;
+    double distance = std::sqrt(x_position * x_position + y_position * y_position);
+    double bullet_radius = bullet_diameter / 2.0;
+    double x_ring_radius = ring_diameters_[6] / 2.0;
     return distance <= x_ring_radius + bullet_radius;
   }
 
-  std::pair<Distance, Distance> Target::getRingInfo(int ring) const
+  double Target::getRingInnerDiameter(int ring) const
   {
-    Distance diameter = ringDiameter(ring);
-    return {diameter, diameter / 2.0};
+    return ringDiameter(ring);
   }
 
-  std::string Target::toString() const
+  double Target::getRingOuterDiameter(int ring) const
   {
-    std::ostringstream oss;
-    oss << name_ << ": ";
-
-    // Display rings in order: 5, 6, 7, 8, 9, 10, X
-    const char* ring_names[] = {"5", "6", "7", "8", "9", "10", "X"};
-
-    bool first = true;
-    for(int i = 0; i < 7; ++i)
-    {
-      if(!first)
-        oss << ", ";
-      oss << ring_names[i] << ": " << std::fixed << std::setprecision(2) << ring_diameters_[i].inches() << "\"";
-      first = false;
-    }
-
-    return oss.str();
+    return ringDiameter(ring);
   }
+
 
 } // namespace btk::ballistics

@@ -3,7 +3,8 @@
 #include "atmosphere.h"
 #include "bullet.h"
 #include "trajectory.h"
-#include "units.h"
+#include "vector.h"
+#include "conversions.h"
 
 namespace btk::ballistics
 {
@@ -14,7 +15,7 @@ namespace btk::ballistics
   struct ZeroingResult
   {
     Bullet initial_state;
-    Angle elevation_angle;
+    double elevation_angle; // rad
   };
 
   /**
@@ -30,12 +31,12 @@ namespace btk::ballistics
      * @brief Advance the state by one step using RK2 midpoint integration
      *
      * @param state Current flying bullet state
-     * @param dt Time step
+     * @param dt Time step in s
      * @param wind Wind conditions
      * @param atmosphere Atmospheric conditions
      * @return New flying bullet state after time step
      */
-    static Bullet timeStep(const Bullet& state, const Time& dt, const Wind& wind, const Atmosphere& atmosphere);
+    static Bullet timeStep(const Bullet& state, double dt, const Vector3D& wind, const Atmosphere& atmosphere);
 
     /**
      * @brief Integrate forward until target distance is reached and return a trajectory
@@ -44,38 +45,37 @@ namespace btk::ballistics
      * is not reached within max_time or the solution becomes invalid.
      *
      * @param initial_state Initial flying bullet state
-     * @param target_distance Target distance to reach
+     * @param target_distance Target distance to reach in m
      * @param wind Wind conditions
      * @param atmosphere Atmospheric conditions
-     * @param dt Time step (default: 0.001 seconds)
-     * @param max_time Maximum simulation time (default: 60 seconds)
+     * @param dt Time step in s (default: 0.001)
+     * @param max_time Maximum simulation time in s (default: 60.0)
      * @return Complete trajectory
      * @throws std::runtime_error if simulation fails
      */
-    static Trajectory simulateToDistance(const Bullet& initial_state, const Distance& target_distance, const Wind& wind,
-                                         const Atmosphere& atmosphere, const Time& dt = Time::seconds(0.001),
-                                         const Time& max_time = Time::seconds(60.0));
+    static Trajectory simulateToDistance(const Bullet& initial_state, double target_distance, const Vector3D& wind,
+                                         const Atmosphere& atmosphere, double dt = 0.001, double max_time = 60.0);
 
     /**
      * @brief Iteratively solve launch angle so impact equals line of sight at zero range
      *
      * @param bullet Bullet properties
-     * @param muzzle_velocity Muzzle velocity
-     * @param scope_height Scope height above bore
-     * @param zero_range Zero range
+     * @param muzzle_velocity Muzzle velocity in m/s
+     * @param scope_height Scope height above bore in m
+     * @param zero_range Zero range in m
      * @param atmosphere Atmospheric conditions
      * @param wind Wind conditions (default: calm)
-     * @param dt Time step (default: 0.001 seconds)
+     * @param dt Time step in s (default: 0.001)
      * @param max_iterations Maximum iterations (default: 20)
-     * @param tolerance Convergence tolerance (default: 0.001 meters)
+     * @param tolerance Convergence tolerance in m (default: 0.001)
      * @return Bullet with zeroed initial state
      * @throws std::runtime_error if convergence fails
      */
-    static Bullet computeZeroedInitialState(const Bullet& bullet, const Velocity& muzzle_velocity,
-                                            const Distance& scope_height, const Distance& zero_range,
-                                            const Atmosphere& atmosphere, const Wind& wind = Wind::calm(),
-                                            const Time& dt = Time::seconds(0.001), int max_iterations = 20,
-                                            const Distance& tolerance = Distance::meters(0.001));
+    static Bullet computeZeroedInitialState(const Bullet& bullet, double muzzle_velocity,
+                                            double scope_height, double zero_range,
+                                            const Atmosphere& atmosphere, const Vector3D& wind = Vector3D(0, 0, 0),
+                                            double dt = 0.001, int max_iterations = 20,
+                                            double tolerance = 0.001);
 
     private:
     /**
@@ -84,12 +84,11 @@ namespace btk::ballistics
      * Uses the bullet's configured drag model (G1/G7) with density scaling.
      *
      * @param bullet Bullet properties
-     * @param velocity Bullet velocity
+     * @param velocity Bullet velocity in m/s
      * @param atmosphere Atmospheric conditions
      * @return Drag acceleration in m/s²
      */
-    static Acceleration calculateDragRetardation(const Bullet& bullet, const Velocity& velocity,
-                                                 const Atmosphere& atmosphere);
+    static double calculateDragRetardation(const Bullet& bullet, double velocity, const Atmosphere& atmosphere);
 
     /**
      * @brief Calculate total acceleration components (ax, ay, az)
@@ -97,9 +96,9 @@ namespace btk::ballistics
      * @param state Current flying bullet state
      * @param atmosphere Atmospheric conditions
      * @param wind Wind conditions
-     * @return Acceleration3D with x, y, z components
+     * @return Vector3D with x, y, z components in m/s²
      */
-    static Acceleration3D calculateAcceleration(const Bullet& state, const Atmosphere& atmosphere, const Wind& wind);
+    static Vector3D calculateAcceleration(const Bullet& state, const Atmosphere& atmosphere, const Vector3D& wind);
 
     /**
      * @brief Return (acceleration, mass) drag coefficients via binary search

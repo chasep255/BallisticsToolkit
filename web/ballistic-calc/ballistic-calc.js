@@ -26,9 +26,9 @@ class BallisticsCalculator
     {
       throw new Error('BallisticsToolkit module not loaded');
     }
-    const weight = this.btk.Weight.grains(bullet.weight);
-    const diameter = this.btk.Distance.inches(bullet.diameter);
-    const length = this.btk.Distance.inches(bullet.length);
+    const weight = this.btk.Conversions.grainsToKg(bullet.weight);
+    const diameter = this.btk.Conversions.inchesToMeters(bullet.diameter);
+    const length = this.btk.Conversions.inchesToMeters(bullet.length);
     const dragFunction = bullet.dragFunction === 'G1' ? this.btk.DragFunction.G1 : this.btk.DragFunction.G7;
 
     this.bullet = new this.btk.Bullet(weight, diameter, length, bullet.bc, dragFunction);
@@ -47,10 +47,10 @@ class BallisticsCalculator
     {
       throw new Error('BallisticsToolkit module not loaded');
     }
-    const temperature = this.btk.Temperature.fahrenheit(atmosphere.temperature);
-    const altitude = this.btk.Distance.feet(atmosphere.altitude);
+    const temperature = this.btk.Conversions.fahrenheitToKelvin(atmosphere.temperature);
+    const altitude = this.btk.Conversions.feetToMeters(atmosphere.altitude);
     const humidity = atmosphere.humidity / 100.0; // Convert percentage to decimal
-    const pressure = this.btk.Pressure.zero(); // Use zero pressure to trigger standard pressure calculation
+    const pressure = 0.0; // Use zero pressure to trigger standard pressure calculation
 
     this.atmosphere = new this.btk.Atmosphere(temperature, altitude, humidity, pressure);
   }
@@ -67,10 +67,17 @@ class BallisticsCalculator
     {
       throw new Error('BallisticsToolkit module not loaded');
     }
-    const speed = this.btk.Velocity.mph(wind.speed);
-    const direction = this.btk.Angle.oclock(wind.direction);
+    const speed = this.btk.Conversions.mphToMps(wind.speed);
+    const direction = this.btk.Conversions.oclockToRadians(wind.direction);
 
-    this.wind = new this.btk.Wind(speed, direction);
+    // Convert from cylindrical (speed, direction) to Cartesian (x, y, z)
+    // o'clock system: 3=from right, 6=headwind, 9=from left, 12=tailwind
+    // direction is in radians: 0°=tailwind, 90°=from right, 180°=headwind, 270°=from left
+    const x = -speed * Math.cos(direction); // Downrange component (negative = headwind, positive = tailwind)
+    const y = speed * Math.sin(direction); // Crossrange component (positive = from right, negative = from left)
+    const z = 0.0; // No vertical component for now
+
+    this.wind = new this.btk.Vector3D(x, y, z);
   }
 
   /**
@@ -95,22 +102,22 @@ class BallisticsCalculator
     }
 
     // Create initial bullet state with zeroed position
-    const muzzleVelocity = this.btk.Velocity.fps(shot.muzzleVelocity);
-    const zeroRange = this.btk.Distance.yards(shot.zeroRange);
-    const scopeHeight = this.btk.Distance.inches(shot.scopeHeight);
+    const muzzleVelocity = this.btk.Conversions.fpsToMps(shot.muzzleVelocity);
+    const zeroRange = this.btk.Conversions.yardsToMeters(shot.zeroRange);
+    const scopeHeight = this.btk.Conversions.inchesToMeters(shot.scopeHeight);
 
     // Compute zeroed initial state
-    const timeStep = this.btk.Time.seconds(0.001);
+    const timeStep = 0.001;
     const maxIterations = 20;
-    const tolerance = this.btk.Distance.meters(0.001);
+    const tolerance = 0.001;
 
     const initialState = this.btk.Simulator.computeZeroedInitialState(
       this.bullet, muzzleVelocity, scopeHeight, zeroRange, this.atmosphere, this.wind,
       timeStep, maxIterations, tolerance
     );
-    const maxRangeDistance = this.btk.Distance.yards(shot.maxRange);
-    const simulationTimeStep = this.btk.Time.seconds(0.001);
-    const maxTime = this.btk.Time.seconds(60.0);
+    const maxRangeDistance = this.btk.Conversions.yardsToMeters(shot.maxRange);
+    const simulationTimeStep = 0.001;
+    const maxTime = 60.0;
 
     // Simulate trajectory
     const trajectory = this.btk.Simulator.simulateToDistance(
@@ -125,14 +132,14 @@ class BallisticsCalculator
     // Sample trajectory at regular intervals using built-in interpolation
     for (let range = 0; range <= maxRange; range += stepSize)
     {
-      const targetRange = this.btk.Distance.yards(range);
+      const targetRange = this.btk.Conversions.yardsToMeters(range);
 
       // Use trajectory's built-in interpolation
       const interpolatedPoint = trajectory.atDistance(targetRange);
 
       // Check if the point is valid (not NaN time)
       const time = interpolatedPoint.getTime();
-      if (!isNaN(time.getSeconds()))
+      if (!isNaN(time))
       {
         const state = interpolatedPoint.getState();
         const position = state.getPosition();
@@ -140,18 +147,17 @@ class BallisticsCalculator
         // Calculate drop and drift in mrad
         // Drop = (bullet_height - scope_height) / range * 1000
         // Negative drop means below line of sight
-        const bulletHeightMeters = position.z.getMeters();
-        const scopeHeightMeters = this.btk.Distance.inches(shot.scopeHeight).getMeters();
-        const rangeMeters = this.btk.Distance.yards(range).getMeters();
+        const bulletHeightMeters = position.z;
+        const scopeHeightMeters = this.btk.Conversions.inchesToMeters(shot.scopeHeight);
+        const rangeMeters = this.btk.Conversions.yardsToMeters(range);
 
         const dropMeters = bulletHeightMeters - scopeHeightMeters;
         const dropMrad = range > 0 ? (dropMeters / rangeMeters) * 1000 : 0;
 
-        // Convert mrad to MOA using C++ units system
-        const dropAngleMrad = this.btk.Angle.mrad(dropMrad);
-        const dropMoa = dropAngleMrad.getMoa();
+        // Convert mrad to MOA using conversions
+        const dropMoa = this.btk.Conversions.radiansToMoa(this.btk.Conversions.mradToRadians(dropMrad));
 
-        const driftMeters = position.y.getMeters(); // Y is crosswind drift
+        const driftMeters = position.y; // Y is crosswind drift
         const driftMrad = range > 0 ? (driftMeters / rangeMeters) * 1000 : 0;
 
         // Convert drift to Left/Right text
@@ -171,9 +177,9 @@ class BallisticsCalculator
           dropMoa: dropMoa,
           drift: driftMrad,
           driftText: driftText,
-          velocity: velocity.getFps(),
-          energy: energy.getFootPounds(),
-          time: time.getSeconds()
+          velocity: this.btk.Conversions.mpsToFps(velocity),
+          energy: this.btk.Conversions.joulesToFootPounds(energy),
+          time: time
         });
       }
     }
@@ -190,10 +196,10 @@ class BallisticsCalculator
   calculateEnergy(weight, velocity)
   {
     // KE = 0.5 * m * v^2
-    const mass = weight.getKilograms();
-    const speed = velocity.getMps();
+    const mass = weight; // weight is already in kg
+    const speed = velocity; // velocity is already in m/s
     const energyJoules = 0.5 * mass * speed * speed;
-    return this.btk.Energy.joules(energyJoules);
+    return energyJoules; // Return raw joules
   }
 
 

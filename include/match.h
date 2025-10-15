@@ -1,8 +1,11 @@
 #pragma once
 
 #include "target.h"
+#include "vector.h"
+#include "conversions.h"
 #include <string>
 #include <vector>
+#include <limits>
 
 namespace btk::ballistics
 {
@@ -13,34 +16,18 @@ namespace btk::ballistics
   class Hit
   {
     public:
-    Hit() : x_(Distance::zero()), y_(Distance::zero()), score_(0)
-    {
-    }
-    Hit(const Distance& x_position, const Distance& y_position, int hit_score, bool is_x)
-      : x_(x_position), y_(y_position), score_(is_x ? 11 : hit_score)
-    {
-    }
+    Hit() : x_(0.0), y_(0.0), score_(0) {}
+    Hit(double x_position, double y_position, int hit_score, bool is_x)
+      : x_(x_position), y_(y_position), score_(is_x ? 11 : hit_score) {}
 
-    Distance getX() const
-    {
-      return x_;
-    }
-    Distance getY() const
-    {
-      return y_;
-    }
-    int getScore() const
-    {
-      return score_ > 10 ? 10 : score_;
-    }
-    bool isX() const
-    {
-      return score_ == 11;
-    }
+    double getX() const { return x_; } // m
+    double getY() const { return y_; } // m
+    int getScore() const { return score_ > 10 ? 10 : score_; }
+    bool isX() const { return score_ == 11; }
 
     private:
-    Distance x_; // X coordinate (positive = right)
-    Distance y_; // Y coordinate (positive = up)
+    double x_; // X coordinate in m (positive = right)
+    double y_; // Y coordinate in m (positive = up)
     int score_;  // Score for this hit (11 = X)
   };
 
@@ -55,8 +42,7 @@ namespace btk::ballistics
     /**
      * @brief Add a hit by coordinates
      */
-    std::pair<int, bool> addHit(const Distance& x, const Distance& y, const Target& target,
-                                const Distance& bullet_diameter = Distance::zero());
+    std::pair<int, bool> addHit(double x, double y, const Target& target, double bullet_diameter = 0.0);
 
     /**
      * @brief Get all hits
@@ -82,22 +68,22 @@ namespace btk::ballistics
     /**
      * @brief Get group size (extreme spread)
      */
-    Distance getGroupSize() const;
+    double getGroupSize() const; // m
 
     /**
      * @brief Get center of group
      */
-    std::pair<Distance, Distance> getCenter() const;
+    std::pair<double, double> getCenter() const; // m
 
     /**
      * @brief Get mean radius
      */
-    Distance getMeanRadius() const;
+    double getMeanRadius() const; // m
 
     /**
      * @brief Get radial standard deviation
      */
-    Distance getRadialStandardDeviation() const;
+    double getRadialStandardDeviation() const; // m
 
     /**
      * @brief Get total score
@@ -124,14 +110,14 @@ namespace btk::ballistics
     std::vector<Hit> hits_;
 
     // Accumulated metrics
-    Distance sumX_ = Distance::zero();
-    Distance sumY_ = Distance::zero();
+    double sumX_ = 0.0; // m
+    double sumY_ = 0.0; // m
     double sumX2_ = 0.0;  // sum of (x/meter)^2 - dimensionless
     double sumY2_ = 0.0;  // sum of (y/meter)^2 - dimensionless
-    Distance minX_ = Distance::nan();
-    Distance maxX_ = Distance::nan();
-    Distance minY_ = Distance::nan();
-    Distance maxY_ = Distance::nan();
+    double minX_ = std::numeric_limits<double>::quiet_NaN(); // m
+    double maxX_ = std::numeric_limits<double>::quiet_NaN(); // m
+    double minY_ = std::numeric_limits<double>::quiet_NaN(); // m
+    double maxY_ = std::numeric_limits<double>::quiet_NaN(); // m
     int totalScore_ = 0;
     int xCount_ = 0;
 

@@ -8,8 +8,7 @@ namespace btk::ballistics
 
   // Match implementation
 
-  std::pair<int, bool> Match::addHit(const Distance& x, const Distance& y, const Target& target,
-                                     const Distance& bullet_diameter)
+  std::pair<int, bool> Match::addHit(double x, double y, const Target& target, double bullet_diameter)
   {
     bool isX = target.isXRing(x, y, bullet_diameter);
     int score = target.scoreHit(x, y, bullet_diameter);
@@ -21,14 +20,14 @@ namespace btk::ballistics
   void Match::clear()
   {
     hits_.clear();
-    sumX_ = Distance::zero();
-    sumY_ = Distance::zero();
+    sumX_ = 0.0;
+    sumY_ = 0.0;
     sumX2_ = 0.0;
     sumY2_ = 0.0;
-    minX_ = Distance::nan();
-    maxX_ = Distance::nan();
-    minY_ = Distance::nan();
-    maxY_ = Distance::nan();
+    minX_ = std::numeric_limits<double>::quiet_NaN();
+    maxX_ = std::numeric_limits<double>::quiet_NaN();
+    minY_ = std::numeric_limits<double>::quiet_NaN();
+    maxY_ = std::numeric_limits<double>::quiet_NaN();
     totalScore_ = 0;
     xCount_ = 0;
   }
@@ -36,19 +35,19 @@ namespace btk::ballistics
   void Match::updateAccumulatedMetrics(const Hit& hit)
   {
     // Update sums for center and second moments (for radius stats)
-    sumX_ = sumX_ + hit.getX();
-    sumY_ = sumY_ + hit.getY();
-    sumX2_ += hit.getX().squared();
-    sumY2_ += hit.getY().squared();
+    sumX_ += hit.getX();
+    sumY_ += hit.getY();
+    sumX2_ += hit.getX() * hit.getX();
+    sumY2_ += hit.getY() * hit.getY();
 
     // Update min/max coordinates
-    if(minX_.isNan() || hit.getX() < minX_)
+    if(std::isnan(minX_) || hit.getX() < minX_)
       minX_ = hit.getX();
-    if(maxX_.isNan() || hit.getX() > maxX_)
+    if(std::isnan(maxX_) || hit.getX() > maxX_)
       maxX_ = hit.getX();
-    if(minY_.isNan() || hit.getY() < minY_)
+    if(std::isnan(minY_) || hit.getY() < minY_)
       minY_ = hit.getY();
-    if(maxY_.isNan() || hit.getY() > maxY_)
+    if(std::isnan(maxY_) || hit.getY() > maxY_)
       maxY_ = hit.getY();
 
     // Calculate and accumulate score
@@ -59,46 +58,46 @@ namespace btk::ballistics
       xCount_++;
   }
 
-  Distance Match::getGroupSize() const
+  double Match::getGroupSize() const
   {
     if(hits_.size() < 2)
     {
-      return Distance::zero();
+      return 0.0;
     }
 
     // Calculate group size using bounding box diagonal
-    double dx = (maxX_ - minX_).baseValue();
-    double dy = (maxY_ - minY_).baseValue();
+    double dx = maxX_ - minX_;
+    double dy = maxY_ - minY_;
     double diagonal = std::sqrt(dx * dx + dy * dy);
 
-    return Distance::fromBaseValue(diagonal);
+    return diagonal;
   }
 
-  std::pair<Distance, Distance> Match::getCenter() const
+  std::pair<double, double> Match::getCenter() const
   {
     if(hits_.empty())
-      return {Distance::zero(), Distance::zero()};
+      return {0.0, 0.0};
 
     return {sumX_ / hits_.size(), sumY_ / hits_.size()};
   }
 
-  Distance Match::getMeanRadius() const
+  double Match::getMeanRadius() const
   {
     if(hits_.empty())
-      return Distance::zero();
+      return 0.0;
 
     // Mean radius ≈ E[sqrt(x^2 + y^2)]
     // We approximate using RMS radius as an upper-bound proxy without looping:
     // rms = sqrt(E[x^2] + E[y^2]) with E[x^2] = sumX2_/n, E[y^2] = sumY2_/n
     double n = static_cast<double>(hits_.size());
-    Distance meanRms = Distance::fromBaseValue(std::sqrt((sumX2_ + sumY2_) / n));
+    double meanRms = std::sqrt((sumX2_ + sumY2_) / n);
     return meanRms;
   }
 
-  Distance Match::getRadialStandardDeviation() const
+  double Match::getRadialStandardDeviation() const
   {
     if(hits_.size() < 2)
-      return Distance::zero();
+      return 0.0;
 
     // Using second moments about origin (no loops):
     // E[r^2] = E[x^2] + E[y^2]
@@ -107,7 +106,7 @@ namespace btk::ballistics
     double er2 = (sumX2_ + sumY2_) / n; // E[r^2]
     double er = std::sqrt(er2);                     // RMS radius as proxy for E[r]
     double variance = std::max(0.0, er2 - er * er);
-    return Distance::fromBaseValue(std::sqrt(variance));
+    return std::sqrt(variance);
   }
 
   int Match::getHitCount() const

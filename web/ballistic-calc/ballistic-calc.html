@@ -225,8 +225,7 @@
                 
                 // Drop values - convert to selected units
                 const dropMrad = point.dropMoa * 0.2909; // Convert MOA to mrad
-                const dropAngleMrad = ballisticsCalculator.btk.Angle.mrad(dropMrad);
-                const dropMoa = dropAngleMrad.getMoa();
+                const dropMoa = ballisticsCalculator.btk.Conversions.radiansToMoa(ballisticsCalculator.btk.Conversions.mradToRadians(dropMrad));
                 
                 let dropValue;
                 if (angleUnits === 'mrad') {
@@ -238,8 +237,7 @@
                 
                 // Drift values - convert to selected units
                 const driftMrad = point.drift;
-                const driftAngleMrad = ballisticsCalculator.btk.Angle.mrad(driftMrad);
-                const driftMoa = driftAngleMrad.getMoa();
+                const driftMoa = ballisticsCalculator.btk.Conversions.radiansToMoa(ballisticsCalculator.btk.Conversions.mradToRadians(driftMrad));
                 
                 let driftValue;
                 if (angleUnits === 'mrad') {
@@ -335,7 +333,7 @@
                     <h3>Wind Conditions</h3>
                     <div class="param-help">
                         <strong>Wind Speed:</strong> Wind velocity in mph. Always positive value.<br><br>
-                        <strong>Wind Direction:</strong> Wind direction using 12-hour clock (1-12). 12 = tailwind (pushes forward), 3 = right crosswind (pushes right), 6 = headwind (pushes backward), 9 = left crosswind (pushes left).
+                        <strong>Wind Direction:</strong> Wind direction using 12-hour clock (1-12). 12 = tailwind, 3 = from right, 6 = headwind, 9 = from left.
                     </div>
                 </div>
                 

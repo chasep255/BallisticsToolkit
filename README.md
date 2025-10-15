@@ -66,6 +66,8 @@ Opens local server at http://localhost:8001
 - **Engine**: 3DOF ballistics simulation with 2nd-order Runge-Kutta (RK2) midpoint method
 - **Language**: C++17 compiled to WebAssembly with Emscripten
 - **Frontend**: Vanilla JavaScript with modern CSS, no frameworks
+- **Units**: SI base units internally with conversion utilities for user-friendly I/O
+- **Performance**: Optimized C++ core with direct vector operations
 - **Match Scoring**: Complete NRA scoring system with statistical analysis
 - **Deployment**: GitHub Actions auto-deploys to GitHub Pages
 - **Architecture**: Client-side only, no server required

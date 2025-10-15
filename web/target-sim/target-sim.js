@@ -125,7 +125,10 @@ class TargetSimulator
 
 
     // Canvas interactions (mouse)
-    this.canvas.addEventListener('wheel', (e) => this.onMouseWheel(e));
+    this.canvas.addEventListener('wheel', (e) => this.onMouseWheel(e),
+    {
+      passive: false
+    });
     this.canvas.addEventListener('mousedown', (e) => this.onCanvasMouseDown(e));
     this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
     this.canvas.addEventListener('mouseup', (e) => this.onCanvasMouseUp(e));
@@ -141,41 +144,35 @@ class TargetSimulator
 
   populateTargetDropdown()
   {
-    try
+    const targetSelect = document.getElementById('target');
+
+    // Clear existing options
+    targetSelect.innerHTML = '';
+
+    // Get available targets from C++
+    const availableTargets = this.btk.NRATargets.listTargets();
+
+    // Add each target as an option directly from C++ vector
+    const targetNames = [];
+    for (let i = 0; i < availableTargets.size(); i++)
     {
-      // Get the target dropdown element
-      const targetSelect = document.getElementById('target');
+      const targetName = availableTargets.get(i);
+      targetNames.push(targetName);
 
-      // Clear existing options
-      targetSelect.innerHTML = '';
-
-      // Get available targets from C++
-      const availableTargets = this.btk.NRATargets.listTargets();
-
-      // Add each target as an option
-      availableTargets.forEach(targetName =>
-      {
-        const option = document.createElement('option');
-        option.value = targetName;
-        option.textContent = targetName;
-        targetSelect.appendChild(option);
-      });
-
-      // Set default selection to MR-1FCA if available, otherwise first target
-      const defaultTarget = availableTargets.includes('MR-1FCA') ? 'MR-1FCA' : availableTargets[0];
-      if (defaultTarget)
-      {
-        targetSelect.value = defaultTarget;
-      }
-
-      console.log(`Loaded ${availableTargets.length} targets from C++:`, availableTargets);
+      const option = document.createElement('option');
+      option.value = targetName;
+      option.textContent = targetName;
+      targetSelect.appendChild(option);
     }
-    catch (error)
+
+    // Set default selection to MR-1FCA if available, otherwise first target
+    const defaultTarget = targetNames.includes('MR-1FCA') ? 'MR-1FCA' : targetNames[0];
+    if (defaultTarget)
     {
-      console.error('Failed to populate target dropdown:', error);
-      // Fallback to hardcoded targets if C++ call fails
-      this.populateTargetDropdownFallback();
+      targetSelect.value = defaultTarget;
     }
+
+    console.log(`Loaded ${targetNames.length} targets:`, targetNames);
   }
 
   populateTargetDropdownFallback()
@@ -295,19 +292,19 @@ class TargetSimulator
     const humidity = parseFloat(document.getElementById('humidity').value) / 100.0;
     // Create bullet
     const bullet = new this.btk.Bullet(
-      this.btk.Weight.grains(0), // Weight not used in 3DOF
-      this.btk.Distance.inches(diameter),
-      this.btk.Distance.inches(0), // Length not used
+      this.btk.Conversions.grainsToKg(0), // Weight not used in 3DOF
+      this.btk.Conversions.inchesToMeters(diameter),
+      this.btk.Conversions.inchesToMeters(0), // Length not used
       bc,
       document.getElementById('dragFunction').value === 'G1' ?
       this.btk.DragFunction.G1 : this.btk.DragFunction.G7
     );
 
     // Create atmosphere
-    const temp = this.btk.Temperature.fahrenheit(temperature);
-    const alt = this.btk.Distance.feet(altitude);
+    const temp = this.btk.Conversions.fahrenheitToKelvin(temperature);
+    const alt = this.btk.Conversions.feetToMeters(altitude);
     // Use automatic pressure calculation at altitude
-    const press = this.btk.Pressure.zero(); // This will be calculated automatically
+    const press = 0.0; // This will be calculated automatically
 
     const atmosphere = new this.btk.Atmosphere(temp, alt, humidity, press);
 
@@ -320,19 +317,19 @@ class TargetSimulator
 
 
     // Create simulator
-    const rifleAccuracyMrad = this.btk.Angle.moa(rifleAccuracy).getMrad();
+    const rifleAccuracyMrad = this.btk.Conversions.moaToRadians(rifleAccuracy);
 
     this.simulator = new this.btk.MatchSimulator(
       bullet,
-      this.btk.Velocity.fps(mv),
+      this.btk.Conversions.fpsToMps(mv),
       target,
-      this.btk.Distance.yards(range),
+      this.btk.Conversions.yardsToMeters(range),
       atmosphere,
-      this.btk.Velocity.fps(mvSd),
-      this.btk.Velocity.mph(windSd),
-      this.btk.Velocity.mph(headwindSd),
-      this.btk.Velocity.mph(updraftSd),
-      this.btk.Angle.mrad(rifleAccuracyMrad),
+      this.btk.Conversions.fpsToMps(mvSd),
+      this.btk.Conversions.mphToMps(windSd),
+      this.btk.Conversions.mphToMps(headwindSd),
+      this.btk.Conversions.mphToMps(updraftSd),
+      rifleAccuracyMrad,
       0.001 // timestep
     );
 
@@ -439,8 +436,8 @@ class TargetSimulator
     const target = this.simulator.getTarget();
 
     // Calculate scale based on container width
-    const ring8Info = this.btk.getRingInfoWrapper(target, 8);
-    const referenceDiameter = ring8Info.inner.getInches() * 2; // 8-ring diameter
+    const ring8InnerDiameter = target.getRingInnerDiameter(8);
+    const referenceDiameter = this.btk.Conversions.metersToInches(ring8InnerDiameter) * 2; // 8-ring diameter
     const baseScale = this.canvas.width * 0.85 / referenceDiameter; // Use width for scaling
     this.targetScale = baseScale * this.zoomFactor;
 
@@ -477,8 +474,8 @@ class TargetSimulator
 
     for (const spec of ringSpecs)
     {
-      const ringInfo = this.btk.getRingInfoWrapper(target, spec.ring);
-      const radiusInches = ringInfo.inner.getInches() / 2;
+      const ringInnerDiameter = target.getRingInnerDiameter(spec.ring);
+      const radiusInches = this.btk.Conversions.metersToInches(ringInnerDiameter) / 2;
       const radiusPixels = radiusInches * this.targetScale;
 
       // Draw filled circle
@@ -503,7 +500,7 @@ class TargetSimulator
     }
 
     // Draw X-ring
-    const xRingRadius = target.getXRingDiameter().getInches() / 2 * this.targetScale;
+    const xRingRadius = this.btk.Conversions.metersToInches(target.getXRingDiameter()) / 2 * this.targetScale;
     this.ctx.beginPath();
     this.ctx.arc(this.targetCenterX, this.targetCenterY, xRingRadius, 0, 2 * Math.PI);
     this.ctx.fillStyle = 'black';
@@ -532,11 +529,11 @@ class TargetSimulator
     }
 
     // Convert shot position to canvas coordinates
-    const xPixels = this.targetCenterX + (simulatedShot.impactX.getInches() * this.targetScale);
-    const yPixels = this.targetCenterY - (simulatedShot.impactY.getInches() * this.targetScale); // Flip Y axis
+    const xPixels = this.targetCenterX + (this.btk.Conversions.metersToInches(simulatedShot.impactX) * this.targetScale);
+    const yPixels = this.targetCenterY - (this.btk.Conversions.metersToInches(simulatedShot.impactY) * this.targetScale); // Flip Y axis
 
     // Use actual bullet diameter scaled to pixels
-    const bulletDiameter = this.simulator.getBulletDiameter().getInches();
+    const bulletDiameter = this.btk.Conversions.metersToInches(this.simulator.getBulletDiameter());
     const holeRadius = (bulletDiameter / 2) * this.targetScale;
 
     // Draw bullet hole (red circle with red outline)
@@ -724,11 +721,11 @@ class TargetSimulator
     const tooltip = this.elements.tooltip;
     tooltip.innerHTML = `
             <div><strong>Shot Details:</strong></div>
-            <div>Impact: X=${simulatedShot.impactX.getInches().toFixed(2)}" Y=${simulatedShot.impactY.getInches().toFixed(2)}"</div>
+            <div>Impact: X=${this.btk.Conversions.metersToInches(simulatedShot.impactX).toFixed(2)}" Y=${this.btk.Conversions.metersToInches(simulatedShot.impactY).toFixed(2)}"</div>
             <div>Score: ${simulatedShot.score}${simulatedShot.isX ? 'x' : ''}</div>
-            <div>MV: ${simulatedShot.actualMv.getFps().toFixed(0)} fps | IV: ${simulatedShot.impactVelocity.getFps().toFixed(0)} fps</div>
-            <div>Wind: (${simulatedShot.windDownrange.getMph().toFixed(1)}, ${simulatedShot.windCrossrange.getMph().toFixed(1)}, ${simulatedShot.windVertical.getMph().toFixed(1)}) mph</div>
-            <div>Release: (${simulatedShot.releaseAngleH.getMoa().toFixed(2)}, ${simulatedShot.releaseAngleV.getMoa().toFixed(2)}) MOA</div>
+            <div>MV: ${this.btk.Conversions.mpsToFps(simulatedShot.actualMv).toFixed(0)} fps | IV: ${this.btk.Conversions.mpsToFps(simulatedShot.impactVelocity).toFixed(0)} fps</div>
+            <div>Wind: (${this.btk.Conversions.mpsToMph(simulatedShot.windDownrange).toFixed(1)}, ${this.btk.Conversions.mpsToMph(simulatedShot.windCrossrange).toFixed(1)}, ${this.btk.Conversions.mpsToMph(simulatedShot.windVertical).toFixed(1)}) mph</div>
+            <div>Release: (${this.btk.Conversions.radiansToMoa(simulatedShot.releaseAngleH).toFixed(2)}, ${this.btk.Conversions.radiansToMoa(simulatedShot.releaseAngleV).toFixed(2)}) MOA</div>
         `;
     tooltip.style.display = 'block';
     tooltip.style.left = (e.pageX + 15) + 'px';

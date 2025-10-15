@@ -1,6 +1,7 @@
 #pragma once
 
-#include "units.h"
+#include "vector.h"
+#include "conversions.h"
 #include <cmath>
 #include <map>
 #include <string>
@@ -23,51 +24,56 @@ namespace btk::ballistics
      * @brief Initialize a target
      *
      * @param name Target name/identifier
-     * @param ring_10 10-ring diameter
-     * @param ring_9 9-ring diameter
-     * @param ring_8 8-ring diameter
-     * @param ring_7 7-ring diameter
-     * @param ring_6 6-ring diameter
-     * @param ring_5 5-ring diameter
-     * @param x_ring X-ring diameter (defaults to ring_10)
+     * @param ring_10 10-ring diameter in m
+     * @param ring_9 9-ring diameter in m
+     * @param ring_8 8-ring diameter in m
+     * @param ring_7 7-ring diameter in m
+     * @param ring_6 6-ring diameter in m
+     * @param ring_5 5-ring diameter in m
+     * @param x_ring X-ring diameter in m (defaults to ring_10)
      * @param description Human-readable description
      */
-    Target(const std::string& name, const Distance& ring_10, const Distance& ring_9, const Distance& ring_8,
-           const Distance& ring_7, const Distance& ring_6, const Distance& ring_5,
-           const Distance& x_ring = Distance::zero(), const std::string& description = "");
+    Target(const std::string& name, double ring_10, double ring_9, double ring_8,
+           double ring_7, double ring_6, double ring_5,
+           double x_ring = 0.0, const std::string& description = "");
 
     /**
      * @brief Get diameter of specified ring (0-6, where 6=X, 5=10, etc.)
      */
-    Distance ringDiameter(int ring) const;
+    double ringDiameter(int ring) const; // returns m
 
     /**
      * @brief Calculate score for a hit at (x, y) coordinates
      *
-     * @param x_position X coordinate (positive = right)
-     * @param y_position Y coordinate (positive = up)
-     * @param bullet_diameter Bullet diameter (for line breaking)
+     * @param x_position X coordinate in m (positive = right)
+     * @param y_position Y coordinate in m (positive = up)
+     * @param bullet_diameter Bullet diameter in m (for line breaking)
      * @return Score (0-10, where 0 = miss)
      */
-    int scoreHit(const Distance& x_position, const Distance& y_position,
-                 const Distance& bullet_diameter = Distance::zero()) const;
+    int scoreHit(double x_position, double y_position, double bullet_diameter = 0.0) const;
 
     /**
      * @brief Check if hit is in X ring
      *
-     * @param x_position X coordinate
-     * @param y_position Y coordinate
-     * @param bullet_diameter Bullet diameter (for line breaking)
+     * @param x_position X coordinate in m
+     * @param y_position Y coordinate in m
+     * @param bullet_diameter Bullet diameter in m (for line breaking)
      */
-    bool isXRing(const Distance& x_position, const Distance& y_position,
-                 const Distance& bullet_diameter = Distance::zero()) const;
+    bool isXRing(double x_position, double y_position, double bullet_diameter = 0.0) const;
 
     /**
-     * @brief Get diameter and radius for a ring
+     * @brief Get inner diameter for a ring
      *
-     * @return Pair of (diameter, radius)
+     * @return Inner diameter in m
      */
-    std::pair<Distance, Distance> getRingInfo(int ring) const;
+    double getRingInnerDiameter(int ring) const;
+
+    /**
+     * @brief Get outer diameter for a ring
+     *
+     * @return Outer diameter in m
+     */
+    double getRingOuterDiameter(int ring) const;
 
     // Getters
     const std::string& getName() const
@@ -78,17 +84,13 @@ namespace btk::ballistics
     {
       return description_;
     }
-    Distance getXRingDiameter() const
-    {
-      return ring_diameters_[6];
-    }
+    double getXRingDiameter() const { return ring_diameters_[6]; } // m
 
-    std::string toString() const;
 
     private:
     std::string name_;
     std::string description_;
-    Distance ring_diameters_[7];
+    double ring_diameters_[7]; // m
   };
 
 } // namespace btk::ballistics

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "units.h"
+#include "vector.h"
+#include "conversions.h"
 #include <memory>
 
 namespace btk::ballistics
@@ -20,28 +21,18 @@ namespace btk::ballistics
     /**
      * @brief Initialize atmosphere with custom conditions
      *
-     * @param temperature Temperature
-     * @param altitude Altitude
+     * @param temperature Temperature in K
+     * @param altitude Altitude in m
      * @param humidity Relative humidity (0.0 to 1.0)
-     * @param pressure Barometric pressure (nullptr for standard pressure at altitude)
+     * @param pressure Barometric pressure in Pa (0 for standard pressure at altitude)
      */
-    Atmosphere(const Temperature& temperature, const Distance& altitude, double humidity,
-               const Pressure& pressure = Pressure::pascals(0));
+    Atmosphere(double temperature, double altitude, double humidity, double pressure = 0.0);
 
-    // Getters
-    const Temperature& getTemperature() const
-    {
-      return temperature_;
-    }
-    const Distance& getAltitude() const
-    {
-      return altitude_;
-    }
-    double getHumidity() const
-    {
-      return humidity_;
-    }
-    const Pressure& getPressure() const;
+    // Getters (all return SI base units)
+    double getTemperature() const { return temperature_; } // K
+    double getAltitude() const { return altitude_; } // m
+    double getHumidity() const { return humidity_; } // 0.0 to 1.0
+    double getPressure() const; // Pa
 
     /**
      * @brief Calculate air density at current conditions
@@ -65,84 +56,20 @@ namespace btk::ballistics
     /**
      * @brief Create atmosphere for given altitude with standard lapse rates
      */
-    static Atmosphere atAltitude(const Distance& altitude);
+    static Atmosphere atAltitude(double altitude); // altitude in m
 
-    std::string toString() const;
 
     private:
-    Temperature temperature_;
-    Distance altitude_;
+    double temperature_; // K
+    double altitude_; // m
     double humidity_; // 0.0 to 1.0
-    Pressure pressure_;
+    double pressure_; // Pa
 
     /**
      * @brief Calculate standard pressure for given altitude
      */
-    Pressure calculateStandardPressure(const Distance& altitude) const;
+    double calculateStandardPressure(double altitude) const; // altitude in m, returns Pa
   };
 
-  /**
-   * @brief Represents wind conditions with 3D components
-   */
-  class Wind
-  {
-    public:
-    /**
-     * @brief Initialize wind with 3D components
-     *
-     * @param speed Wind speed
-     * @param direction Wind direction (0° = headwind, 90° = right crosswind)
-     * @param vertical Vertical wind component (positive = updraft, negative = downdraft)
-     */
-    Wind(const Velocity& speed, const Angle& direction, const Velocity& vertical);
-
-    /**
-     * @brief Initialize wind with only horizontal components
-     *
-     * @param speed Wind speed
-     * @param direction Wind direction
-     */
-    Wind(const Velocity& speed, const Angle& direction);
-
-    /**
-     * @brief Create calm wind (no wind)
-     */
-    static Wind calm();
-
-    // Getters
-    const Velocity& getSpeed() const
-    {
-      return speed_;
-    }
-    const Angle& getDirection() const
-    {
-      return direction_;
-    }
-    const Velocity& getVertical() const
-    {
-      return vertical_;
-    }
-
-    /**
-     * @brief Get wind components in 3D coordinate system
-     *
-     * @return Tuple of (downrange, crossrange, vertical) wind components in m/s
-     */
-    std::tuple<double, double, double> getComponents() const;
-
-    /**
-     * @brief Get wind components in 3D coordinate system as Velocity objects
-     *
-     * @return Tuple of (downrange, crossrange, vertical) wind components
-     */
-    std::tuple<Velocity, Velocity, Velocity> getComponentVelocities() const;
-
-    std::string toString() const;
-
-    private:
-    Velocity speed_;
-    Angle direction_;
-    Velocity vertical_;
-  };
 
 } // namespace btk::ballistics

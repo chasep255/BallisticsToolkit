@@ -1,13 +1,23 @@
 #pragma once
 
 #include "constants.h"
-#include "units.h"
+#include "vector.h"
+#include "conversions.h"
 #include <cmath>
 #include <string>
 #include <tuple>
 
 namespace btk::ballistics
 {
+
+  /**
+   * @brief Drag function types for ballistics calculations
+   */
+  enum DragFunction : uint8_t
+  {
+    G1 = 0,
+    G7 = 1
+  };
 
   /**
    * @brief Represents a bullet with physical properties and ballistic coefficient
@@ -23,18 +33,16 @@ namespace btk::ballistics
     /**
      * @brief Initialize a bullet (static properties only)
      *
-     * @param weight Bullet weight
-     * @param diameter Bullet diameter
-     * @param length Bullet length
+     * @param weight Bullet weight in kg
+     * @param diameter Bullet diameter in m
+     * @param length Bullet length in m
      * @param bc Ballistic coefficient (G1 or G7 depending on drag_function)
      * @param drag_function Drag function type (default: G7)
      */
-    constexpr Bullet(const Weight& weight, const Distance& diameter, const Distance& length, double bc,
+    constexpr Bullet(double weight, double diameter, double length, double bc,
                      DragFunction drag_function = DragFunction::G7)
       : weight_(weight), diameter_(diameter), length_(length), bc_(bc), drag_function_(drag_function),
-        position_(Distance::zero(), Distance::zero(), Distance::zero()),
-        velocity_(Velocity::zero(), Velocity::zero(), Velocity::zero()), spin_rate_(AngularVelocity::zero()),
-        has_flight_state_(false)
+        position_(0.0, 0.0, 0.0), velocity_(0.0, 0.0, 0.0), spin_rate_(0.0), has_flight_state_(false)
     {
     }
 
@@ -42,12 +50,11 @@ namespace btk::ballistics
      * @brief Initialize a flying bullet with 4DOF state
      *
      * @param bullet The bullet object with physical properties and BC
-     * @param position 3D position vector
-     * @param velocity 3D velocity vector
-     * @param spin_rate Spin rate around the velocity vector (for Magnus effects)
+     * @param position 3D position vector in m
+     * @param velocity 3D velocity vector in m/s
+     * @param spin_rate Spin rate around the velocity vector in rad/s (for Magnus effects)
      */
-    constexpr Bullet(const Bullet& bullet, const Position3D& position, const Velocity3D& velocity,
-                     const AngularVelocity& spin_rate)
+    constexpr Bullet(const Bullet& bullet, const Vector3D& position, const Vector3D& velocity, double spin_rate)
       : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_),
         drag_function_(bullet.drag_function_), position_(position), velocity_(velocity), spin_rate_(spin_rate),
         has_flight_state_(true)
@@ -58,171 +65,95 @@ namespace btk::ballistics
      * @brief Initialize a flying bullet with 4DOF state (legacy constructor)
      *
      * @param bullet The bullet object with physical properties and BC
-     * @param position_x Position along X axis (downrange/horizontal)
-     * @param position_y Position along Y axis (crossrange/windage)
-     * @param position_z Position along Z axis (vertical/elevation)
-     * @param velocity_x Velocity component along X axis
-     * @param velocity_y Velocity component along Y axis
-     * @param velocity_z Velocity component along Z axis
-     * @param spin_rate Spin rate around the velocity vector (for Magnus effects)
+     * @param position_x Position along X axis in m (downrange/horizontal)
+     * @param position_y Position along Y axis in m (crossrange/windage)
+     * @param position_z Position along Z axis in m (vertical/elevation)
+     * @param velocity_x Velocity component along X axis in m/s
+     * @param velocity_y Velocity component along Y axis in m/s
+     * @param velocity_z Velocity component along Z axis in m/s
+     * @param spin_rate Spin rate around the velocity vector in rad/s (for Magnus effects)
      */
-    constexpr Bullet(const Bullet& bullet, const Distance& position_x, const Distance& position_y,
-                     const Distance& position_z, const Velocity& velocity_x, const Velocity& velocity_y,
-                     const Velocity& velocity_z, const AngularVelocity& spin_rate)
+    constexpr Bullet(const Bullet& bullet, double position_x, double position_y, double position_z,
+                     double velocity_x, double velocity_y, double velocity_z, double spin_rate)
       : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_),
         drag_function_(bullet.drag_function_), position_(position_x, position_y, position_z),
         velocity_(velocity_x, velocity_y, velocity_z), spin_rate_(spin_rate), has_flight_state_(true)
     {
     }
 
-    // Getters
-    constexpr const Weight& getWeight() const
-    {
-      return weight_;
-    }
-    constexpr const Distance& getDiameter() const
-    {
-      return diameter_;
-    }
-    constexpr const Distance& getLength() const
-    {
-      return length_;
-    }
-    constexpr double getBc() const
-    {
-      return bc_;
-    }
-    constexpr DragFunction getDragFunction() const
-    {
-      return drag_function_;
-    }
+    // Getters (all return SI base units)
+    constexpr double getWeight() const { return weight_; } // kg
+    constexpr double getDiameter() const { return diameter_; } // m
+    constexpr double getLength() const { return length_; } // m
+    constexpr double getBc() const { return bc_; }
+    constexpr DragFunction getDragFunction() const { return drag_function_; }
 
     /**
      * @brief Calculate sectional density (weight/diameter²)
      *
-     * @return Sectional density in lb/in² for standard ballistics calculations
+     * @return Sectional density in kg/m² (SI units)
      */
     constexpr double getSectionalDensity() const
     {
-      return weight_.pounds() / (diameter_.inches() * diameter_.inches());
+      return weight_ / (diameter_ * diameter_);
     }
 
-    std::string toString() const
-    {
-      if(has_flight_state_)
-      {
-        return std::to_string(weight_.grains()) + "gr, BC=" + std::to_string(bc_) +
-               (drag_function_ == DragFunction::G1 ? " (G1)" : " (G7)") + " at " + position_.toString() + " m";
-      }
-      else
-      {
-        return std::to_string(weight_.grains()) + "gr, BC=" + std::to_string(bc_) +
-               (drag_function_ == DragFunction::G1 ? " (G1)" : " (G7)");
-      }
-    }
 
-    std::string toDetailedString() const
-    {
-      if(has_flight_state_)
-      {
-        return "Bullet(" + std::to_string(weight_.grains()) + "gr, " + std::to_string(diameter_.inches()) + "\", " +
-               std::to_string(length_.inches()) + "\", BC=" + std::to_string(bc_) +
-               (drag_function_ == DragFunction::G1 ? ", G1" : ", G7") + ", pos=" + position_.toString() + " m, " +
-               "vel=" + velocity_.toString() + " m/s, " + "spin=" + std::to_string(spin_rate_.radians_per_second()) +
-               " rad/s)";
-      }
-      else
-      {
-        return "Bullet(" + std::to_string(weight_.grains()) + "gr, " + std::to_string(diameter_.inches()) + "\", " +
-               std::to_string(length_.inches()) + "\", BC=" + std::to_string(bc_) +
-               (drag_function_ == DragFunction::G1 ? ", G1)" : ", G7)");
-      }
-    }
 
     // Flight state methods (only valid if has_flight_state_ is true)
-    constexpr bool hasFlightState() const
-    {
-      return has_flight_state_;
-    }
+    constexpr bool hasFlightState() const { return has_flight_state_; }
 
-    constexpr const Position3D& getPosition() const
-    {
-      return position_;
-    }
-    constexpr const Velocity3D& getVelocity() const
-    {
-      return velocity_;
-    }
+    constexpr const Vector3D& getPosition() const { return position_; } // m
+    constexpr const Vector3D& getVelocity() const { return velocity_; } // m/s
 
     // Individual component getters (for compatibility)
-    constexpr const Distance& getPositionX() const
-    {
-      return position_.x;
-    }
-    constexpr const Distance& getPositionY() const
-    {
-      return position_.y;
-    }
-    constexpr const Distance& getPositionZ() const
-    {
-      return position_.z;
-    }
-    constexpr const Velocity& getVelocityX() const
-    {
-      return velocity_.x;
-    }
-    constexpr const Velocity& getVelocityY() const
-    {
-      return velocity_.y;
-    }
-    constexpr const Velocity& getVelocityZ() const
-    {
-      return velocity_.z;
-    }
-    constexpr const AngularVelocity& getSpinRate() const
-    {
-      return spin_rate_;
-    }
+    constexpr double getPositionX() const { return position_.x; } // m
+    constexpr double getPositionY() const { return position_.y; } // m
+    constexpr double getPositionZ() const { return position_.z; } // m
+    constexpr double getVelocityX() const { return velocity_.x; } // m/s
+    constexpr double getVelocityY() const { return velocity_.y; } // m/s
+    constexpr double getVelocityZ() const { return velocity_.z; } // m/s
+    constexpr double getSpinRate() const { return spin_rate_; } // rad/s
 
     /**
      * @brief Calculate total velocity magnitude from components
      */
-    constexpr Velocity getTotalVelocity() const
+    constexpr double getTotalVelocity() const
     {
-      return velocity_.magnitude();
+      return velocity_.magnitude(); // m/s
     }
 
     /**
      * @brief Calculate elevation angle (pitch) from velocity vector
      *
-     * @return Angle above horizontal plane
+     * @return Angle above horizontal plane in radians
      */
-    constexpr Angle getElevationAngle() const
+    constexpr double getElevationAngle() const
     {
-      return Angle::radians(std::atan2(velocity_.z.mps(), velocity_.x.mps()));
+      return std::atan2(velocity_.z, velocity_.x); // rad
     }
 
     /**
      * @brief Calculate azimuth angle (bearing/yaw) from velocity vector
      *
-     * @return Horizontal angle from X-axis (downrange direction)
+     * @return Horizontal angle from X-axis in radians (downrange direction)
      */
-    constexpr Angle getAzimuthAngle() const
+    constexpr double getAzimuthAngle() const
     {
-      return Angle::radians(std::atan2(velocity_.y.mps(), velocity_.x.mps()));
+      return std::atan2(velocity_.y, velocity_.x); // rad
     }
 
     private:
-    Weight weight_;
-    Distance diameter_;
-    Distance length_;
+    double weight_; // kg
+    double diameter_; // m
+    double length_; // m
     double bc_;
     DragFunction drag_function_;
 
     // Flight state (only valid if has_flight_state_ is true)
-    Position3D position_;
-    Velocity3D velocity_;
-    AngularVelocity spin_rate_;
+    Vector3D position_; // m
+    Vector3D velocity_; // m/s
+    double spin_rate_; // rad/s
     bool has_flight_state_;
   };
 
