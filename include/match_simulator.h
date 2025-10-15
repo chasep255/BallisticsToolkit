@@ -160,8 +160,8 @@ namespace btk::ballistics
     double rifle_accuracy_; // rad
     double timestep_; // s
 
-    // Zeroed state computed once at initialization
-    Bullet zeroed_state_;
+    // Simulator for trajectory calculations
+    Simulator simulator_;
 
     // Track all shots using Match class
     Match match_;

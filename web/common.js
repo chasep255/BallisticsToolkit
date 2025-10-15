@@ -2,6 +2,29 @@
  * Common JavaScript functionality for BallisticsToolkit
  */
 
+// Enable Emscripten console output globally
+function enableEmscriptenConsole() {
+  if (typeof Module !== 'undefined' && Module.print) {
+    const originalPrint = Module.print;
+    Module.print = function(text) {
+      console.log('[C++]', text);
+      originalPrint(text);
+    };
+  }
+}
+
+// Auto-enable when Module is available
+if (typeof Module !== 'undefined') {
+  enableEmscriptenConsole();
+} else {
+  // Enable when Module becomes available
+  const originalOnLoad = window.onload;
+  window.onload = function() {
+    if (originalOnLoad) originalOnLoad();
+    enableEmscriptenConsole();
+  };
+}
+
 // Navigation helper
 function setActiveNavLink()
 {

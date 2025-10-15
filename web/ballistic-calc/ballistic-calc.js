@@ -6,17 +6,13 @@ class BallisticsCalculator
   constructor(btk)
   {
     this.btk = btk;
-    this.bullet = null;
-    this.atmosphere = null;
-    this.wind = null;
+    this.simulator = new btk.Simulator();
   }
 
   /**
    * Set bullet parameters
    * @param {Object} bullet - Bullet parameters
    * @param {number} bullet.weight - Weight in grains
-   * @param {number} bullet.diameter - Diameter in inches
-   * @param {number} bullet.length - Length in inches
    * @param {number} bullet.bc - Ballistic coefficient
    * @param {string} bullet.dragFunction - 'G1' or 'G7'
    */
@@ -27,12 +23,14 @@ class BallisticsCalculator
       throw new Error('BallisticsToolkit module not loaded');
     }
     const weight = this.btk.Conversions.grainsToKg(bullet.weight);
-    const diameter = this.btk.Conversions.inchesToMeters(bullet.diameter);
-    const length = this.btk.Conversions.inchesToMeters(bullet.length);
+    const diameter = 0.0; // Not used in current calculations
+    const length = 0.0; // Not used in current calculations
     const dragFunction = bullet.dragFunction === 'G1' ? this.btk.DragFunction.G1 : this.btk.DragFunction.G7;
 
-    this.bullet = new this.btk.Bullet(weight, diameter, length, bullet.bc, dragFunction);
+    const bulletObj = new this.btk.Bullet(weight, diameter, length, bullet.bc, dragFunction);
+    this.simulator.setBullet(bulletObj);
   }
+
 
   /**
    * Set atmospheric conditions
@@ -52,7 +50,8 @@ class BallisticsCalculator
     const humidity = atmosphere.humidity / 100.0; // Convert percentage to decimal
     const pressure = 0.0; // Use zero pressure to trigger standard pressure calculation
 
-    this.atmosphere = new this.btk.Atmosphere(temperature, altitude, humidity, pressure);
+    const atmosphereObj = new this.btk.Atmosphere(temperature, altitude, humidity, pressure);
+    this.simulator.setAtmosphere(atmosphereObj);
   }
 
   /**
@@ -77,7 +76,8 @@ class BallisticsCalculator
     const y = speed * Math.sin(direction); // Crossrange component (positive = from right, negative = from left)
     const z = 0.0; // No vertical component for now
 
-    this.wind = new this.btk.Vector3D(x, y, z);
+    const windObj = new this.btk.Vector3D(x, y, z);
+    this.simulator.setWind(windObj);
   }
 
   /**
@@ -96,33 +96,26 @@ class BallisticsCalculator
     {
       throw new Error('BallisticsToolkit module not loaded');
     }
-    if (!this.bullet || !this.atmosphere || !this.wind)
-    {
-      throw new Error('Bullet, atmosphere, and wind must be set before calculating trajectory');
-    }
 
     // Create initial bullet state with zeroed position
     const muzzleVelocity = this.btk.Conversions.fpsToMps(shot.muzzleVelocity);
     const zeroRange = this.btk.Conversions.yardsToMeters(shot.zeroRange);
     const scopeHeight = this.btk.Conversions.inchesToMeters(shot.scopeHeight);
 
-    // Compute zeroed initial state
+    // Compute zeroed initial state using simulator
     const timeStep = 0.001;
     const maxIterations = 20;
     const tolerance = 0.001;
+    const spinRate = 0.0;
 
-    const initialState = this.btk.Simulator.computeZeroedInitialState(
-      this.bullet, muzzleVelocity, scopeHeight, zeroRange, this.atmosphere, this.wind,
-      timeStep, maxIterations, tolerance
-    );
+    this.simulator.computeZero(muzzleVelocity, scopeHeight, zeroRange, timeStep, maxIterations, tolerance, spinRate);
+    
     const maxRangeDistance = this.btk.Conversions.yardsToMeters(shot.maxRange);
     const simulationTimeStep = 0.001;
     const maxTime = 60.0;
 
-    // Simulate trajectory
-    const trajectory = this.btk.Simulator.simulateToDistance(
-      initialState, maxRangeDistance, this.wind, this.atmosphere, simulationTimeStep, maxTime
-    );
+    // Simulate using stored state
+    const trajectory = this.simulator.simulate(maxRangeDistance, simulationTimeStep, maxTime);
 
     // Convert trajectory to JavaScript array, sampling at requested intervals
     const trajectoryData = [];
@@ -168,7 +161,7 @@ class BallisticsCalculator
 
         // Get velocity and energy
         const velocity = state.getTotalVelocity();
-        const energy = this.calculateEnergy(this.bullet.getWeight(), velocity);
+        const energy = this.calculateEnergy(this.simulator.getInitialBullet().getWeight(), velocity);
 
         trajectoryData.push(
         {
@@ -210,14 +203,34 @@ class BallisticsCalculator
    */
   getTrajectoryPoint(range)
   {
-    if (!this.bullet || !this.atmosphere || !this.wind)
-    {
-      throw new Error('Bullet, atmosphere, and wind must be set before calculating trajectory');
+    if (!this.trajectory) {
+      return null;
     }
-
-    // This would require implementing interpolation in the trajectory
-    // For now, return null as this is a more complex operation
-    return null;
+    
+    // Convert yards to meters for C++ API
+    const rangeMeters = this.btk.Conversions.yardsToMeters(range);
+    
+    // Use the C++ trajectory interpolation
+    const point = this.trajectory.atDistance(rangeMeters);
+    
+    // Check if point is valid (not NaN time)
+    if (isNaN(point.getTime())) {
+      return null;
+    }
+    
+    // Convert back to imperial units for JavaScript
+    const state = point.getState();
+    const position = state.getPosition();
+    const velocity = state.getVelocity();
+    
+    return {
+      range: range,
+      drop: this.btk.Conversions.radiansToMoa(point.getState().getPositionZ() / rangeMeters),
+      drift: this.btk.Conversions.radiansToMoa(point.getState().getPositionY() / rangeMeters),
+      velocity: this.btk.Conversions.mpsToFps(velocity.magnitude()),
+      energy: this.calculateEnergy(state.getWeight(), velocity.magnitude()),
+      time: point.getTime()
+    };
   }
 
   /**
@@ -226,9 +239,7 @@ class BallisticsCalculator
   destroy()
   {
     // With embind, objects are automatically garbage collected
-    this.bullet = null;
-    this.atmosphere = null;
-    this.wind = null;
+    this.simulator = null;
   }
 }
 

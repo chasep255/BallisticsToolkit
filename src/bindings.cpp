@@ -109,7 +109,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getSpinRate", &Bullet::getSpinRate)
     .function("getTotalVelocity", &Bullet::getTotalVelocity)
     .function("getElevationAngle", &Bullet::getElevationAngle)
-    .function("getAzimuthAngle", &Bullet::getAzimuthAngle);
+    .function("getAzimuthAngle", &Bullet::getAzimuthAngle)
+    .class_function("computeSpinRateFromTwist", &Bullet::computeSpinRateFromTwist);
 
 
   // Atmosphere class
@@ -151,9 +152,20 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Simulator class
   class_<Simulator>("Simulator")
-    .class_function("timeStep", &Simulator::timeStep)
-    .class_function("simulateToDistance", &Simulator::simulateToDistance)
-    .class_function("computeZeroedInitialState", &Simulator::computeZeroedInitialState);
+    .constructor<>()
+    .function("setBullet", &Simulator::setBullet)
+    .function("setInitialBullet", &Simulator::setInitialBullet)
+    .function("setCurrentBullet", &Simulator::setCurrentBullet)
+    .function("setAtmosphere", &Simulator::setAtmosphere)
+    .function("setWind", &Simulator::setWind)
+    .function("getInitialBullet", &Simulator::getInitialBullet)
+    .function("getCurrentBullet", &Simulator::getCurrentBullet)
+    .function("getAtmosphere", &Simulator::getAtmosphere)
+    .function("getWind", &Simulator::getWind)
+    .function("resetToInitial", &Simulator::resetToInitial)
+    .function("computeZero", &Simulator::computeZero)
+    .function("simulate", &Simulator::simulate)
+    .function("timeStep", select_overload<void(double)>(&Simulator::timeStep));
 
   // Target class
   class_<Target>("Target")

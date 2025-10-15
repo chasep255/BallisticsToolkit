@@ -23,14 +23,6 @@
                 <input type="number" id="weight" value="140" step="0.1" title="Bullet weight in grains">
             </div>
             <div class="param-item">
-                <label for="diameter" title="Bullet diameter in inches">Diameter (in)</label>
-                <input type="number" id="diameter" value="0.264" step="0.001" title="Bullet diameter in inches">
-        </div>
-            <div class="param-item">
-                <label for="length" title="Bullet length in inches">Length (in)</label>
-                <input type="number" id="length" value="1.4" step="0.1" title="Bullet length in inches">
-                </div>
-            <div class="param-item">
                 <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
                 <input type="number" id="bc" value="0.311" step="0.001" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">
             </div>
@@ -134,6 +126,7 @@
                 
                 // Initialize help modal
                 Utils.setupHelpModal('helpBtn', 'helpModal');
+
             } catch (error) {
                 console.error('Failed to load BallisticsCalculator WebAssembly module:', error);
                 showError('Failed to load ballistic calculator. Please refresh the page.');
@@ -156,8 +149,6 @@
                 // Get form values
                 const bullet = {
                     weight: parseFloat(document.getElementById('weight').value),
-                    diameter: parseFloat(document.getElementById('diameter').value),
-                    length: parseFloat(document.getElementById('length').value),
                     bc: parseFloat(document.getElementById('bc').value),
                     dragFunction: document.getElementById('dragFunction').value
                 };

@@ -19,95 +19,157 @@ namespace btk::ballistics
   };
 
   /**
-   * @brief Ballistics flight simulation helpers
+   * @brief Stateful ballistics flight simulator
    *
-   * This module provides a small set of functions to compute bullet flight through
-   * the atmosphere with drag, gravity, and wind using a fixed time-step integrator.
+   * This class manages bullet, atmosphere, and wind conditions internally,
+   * allowing for easy simulation with different conditions and bullet states.
    */
   class Simulator
   {
     public:
     /**
-     * @brief Advance the state by one step using RK2 midpoint integration
-     *
-     * @param state Current flying bullet state
-     * @param dt Time step in s
-     * @param wind Wind conditions
-     * @param atmosphere Atmospheric conditions
-     * @return New flying bullet state after time step
+     * @brief Default constructor
+     * 
+     * Initializes simulator with default values:
+     * - Bullet: zero state (0 position, 0 velocity, 0 spin)
+     * - Atmosphere: standard conditions (15°C, sea level, 50% humidity)
+     * - Wind: zero (0, 0, 0) m/s
+     * - Time: 0.0 seconds
      */
-    static Bullet timeStep(const Bullet& state, double dt, const Vector3D& wind, const Atmosphere& atmosphere);
+    Simulator() : initial_bullet_(0.0, 0.0, 0.0, 0.0), current_bullet_(0.0, 0.0, 0.0, 0.0), 
+                  atmosphere_(), wind_(0.0, 0.0, 0.0), current_time_(0.0) {}
+
+    // Setters (individual)
+    /**
+     * @brief Set bullet properties and update both initial and current bullet states
+     * 
+     * @param bullet Bullet object with physical properties (weight, diameter, length, BC, drag function)
+     */
+    void setBullet(const Bullet& bullet);
 
     /**
-     * @brief Integrate forward until target distance is reached and return a trajectory
-     *
-     * Records points periodically for later interpolation. Raises if the target
-     * is not reached within max_time or the solution becomes invalid.
-     *
-     * @param initial_state Initial flying bullet state
-     * @param target_distance Target distance to reach in m
-     * @param wind Wind conditions
-     * @param atmosphere Atmospheric conditions
-     * @param dt Time step in s (default: 0.001)
-     * @param max_time Maximum simulation time in s (default: 60.0)
-     * @return Complete trajectory
-     * @throws std::runtime_error if simulation fails
+     * @brief Set initial bullet state (for advanced use)
+     * 
+     * @param bullet Bullet object representing the initial state
      */
-    static Trajectory simulateToDistance(const Bullet& initial_state, double target_distance, const Vector3D& wind,
-                                         const Atmosphere& atmosphere, double dt = 0.001, double max_time = 60.0);
+    void setInitialBullet(const Bullet& bullet);
 
     /**
-     * @brief Iteratively solve launch angle so impact equals line of sight at zero range
-     *
-     * @param bullet Bullet properties
+     * @brief Set current bullet state
+     * 
+     * @param bullet Bullet object representing the current in-flight state
+     */
+    void setCurrentBullet(const Bullet& bullet);
+
+    /**
+     * @brief Set atmospheric conditions
+     * 
+     * @param atmosphere Atmosphere object with temperature, altitude, humidity, and pressure
+     */
+    void setAtmosphere(const Atmosphere& atmosphere);
+
+    /**
+     * @brief Set wind conditions
+     * 
+     * @param wind Wind vector in Cartesian coordinates (x=downrange m/s, y=crossrange m/s, z=vertical m/s)
+     */
+    void setWind(const Vector3D& wind);
+
+    // Getters
+    /**
+     * @brief Get the initial bullet state
+     * 
+     * @return Reference to the initial bullet state
+     */
+    const Bullet& getInitialBullet() const;
+
+    /**
+     * @brief Get the current bullet state
+     * 
+     * @return Reference to the current in-flight bullet state
+     */
+    const Bullet& getCurrentBullet() const;
+
+    /**
+     * @brief Get atmospheric conditions
+     * 
+     * @return Reference to the current atmosphere object
+     */
+    const Atmosphere& getAtmosphere() const;
+
+    /**
+     * @brief Get wind conditions
+     * 
+     * @return Reference to the current wind vector
+     */
+    const Vector3D& getWind() const;
+
+    // State management
+    /**
+     * @brief Reset current bullet to initial bullet state and reset time to zero
+     */
+    void resetToInitial();
+
+    // Simulation methods
+    /**
+     * @brief Compute zeroed initial state for given muzzle velocity and zero range
+     * 
      * @param muzzle_velocity Muzzle velocity in m/s
      * @param scope_height Scope height above bore in m
      * @param zero_range Zero range in m
-     * @param atmosphere Atmospheric conditions
-     * @param wind Wind conditions (default: calm)
-     * @param dt Time step in s (default: 0.001)
-     * @param max_iterations Maximum iterations (default: 20)
-     * @param tolerance Convergence tolerance in m (default: 0.001)
-     * @return Bullet with zeroed initial state
-     * @throws std::runtime_error if convergence fails
+     * @param dt Time step for zeroing calculation in s (default: 0.001)
+     * @param max_iterations Maximum iterations for zeroing (default: 20)
+     * @param tolerance Convergence tolerance for zeroing in m (default: 0.001)
+     * @param spin_rate Bullet spin rate in rad/s (default: 0.0)
      */
-    static Bullet computeZeroedInitialState(const Bullet& bullet, double muzzle_velocity,
-                                            double scope_height, double zero_range,
-                                            const Atmosphere& atmosphere, const Vector3D& wind = Vector3D(0, 0, 0),
-                                            double dt = 0.001, int max_iterations = 20,
-                                            double tolerance = 0.001);
+    void computeZero(double muzzle_velocity, double scope_height, double zero_range,
+                     double dt = 0.001, int max_iterations = 20, double tolerance = 0.001, double spin_rate = 0.0);
+
+    /**
+     * @brief Simulate trajectory from current state to maximum distance
+     * 
+     * @param max_distance Maximum distance to simulate in m
+     * @param dt Time step for simulation in s (default: 0.001)
+     * @param max_time Maximum simulation time in s (default: 60.0)
+     * @return Trajectory object containing all simulation points
+     */
+    Trajectory simulate(double max_distance, double dt = 0.001, double max_time = 60.0);
+
+    /**
+     * @brief Advance simulation by one time step
+     * 
+     * @param dt Time step in s
+     */
+    void timeStep(double dt);
+
+    // State queries
+    /**
+     * @brief Get current bullet distance (X position)
+     * 
+     * @return Current bullet X position in m
+     */
+    double getCurrentDistance() const;
+
+    /**
+     * @brief Get current simulation time
+     * 
+     * @return Current simulation time in s
+     */
+    double getCurrentTime() const;
+
 
     private:
-    /**
-     * @brief Calculate drag deceleration for a bullet at a given velocity
-     *
-     * Uses the bullet's configured drag model (G1/G7) with density scaling.
-     *
-     * @param bullet Bullet properties
-     * @param velocity Bullet velocity in m/s
-     * @param atmosphere Atmospheric conditions
-     * @return Drag acceleration in m/s²
-     */
-    static double calculateDragRetardation(const Bullet& bullet, double velocity, const Atmosphere& atmosphere);
+    // Physics helpers
+    double calculateDragRetardation() const;
+    Vector3D calculateAcceleration() const;
 
-    /**
-     * @brief Calculate total acceleration components (ax, ay, az)
-     *
-     * @param state Current flying bullet state
-     * @param atmosphere Atmospheric conditions
-     * @param wind Wind conditions
-     * @return Vector3D with x, y, z components in m/s²
-     */
-    static Vector3D calculateAcceleration(const Bullet& state, const Atmosphere& atmosphere, const Vector3D& wind);
+    // Internal state
+    Bullet initial_bullet_;
+    Bullet current_bullet_;
+    Atmosphere atmosphere_;
+    Vector3D wind_;
+    double current_time_;
 
-    /**
-     * @brief Return (acceleration, mass) drag coefficients via binary search
-     *
-     * @param vp_fps Velocity in fps
-     * @param drag_type Drag function type
-     * @return Tuple of (acceleration, mass) coefficients
-     */
-    static constexpr std::tuple<double, double> dragFunction(double vp_fps, DragFunction drag_type);
   };
 
 } // namespace btk::ballistics

@@ -18,7 +18,7 @@ namespace btk::ballistics
      {1260.0, 7.97592111627665e-04, 1.67688974440324},
      {1110.0, 5.71086414289273e-12, 4.3212826264889},
      {960.0, 3.02865108244904e-17, 5.99074203776707},
-     {670.0, 7.52285155782535e-06, 2.1738019851075},
+     {670.0, 7.52285155782565e-06, 2.1738019851075},
      {540.0, 1.31766281225189e-05, 2.08774690257991},
      {0.0, 1.34504843776525e-05, 2.08702306738884}}};
 
@@ -79,41 +79,41 @@ namespace btk::ballistics
     return {std::get<1>(data[data_size - 1]), std::get<2>(data[data_size - 1])};
   }
 
-  // Calculate drag retardation
-  double Simulator::calculateDragRetardation(const Bullet& bullet, double velocity, const Atmosphere& atmosphere)
+  // Calculate drag retardation (instance)
+  double Simulator::calculateDragRetardation() const
   {
+    // Get velocity magnitude from current bullet
+    double velocity = current_bullet_.getVelocity().magnitude();
+    
     // Convert velocity to fps for drag function
     double v_fps = Conversions::mpsToFps(velocity);
 
     // Get drag coefficients
-    auto [acceleration, mass] = findDragCoefficients(v_fps, bullet.getDragFunction());
+    auto [acceleration, mass] = findDragCoefficients(v_fps, current_bullet_.getDragFunction());
 
     if(acceleration <= 0.0 || mass <= 0.0)
     {
       return 0.0;
     }
 
-    double density_ratio = atmosphere.getAirDensity() / Constants::AIR_DENSITY_STANDARD;
-    double retardation_fps_per_sec = acceleration * std::pow(v_fps, mass) * density_ratio / bullet.getBc();
+    double density_ratio = atmosphere_.getAirDensity() / Constants::AIR_DENSITY_STANDARD;
+    double retardation_fps_per_sec = acceleration * std::pow(v_fps, mass) * density_ratio / current_bullet_.getBc();
 
     // Convert from fps/s to m/s²
     return Conversions::fpsToMps(retardation_fps_per_sec);
   }
 
-  // Calculate total acceleration components
-  Vector3D Simulator::calculateAcceleration(const Bullet& state, const Atmosphere& atmosphere, const Vector3D& wind)
+  // Calculate total acceleration components (instance)
+  Vector3D Simulator::calculateAcceleration() const
   {
-    // Get velocity vector
-    Vector3D velocity = state.getVelocity();
-
-    // Calculate total velocity magnitude
-    double total_velocity = velocity.magnitude();
+    // Get velocity vector from current bullet
+    Vector3D velocity = current_bullet_.getVelocity();
 
     // Calculate drag retardation
-    double drag_retardation = calculateDragRetardation(state, total_velocity, atmosphere);
+    double drag_retardation = calculateDragRetardation();
 
     // Calculate relative velocity (bullet velocity - wind velocity)
-    Vector3D relative_velocity = velocity - wind;
+    Vector3D relative_velocity = velocity - wind_;
     double v_rel_total = relative_velocity.magnitude();
 
     if(v_rel_total > 0.0)
@@ -122,7 +122,7 @@ namespace btk::ballistics
       Vector3D drag_dir = relative_velocity.normalized();
       Vector3D drag_accel = -drag_retardation * drag_dir;
       Vector3D gravity(0.0, 0.0, -Constants::GRAVITY);
-      
+
       return drag_accel + gravity;
     }
     else
@@ -132,47 +132,67 @@ namespace btk::ballistics
     }
   }
 
-  // RK2 time step implementation
-  Bullet Simulator::timeStep(const Bullet& state, double dt, const Vector3D& wind, const Atmosphere& atmosphere)
+
+  // Setters
+  void Simulator::setBullet(const Bullet& bullet)
   {
-    // Get current state vectors
-    Vector3D position = state.getPosition();
-    Vector3D velocity = state.getVelocity();
-
-    // Calculate initial acceleration
-    Vector3D accel = calculateAcceleration(state, atmosphere, wind);
-
-    // True RK2 (midpoint method):
-    // 1. Compute midpoint velocities
-    double half_dt = dt * 0.5;
-    Vector3D v_half = velocity + accel * half_dt;
-
-    // 2. Compute midpoint positions
-    Vector3D pos_half = position + v_half * half_dt;
-
-    // 3. Create midpoint state and recompute acceleration
-    Bullet midpoint_state(state, pos_half, v_half, state.getSpinRate());
-
-    // 4. Recompute acceleration at midpoint
-    Vector3D accel_mid = calculateAcceleration(midpoint_state, atmosphere, wind);
-
-    // 5. Use midpoint acceleration for final step
-    Vector3D pos_new = position + v_half * dt;
-    Vector3D vel_new = velocity + accel_mid * dt;
-
-    // No spin decay (constant spin rate)
-    double spin_new = state.getSpinRate();
-
-    // Create new state using Vector3D constructor
-    return Bullet(state, pos_new, vel_new, spin_new);
+    initial_bullet_ = bullet;
+    current_bullet_ = bullet;
   }
 
-  // Compute zeroed initial state
-  Bullet Simulator::computeZeroedInitialState(const Bullet& bullet, double muzzle_velocity,
-                                              double scope_height, double zero_range,
-                                              const Atmosphere& atmosphere, const Vector3D& wind, double dt,
-                                              int max_iterations, double tolerance)
+  void Simulator::setInitialBullet(const Bullet& bullet)
   {
+    initial_bullet_ = bullet;
+  }
+
+  void Simulator::setCurrentBullet(const Bullet& bullet)
+  {
+    current_bullet_ = bullet;
+  }
+
+  void Simulator::setAtmosphere(const Atmosphere& atmosphere)
+  {
+    atmosphere_ = atmosphere;
+  }
+
+  void Simulator::setWind(const Vector3D& wind)
+  {
+    wind_ = wind;
+  }
+
+  // Getters
+  const Bullet& Simulator::getInitialBullet() const
+  {
+    return initial_bullet_;
+  }
+
+  const Bullet& Simulator::getCurrentBullet() const
+  {
+    return current_bullet_;
+  }
+
+  const Atmosphere& Simulator::getAtmosphere() const
+  {
+    return atmosphere_;
+  }
+
+  const Vector3D& Simulator::getWind() const
+  {
+    return wind_;
+  }
+
+  // State management
+  void Simulator::resetToInitial()
+  {
+    current_bullet_ = initial_bullet_;
+    current_time_ = 0.0;
+  }
+
+  // Compute zeroed initial state (instance method)
+  void Simulator::computeZero(double muzzle_velocity, double scope_height, double zero_range,
+                               double dt, int max_iterations, double tolerance, double spin_rate)
+  {
+
     double best_angle = 0.0; // radians
 
     for(int i = 0; i < max_iterations; ++i)
@@ -183,11 +203,12 @@ namespace btk::ballistics
 
       // Start at bore height (z=0)
       Vector3D position_init(0.0, 0.0, 0.0);
-      Bullet test_state(bullet, position_init, velocity_init, 0.0);
+      Bullet test_state(initial_bullet_, position_init, velocity_init, spin_rate);
 
       // Simulate slightly past zero range to ensure we can interpolate
       double target_dist = zero_range * 1.1;
-      Trajectory trajectory = simulateToDistance(test_state, target_dist, wind, atmosphere, dt, 5.0);
+      setCurrentBullet(test_state);
+      Trajectory trajectory = simulate(target_dist, dt, 5.0);
 
       // Get state at zero range using interpolation
       TrajectoryPoint point_at_zero = trajectory.atDistance(zero_range);
@@ -216,39 +237,84 @@ namespace btk::ballistics
     Vector3D velocity_final(muzzle_velocity * std::cos(best_angle), 0.0,
                               muzzle_velocity * std::sin(best_angle));
     Vector3D position_final(0.0, 0.0, 0.0);
-    Bullet initial_state(bullet, position_final, velocity_final, 0.0);
+    Bullet initial_state(initial_bullet_, position_final, velocity_final, spin_rate);
 
-    return initial_state;
+    // Update initial bullet with zeroed state
+    initial_bullet_ = initial_state;
+    resetToInitial();
   }
 
-  // Simulate trajectory to target distance
-  Trajectory Simulator::simulateToDistance(const Bullet& initial_state, double target_distance,
-                                           const Vector3D& wind, const Atmosphere& atmosphere, double dt,
-                                           double max_time)
+  // Simulate trajectory using stored state
+  Trajectory Simulator::simulate(double max_distance, double dt, double max_time)
   {
     Trajectory trajectory;
+    trajectory.addPoint(current_time_, current_bullet_);
 
-    // Add initial point
-    trajectory.addPoint(0.0, initial_state);
+    double start_time = current_time_;
+    double max_sim_time = start_time + max_time;
 
-    Bullet current_state = initial_state;
-    double current_time = 0.0;
-
-    while(current_time < max_time)
+    while(current_time_ < max_sim_time)
     {
-      // Advance one time step
-      current_state = timeStep(current_state, dt, wind, atmosphere);
-      current_time = current_time + dt;
+      // Use the proper timeStep method that updates current_bullet_ and current_time_
+      timeStep(dt);
+      
+      trajectory.addPoint(current_time_, current_bullet_);
 
-      // Add point to trajectory
-      trajectory.addPoint(current_time, current_state);
-
-      // Check if we've reached the target distance (continue 1% past for interpolation)
-      if(current_state.getPositionX() > target_distance)
+      if(current_bullet_.getPositionX() > max_distance)
         break;
     }
 
     return trajectory;
   }
+
+  // Time step using stored state
+  void Simulator::timeStep(double dt)
+  {
+    // Get current state vectors
+    Vector3D position = current_bullet_.getPosition();
+    Vector3D velocity = current_bullet_.getVelocity();
+
+    // Calculate initial acceleration
+    Vector3D accel = calculateAcceleration();
+
+    // True RK2 (midpoint method):
+    // 1. Compute midpoint velocities
+    double half_dt = dt * 0.5;
+    Vector3D v_half = velocity + accel * half_dt;
+
+    // 2. Compute midpoint positions
+    Vector3D pos_half = position + v_half * half_dt;
+
+    // 3. Create midpoint state and recompute acceleration
+    Bullet midpoint_state(current_bullet_, pos_half, v_half, current_bullet_.getSpinRate());
+
+    // 4. Recompute acceleration at midpoint
+    Vector3D accel_mid = calculateAcceleration();
+
+    // 5. Use midpoint acceleration for final step
+    Vector3D pos_new = position + v_half * dt;
+    Vector3D vel_new = velocity + accel_mid * dt;
+
+    // No spin decay (constant spin rate)
+    double spin_new = current_bullet_.getSpinRate();
+
+    // Update current bullet state and time
+    current_bullet_ = Bullet(current_bullet_, pos_new, vel_new, spin_new);
+    current_time_ += dt;
+  }
+
+  // State queries
+  double Simulator::getCurrentDistance() const
+  {
+    return current_bullet_.getPositionX();
+  }
+
+  double Simulator::getCurrentTime() const
+  {
+    return current_time_;
+  }
+
+
+
 
 } // namespace btk::ballistics

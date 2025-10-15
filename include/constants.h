@@ -10,7 +10,7 @@ namespace btk::ballistics
    */
   class Constants
   {
-  public:
+    public:
     // Gravity
     static constexpr double GRAVITY = 9.80665; // m/s² - standard gravitational acceleration at sea level
 
@@ -32,6 +32,7 @@ namespace btk::ballistics
     static constexpr double GAS_CONSTANT_UNIVERSAL = 8.314; // J/(mol·K) - universal gas constant
     static constexpr double MOLAR_MASS_DRY_AIR = 0.02897;   // kg/mol - molar mass of dry air
     static constexpr double HEAT_CAPACITY_RATIO_AIR = 1.4;  // dimensionless - heat capacity ratio for air
+
   };
 
 } // namespace btk::ballistics

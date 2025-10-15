@@ -11,18 +11,55 @@ namespace btk::ballistics
 {
 
   /**
-   * @brief Hit coordinates
+   * @brief Represents a single hit on a target
+   * 
+   * Stores the position and score of a hit, with special handling for X-ring hits.
    */
   class Hit
   {
     public:
+    /**
+     * @brief Default constructor (zero hit)
+     */
     Hit() : x_(0.0), y_(0.0), score_(0) {}
+    
+    /**
+     * @brief Construct hit with position and score
+     * 
+     * @param x_position X coordinate in m (positive = right)
+     * @param y_position Y coordinate in m (positive = up)
+     * @param hit_score Score (0-10)
+     * @param is_x Whether this is an X-ring hit
+     */
     Hit(double x_position, double y_position, int hit_score, bool is_x)
       : x_(x_position), y_(y_position), score_(is_x ? 11 : hit_score) {}
 
-    double getX() const { return x_; } // m
-    double getY() const { return y_; } // m
+    /**
+     * @brief Get X coordinate
+     * 
+     * @return X coordinate in m
+     */
+    double getX() const { return x_; }
+    
+    /**
+     * @brief Get Y coordinate
+     * 
+     * @return Y coordinate in m
+     */
+    double getY() const { return y_; }
+    
+    /**
+     * @brief Get score (0-10)
+     * 
+     * @return Score value
+     */
     int getScore() const { return score_ > 10 ? 10 : score_; }
+    
+    /**
+     * @brief Check if hit is in X-ring
+     * 
+     * @return True if X-ring hit
+     */
     bool isX() const { return score_ == 11; }
 
     private:
@@ -33,19 +70,33 @@ namespace btk::ballistics
 
   /**
    * @brief Class that accumulates hits and provides match analysis
+   * 
+   * Tracks all hits in a match and provides statistical analysis including
+   * group size, center of impact, mean radius, and scoring statistics.
    */
   class Match
   {
     public:
+    /**
+     * @brief Default constructor
+     */
     Match() = default;
 
     /**
      * @brief Add a hit by coordinates
+     * 
+     * @param x X coordinate in m (positive = right)
+     * @param y Y coordinate in m (positive = up)
+     * @param target Target for scoring
+     * @param bullet_diameter Bullet diameter in m (for line breaking, default: 0.0)
+     * @return Reference to the created Hit object
      */
-    std::pair<int, bool> addHit(double x, double y, const Target& target, double bullet_diameter = 0.0);
+    const Hit& addHit(double x, double y, const Target& target, double bullet_diameter = 0.0);
 
     /**
      * @brief Get all hits
+     * 
+     * @return Vector of all hits
      */
     const std::vector<Hit>& getHits() const
     {
@@ -54,6 +105,8 @@ namespace btk::ballistics
 
     /**
      * @brief Get number of hits
+     * 
+     * @return Number of hits
      */
     size_t size() const
     {
@@ -67,26 +120,36 @@ namespace btk::ballistics
 
     /**
      * @brief Get group size (extreme spread)
+     * 
+     * @return Group size in m (diagonal of bounding box)
      */
-    double getGroupSize() const; // m
+    double getGroupSize() const;
 
     /**
      * @brief Get center of group
+     * 
+     * @return Pair of (x_center, y_center) in m
      */
-    std::pair<double, double> getCenter() const; // m
+    std::pair<double, double> getCenter() const;
 
     /**
-     * @brief Get mean radius
+     * @brief Get mean radius from center
+     * 
+     * @return Mean radius in m
      */
-    double getMeanRadius() const; // m
+    double getMeanRadius() const;
 
     /**
      * @brief Get radial standard deviation
+     * 
+     * @return Radial standard deviation in m
      */
-    double getRadialStandardDeviation() const; // m
+    double getRadialStandardDeviation() const;
 
     /**
      * @brief Get total score
+     * 
+     * @return Total score of all hits
      */
     int getTotalScore() const
     {
@@ -94,7 +157,9 @@ namespace btk::ballistics
     }
 
     /**
-     * @brief Get X count
+     * @brief Get X-ring count
+     * 
+     * @return Number of X-ring hits
      */
     int getXCount() const
     {
@@ -103,6 +168,8 @@ namespace btk::ballistics
 
     /**
      * @brief Get hit count
+     * 
+     * @return Number of hits
      */
     int getHitCount() const;
 

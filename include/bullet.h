@@ -115,6 +115,15 @@ namespace btk::ballistics
     constexpr double getVelocityZ() const { return velocity_.z; } // m/s
     constexpr double getSpinRate() const { return spin_rate_; } // rad/s
 
+    // Compute spin rate from signed twist pitch (meters/turn). RH>0, LH<0
+    static constexpr double computeSpinRateFromTwist(double speed_mps, double twist_pitch_m_signed)
+    {
+      if(twist_pitch_m_signed == 0.0)
+        return 0.0;
+      double omega_mag = 2.0 * M_PI * (speed_mps / std::abs(twist_pitch_m_signed));
+      return (twist_pitch_m_signed > 0.0 ? omega_mag : -omega_mag);
+    }
+
     /**
      * @brief Calculate total velocity magnitude from components
      */

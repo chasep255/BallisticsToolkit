@@ -8,13 +8,13 @@ namespace btk::ballistics
 
   // Match implementation
 
-  std::pair<int, bool> Match::addHit(double x, double y, const Target& target, double bullet_diameter)
+  const Hit& Match::addHit(double x, double y, const Target& target, double bullet_diameter)
   {
     bool isX = target.isXRing(x, y, bullet_diameter);
     int score = target.scoreHit(x, y, bullet_diameter);
     hits_.emplace_back(x, y, score, isX);
     updateAccumulatedMetrics(hits_.back());
-    return {score, isX};
+    return hits_.back();
   }
 
   void Match::clear()
