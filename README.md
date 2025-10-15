@@ -2,7 +2,7 @@
 
 Professional web-based ballistics calculator and match simulation suite for long-range shooting. Fast, accurate trajectory calculations with atmospheric and wind compensation, plus Monte Carlo match simulation with NRA targets.
 
-**Live Demo:** https://chasep255.github.io/BallisticsToolkit/
+**Website:** https://www.ballisticstoolkit.com/
 
 ## Features
 
@@ -23,7 +23,7 @@ Professional web-based ballistics calculator and match simulation suite for long
 ## Quick Start
 
 ### Ballistic Calculator
-Visit the [Ballistic Calculator](https://chasep255.github.io/BallisticsToolkit/ballistic-calc/ballistic-calc.html) and enter your:
+Visit the [Ballistic Calculator](https://www.ballisticstoolkit.com/ballistic-calc/ballistic-calc.html) and enter your:
 
 1. **Bullet specs** - Weight, diameter, BC, drag function
 2. **Conditions** - Temperature, pressure, humidity, altitude  
@@ -33,7 +33,7 @@ Visit the [Ballistic Calculator](https://chasep255.github.io/BallisticsToolkit/b
 Results display drop and drift corrections in your choice of milliradians or MOA for precise long-range adjustments.
 
 ### Target Simulator
-Navigate to the [Target Simulator](https://chasep255.github.io/BallisticsToolkit/target-sim/target-sim.html) for match simulation:
+Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/target-sim.html) for match simulation:
 
 1. **Bullet Parameters** - BC, muzzle velocity, diameter, drag function
 2. **Match Setup** - Target selection, range, shots per match, number of matches
