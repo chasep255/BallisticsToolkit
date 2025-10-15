@@ -158,20 +158,14 @@ namespace btk
       const Bullet& state1 = points_[left].getState();
       const Bullet& state2 = points_[right].getState();
 
-      // Interpolate position
-      Distance x = state1.getPositionX() + t * (state2.getPositionX() - state1.getPositionX());
-      Distance y = state1.getPositionY() + t * (state2.getPositionY() - state1.getPositionY());
-      Distance z = state1.getPositionZ() + t * (state2.getPositionZ() - state1.getPositionZ());
-
-      // Interpolate velocity
-      Velocity vx = state1.getVelocityX() + t * (state2.getVelocityX() - state1.getVelocityX());
-      Velocity vy = state1.getVelocityY() + t * (state2.getVelocityY() - state1.getVelocityY());
-      Velocity vz = state1.getVelocityZ() + t * (state2.getVelocityZ() - state1.getVelocityZ());
+      // Interpolate position and velocity using vector lerp
+      Position3D pos = state1.getPosition().lerp(state2.getPosition(), t);
+      Velocity3D vel = state1.getVelocity().lerp(state2.getVelocity(), t);
 
       // Interpolate spin rate
       AngularVelocity spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
 
-      Bullet interp_state(state1, x, y, z, vx, vy, vz, spin);
+      Bullet interp_state(state1, pos, vel, spin);
 
       return TrajectoryPoint(time, interp_state);
     }
@@ -256,20 +250,14 @@ namespace btk
       const Bullet& state1 = point1.getState();
       const Bullet& state2 = point2.getState();
 
-      // Interpolate position
-      Distance x = state1.getPositionX() + t * (state2.getPositionX() - state1.getPositionX());
-      Distance y = state1.getPositionY() + t * (state2.getPositionY() - state1.getPositionY());
-      Distance z = state1.getPositionZ() + t * (state2.getPositionZ() - state1.getPositionZ());
-
-      // Interpolate velocity
-      Velocity vx = state1.getVelocityX() + t * (state2.getVelocityX() - state1.getVelocityX());
-      Velocity vy = state1.getVelocityY() + t * (state2.getVelocityY() - state1.getVelocityY());
-      Velocity vz = state1.getVelocityZ() + t * (state2.getVelocityZ() - state1.getVelocityZ());
+      // Interpolate position and velocity using vector lerp
+      Position3D pos = state1.getPosition().lerp(state2.getPosition(), t);
+      Velocity3D vel = state1.getVelocity().lerp(state2.getVelocity(), t);
 
       // Interpolate spin rate
       AngularVelocity spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
 
-      return Bullet(state1, x, y, z, vx, vy, vz, spin);
+      return Bullet(state1, pos, vel, spin);
     }
 
   } // namespace ballistics

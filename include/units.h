@@ -6,6 +6,32 @@
 namespace btk::ballistics
 {
 
+  // ============================================================================
+  // OPERATOR PLACEMENT RULES
+  // ============================================================================
+  // 
+  // Member operators (require 'this' or natural left-hand side):
+  //   - Unary: operator-(), operator++()
+  //   - Comparison: operator==, operator!=, operator<, etc.
+  //   - Compound assignment: operator+=, operator-=, operator*=, operator/=
+  //   - Same-type binary: operator+(Unit), operator-(Unit)
+  //   - Scalar multiplication (right): operator*(double), operator/(double)
+  //
+  // Friend operators (for symmetry or left-hand non-member):
+  //   - Scalar multiplication (left): operator*(double, Unit)
+  //   - Should be defined inline in class for proper access
+  //
+  // Free function operators (inter-type operations):
+  //   - Inter-unit: Distance * Distance -> Area, Distance / Time -> Velocity
+  //   - Ratio: Distance / Distance -> double
+  //   - Should be defined after all unit classes
+  //
+  // ============================================================================
+
+  // ============================================================================
+  // UNIT BASE CLASS
+  // ============================================================================
+
   /**
    * @brief CRTP base class for all unit types
    * Provides common operators to avoid code duplication
@@ -160,6 +186,10 @@ namespace btk::ballistics
 
     double value_;
   };
+
+  // ============================================================================
+  // INDIVIDUAL UNIT CLASSES
+  // ============================================================================
 
   /**
    * @brief Distance measurements with meters as base unit (SI)
@@ -1064,6 +1094,59 @@ namespace btk::ballistics
   };
 
   /**
+   * @brief Density measurements with kg/m³ as base unit
+   */
+  class Density : public UnitBase<Density>
+  {
+    public:
+    // Static factory methods
+    static constexpr Density kgpm3(double value)
+    {
+      return Density(value);
+    }
+    static constexpr Density gpm3(double value)
+    {
+      return Density(value * 0.001);
+    }
+    static constexpr Density lbpft3(double value)
+    {
+      return Density(value * 16.0185);
+    }
+    static constexpr Density slugpft3(double value)
+    {
+      return Density(value * 515.379);
+    }
+
+    // Getter methods
+    constexpr double kgpm3() const
+    {
+      return value_;
+    }
+    constexpr double gpm3() const
+    {
+      return value_ * 1000.0;
+    }
+    constexpr double lbpft3() const
+    {
+      return value_ * 0.062428;
+    }
+    constexpr double slugpft3() const
+    {
+      return value_ * 0.00194032;
+    }
+
+    private:
+    friend class UnitBase<Density>;
+    explicit constexpr Density(double value) : UnitBase<Density>(value)
+    {
+    }
+  };
+
+  // ============================================================================
+  // VECTOR3D TEMPLATE CLASS
+  // ============================================================================
+
+  /**
    * @brief 3D vector template for unit types
    */
   template <typename UnitType>
@@ -1103,6 +1186,19 @@ namespace btk::ballistics
     constexpr Vector3D operator/(double scalar) const
     {
       return Vector3D(x / scalar, y / scalar, z / scalar);
+    }
+
+    // Friend operators for scalar multiplication from left
+    friend constexpr Vector3D operator*(double scalar, const Vector3D& vec)
+    {
+      return Vector3D(scalar * vec.x, scalar * vec.y, scalar * vec.z);
+    }
+
+    // Vector operations with other unit types
+    template <typename OtherUnit>
+    constexpr Vector3D operator*(const OtherUnit& unit) const
+    {
+      return Vector3D(x * unit, y * unit, z * unit);
     }
 
     constexpr Vector3D& operator+=(const Vector3D& other)
@@ -1155,19 +1251,29 @@ namespace btk::ballistics
     }
 
     // Vector operations
-    constexpr double magnitude() const
+    constexpr UnitType magnitude() const
     {
-      return std::sqrt(x.baseValue() * x.baseValue() + y.baseValue() * y.baseValue() + z.baseValue() * z.baseValue());
+      return UnitType::fromBaseValue(
+        std::sqrt(x.baseValue() * x.baseValue() + y.baseValue() * y.baseValue() + z.baseValue() * z.baseValue())
+      );
     }
 
     constexpr Vector3D normalized() const
     {
-      double mag = magnitude();
+      double mag = magnitude().baseValue();
       if(mag > 0.0)
       {
         return *this / mag;
       }
       return Vector3D();
+    }
+
+    constexpr Vector3D<double> direction() const
+    {
+      double mag = magnitude().baseValue();
+      if(mag > 0.0)
+        return Vector3D<double>(x.baseValue() / mag, y.baseValue() / mag, z.baseValue() / mag);
+      return Vector3D<double>(0.0, 0.0, 0.0);
     }
 
     constexpr double dot(const Vector3D& other) const
@@ -1193,6 +1299,16 @@ namespace btk::ballistics
                       UnitType::meters(ax * by - ay * bx));
     }
 
+    // Linear interpolation
+    constexpr Vector3D lerp(const Vector3D& other, double t) const
+    {
+      return Vector3D(
+        x + t * (other.x - x),
+        y + t * (other.y - y),
+        z + t * (other.z - z)
+      );
+    }
+
     // String representation
     std::string toString() const
     {
@@ -1208,10 +1324,33 @@ namespace btk::ballistics
     return vec * scalar;
   }
 
+  // Free function lerp for alternative syntax
+  template <typename UnitType>
+  constexpr Vector3D<UnitType> lerp(const Vector3D<UnitType>& a, const Vector3D<UnitType>& b, double t)
+  {
+    return a.lerp(b, t);
+  }
+
+  // Scalar vector operations
+  template <typename UnitType>
+  constexpr Vector3D<UnitType> operator*(const UnitType& scalar, const Vector3D<double>& dir)
+  {
+    return Vector3D<UnitType>(scalar * dir.x, scalar * dir.y, scalar * dir.z);
+  }
+
+  // ============================================================================
+  // TYPE ALIASES
+  // ============================================================================
+
   // Type aliases for common vector types
   using Position3D = Vector3D<Distance>;
   using Velocity3D = Vector3D<Velocity>;
   using Acceleration3D = Vector3D<Acceleration>;
+  using ScalarVector3D = Vector3D<double>;
+
+  // ============================================================================
+  // INTER-UNIT OPERATIONS (DIMENSIONAL ANALYSIS)
+  // ============================================================================
 
   // Inter-unit operations for dimensional analysis
   constexpr Area operator*(const Distance& d1, const Distance& d2)
@@ -1283,6 +1422,10 @@ namespace btk::ballistics
   {
     return p * a;
   }
+
+  // ============================================================================
+  // RATIO OPERATIONS (DIMENSIONLESS)
+  // ============================================================================
 
   // Ballistics-specific operations
   constexpr double operator/(const Distance& d1, const Distance& d2)

@@ -189,7 +189,7 @@ namespace btk::ballistics
      */
     constexpr Velocity getTotalVelocity() const
     {
-      return Velocity::mps(velocity_.magnitude());
+      return velocity_.magnitude();
     }
 
     /**

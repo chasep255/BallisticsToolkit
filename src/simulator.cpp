@@ -93,7 +93,7 @@ namespace btk::ballistics
       return Acceleration::mps2(0.0);
     }
 
-    double density_ratio = atmosphere.getAirDensity() / constants::AIR_DENSITY_STANDARD;
+    double density_ratio = atmosphere.getAirDensity() / constants::AIR_DENSITY_STANDARD.kgpm3();
     double retardation_fps_per_sec = acceleration * std::pow(v_fps, mass) * density_ratio / bullet.getBc();
 
     // Convert from fps/s to m/s² using unit conversion
@@ -107,33 +107,32 @@ namespace btk::ballistics
     Velocity3D velocity = state.getVelocity();
 
     // Calculate total velocity magnitude
-    Velocity total_velocity = Velocity::mps(velocity.magnitude());
+    Velocity total_velocity = velocity.magnitude();
 
     // Calculate drag retardation
     Acceleration drag_retardation = calculateDragRetardation(state, total_velocity, atmosphere);
 
-    // Get wind components
+    // Get wind components and create wind velocity vector
     auto [wind_x_mps, wind_y_mps, wind_z_mps] = wind.getComponents();
+    Velocity3D wind_velocity(Velocity::mps(wind_x_mps), Velocity::mps(wind_y_mps), Velocity::mps(wind_z_mps));
 
     // Calculate relative velocity (bullet velocity - wind velocity)
-    Velocity3D wind_velocity(Velocity::mps(wind_x_mps), Velocity::mps(wind_y_mps), Velocity::mps(wind_z_mps));
     Velocity3D relative_velocity = velocity - wind_velocity;
-    Velocity v_rel_total = Velocity::mps(relative_velocity.magnitude());
+    Velocity v_rel_total = relative_velocity.magnitude();
 
     if(v_rel_total.mps() > 0.0)
     {
-      // Apply drag retardation in direction of relative velocity
-      double mag = relative_velocity.magnitude();
-      Acceleration ax = -drag_retardation * (relative_velocity.x.mps() / mag);
-      Acceleration ay = -drag_retardation * (relative_velocity.y.mps() / mag);
-      Acceleration az = -drag_retardation * (relative_velocity.z.mps() / mag) + Acceleration::mps2(-constants::GRAVITY);
-
-      return {ax, ay, az};
+      // Apply drag retardation in direction of relative velocity using vector operations
+      Vector3D<double> drag_dir = relative_velocity.direction();
+      Acceleration3D drag_accel = -drag_retardation * drag_dir;
+      Acceleration3D gravity(Acceleration::mps2(0.0), Acceleration::mps2(0.0), -constants::GRAVITY);
+      
+      return drag_accel + gravity;
     }
     else
     {
       // No relative velocity, only gravity
-      return {Acceleration::mps2(0.0), Acceleration::mps2(0.0), Acceleration::mps2(-constants::GRAVITY)};
+      return Acceleration3D(Acceleration::mps2(0.0), Acceleration::mps2(0.0), -constants::GRAVITY);
     }
   }
 
@@ -198,7 +197,7 @@ namespace btk::ballistics
                                muzzle_velocity * std::sin(best_angle.radians()));
 
       // Start at bore height (z=0)
-      Position3D position_init(Distance::meters(0.0), Distance::meters(0.0), Distance::meters(0.0));
+      Position3D position_init(Distance::zero(), Distance::zero(), Distance::zero());
       Bullet test_state(bullet, position_init, velocity_init, AngularVelocity::rpm(0.0));
 
       // Simulate slightly past zero range to ensure we can interpolate
@@ -231,7 +230,7 @@ namespace btk::ballistics
     // Create final initial state at bore height (z=0)
     Velocity3D velocity_final(muzzle_velocity * std::cos(best_angle.radians()), Velocity::mps(0.0),
                               muzzle_velocity * std::sin(best_angle.radians()));
-    Position3D position_final(Distance::meters(0.0), Distance::meters(0.0), Distance::meters(0.0));
+    Position3D position_final(Distance::zero(), Distance::zero(), Distance::zero());
     Bullet initial_state(bullet, position_final, velocity_final, AngularVelocity::rpm(0.0));
 
     return initial_state;

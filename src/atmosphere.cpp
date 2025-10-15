@@ -11,7 +11,7 @@ namespace btk
 
     // Atmosphere implementation
     Atmosphere::Atmosphere()
-      : temperature_(Temperature::fahrenheit(constants::TEMPERATURE_STANDARD_FAHRENHEIT)), altitude_(Distance::feet(0)),
+      : temperature_(constants::TEMPERATURE_STANDARD_FAHRENHEIT), altitude_(Distance::feet(0)),
         humidity_(0.5), pressure_(calculateStandardPressure(Distance::feet(0)))
     {
     }
@@ -78,7 +78,7 @@ namespace btk
     {
       // Calculate temperature at altitude using standard lapse rate
       double altitude_m = altitude.meters();
-      double temperature_k = constants::TEMPERATURE_STANDARD_KELVIN + constants::TEMPERATURE_LAPSE_RATE * altitude_m;
+      double temperature_k = constants::TEMPERATURE_STANDARD_KELVIN.kelvin() + constants::TEMPERATURE_LAPSE_RATE * altitude_m;
       Temperature temp = Temperature::kelvin(temperature_k);
 
       return Atmosphere(temp, altitude, 0.5, Pressure::pascals(0));
@@ -99,7 +99,7 @@ namespace btk
 
       double altitude_m = altitude.meters();
       double pressure_pa =
-        constants::PRESSURE_STANDARD_PASCALS * std::exp(-altitude_m / constants::PRESSURE_SCALE_HEIGHT);
+        constants::PRESSURE_STANDARD_PASCALS.pascals() * std::exp(-altitude_m / constants::PRESSURE_SCALE_HEIGHT.meters());
 
       return Pressure::pascals(pressure_pa);
     }
