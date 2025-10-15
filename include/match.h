@@ -126,8 +126,8 @@ namespace btk::ballistics
     // Accumulated metrics
     Distance sumX_ = Distance::zero();
     Distance sumY_ = Distance::zero();
-    Distance sumX2_ = Distance::zero(); // sum of x^2 (stored as Distance per units API)
-    Distance sumY2_ = Distance::zero(); // sum of y^2 (stored as Distance per units API)
+    double sumX2_ = 0.0;  // sum of (x/meter)^2 - dimensionless
+    double sumY2_ = 0.0;  // sum of (y/meter)^2 - dimensionless
     Distance minX_ = Distance::nan();
     Distance maxX_ = Distance::nan();
     Distance minY_ = Distance::nan();

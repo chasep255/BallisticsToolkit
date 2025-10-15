@@ -102,10 +102,10 @@ namespace btk::ballistics_calc
         // Calculate drop and drift in mrad
         if(range > 0.0)
         {
-          double drop_meters = point->getState().getPositionZ().meters() - scope_height.meters();
-          double drift_meters = point->getState().getPositionY().meters();
-          tp.drop_mrad = (drop_meters / range_dist.meters()) * 1000.0;
-          tp.drift_mrad = (drift_meters / range_dist.meters()) * 1000.0;
+          Distance drop = point->getState().getPositionZ() - scope_height;
+          Distance drift = point->getState().getPositionY();
+          tp.drop_mrad = (drop / range_dist) * 1000.0;
+          tp.drift_mrad = (drift / range_dist) * 1000.0;
         }
         else
         {

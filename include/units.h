@@ -48,11 +48,12 @@ namespace btk::ballistics
       return Derived(scalar / unit.value_);
     }
 
-    // Distance * Distance operator for squaring
-    friend constexpr Derived operator*(const Derived& unit1, const Derived& unit2)
+    // Division by same unit type returns dimensionless ratio
+    constexpr double operator/(const Derived& other) const
     {
-      return Derived(unit1.value_ * unit2.value_);
+      return value_ / other.value_;
     }
+
 
     // Compound assignment operators
     constexpr Derived& operator+=(const Derived& other)
@@ -121,6 +122,18 @@ namespace btk::ballistics
     constexpr double baseValue() const
     {
       return value_;
+    }
+
+    // Squared value for dimensionless calculations
+    constexpr double squared() const
+    {
+      return value_ * value_;
+    }
+
+    // Square root for dimensionless calculations
+    constexpr double sqrt() const
+    {
+      return std::sqrt(value_);
     }
 
     // Create from base value (for Vector3D default constructor)
@@ -225,6 +238,103 @@ namespace btk::ballistics
     private:
     friend class UnitBase<Distance>;
     explicit constexpr Distance(double value) : UnitBase<Distance>(value)
+    {
+    }
+  };
+
+  /**
+   * @brief Area measurements with square meters as base unit (SI)
+   */
+  class Area : public UnitBase<Area>
+  {
+    public:
+    // Static factory methods
+    static constexpr Area square_meters(double value)
+    {
+      return Area(value);
+    }
+    static constexpr Area square_centimeters(double value)
+    {
+      return Area(value * 0.0001);
+    }
+    static constexpr Area square_millimeters(double value)
+    {
+      return Area(value * 0.000001);
+    }
+    static constexpr Area square_kilometers(double value)
+    {
+      return Area(value * 1000000.0);
+    }
+    static constexpr Area square_yards(double value)
+    {
+      return Area(value * 0.836127);
+    }
+    static constexpr Area square_feet(double value)
+    {
+      return Area(value * 0.092903);
+    }
+    static constexpr Area square_inches(double value)
+    {
+      return Area(value * 0.00064516);
+    }
+    static constexpr Area square_miles(double value)
+    {
+      return Area(value * 2589988.11);
+    }
+    static constexpr Area acres(double value)
+    {
+      return Area(value * 4046.86);
+    }
+    static constexpr Area hectares(double value)
+    {
+      return Area(value * 10000.0);
+    }
+
+    // Getter methods
+    constexpr double square_meters() const
+    {
+      return value_;
+    }
+    constexpr double square_centimeters() const
+    {
+      return value_ * 10000.0;
+    }
+    constexpr double square_millimeters() const
+    {
+      return value_ * 1000000.0;
+    }
+    constexpr double square_kilometers() const
+    {
+      return value_ * 0.000001;
+    }
+    constexpr double square_yards() const
+    {
+      return value_ * 1.19599;
+    }
+    constexpr double square_feet() const
+    {
+      return value_ * 10.7639;
+    }
+    constexpr double square_inches() const
+    {
+      return value_ * 1550.0;
+    }
+    constexpr double square_miles() const
+    {
+      return value_ * 3.86102e-7;
+    }
+    constexpr double acres() const
+    {
+      return value_ * 0.000247105;
+    }
+    constexpr double hectares() const
+    {
+      return value_ * 0.0001;
+    }
+
+    private:
+    friend class UnitBase<Area>;
+    explicit constexpr Area(double value) : UnitBase<Area>(value)
     {
     }
   };
@@ -1102,5 +1212,104 @@ namespace btk::ballistics
   using Position3D = Vector3D<Distance>;
   using Velocity3D = Vector3D<Velocity>;
   using Acceleration3D = Vector3D<Acceleration>;
+
+  // Inter-unit operations for dimensional analysis
+  constexpr Area operator*(const Distance& d1, const Distance& d2)
+  {
+    return Area::square_meters(d1.meters() * d2.meters());
+  }
+
+  constexpr Velocity operator/(const Distance& d, const Time& t)
+  {
+    return Velocity::mps(d.meters() / t.seconds());
+  }
+
+  constexpr Distance operator*(const Velocity& v, const Time& t)
+  {
+    return Distance::meters(v.mps() * t.seconds());
+  }
+
+  constexpr Distance operator*(const Time& t, const Velocity& v)
+  {
+    return v * t;
+  }
+
+  constexpr Acceleration operator/(const Velocity& v, const Time& t)
+  {
+    return Acceleration::mps2(v.mps() / t.seconds());
+  }
+
+  constexpr Velocity operator*(const Acceleration& a, const Time& t)
+  {
+    return Velocity::mps(a.mps2() * t.seconds());
+  }
+
+  constexpr Velocity operator*(const Time& t, const Acceleration& a)
+  {
+    return a * t;
+  }
+
+  constexpr Force operator*(const Weight& w, const Acceleration& a)
+  {
+    return Force::newtons(w.kilograms() * a.mps2());
+  }
+
+  constexpr Force operator*(const Acceleration& a, const Weight& w)
+  {
+    return w * a;
+  }
+
+  constexpr Energy operator*(const Force& f, const Distance& d)
+  {
+    return Energy::joules(f.newtons() * d.meters());
+  }
+
+  constexpr Energy operator*(const Distance& d, const Force& f)
+  {
+    return f * d;
+  }
+
+  constexpr Pressure operator/(const Force& f, const Area& a)
+  {
+    return Pressure::pascals(f.newtons() / a.square_meters());
+  }
+
+  constexpr Force operator*(const Pressure& p, const Area& a)
+  {
+    return Force::newtons(p.pascals() * a.square_meters());
+  }
+
+  constexpr Force operator*(const Area& a, const Pressure& p)
+  {
+    return p * a;
+  }
+
+  // Ballistics-specific operations
+  constexpr double operator/(const Distance& d1, const Distance& d2)
+  {
+    return d1.baseValue() / d2.baseValue();
+  }
+
+  constexpr double operator/(const Velocity& v1, const Velocity& v2)
+  {
+    return v1.baseValue() / v2.baseValue();
+  }
+
+  constexpr double operator/(const Time& t1, const Time& t2)
+  {
+    return t1.baseValue() / t2.baseValue();
+  }
+
+  constexpr double operator/(const Weight& w1, const Weight& w2)
+  {
+    return w1.baseValue() / w2.baseValue();
+  }
+
+  constexpr double operator/(const Angle& a1, const Angle& a2)
+  {
+    return a1.baseValue() / a2.baseValue();
+  }
+
+
 
 } // namespace btk::ballistics

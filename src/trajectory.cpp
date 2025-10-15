@@ -29,7 +29,7 @@ namespace btk
     {
       // KE = 0.5 * m * v^2
       double mass_kg = state_.getWeight().kilograms();
-      double velocity_mps = state_.getTotalVelocity().baseValue();
+      double velocity_mps = state_.getTotalVelocity().mps();
       double energy_joules = 0.5 * mass_kg * velocity_mps * velocity_mps;
       return Energy::joules(energy_joules);
     }
@@ -104,7 +104,7 @@ namespace btk
       const auto& dist2 = points_[right].getDistance();
 
       // Interpolate between the two points
-      double t = (distance - dist1).baseValue() / (dist2 - dist1).baseValue();
+      double t = (distance - dist1) / (dist2 - dist1);
 
       // Interpolate time
       Time interp_time = points_[left].getTime() + t * (points_[right].getTime() - points_[left].getTime());
@@ -153,7 +153,7 @@ namespace btk
       const auto& time1 = points_[left].getTime();
       const auto& time2 = points_[right].getTime();
 
-      double t = (time - time1).baseValue() / (time2 - time1).baseValue();
+      double t = (time - time1) / (time2 - time1);
 
       const Bullet& state1 = points_[left].getState();
       const Bullet& state2 = points_[right].getState();
@@ -200,7 +200,7 @@ namespace btk
       double max_height = 0.0;
       for(const auto& point : points_)
       {
-        double height = point.getState().getPositionZ().baseValue();
+        double height = point.getState().getPositionZ().meters();
         if(height > max_height)
         {
           max_height = height;
@@ -224,8 +224,8 @@ namespace btk
         return Angle::zero();
 
       const Bullet& impact_state = points_.back().getState();
-      double vx = impact_state.getVelocityX().baseValue();
-      double vz = impact_state.getVelocityZ().baseValue();
+      double vx = impact_state.getVelocityX().mps();
+      double vz = impact_state.getVelocityZ().mps();
 
       // Impact angle is the angle below horizontal
       double angle_rad = std::atan2(-vz, vx); // Negative vz because it's downward
@@ -251,7 +251,7 @@ namespace btk
       const auto& dist1 = point1.getDistance();
       const auto& dist2 = point2.getDistance();
 
-      double t = (distance - dist1).baseValue() / (dist2 - dist1).baseValue();
+      double t = (distance - dist1) / (dist2 - dist1);
 
       const Bullet& state1 = point1.getState();
       const Bullet& state2 = point2.getState();

@@ -26,7 +26,7 @@ namespace btk::ballistics
   {
     // Calculate distance from center
     Distance distance = Distance::fromBaseValue(
-      std::sqrt(x_position.baseValue() * x_position.baseValue() + y_position.baseValue() * y_position.baseValue()));
+      std::sqrt(x_position.squared() + y_position.squared()));
     Distance bullet_radius = bullet_diameter / 2.0;
 
     // Check scoring rings in descending order (10, 9, 8, 7, 6, 5)
@@ -45,7 +45,7 @@ namespace btk::ballistics
   bool Target::isXRing(const Distance& x_position, const Distance& y_position, const Distance& bullet_diameter) const
   {
     Distance distance = Distance::fromBaseValue(
-      std::sqrt(x_position.baseValue() * x_position.baseValue() + y_position.baseValue() * y_position.baseValue()));
+      std::sqrt(x_position.squared() + y_position.squared()));
     Distance bullet_radius = bullet_diameter / 2.0;
     Distance x_ring_radius = ring_diameters_[6] / 2.0;
     return distance <= x_ring_radius + bullet_radius;
@@ -70,7 +70,7 @@ namespace btk::ballistics
     {
       if(!first)
         oss << ", ";
-      oss << ring_names[i] << ": " << std::fixed << std::setprecision(2) << ring_diameters_[i].baseValue() << "\"";
+      oss << ring_names[i] << ": " << std::fixed << std::setprecision(2) << ring_diameters_[i].inches() << "\"";
       first = false;
     }
 

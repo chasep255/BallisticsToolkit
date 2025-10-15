@@ -81,9 +81,9 @@ namespace btk::ballistics
     // Start from zeroed angle and position
     Bullet initial_state =
       Bullet(varied_bullet, zeroed_state_.getPosition(),
-             Velocity3D(Velocity::mps(mv.mps() * zeroed_state_.getVelocity().x.mps() / nominal_mv_.mps()),
+             Velocity3D(mv * (zeroed_state_.getVelocity().x / nominal_mv_),
                         zeroed_state_.getVelocity().y,
-                        Velocity::mps(mv.mps() * zeroed_state_.getVelocity().z.mps() / nominal_mv_.mps())),
+                        mv * (zeroed_state_.getVelocity().z / nominal_mv_)),
              zeroed_state_.getSpinRate());
 
     // Apply rifle accuracy (uniform distribution within max diameter)
@@ -105,8 +105,8 @@ namespace btk::ballistics
     // Modify velocity components for angular dispersion
     Velocity3D modified_velocity = Velocity3D(
       initial_state.getVelocity().x,
-      Velocity::mps(initial_state.getVelocity().y.mps() + initial_state.getVelocity().x.mps() * h_angle_rad),
-      Velocity::mps(initial_state.getVelocity().z.mps() + initial_state.getVelocity().x.mps() * v_angle_rad));
+      initial_state.getVelocity().y + initial_state.getVelocity().x * h_angle_rad,
+      initial_state.getVelocity().z + initial_state.getVelocity().x * v_angle_rad);
 
     Bullet final_initial_state =
       Bullet(initial_state, initial_state.getPosition(), modified_velocity, initial_state.getSpinRate());

@@ -148,39 +148,38 @@ namespace btk::ballistics
     Acceleration3D accel = calculateAcceleration(state, atmosphere, wind);
 
     // True RK2 (midpoint method):
-    // 1. Compute midpoint velocities (convert to scalars for physics)
-    double dt_s = dt.seconds();
-    double vx_half = velocity.x.mps() + accel.x.mps2() * (dt_s * 0.5);
-    double vy_half = velocity.y.mps() + accel.y.mps2() * (dt_s * 0.5);
-    double vz_half = velocity.z.mps() + accel.z.mps2() * (dt_s * 0.5);
+    // 1. Compute midpoint velocities using unit operations
+    Time half_dt = dt * 0.5;
+    Velocity vx_half = velocity.x + accel.x * half_dt;
+    Velocity vy_half = velocity.y + accel.y * half_dt;
+    Velocity vz_half = velocity.z + accel.z * half_dt;
 
-    // 2. Compute midpoint positions (convert to scalars for physics)
-    double x_half = position.x.meters() + vx_half * (dt_s * 0.5);
-    double y_half = position.y.meters() + vy_half * (dt_s * 0.5);
-    double z_half = position.z.meters() + vz_half * (dt_s * 0.5);
+    // 2. Compute midpoint positions using unit operations
+    Distance x_half = position.x + vx_half * half_dt;
+    Distance y_half = position.y + vy_half * half_dt;
+    Distance z_half = position.z + vz_half * half_dt;
 
     // 3. Create midpoint state and recompute acceleration
-    Bullet midpoint_state(state, Distance::meters(x_half), Distance::meters(y_half), Distance::meters(z_half),
-                          Velocity::mps(vx_half), Velocity::mps(vy_half), Velocity::mps(vz_half), state.getSpinRate());
+    Bullet midpoint_state(state, x_half, y_half, z_half, vx_half, vy_half, vz_half, state.getSpinRate());
 
     // 4. Recompute acceleration at midpoint
     Acceleration3D accel_mid = calculateAcceleration(midpoint_state, atmosphere, wind);
 
-    // 5. Use midpoint acceleration for final step (convert to scalars for physics)
-    double x_new = position.x.meters() + vx_half * dt_s;
-    double y_new = position.y.meters() + vy_half * dt_s;
-    double z_new = position.z.meters() + vz_half * dt_s;
+    // 5. Use midpoint acceleration for final step using unit operations
+    Distance x_new = position.x + vx_half * dt;
+    Distance y_new = position.y + vy_half * dt;
+    Distance z_new = position.z + vz_half * dt;
 
-    double vx_new = velocity.x.mps() + accel_mid.x.mps2() * dt_s;
-    double vy_new = velocity.y.mps() + accel_mid.y.mps2() * dt_s;
-    double vz_new = velocity.z.mps() + accel_mid.z.mps2() * dt_s;
+    Velocity vx_new = velocity.x + accel_mid.x * dt;
+    Velocity vy_new = velocity.y + accel_mid.y * dt;
+    Velocity vz_new = velocity.z + accel_mid.z * dt;
 
     // No spin decay (constant spin rate)
     AngularVelocity spin_new = state.getSpinRate();
 
     // Create new state using Vector3D constructor
-    Position3D position_new(Distance::meters(x_new), Distance::meters(y_new), Distance::meters(z_new));
-    Velocity3D velocity_new(Velocity::mps(vx_new), Velocity::mps(vy_new), Velocity::mps(vz_new));
+    Position3D position_new(x_new, y_new, z_new);
+    Velocity3D velocity_new(vx_new, vy_new, vz_new);
     return Bullet(state, position_new, velocity_new, spin_new);
   }
 
@@ -225,7 +224,7 @@ namespace btk::ballistics
       }
 
       // Simple gradient step on angle
-      Angle angle_correction = Angle::mrad(-(height_error.meters() / zero_range.meters()) * 1000.0);
+      Angle angle_correction = Angle::mrad(-(height_error / zero_range) * 1000.0);
       best_angle = best_angle + angle_correction * 0.5;
     }
 
