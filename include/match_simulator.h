@@ -163,6 +163,9 @@ namespace btk::ballistics
     // Simulator for trajectory calculations
     Simulator simulator_;
 
+    // Cached zeroed bullet (original zeroed state)
+    Bullet zeroed_bullet_;
+
     // Track all shots using Match class
     Match match_;
     

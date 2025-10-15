@@ -23,12 +23,12 @@ class BallisticsCalculator
       throw new Error('BallisticsToolkit module not loaded');
     }
     const weight = this.btk.Conversions.grainsToKg(bullet.weight);
-    const diameter = 0.0; // Not used in current calculations
-    const length = 0.0; // Not used in current calculations
+    const diameter = this.btk.Conversions.inchesToMeters(bullet.diameter);
+    const length = this.btk.Conversions.inchesToMeters(bullet.length);
     const dragFunction = bullet.dragFunction === 'G1' ? this.btk.DragFunction.G1 : this.btk.DragFunction.G7;
 
     const bulletObj = new this.btk.Bullet(weight, diameter, length, bullet.bc, dragFunction);
-    this.simulator.setBullet(bulletObj);
+    this.simulator.setInitialBullet(bulletObj);
   }
 
 

@@ -31,28 +31,26 @@ namespace btk::ballistics
                                  double rifle_accuracy, double timestep)
     : bullet_(bullet), nominal_mv_(nominal_mv), target_(target), target_range_(target_range), atmosphere_(atmosphere),
       mv_sd_(mv_sd), wind_speed_sd_(wind_speed_sd), headwind_sd_(headwind_sd), updraft_sd_(updraft_sd),
-      rifle_accuracy_(rifle_accuracy), timestep_(timestep),
+      rifle_accuracy_(rifle_accuracy), timestep_(timestep), zeroed_bullet_(bullet),
       rng_(std::random_device{}())
   {
     // Set up the simulator with bullet and atmosphere
-    simulator_.setBullet(bullet);
+    simulator_.setInitialBullet(bullet);
     simulator_.setAtmosphere(atmosphere);
     
     // Zero the rifle once at initialization
     // Zero with nominal BC and MV, no wind, scope at bore height
     double scope_height = 0.0;
     Vector3D calm_wind(0.0, 0.0, 0.0);
-    simulator_.setWind(calm_wind);
-    simulator_.computeZero(nominal_mv, scope_height, target_range, timestep, 1000, 1e-6);
+    simulator_.setWind(calm_wind);    
+    zeroed_bullet_ = simulator_.computeZero(nominal_mv, scope_height, target_range, timestep, 1000, 1e-6);
+
   }
 
   SimulatedShot MatchSimulator::fireShot()
   {
-    // Reset to initial bullet state
-    simulator_.resetToInitial();
-    
-    // Get the current bullet (zeroed state)
-    Bullet current_bullet = simulator_.getCurrentBullet();
+    // Use the cached zeroed bullet (original zeroed state)
+    Bullet initial_bullet = zeroed_bullet_;
 
     // Apply muzzle velocity variation (clipped to 3-sigma)
     double mv_sd_mps = mv_sd_;
@@ -60,7 +58,7 @@ namespace btk::ballistics
     double mv_mps = clipToThreeSigma(mv_dist(rng_), nominal_mv_, mv_sd_mps);
 
     // Tweak the MV by scaling the velocity components
-    Vector3D zeroed_velocity = current_bullet.getVelocity();
+    Vector3D zeroed_velocity = initial_bullet.getVelocity();
     Vector3D scaled_velocity = Vector3D(
       mv_mps * (zeroed_velocity.x / nominal_mv_),
       zeroed_velocity.y,
@@ -89,7 +87,7 @@ namespace btk::ballistics
       scaled_velocity.z + scaled_velocity.x * v_angle_rad);
 
     // Create modified bullet with new velocity
-    Bullet modified_bullet = Bullet(current_bullet, current_bullet.getPosition(), modified_velocity, current_bullet.getSpinRate());
+    Bullet modified_bullet = Bullet(initial_bullet, initial_bullet.getPosition(), modified_velocity, initial_bullet.getSpinRate());
 
     // Generate 3D wind components
     double crosswind_sd_mps = wind_speed_sd_;
@@ -107,8 +105,8 @@ namespace btk::ballistics
     // Create 3D wind vector (Cartesian coordinates)
     Vector3D varied_wind(headwind_mps, crosswind_mps, updraft_mps);
 
-    // Set the modified bullet and wind, then fire
-    simulator_.setCurrentBullet(modified_bullet);
+    // Set the modified bullet as initial and wind, then fire
+    simulator_.setInitialBullet(modified_bullet);
     simulator_.setWind(varied_wind);
     Trajectory trajectory = simulator_.simulate(target_range_, timestep_);
 
