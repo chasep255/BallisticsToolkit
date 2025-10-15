@@ -109,12 +109,11 @@ namespace btk::ballistics
     return drag_accel + gravity;
   }
 
-
-
   // Setters
   void Simulator::setInitialBullet(const Bullet& bullet)
   {
     initial_bullet_ = bullet;
+    resetToInitial();
   }
 
 
@@ -219,7 +218,7 @@ namespace btk::ballistics
 
   // Simulate trajectory using stored state
   const Trajectory& Simulator::simulate(double max_distance, double dt, double max_time)
-  {
+  { 
     // Add initial point
     trajectory_.addPoint(current_time_, current_bullet_);
 
