@@ -1,4 +1,4 @@
-# BallisticsToolkit
+# Ballistics Toolkit
 
 Professional web-based ballistics calculator and match simulation suite for long-range shooting. Fast, accurate trajectory calculations with atmospheric and wind compensation, plus Monte Carlo match simulation with NRA targets.
 
