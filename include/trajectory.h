@@ -1,8 +1,8 @@
 #pragma once
 
 #include "bullet.h"
-#include "vector.h"
 #include "conversions.h"
+#include "vector.h"
 #include <optional>
 #include <vector>
 
@@ -42,7 +42,6 @@ namespace btk::ballistics
      */
     double getKineticEnergy() const; // J
 
-
     private:
     double time_; // s
     Bullet state_;
@@ -70,10 +69,7 @@ namespace btk::ballistics
     /**
      * @brief Get the number of points in the trajectory
      */
-    size_t getPointCount() const
-    {
-      return points_.size();
-    }
+    size_t getPointCount() const { return points_.size(); }
 
     /**
      * @brief Get a specific trajectory point by index
@@ -87,10 +83,7 @@ namespace btk::ballistics
     /**
      * @brief Get all trajectory points
      */
-    const std::vector<TrajectoryPoint>& getPoints() const
-    {
-      return points_;
-    }
+    const std::vector<TrajectoryPoint>& getPoints() const { return points_; }
 
     /**
      * @brief Get the trajectory point at a specific distance
@@ -141,11 +134,7 @@ namespace btk::ballistics
     /**
      * @brief Check if trajectory is empty
      */
-    bool isEmpty() const
-    {
-      return points_.empty();
-    }
-
+    bool isEmpty() const { return points_.empty(); }
 
     private:
     std::vector<TrajectoryPoint> points_;

@@ -2,9 +2,9 @@
 
 #include "atmosphere.h"
 #include "bullet.h"
+#include "conversions.h"
 #include "trajectory.h"
 #include "vector.h"
-#include "conversions.h"
 
 namespace btk::ballistics
 {
@@ -29,35 +29,33 @@ namespace btk::ballistics
     public:
     /**
      * @brief Default constructor
-     * 
+     *
      * Initializes simulator with default values:
      * - Bullet: zero state (0 position, 0 velocity, 0 spin)
      * - Atmosphere: standard conditions (15°C, sea level, 50% humidity)
      * - Wind: zero (0, 0, 0) m/s
      * - Time: 0.0 seconds
      */
-    Simulator() : initial_bullet_(0.0, 0.0, 0.0, 0.0), current_bullet_(0.0, 0.0, 0.0, 0.0), 
-                  atmosphere_(), wind_(0.0, 0.0, 0.0), current_time_(0.0), trajectory_() {}
+    Simulator() : initial_bullet_(0.0, 0.0, 0.0, 0.0), current_bullet_(0.0, 0.0, 0.0, 0.0), atmosphere_(), wind_(0.0, 0.0, 0.0), current_time_(0.0), trajectory_() {}
 
     // Setters (individual)
     /**
      * @brief Set initial bullet state
-     * 
+     *
      * @param bullet Bullet object representing the initial state
      */
     void setInitialBullet(const Bullet& bullet);
 
-
     /**
      * @brief Set atmospheric conditions
-     * 
+     *
      * @param atmosphere Atmosphere object with temperature, altitude, humidity, and pressure
      */
     void setAtmosphere(const Atmosphere& atmosphere);
 
     /**
      * @brief Set wind conditions
-     * 
+     *
      * @param wind Wind vector in Cartesian coordinates (x=downrange m/s, y=crossrange m/s, z=vertical m/s)
      */
     void setWind(const Vector3D& wind);
@@ -65,28 +63,28 @@ namespace btk::ballistics
     // Getters
     /**
      * @brief Get the initial bullet state
-     * 
+     *
      * @return Reference to the initial bullet state
      */
     const Bullet& getInitialBullet() const;
 
     /**
      * @brief Get the current bullet state
-     * 
+     *
      * @return Reference to the current in-flight bullet state
      */
     const Bullet& getCurrentBullet() const;
 
     /**
      * @brief Get atmospheric conditions
-     * 
+     *
      * @return Reference to the current atmosphere object
      */
     const Atmosphere& getAtmosphere() const;
 
     /**
      * @brief Get wind conditions
-     * 
+     *
      * @return Reference to the current wind vector
      */
     const Vector3D& getWind() const;
@@ -100,7 +98,7 @@ namespace btk::ballistics
     // Simulation methods
     /**
      * @brief Compute zeroed initial state for given muzzle velocity and zero range
-     * 
+     *
      * @param muzzle_velocity Muzzle velocity in m/s
      * @param scope_height Scope height above bore in m
      * @param zero_range Zero range in m
@@ -110,12 +108,11 @@ namespace btk::ballistics
      * @param spin_rate Bullet spin rate in rad/s (default: 0.0)
      * @return Const reference to the zeroed initial bullet
      */
-    const Bullet& computeZero(double muzzle_velocity, double scope_height, double zero_range,
-                              double dt = 0.001, int max_iterations = 20, double tolerance = 0.001, double spin_rate = 0.0);
+    const Bullet& computeZero(double muzzle_velocity, double scope_height, double zero_range, double dt = 0.001, int max_iterations = 20, double tolerance = 0.001, double spin_rate = 0.0);
 
     /**
      * @brief Simulate trajectory from current state to maximum distance
-     * 
+     *
      * @param max_distance Maximum distance to simulate in m
      * @param dt Time step for simulation in s (default: 0.001)
      * @param max_time Maximum simulation time in s (default: 60.0)
@@ -125,7 +122,7 @@ namespace btk::ballistics
 
     /**
      * @brief Advance simulation by one time step
-     * 
+     *
      * @param dt Time step in s
      * @return Const reference to the updated current bullet state
      */
@@ -134,25 +131,24 @@ namespace btk::ballistics
     // State queries
     /**
      * @brief Get current bullet distance (X position)
-     * 
+     *
      * @return Current bullet X position in m
      */
     double getCurrentDistance() const;
 
     /**
      * @brief Get current simulation time
-     * 
+     *
      * @return Current simulation time in s
      */
     double getCurrentTime() const;
 
     /**
      * @brief Get the trajectory
-     * 
+     *
      * @return Reference to the trajectory object
      */
     const Trajectory& getTrajectory() const;
-
 
     private:
     // Physics helpers
@@ -166,7 +162,6 @@ namespace btk::ballistics
     Vector3D wind_;
     double current_time_;
     Trajectory trajectory_;
-
   };
 
 } // namespace btk::ballistics

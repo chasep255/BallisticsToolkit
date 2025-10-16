@@ -1,50 +1,38 @@
 #include "match_simulator.h"
 #include "atmosphere.h"
-#include "simulator.h"
 #include "conversions.h"
+#include "simulator.h"
 #include <algorithm>
 #include <cmath>
 #include <random>
 
-static double clipToThreeSigma(double value, double mean, double sd)
-{
-  return std::max(mean - 3 * sd, std::min(mean + 3 * sd, value));
-}
+static double clipToThreeSigma(double value, double mean, double sd) { return std::max(mean - 3 * sd, std::min(mean + 3 * sd, value)); }
 
 namespace btk::ballistics
 {
 
-  SimulatedShot::SimulatedShot(double impact_x, double impact_y, int score, bool is_x,
-                         double actual_mv, double actual_bc, double wind_downrange,
-                         double wind_crossrange, double wind_vertical, double release_angle_h,
-                         double release_angle_v, double impact_velocity)
-    : impact_x(impact_x), impact_y(impact_y), score(score), is_x(is_x), actual_mv(actual_mv), actual_bc(actual_bc),
-      wind_downrange(wind_downrange), wind_crossrange(wind_crossrange), wind_vertical(wind_vertical),
-      release_angle_h(release_angle_h), release_angle_v(release_angle_v), impact_velocity(impact_velocity)
+  SimulatedShot::SimulatedShot(double impact_x, double impact_y, int score, bool is_x, double actual_mv, double actual_bc, double wind_downrange, double wind_crossrange, double wind_vertical,
+                               double release_angle_h, double release_angle_v, double impact_velocity)
+    : impact_x(impact_x), impact_y(impact_y), score(score), is_x(is_x), actual_mv(actual_mv), actual_bc(actual_bc), wind_downrange(wind_downrange), wind_crossrange(wind_crossrange),
+      wind_vertical(wind_vertical), release_angle_h(release_angle_h), release_angle_v(release_angle_v), impact_velocity(impact_velocity)
   {
   }
 
-
-  MatchSimulator::MatchSimulator(const Bullet& bullet, double nominal_mv, const Target& target,
-                                 double target_range, const Atmosphere& atmosphere, double mv_sd,
-                                 double wind_speed_sd, double headwind_sd, double updraft_sd,
-                                 double rifle_accuracy, double timestep)
-    : bullet_(bullet), nominal_mv_(nominal_mv), target_(target), target_range_(target_range), atmosphere_(atmosphere),
-      mv_sd_(mv_sd), wind_speed_sd_(wind_speed_sd), headwind_sd_(headwind_sd), updraft_sd_(updraft_sd),
-      rifle_accuracy_(rifle_accuracy), timestep_(timestep), zeroed_bullet_(bullet),
-      rng_(std::random_device{}())
+  MatchSimulator::MatchSimulator(const Bullet& bullet, double nominal_mv, const Target& target, double target_range, const Atmosphere& atmosphere, double mv_sd, double wind_speed_sd,
+                                 double headwind_sd, double updraft_sd, double rifle_accuracy, double timestep)
+    : bullet_(bullet), nominal_mv_(nominal_mv), target_(target), target_range_(target_range), atmosphere_(atmosphere), mv_sd_(mv_sd), wind_speed_sd_(wind_speed_sd), headwind_sd_(headwind_sd),
+      updraft_sd_(updraft_sd), rifle_accuracy_(rifle_accuracy), timestep_(timestep), zeroed_bullet_(bullet), rng_(std::random_device{}())
   {
     // Set up the simulator with bullet and atmosphere
     simulator_.setInitialBullet(bullet);
     simulator_.setAtmosphere(atmosphere);
-    
+
     // Zero the rifle once at initialization
     // Zero with nominal BC and MV, no wind, scope at bore height
     double scope_height = 0.0;
     Vector3D calm_wind(0.0, 0.0, 0.0);
-    simulator_.setWind(calm_wind);    
+    simulator_.setWind(calm_wind);
     zeroed_bullet_ = simulator_.computeZero(nominal_mv, scope_height, target_range, timestep, 1000, 1e-6);
-
   }
 
   SimulatedShot MatchSimulator::fireShot()
@@ -59,11 +47,7 @@ namespace btk::ballistics
 
     // Tweak the MV by scaling the velocity components
     Vector3D zeroed_velocity = initial_bullet.getVelocity();
-    Vector3D scaled_velocity = Vector3D(
-      mv_mps * (zeroed_velocity.x / nominal_mv_),
-      zeroed_velocity.y,
-      mv_mps * (zeroed_velocity.z / nominal_mv_)
-    );
+    Vector3D scaled_velocity = Vector3D(mv_mps * (zeroed_velocity.x / nominal_mv_), zeroed_velocity.y, mv_mps * (zeroed_velocity.z / nominal_mv_));
 
     // Apply rifle accuracy (uniform distribution within circle of given diameter)
     std::uniform_real_distribution<double> angle_dist(0.0, 2.0 * M_PI);
@@ -81,10 +65,7 @@ namespace btk::ballistics
     double release_angle_v = v_angle_rad;
 
     // Modify velocity components for angular dispersion
-    Vector3D modified_velocity = Vector3D(
-      scaled_velocity.x,
-      scaled_velocity.y + scaled_velocity.x * h_angle_rad,
-      scaled_velocity.z + scaled_velocity.x * v_angle_rad);
+    Vector3D modified_velocity = Vector3D(scaled_velocity.x, scaled_velocity.y + scaled_velocity.x * h_angle_rad, scaled_velocity.z + scaled_velocity.x * v_angle_rad);
 
     // Create modified bullet with new velocity
     Bullet modified_bullet = Bullet(initial_bullet, initial_bullet.getPosition(), modified_velocity, initial_bullet.getSpinRate());
@@ -117,9 +98,8 @@ namespace btk::ballistics
     if(std::isnan(impact_point.getTime()))
     {
       // Shouldn't happen, but handle gracefully
-      SimulatedShot simulatedShot(Conversions::inchesToMeters(999.0), Conversions::inchesToMeters(999.0), 0, false, mv_mps, bullet_.getBc(),
-                      headwind_mps, crosswind_mps, updraft_mps,
-                      release_angle_h, release_angle_v, 0.0);
+      SimulatedShot simulatedShot(Conversions::inchesToMeters(999.0), Conversions::inchesToMeters(999.0), 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps, updraft_mps, release_angle_h,
+                                  release_angle_v, 0.0);
       shots_.push_back(simulatedShot);
       return simulatedShot;
     }
@@ -132,16 +112,13 @@ namespace btk::ballistics
     // Score the shot and add to match
     const Hit& hit = match_.addHit(impact_x, impact_y, target_, bullet_.getDiameter());
 
-    SimulatedShot simulatedShot(impact_x, impact_y, hit.getScore(), hit.isX(), mv_mps, bullet_.getBc(), headwind_mps,
-                    crosswind_mps, updraft_mps, release_angle_h, release_angle_v,
-                    impact_velocity);
+    SimulatedShot simulatedShot(impact_x, impact_y, hit.getScore(), hit.isX(), mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps, updraft_mps, release_angle_h, release_angle_v, impact_velocity);
 
     // Store shot result for diagnostics
     shots_.push_back(simulatedShot);
 
     return simulatedShot;
   }
-
 
   void MatchSimulator::clearShots()
   {

@@ -2,11 +2,11 @@
 
 #include "atmosphere.h"
 #include "bullet.h"
+#include "conversions.h"
 #include "match.h"
 #include "simulator.h"
 #include "target.h"
 #include "vector.h"
-#include "conversions.h"
 #include <random>
 #include <string>
 #include <vector>
@@ -33,18 +33,13 @@ namespace btk::ballistics
     double impact_velocity; // Velocity at target impact in m/s
 
     SimulatedShot()
-      : impact_x(0.0), impact_y(0.0), score(0), is_x(false), actual_mv(0.0),
-        actual_bc(0.0), wind_downrange(0.0), wind_crossrange(0.0),
-        wind_vertical(0.0), release_angle_h(0.0), release_angle_v(0.0),
+      : impact_x(0.0), impact_y(0.0), score(0), is_x(false), actual_mv(0.0), actual_bc(0.0), wind_downrange(0.0), wind_crossrange(0.0), wind_vertical(0.0), release_angle_h(0.0), release_angle_v(0.0),
         impact_velocity(0.0)
     {
     }
-    SimulatedShot(double impact_x, double impact_y, int score, bool is_x, double actual_mv,
-               double actual_bc, double wind_downrange, double wind_crossrange,
-               double wind_vertical, double release_angle_h, double release_angle_v,
-               double impact_velocity);
+    SimulatedShot(double impact_x, double impact_y, int score, bool is_x, double actual_mv, double actual_bc, double wind_downrange, double wind_crossrange, double wind_vertical,
+                  double release_angle_h, double release_angle_v, double impact_velocity);
   };
-
 
   /**
    * @brief Match simulator that zeros once and fires multiple shots
@@ -72,10 +67,8 @@ namespace btk::ballistics
      * @param rifle_accuracy Rifle/shooter accuracy in rad (angular dispersion diameter)
      * @param timestep Simulation timestep in seconds
      */
-    MatchSimulator(const Bullet& bullet, double nominal_mv, const Target& target, double target_range,
-                   const Atmosphere& atmosphere, double mv_sd, double wind_speed_sd,
-                   double headwind_sd, double updraft_sd, double rifle_accuracy,
-                   double timestep = 0.001);
+    MatchSimulator(const Bullet& bullet, double nominal_mv, const Target& target, double target_range, const Atmosphere& atmosphere, double mv_sd, double wind_speed_sd, double headwind_sd,
+                   double updraft_sd, double rifle_accuracy, double timestep = 0.001);
 
     /**
      * @brief Fire a single shot with variability
@@ -89,10 +82,7 @@ namespace btk::ballistics
      *
      * @return Reference to the Match object
      */
-    const Match& getMatch() const
-    {
-      return match_;
-    }
+    const Match& getMatch() const { return match_; }
 
     /**
      * @brief Clear all fired shots
@@ -102,26 +92,17 @@ namespace btk::ballistics
     /**
      * @brief Get number of shots fired
      */
-    size_t getShotCount() const
-    {
-      return match_.getHitCount();
-    }
+    size_t getShotCount() const { return match_.getHitCount(); }
 
     /**
      * @brief Get the target for this match
      */
-    const Target& getTarget() const
-    {
-      return target_;
-    }
+    const Target& getTarget() const { return target_; }
 
     /**
      * @brief Get the bullet for this match
      */
-    const Bullet& getBullet() const
-    {
-      return bullet_;
-    }
+    const Bullet& getBullet() const { return bullet_; }
 
     /**
      * @brief Get the bullet diameter
@@ -134,18 +115,12 @@ namespace btk::ballistics
     /**
      * @brief Get all shot results with diagnostics
      */
-    const std::vector<SimulatedShot>& getShots() const
-    {
-      return shots_;
-    }
+    const std::vector<SimulatedShot>& getShots() const { return shots_; }
 
     /**
      * @brief Get a specific shot by index
      */
-    const SimulatedShot& getShot(size_t index) const
-    {
-      return shots_[index];
-    }
+    const SimulatedShot& getShot(size_t index) const { return shots_[index]; }
 
     private:
     Bullet bullet_;
@@ -153,12 +128,12 @@ namespace btk::ballistics
     Target target_;
     double target_range_; // m
     Atmosphere atmosphere_;
-    double mv_sd_; // m/s
-    double wind_speed_sd_; // m/s
-    double headwind_sd_; // m/s
-    double updraft_sd_; // m/s
+    double mv_sd_;          // m/s
+    double wind_speed_sd_;  // m/s
+    double headwind_sd_;    // m/s
+    double updraft_sd_;     // m/s
     double rifle_accuracy_; // rad
-    double timestep_; // s
+    double timestep_;       // s
 
     // Simulator for trajectory calculations
     Simulator simulator_;
@@ -168,7 +143,7 @@ namespace btk::ballistics
 
     // Track all shots using Match class
     Match match_;
-    
+
     // Store detailed shot diagnostics
     std::vector<SimulatedShot> shots_;
 

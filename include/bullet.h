@@ -1,8 +1,8 @@
 #pragma once
 
 #include "constants.h"
-#include "vector.h"
 #include "conversions.h"
+#include "vector.h"
 #include <cmath>
 #include <string>
 #include <tuple>
@@ -39,10 +39,8 @@ namespace btk::ballistics
      * @param bc Ballistic coefficient (G1 or G7 depending on drag_function)
      * @param drag_function Drag function type (default: G7)
      */
-    constexpr Bullet(double weight, double diameter, double length, double bc,
-                     DragFunction drag_function = DragFunction::G7)
-      : weight_(weight), diameter_(diameter), length_(length), bc_(bc), drag_function_(drag_function),
-        position_(0.0, 0.0, 0.0), velocity_(0.0, 0.0, 0.0), spin_rate_(0.0), has_flight_state_(false)
+    constexpr Bullet(double weight, double diameter, double length, double bc, DragFunction drag_function = DragFunction::G7)
+      : weight_(weight), diameter_(diameter), length_(length), bc_(bc), drag_function_(drag_function), position_(0.0, 0.0, 0.0), velocity_(0.0, 0.0, 0.0), spin_rate_(0.0), has_flight_state_(false)
     {
     }
 
@@ -55,9 +53,8 @@ namespace btk::ballistics
      * @param spin_rate Spin rate around the velocity vector in rad/s (for Magnus effects)
      */
     constexpr Bullet(const Bullet& bullet, const Vector3D& position, const Vector3D& velocity, double spin_rate)
-      : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_),
-        drag_function_(bullet.drag_function_), position_(position), velocity_(velocity), spin_rate_(spin_rate),
-        has_flight_state_(true)
+      : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_), drag_function_(bullet.drag_function_), position_(position), velocity_(velocity),
+        spin_rate_(spin_rate), has_flight_state_(true)
     {
     }
 
@@ -73,18 +70,16 @@ namespace btk::ballistics
      * @param velocity_z Velocity component along Z axis in m/s
      * @param spin_rate Spin rate around the velocity vector in rad/s (for Magnus effects)
      */
-    constexpr Bullet(const Bullet& bullet, double position_x, double position_y, double position_z,
-                     double velocity_x, double velocity_y, double velocity_z, double spin_rate)
-      : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_),
-        drag_function_(bullet.drag_function_), position_(position_x, position_y, position_z),
+    constexpr Bullet(const Bullet& bullet, double position_x, double position_y, double position_z, double velocity_x, double velocity_y, double velocity_z, double spin_rate)
+      : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_), drag_function_(bullet.drag_function_), position_(position_x, position_y, position_z),
         velocity_(velocity_x, velocity_y, velocity_z), spin_rate_(spin_rate), has_flight_state_(true)
     {
     }
 
     // Getters (all return SI base units)
-    constexpr double getWeight() const { return weight_; } // kg
+    constexpr double getWeight() const { return weight_; }     // kg
     constexpr double getDiameter() const { return diameter_; } // m
-    constexpr double getLength() const { return length_; } // m
+    constexpr double getLength() const { return length_; }     // m
     constexpr double getBc() const { return bc_; }
     constexpr DragFunction getDragFunction() const { return drag_function_; }
 
@@ -93,12 +88,7 @@ namespace btk::ballistics
      *
      * @return Sectional density in kg/m² (SI units)
      */
-    constexpr double getSectionalDensity() const
-    {
-      return weight_ / (diameter_ * diameter_);
-    }
-
-
+    constexpr double getSectionalDensity() const { return weight_ / (diameter_ * diameter_); }
 
     // Flight state methods (only valid if has_flight_state_ is true)
     constexpr bool hasFlightState() const { return has_flight_state_; }
@@ -113,7 +103,7 @@ namespace btk::ballistics
     constexpr double getVelocityX() const { return velocity_.x; } // m/s
     constexpr double getVelocityY() const { return velocity_.y; } // m/s
     constexpr double getVelocityZ() const { return velocity_.z; } // m/s
-    constexpr double getSpinRate() const { return spin_rate_; } // rad/s
+    constexpr double getSpinRate() const { return spin_rate_; }   // rad/s
 
     // Compute spin rate from signed twist pitch (meters/turn). RH>0, LH<0
     static constexpr double computeSpinRateFromTwist(double speed_mps, double twist_pitch_m_signed)
@@ -153,16 +143,16 @@ namespace btk::ballistics
     }
 
     private:
-    double weight_; // kg
+    double weight_;   // kg
     double diameter_; // m
-    double length_; // m
+    double length_;   // m
     double bc_;
     DragFunction drag_function_;
 
     // Flight state (only valid if has_flight_state_ is true)
     Vector3D position_; // m
     Vector3D velocity_; // m/s
-    double spin_rate_; // rad/s
+    double spin_rate_;  // rad/s
     bool has_flight_state_;
   };
 

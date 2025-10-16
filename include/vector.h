@@ -8,7 +8,7 @@ namespace btk::ballistics
 
   /**
    * @brief 2D vector with double components
-   * 
+   *
    * Provides basic 2D vector operations for ballistics calculations.
    * All operations are constexpr for compile-time evaluation.
    */
@@ -21,10 +21,10 @@ namespace btk::ballistics
      * @brief Default constructor (zero vector)
      */
     constexpr Vector2D() : x(0.0), y(0.0) {}
-    
+
     /**
      * @brief Construct vector with specified components
-     * 
+     *
      * @param x_val X component
      * @param y_val Y component
      */
@@ -33,102 +33,75 @@ namespace btk::ballistics
     // Basic operators
     /**
      * @brief Vector addition
-     * 
+     *
      * @param other Vector to add
      * @return Sum of vectors
      */
-    constexpr Vector2D operator+(const Vector2D& other) const
-    {
-      return Vector2D(x + other.x, y + other.y);
-    }
+    constexpr Vector2D operator+(const Vector2D& other) const { return Vector2D(x + other.x, y + other.y); }
 
     /**
      * @brief Vector subtraction
-     * 
+     *
      * @param other Vector to subtract
      * @return Difference of vectors
      */
-    constexpr Vector2D operator-(const Vector2D& other) const
-    {
-      return Vector2D(x - other.x, y - other.y);
-    }
+    constexpr Vector2D operator-(const Vector2D& other) const { return Vector2D(x - other.x, y - other.y); }
 
     /**
      * @brief Scalar multiplication
-     * 
+     *
      * @param scalar Scalar to multiply by
      * @return Scaled vector
      */
-    constexpr Vector2D operator*(double scalar) const
-    {
-      return Vector2D(x * scalar, y * scalar);
-    }
+    constexpr Vector2D operator*(double scalar) const { return Vector2D(x * scalar, y * scalar); }
 
     /**
      * @brief Element-wise multiplication
-     * 
+     *
      * @param other Vector to multiply with
      * @return Element-wise product
      */
-    constexpr Vector2D operator*(const Vector2D& other)
-    {
-      return Vector2D(x * other.x, y * other.y);
-    }
+    constexpr Vector2D operator*(const Vector2D& other) { return Vector2D(x * other.x, y * other.y); }
 
     /**
      * @brief Scalar division
-     * 
+     *
      * @param scalar Scalar to divide by
      * @return Scaled vector
      */
-    constexpr Vector2D operator/(double scalar) const
-    {
-      return Vector2D(x / scalar, y / scalar);
-    }
+    constexpr Vector2D operator/(double scalar) const { return Vector2D(x / scalar, y / scalar); }
 
     /**
      * @brief Element-wise division
-     * 
+     *
      * @param other Vector to divide by
      * @return Element-wise quotient
      */
-    constexpr Vector2D operator/(const Vector2D& other) const
-    {
-      return Vector2D(x / other.x, y / other.y);
-    }
+    constexpr Vector2D operator/(const Vector2D& other) const { return Vector2D(x / other.x, y / other.y); }
 
     // Scalar addition and subtraction
     /**
      * @brief Add scalar to each component
-     * 
+     *
      * @param scalar Scalar to add
      * @return Vector with scalar added to each component
      */
-    constexpr Vector2D operator+(double scalar) const
-    {
-      return Vector2D(x + scalar, y + scalar);
-    }
+    constexpr Vector2D operator+(double scalar) const { return Vector2D(x + scalar, y + scalar); }
 
     /**
      * @brief Subtract scalar from each component
-     * 
+     *
      * @param scalar Scalar to subtract
      * @return Vector with scalar subtracted from each component
      */
-    constexpr Vector2D operator-(double scalar) const
-    {
-      return Vector2D(x - scalar, y - scalar);
-    }
+    constexpr Vector2D operator-(double scalar) const { return Vector2D(x - scalar, y - scalar); }
 
     /**
      * @brief Unary minus (negation)
-     * 
+     *
      * @return Negated vector
      */
-    constexpr Vector2D operator-() const
-    {
-      return Vector2D(-x, -y);
-    }
+    constexpr Vector2D operator-() const { return Vector2D(-x, -y); }
 
     // Compound assignment
     Vector2D& operator+=(const Vector2D& other)
@@ -158,22 +131,18 @@ namespace btk::ballistics
       y /= scalar;
       return *this;
     }
-    
 
     // Vector operations
     /**
      * @brief Calculate vector magnitude (length)
-     * 
+     *
      * @return Vector magnitude
      */
-    constexpr double magnitude() const
-    {
-      return std::sqrt(x * x + y * y);
-    }
+    constexpr double magnitude() const { return std::sqrt(x * x + y * y); }
 
     /**
      * @brief Get normalized (unit) vector
-     * 
+     *
      * @return Unit vector in same direction, or zero vector if magnitude is zero
      */
     constexpr Vector2D normalized() const
@@ -186,65 +155,49 @@ namespace btk::ballistics
 
     /**
      * @brief Calculate dot product
-     * 
+     *
      * @param other Vector to dot with
      * @return Dot product result
      */
-    constexpr double dot(const Vector2D& other) const
-    {
-      return x * other.x + y * other.y;
-    }
+    constexpr double dot(const Vector2D& other) const { return x * other.x + y * other.y; }
 
     /**
      * @brief Linear interpolation between vectors
-     * 
+     *
      * @param other Target vector
      * @param t Interpolation parameter (0.0 = this vector, 1.0 = other vector)
      * @return Interpolated vector
      */
-    constexpr Vector2D lerp(const Vector2D& other, double t) const
-    {
-      return Vector2D(x + t * (other.x - x), y + t * (other.y - y));
-    }
-
+    constexpr Vector2D lerp(const Vector2D& other, double t) const { return Vector2D(x + t * (other.x - x), y + t * (other.y - y)); }
   };
 
   // Friend operators for scalar operations from left
-  constexpr Vector2D operator*(double scalar, const Vector2D& vec)
-  {
-    return vec * scalar;
-  }
+  constexpr Vector2D operator*(double scalar, const Vector2D& vec) { return vec * scalar; }
 
-  constexpr Vector2D operator+(double scalar, const Vector2D& vec)
-  {
-    return vec + scalar;
-  }
+  constexpr Vector2D operator+(double scalar, const Vector2D& vec) { return vec + scalar; }
 
-  constexpr Vector2D operator-(double scalar, const Vector2D& vec)
-  {
-    return Vector2D(scalar - vec.x, scalar - vec.y);
-  }
+  constexpr Vector2D operator-(double scalar, const Vector2D& vec) { return Vector2D(scalar - vec.x, scalar - vec.y); }
 
   /**
    * @brief 3D vector with double components
-   * 
+   *
    * Provides 3D vector operations for ballistics calculations including position,
    * velocity, and acceleration vectors. All operations are constexpr for compile-time evaluation.
    */
   struct Vector3D
   {
     double x; ///< X component
-    double y; ///< Y component  
+    double y; ///< Y component
     double z; ///< Z component
 
     /**
      * @brief Default constructor (zero vector)
      */
     constexpr Vector3D() : x(0.0), y(0.0), z(0.0) {}
-    
+
     /**
      * @brief Construct vector with specified components
-     * 
+     *
      * @param x_val X component
      * @param y_val Y component
      * @param z_val Z component
@@ -254,107 +207,80 @@ namespace btk::ballistics
     // Basic operators
     /**
      * @brief Vector addition
-     * 
+     *
      * @param other Vector to add
      * @return Sum of vectors
      */
-    constexpr Vector3D operator+(const Vector3D& other) const
-    {
-      return Vector3D(x + other.x, y + other.y, z + other.z);
-    }
+    constexpr Vector3D operator+(const Vector3D& other) const { return Vector3D(x + other.x, y + other.y, z + other.z); }
 
     /**
      * @brief Vector subtraction
-     * 
+     *
      * @param other Vector to subtract
      * @return Difference of vectors
      */
-    constexpr Vector3D operator-(const Vector3D& other) const
-    {
-      return Vector3D(x - other.x, y - other.y, z - other.z);
-    }
+    constexpr Vector3D operator-(const Vector3D& other) const { return Vector3D(x - other.x, y - other.y, z - other.z); }
 
     /**
      * @brief Scalar multiplication
-     * 
+     *
      * @param scalar Scalar to multiply by
      * @return Scaled vector
      */
-    constexpr Vector3D operator*(double scalar) const
-    {
-      return Vector3D(x * scalar, y * scalar, z * scalar);
-    }
+    constexpr Vector3D operator*(double scalar) const { return Vector3D(x * scalar, y * scalar, z * scalar); }
 
     /**
      * @brief Element-wise multiplication
-     * 
+     *
      * @param other Vector to multiply with
      * @return Element-wise product
      */
-    constexpr Vector3D operator*(const Vector3D& other)
-    {
-      return Vector3D(x * other.x, y * other.y, z * other.z);
-    }
+    constexpr Vector3D operator*(const Vector3D& other) { return Vector3D(x * other.x, y * other.y, z * other.z); }
 
     /**
      * @brief Element-wise division
-     * 
+     *
      * @param other Vector to divide by
      * @return Element-wise quotient
      */
-    constexpr Vector3D operator/(const Vector3D& other)
-    {
-      return Vector3D(x / other.x, y / other.y, z / other.z);
-    }
+    constexpr Vector3D operator/(const Vector3D& other) { return Vector3D(x / other.x, y / other.y, z / other.z); }
 
     /**
      * @brief Scalar division
-     * 
+     *
      * @param scalar Scalar to divide by
      * @return Scaled vector
      */
-    constexpr Vector3D operator/(double scalar) const
-    {
-      return Vector3D(x / scalar, y / scalar, z / scalar);
-    }
+    constexpr Vector3D operator/(double scalar) const { return Vector3D(x / scalar, y / scalar, z / scalar); }
 
     // Scalar addition and subtraction
     /**
      * @brief Add scalar to each component
-     * 
+     *
      * @param scalar Scalar to add
      * @return Vector with scalar added to each component
      */
-    constexpr Vector3D operator+(double scalar) const
-    {
-      return Vector3D(x + scalar, y + scalar, z + scalar);
-    }
+    constexpr Vector3D operator+(double scalar) const { return Vector3D(x + scalar, y + scalar, z + scalar); }
 
     /**
      * @brief Subtract scalar from each component
-     * 
+     *
      * @param scalar Scalar to subtract
      * @return Vector with scalar subtracted from each component
      */
-    constexpr Vector3D operator-(double scalar) const
-    {
-      return Vector3D(x - scalar, y - scalar, z - scalar);
-    }
+    constexpr Vector3D operator-(double scalar) const { return Vector3D(x - scalar, y - scalar, z - scalar); }
 
     /**
      * @brief Unary minus (negation)
-     * 
+     *
      * @return Negated vector
      */
-    constexpr Vector3D operator-() const
-    {
-      return Vector3D(-x, -y, -z);
-    }
+    constexpr Vector3D operator-() const { return Vector3D(-x, -y, -z); }
 
     // Compound assignment
     /**
      * @brief Compound assignment addition
-     * 
+     *
      * @param other Vector to add
      * @return Reference to this vector
      */
@@ -368,7 +294,7 @@ namespace btk::ballistics
 
     /**
      * @brief Compound assignment subtraction
-     * 
+     *
      * @param other Vector to subtract
      * @return Reference to this vector
      */
@@ -382,7 +308,7 @@ namespace btk::ballistics
 
     /**
      * @brief Compound assignment scalar multiplication
-     * 
+     *
      * @param scalar Scalar to multiply by
      * @return Reference to this vector
      */
@@ -396,7 +322,7 @@ namespace btk::ballistics
 
     /**
      * @brief Compound assignment scalar division
-     * 
+     *
      * @param scalar Scalar to divide by
      * @return Reference to this vector
      */
@@ -411,17 +337,14 @@ namespace btk::ballistics
     // Vector operations
     /**
      * @brief Calculate vector magnitude (length)
-     * 
+     *
      * @return Vector magnitude
      */
-    constexpr double magnitude() const
-    {
-      return std::sqrt(x * x + y * y + z * z);
-    }
+    constexpr double magnitude() const { return std::sqrt(x * x + y * y + z * z); }
 
     /**
      * @brief Get normalized (unit) vector
-     * 
+     *
      * @return Unit vector in same direction, or zero vector if magnitude is zero
      */
     constexpr Vector3D normalized() const
@@ -434,95 +357,65 @@ namespace btk::ballistics
 
     /**
      * @brief Calculate dot product
-     * 
+     *
      * @param other Vector to dot with
      * @return Dot product result
      */
-    constexpr double dot(const Vector3D& other) const
-    {
-      return x * other.x + y * other.y + z * other.z;
-    }
+    constexpr double dot(const Vector3D& other) const { return x * other.x + y * other.y + z * other.z; }
 
     /**
      * @brief Calculate cross product
-     * 
+     *
      * @param other Vector to cross with
      * @return Cross product result (perpendicular to both vectors)
      */
-    constexpr Vector3D cross(const Vector3D& other) const
-    {
-      return Vector3D(
-        y * other.z - z * other.y,
-        z * other.x - x * other.z,
-        x * other.y - y * other.x
-      );
-    }
+    constexpr Vector3D cross(const Vector3D& other) const { return Vector3D(y * other.z - z * other.y, z * other.x - x * other.z, x * other.y - y * other.x); }
 
     /**
      * @brief Linear interpolation between vectors
-     * 
+     *
      * @param other Target vector
      * @param t Interpolation parameter (0.0 = this vector, 1.0 = other vector)
      * @return Interpolated vector
      */
-    constexpr Vector3D lerp(const Vector3D& other, double t) const
-    {
-      return Vector3D(
-        x + t * (other.x - x),
-        y + t * (other.y - y),
-        z + t * (other.z - z)
-      );
-    }
-
+    constexpr Vector3D lerp(const Vector3D& other, double t) const { return Vector3D(x + t * (other.x - x), y + t * (other.y - y), z + t * (other.z - z)); }
   };
 
   // Friend operators for scalar operations from left
   /**
    * @brief Scalar multiplication from left
-   * 
+   *
    * @param scalar Scalar to multiply by
    * @param vec Vector to multiply
    * @return Scaled vector
    */
-  constexpr Vector3D operator*(double scalar, const Vector3D& vec)
-  {
-    return vec * scalar;
-  }
+  constexpr Vector3D operator*(double scalar, const Vector3D& vec) { return vec * scalar; }
 
   /**
    * @brief Scalar addition from left
-   * 
+   *
    * @param scalar Scalar to add
    * @param vec Vector to add to
    * @return Vector with scalar added to each component
    */
-  constexpr Vector3D operator+(double scalar, const Vector3D& vec)
-  {
-    return vec + scalar;
-  }
+  constexpr Vector3D operator+(double scalar, const Vector3D& vec) { return vec + scalar; }
 
   /**
    * @brief Scalar subtraction from left
-   * 
+   *
    * @param scalar Scalar to subtract from
    * @param vec Vector to subtract
    * @return Vector with scalar minus each component
    */
-  constexpr Vector3D operator-(double scalar, const Vector3D& vec)
-  {
-    return Vector3D(scalar - vec.x, scalar - vec.y, scalar - vec.z);
-  }
+  constexpr Vector3D operator-(double scalar, const Vector3D& vec) { return Vector3D(scalar - vec.x, scalar - vec.y, scalar - vec.z); }
 
   /**
    * @brief Free function for linear interpolation (alternative syntax)
-   * 
+   *
    * @param a First vector
-   * @param b Second vector  
+   * @param b Second vector
    * @param t Interpolation parameter (0.0 = a, 1.0 = b)
    * @return Interpolated vector
    */
-  constexpr Vector3D lerp(const Vector3D& a, const Vector3D& b, double t)
-  {
-    return a.lerp(b, t);
-  }
+  constexpr Vector3D lerp(const Vector3D& a, const Vector3D& b, double t) { return a.lerp(b, t); }
 } // namespace btk::ballistics

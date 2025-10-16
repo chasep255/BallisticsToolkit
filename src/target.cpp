@@ -9,9 +9,7 @@
 namespace btk::ballistics
 {
 
-  Target::Target(const std::string& name, double ring_10, double ring_9, double ring_8,
-                 double ring_7, double ring_6, double ring_5, double x_ring,
-                 const std::string& description)
+  Target::Target(const std::string& name, double ring_10, double ring_9, double ring_8, double ring_7, double ring_6, double ring_5, double x_ring, const std::string& description)
     : name_(name), description_(description), ring_diameters_{ring_5, ring_6, ring_7, ring_8, ring_9, ring_10, x_ring}
   {
   }
@@ -51,15 +49,8 @@ namespace btk::ballistics
     return distance <= x_ring_radius + bullet_radius;
   }
 
-  double Target::getRingInnerDiameter(int ring) const
-  {
-    return ringDiameter(ring);
-  }
+  double Target::getRingInnerDiameter(int ring) const { return ringDiameter(ring); }
 
-  double Target::getRingOuterDiameter(int ring) const
-  {
-    return ringDiameter(ring);
-  }
-
+  double Target::getRingOuterDiameter(int ring) const { return ringDiameter(ring); }
 
 } // namespace btk::ballistics

@@ -104,14 +104,11 @@ namespace btk::ballistics
     // RSD ≈ sqrt(E[r^2] - (E[r])^2). We approximate E[r] by RMS radius above.
     double n = static_cast<double>(hits_.size());
     double er2 = (sumX2_ + sumY2_) / n; // E[r^2]
-    double er = std::sqrt(er2);                     // RMS radius as proxy for E[r]
+    double er = std::sqrt(er2);         // RMS radius as proxy for E[r]
     double variance = std::max(0.0, er2 - er * er);
     return std::sqrt(variance);
   }
 
-  int Match::getHitCount() const
-  {
-    return hits_.size();
-  }
+  int Match::getHitCount() const { return hits_.size(); }
 
 } // namespace btk::ballistics

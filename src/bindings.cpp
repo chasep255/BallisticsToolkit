@@ -4,14 +4,15 @@
 // Include all our C++ headers
 #include "atmosphere.h"
 #include "bullet.h"
+#include "conversions.h"
 #include "match.h"
 #include "match_simulator.h"
 #include "nra_targets.h"
 #include "simulator.h"
 #include "target.h"
 #include "trajectory.h"
-#include "conversions.h"
 #include "vector.h"
+#include "wind_generator.h"
 
 using namespace emscripten;
 using namespace btk::ballistics;
@@ -112,7 +113,6 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getAzimuthAngle", &Bullet::getAzimuthAngle)
     .class_function("computeSpinRateFromTwist", &Bullet::computeSpinRateFromTwist);
 
-
   // Atmosphere class
   class_<Atmosphere>("Atmosphere")
     .constructor<>()
@@ -180,10 +180,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   // Removed legacy Hit value_object and AccuracyMetrics/legacy scoring bindings
 
   // NRA Targets
-  class_<NRATargets>("NRATargets")
-    .class_function("getTarget", &NRATargets::getTarget)
-    .class_function("listTargets", &NRATargets::listTargets)
-    .class_function("hasTarget", &NRATargets::hasTarget);
+  class_<NRATargets>("NRATargets").class_function("getTarget", &NRATargets::getTarget).class_function("listTargets", &NRATargets::listTargets).class_function("hasTarget", &NRATargets::hasTarget);
 
   // SimulatedShot struct
   value_object<SimulatedShot>("SimulatedShot")
@@ -201,13 +198,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .field("impactVelocity", &SimulatedShot::impact_velocity);
 
   // Hit class
-  class_<Hit>("Hit")
-    .constructor<>()
-    .constructor<double, double, int, bool>()
-    .function("getX", &Hit::getX)
-    .function("getY", &Hit::getY)
-    .function("getScore", &Hit::getScore)
-    .function("isX", &Hit::isX);
+  class_<Hit>("Hit").constructor<>().constructor<double, double, int, bool>().function("getX", &Hit::getX).function("getY", &Hit::getY).function("getScore", &Hit::getScore).function("isX", &Hit::isX);
 
   // Match class
   class_<Match>("Match")
@@ -244,4 +235,18 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   register_vector<std::string>("StringVector");
 
   // No RingInfo struct needed - direct methods are cleaner
+
+  // Wind generator class
+  class_<WindGenerator>("WindGenerator")
+    .constructor<Vector3D, double>()
+    .function("setBias", &WindGenerator::setBias)
+    .function("setAdvection", &WindGenerator::setAdvection)
+    .function("addSine", &WindGenerator::addSine)
+    .function("addRandomCrosswindModes", &WindGenerator::addRandomCrosswindModes)
+    .function("clearModes", &WindGenerator::clearModes)
+    .function("setSwitchy", &WindGenerator::setSwitchy)
+    .function("sample", select_overload<Vector3D(double, double) const>(&WindGenerator::operator()));
+
+  // Wind presets factory
+  class_<WindPresets>("WindPresets").class_function("getPreset", &WindPresets::getPreset).class_function("listPresets", &WindPresets::listPresets).class_function("hasPreset", &WindPresets::hasPreset);
 }

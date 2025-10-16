@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 namespace btk::ballistics
 {
 
@@ -97,7 +99,8 @@ namespace btk::ballistics
     static constexpr double oclockToRadians(double oclock)
     {
       double degrees = ((18.0 - oclock) * 30.0);
-      if(degrees >= 360.0) degrees -= 360.0;
+      if(degrees >= 360.0)
+        degrees -= 360.0;
       return degrees * M_PI / 180.0;
     }
 

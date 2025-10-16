@@ -3,10 +3,13 @@
  */
 
 // Enable Emscripten console output globally
-function enableEmscriptenConsole() {
-  if (typeof Module !== 'undefined' && Module.print) {
+function enableEmscriptenConsole()
+{
+  if (typeof Module !== 'undefined' && Module.print)
+  {
     const originalPrint = Module.print;
-    Module.print = function(text) {
+    Module.print = function(text)
+    {
       console.log('[C++]', text);
       originalPrint(text);
     };
@@ -14,12 +17,16 @@ function enableEmscriptenConsole() {
 }
 
 // Auto-enable when Module is available
-if (typeof Module !== 'undefined') {
+if (typeof Module !== 'undefined')
+{
   enableEmscriptenConsole();
-} else {
+}
+else
+{
   // Enable when Module becomes available
   const originalOnLoad = window.onload;
-  window.onload = function() {
+  window.onload = function()
+  {
     if (originalOnLoad) originalOnLoad();
     enableEmscriptenConsole();
   };
@@ -56,6 +63,7 @@ function generateNavigation(currentPageName)
   const isHome = currentPageName === 'index';
   const isBallisticCalc = currentPageName === 'ballistic-calc';
   const isTargetSim = currentPageName === 'target-sim';
+  const isWindSim = currentPageName === 'wind-sim';
   const isAbout = currentPageName === 'about';
 
   const navHTML = `
@@ -68,6 +76,7 @@ function generateNavigation(currentPageName)
                 <a href="${pathPrefix}index.html" ${isHome ? 'class="active"' : ''}>Home</a>
                 <a href="${pathPrefix}ballistic-calc/ballistic-calc.html" ${isBallisticCalc ? 'class="active"' : ''}>Ballistic Calculator</a>
                 <a href="${pathPrefix}target-sim/target-sim.html" ${isTargetSim ? 'class="active"' : ''}>Target Simulator</a>
+                <a href="${pathPrefix}wind-sim/wind-sim.html" ${isWindSim ? 'class="active"' : ''}>Wind Sim</a>
                 <a href="${pathPrefix}about.html" ${isAbout ? 'class="active"' : ''}>About</a>
             </div>
         </div>

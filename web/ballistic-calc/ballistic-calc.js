@@ -109,7 +109,7 @@ class BallisticsCalculator
     const spinRate = 0.0;
 
     this.simulator.computeZero(muzzleVelocity, scopeHeight, zeroRange, timeStep, maxIterations, tolerance, spinRate);
-    
+
     const maxRangeDistance = this.btk.Conversions.yardsToMeters(shot.maxRange);
     const simulationTimeStep = 0.001;
     const maxTime = 60.0;
@@ -203,26 +203,28 @@ class BallisticsCalculator
    */
   getTrajectoryPoint(range)
   {
-    if (!this.trajectory) {
+    if (!this.trajectory)
+    {
       return null;
     }
-    
+
     // Convert yards to meters for C++ API
     const rangeMeters = this.btk.Conversions.yardsToMeters(range);
-    
+
     // Use the C++ trajectory interpolation
     const point = this.trajectory.atDistance(rangeMeters);
-    
+
     // Check if point is valid (not NaN time)
-    if (isNaN(point.getTime())) {
+    if (isNaN(point.getTime()))
+    {
       return null;
     }
-    
+
     // Convert back to imperial units for JavaScript
     const state = point.getState();
     const position = state.getPosition();
     const velocity = state.getVelocity();
-    
+
     return {
       range: range,
       drop: this.btk.Conversions.radiansToMoa(point.getState().getPositionZ() / rangeMeters),

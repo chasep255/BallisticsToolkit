@@ -13,19 +13,11 @@ namespace btk
   {
 
     // TrajectoryPoint implementation
-    TrajectoryPoint::TrajectoryPoint(double time, const Bullet& state) : time_(time), state_(state)
-    {
-    }
+    TrajectoryPoint::TrajectoryPoint(double time, const Bullet& state) : time_(time), state_(state) {}
 
-    double TrajectoryPoint::getDistance() const
-    {
-      return state_.getPositionX();
-    }
+    double TrajectoryPoint::getDistance() const { return state_.getPositionX(); }
 
-    double TrajectoryPoint::getVelocity() const
-    {
-      return state_.getTotalVelocity();
-    }
+    double TrajectoryPoint::getVelocity() const { return state_.getTotalVelocity(); }
 
     double TrajectoryPoint::getKineticEnergy() const
     {
@@ -36,16 +28,10 @@ namespace btk
       return energy_joules;
     }
 
-
     // Trajectory implementation
-    Trajectory::Trajectory()
-    {
-    }
+    Trajectory::Trajectory() {}
 
-    void Trajectory::addPoint(double time, const Bullet& state)
-    {
-      points_.emplace_back(time, state);
-    }
+    void Trajectory::addPoint(double time, const Bullet& state) { points_.emplace_back(time, state); }
 
     const TrajectoryPoint& Trajectory::getPoint(size_t index) const
     {
@@ -220,14 +206,9 @@ namespace btk
       return angle_rad;
     }
 
-    void Trajectory::clear()
-    {
-      points_.clear();
-    }
+    void Trajectory::clear() { points_.clear(); }
 
-
-    Bullet Trajectory::interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2,
-                                   double distance) const
+    Bullet Trajectory::interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2, double distance) const
     {
       double dist1 = point1.getDistance();
       double dist2 = point2.getDistance();

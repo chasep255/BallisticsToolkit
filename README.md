@@ -20,6 +20,13 @@ Professional web-based ballistics calculator and match simulation suite for long
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
 - **Match Scoring** - Complete NRA scoring with X-counts and group size analysis
 
+### 🌬️ Wind Sim (Beta)
+- **Real-time Wind Visualization** - WebGL arrows show crosswind and head/tail components along the range
+- **Engine-backed Presets** - Preset list loaded from C++ `WindPresets` (single source of truth)
+- **WindGenerator** - New header/cpp implementation with time-coherent "switchy" behavior and spectral turbulence
+- **Controls** - Distance, preset, seed, arrow density, and time speed (0.1x–20x)
+- Note: This feature is experimental and evolving
+
 ## Quick Start
 
 ### Ballistic Calculator
@@ -68,6 +75,7 @@ Opens local server at http://localhost:8001
 - **Frontend**: Vanilla JavaScript with modern CSS, no frameworks
 - **Units**: SI base units internally with conversion utilities for user-friendly I/O
 - **Performance**: Optimized C++ core with direct vector operations
+- **Wind Module**: `WindGenerator` class (C++) exposed via Embind; preset factory `WindPresets` mirrors `NRATargets`
 - **Match Scoring**: Complete NRA scoring system with statistical analysis
 - **Deployment**: GitHub Actions auto-deploys to GitHub Pages
 - **Architecture**: Client-side only, no server required

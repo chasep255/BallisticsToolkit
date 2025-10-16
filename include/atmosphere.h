@@ -1,7 +1,7 @@
 #pragma once
 
-#include "vector.h"
 #include "conversions.h"
+#include "vector.h"
 #include <memory>
 
 namespace btk::ballistics
@@ -30,9 +30,9 @@ namespace btk::ballistics
 
     // Getters (all return SI base units)
     double getTemperature() const { return temperature_; } // K
-    double getAltitude() const { return altitude_; } // m
-    double getHumidity() const { return humidity_; } // 0.0 to 1.0
-    double getPressure() const; // Pa
+    double getAltitude() const { return altitude_; }       // m
+    double getHumidity() const { return humidity_; }       // 0.0 to 1.0
+    double getPressure() const;                            // Pa
 
     /**
      * @brief Calculate air density at current conditions
@@ -58,18 +58,16 @@ namespace btk::ballistics
      */
     static Atmosphere atAltitude(double altitude); // altitude in m
 
-
     private:
     double temperature_; // K
-    double altitude_; // m
-    double humidity_; // 0.0 to 1.0
-    double pressure_; // Pa
+    double altitude_;    // m
+    double humidity_;    // 0.0 to 1.0
+    double pressure_;    // Pa
 
     /**
      * @brief Calculate standard pressure for given altitude
      */
     double calculateStandardPressure(double altitude) const; // altitude in m, returns Pa
   };
-
 
 } // namespace btk::ballistics

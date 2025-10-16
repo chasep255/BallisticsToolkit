@@ -1,7 +1,7 @@
 #pragma once
 
-#include "vector.h"
 #include "conversions.h"
+#include "vector.h"
 #include <cmath>
 #include <map>
 #include <string>
@@ -33,9 +33,7 @@ namespace btk::ballistics
      * @param x_ring X-ring diameter in m (defaults to ring_10)
      * @param description Human-readable description
      */
-    Target(const std::string& name, double ring_10, double ring_9, double ring_8,
-           double ring_7, double ring_6, double ring_5,
-           double x_ring = 0.0, const std::string& description = "");
+    Target(const std::string& name, double ring_10, double ring_9, double ring_8, double ring_7, double ring_6, double ring_5, double x_ring = 0.0, const std::string& description = "");
 
     /**
      * @brief Get diameter of specified ring (0-6, where 6=X, 5=10, etc.)
@@ -76,16 +74,9 @@ namespace btk::ballistics
     double getRingOuterDiameter(int ring) const;
 
     // Getters
-    const std::string& getName() const
-    {
-      return name_;
-    }
-    const std::string& getDescription() const
-    {
-      return description_;
-    }
+    const std::string& getName() const { return name_; }
+    const std::string& getDescription() const { return description_; }
     double getXRingDiameter() const { return ring_diameters_[6]; } // m
-
 
     private:
     std::string name_;

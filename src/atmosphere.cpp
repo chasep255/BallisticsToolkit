@@ -10,15 +10,10 @@ namespace btk
   {
 
     // Atmosphere implementation
-    Atmosphere::Atmosphere()
-      : temperature_(Constants::TEMPERATURE_STANDARD_FAHRENHEIT), altitude_(0.0),
-        humidity_(0.5), pressure_(calculateStandardPressure(0.0))
-    {
-    }
+    Atmosphere::Atmosphere() : temperature_(Constants::TEMPERATURE_STANDARD_FAHRENHEIT), altitude_(0.0), humidity_(0.5), pressure_(calculateStandardPressure(0.0)) {}
 
     Atmosphere::Atmosphere(double temperature, double altitude, double humidity, double pressure)
-      : temperature_(temperature), altitude_(altitude), humidity_(humidity),
-        pressure_(pressure > 0 ? pressure : calculateStandardPressure(altitude))
+      : temperature_(temperature), altitude_(altitude), humidity_(humidity), pressure_(pressure > 0 ? pressure : calculateStandardPressure(altitude))
     {
       if(humidity < 0.0 || humidity > 1.0)
       {
@@ -26,10 +21,7 @@ namespace btk
       }
     }
 
-    double Atmosphere::getPressure() const
-    {
-      return pressure_;
-    }
+    double Atmosphere::getPressure() const { return pressure_; }
 
     double Atmosphere::getAirDensity() const
     {
@@ -67,10 +59,7 @@ namespace btk
       return speed_of_sound;
     }
 
-    Atmosphere Atmosphere::standard()
-    {
-      return Atmosphere();
-    }
+    Atmosphere Atmosphere::standard() { return Atmosphere(); }
 
     Atmosphere Atmosphere::atAltitude(double altitude)
     {
@@ -79,7 +68,6 @@ namespace btk
 
       return Atmosphere(temperature_k, altitude, 0.5, 0.0);
     }
-
 
     double Atmosphere::calculateStandardPressure(double altitude) const
     {
@@ -90,7 +78,6 @@ namespace btk
 
       return pressure_pa;
     }
-
 
   } // namespace ballistics
 } // namespace btk
