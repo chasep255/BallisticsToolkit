@@ -1,149 +1,170 @@
 #pragma once
 
 #include "vector.h"
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <functional>
 #include <map>
+#include <random>
 #include <string>
 #include <vector>
 
 namespace btk::ballistics
 {
 
-  /**
-   * @brief 1D wind field generator with position and time dependence
-   *
-   * Generates wind vectors using sinusoidal modes and frozen-turbulence advection.
-   * Supports both spatial turbulence and time-coherent switching behavior.
-   */
-  class WindGenerator
+// ----------- PerlinNoise2D --------------------------------------------------
+
+class PerlinNoise2D
+{
+  private:
+  std::array<int, 256> perm_;
+
+  // Perlin noise functions
+  static double fade(double t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  static double lerp(double a, double b, double t) { return a + (b - a) * t; }
+  static double grad(int h, double x, double y) {
+    switch (h & 7) {
+    case 0: return x + y;
+    case 1: return x - y;
+    case 2: return -x + y;
+    case 3: return -x - y;
+    case 4: return x;
+    case 5: return -x;
+    case 6: return y;
+    default: return -y;
+    }
+  }
+
+  double noise(double x, double y) const
   {
-    public:
-    /**
-     * @brief Construct with initial bias and advection speed
-     *
-     * @param bias Initial wind bias vector (m/s)
-     * @param advection_speed Advection speed for frozen turbulence (m/s)
-     */
-    WindGenerator(const Vector3D& bias = Vector3D(0, 0, 0), double advection_speed = 0.0);
+    int X = static_cast<int>(std::floor(x)) & 255;
+    int Y = static_cast<int>(std::floor(y)) & 255;
+    double xf = x - std::floor(x);
+    double yf = y - std::floor(y);
+    double u = fade(xf);
+    double v = fade(yf);
+    
+    int aa = perm_[perm_[X] + Y];
+    int ab = perm_[perm_[X] + Y + 1];
+    int ba = perm_[perm_[X + 1] + Y];
+    int bb = perm_[perm_[X + 1] + Y + 1];
+    
+    double x1 = lerp(grad(aa, xf, yf), grad(ba, xf - 1, yf), u);
+    double x2 = lerp(grad(ab, xf, yf - 1), grad(bb, xf - 1, yf - 1), u);
+    
+    return lerp(x1, x2, v);
+  }
 
-    /**
-     * @brief Set the wind bias vector
-     *
-     * @param bias New bias vector (m/s)
-     */
-    void setBias(const Vector3D& bias);
+  public:
+  PerlinNoise2D(uint32_t seed)
+  {
+    // Initialize permutation table
+    for(int i = 0; i < 256; ++i)
+      perm_[i] = i;
+    std::mt19937 eng(seed);
+    std::shuffle(perm_.begin(), perm_.end(), eng);
+  }
 
-    /**
-     * @brief Set the advection speed for frozen turbulence
-     *
-     * @param speed Advection speed (m/s)
-     */
-    void setAdvection(double speed);
+  double operator()(double x, double y) const { return noise(x, y); }
+};
 
-    /**
-     * @brief Add a sinusoidal wind mode
-     *
-     * @param wavelength Wavelength in meters
-     * @param amplitude Amplitude in m/s
-     * @param phase Phase offset in radians
-     */
-    void addSine(double wavelength, double amplitude, double phase);
+/**
+ * @brief Wind component for position and time-dependent wind
+ */
+struct WindComponent
+{
+  double amplitude_scale_;      // Overall strength multiplier
+  double temporal_frequency_;   // How fast it changes over time (Hz)
+  double spatial_frequency_;    // How fast it changes over space (cycles/meter)
+  double exponent_;             // Controls spikiness (1.0 = linear, >1.0 = spiky, <1.0 = smooth)
+  
+  // 2D Perlin noise generators
+  PerlinNoise2D crosswind_noise_;   // For left/right wind component
+  PerlinNoise2D headwind_noise_;    // For forward/backward wind component
+  
+  WindComponent(double amp_scale, double temp_freq, double spatial_freq, double exponent, uint32_t seed)
+    : amplitude_scale_(amp_scale), temporal_frequency_(temp_freq), spatial_frequency_(spatial_freq), 
+      exponent_(exponent), crosswind_noise_(seed), headwind_noise_(seed + 1000) {}
+};
 
-    /**
-     * @brief Add random crosswind modes with specified characteristics
-     *
-     * @param num_modes Number of modes to add
-     * @param min_wavelength Minimum wavelength (m)
-     * @param max_wavelength Maximum wavelength (m)
-     * @param target_rms Target RMS amplitude (m/s)
-     * @param orientation_rad Orientation angle in radians (0 = +Y, π/2 = +X)
-     * @param seed Random seed
-     */
-    void addRandomCrosswindModes(int num_modes, double min_wavelength, double max_wavelength, double target_rms, double orientation_rad, uint32_t seed);
-
-    /**
-     * @brief Clear all wind modes
-     */
-    void clearModes();
-
-    /**
-     * @brief Enable time-coherent switching behavior
-     *
-     * @param period_s Switching period in seconds
-     * @param strength_mps RMS strength of switching component (m/s)
-     * @param orientation_rad Orientation angle in radians
-     */
-    void setSwitchy(double period_s, double strength_mps, double orientation_rad);
-
-    /**
-     * @brief Sample wind at given position and time
-     *
-     * @param x_m Position in meters
-     * @param t_s Time in seconds
-     * @return Wind vector (m/s)
-     */
-    Vector3D operator()(double x_m, double t_s) const;
-
-    private:
-    struct Mode
-    {
-      double k;   // wavenumber (2π/λ)
-      double amp; // amplitude
-      double phi; // phase
-    };
-
-    Vector3D bias_;
-    double advect_c_;
-    std::vector<Mode> components_;
-
-    // Time-coherent switching
-    bool switchy_enabled_;
-    double switchy_period_s_;
-    double switchy_strength_mps_;
-    double switchy_dir_cos_;
-    double switchy_dir_sin_;
-
-    // Helper functions
-    static double prand01(uint64_t n);
-    static double smoothFlip(double a, double b, double t);
-  };
+/**
+ * @brief Wind generator for position and time-dependent wind
+ */
+class WindGenerator
+{
+  public:
+  /**
+   * @brief Construct wind generator
+   * @param seed Random seed for reproducible wind patterns
+   */
+  WindGenerator(uint32_t seed = 42);
 
   /**
-   * @brief Wind preset factory for creating common wind patterns
+   * @brief Sample wind at given position and time
    *
-   * Provides predefined wind patterns with realistic characteristics.
-   * Similar to NRATargets but for wind conditions.
+   * @param x_m Position in meters
+   * @param t_s Time in seconds
+   * @return Wind vector (m/s)
    */
-  class WindPresets
-  {
-    public:
-    /**
-     * @brief Get a specific wind preset by name
-     *
-     * @param name Preset name (e.g., "Calm", "SwitchyLight", "StrongSteady")
-     * @param seed Random seed for reproducible patterns
-     * @return WindGenerator object
-     * @throws std::invalid_argument if preset not found
-     */
-    static WindGenerator getPreset(const std::string& name, uint32_t seed = 42);
+  Vector3D operator()(double x_m, double t_s) const;
 
-    /**
-     * @brief List all available preset names
-     *
-     * @return Vector of preset names
-     */
-    static std::vector<std::string> listPresets();
+  /**
+   * @brief Add a wind component with specified characteristics
+   *
+   * @param amplitude_scale Overall strength multiplier (m/s)
+   * @param temporal_frequency How fast it changes over time (Hz)
+   * @param spatial_frequency How fast it changes over space (cycles/meter)
+   * @param exponent Controls spikiness (1.0 = linear, >1.0 = spiky, <1.0 = smooth)
+   */
+  void addWindComponent(double amplitude_scale, double temporal_frequency, double spatial_frequency, double exponent = 1.0);
 
-    /**
-     * @brief Check if a preset exists
-     *
-     * @param name Preset name
-     * @return True if preset exists
-     */
-    static bool hasPreset(const std::string& name);
+  /**
+   * @brief Set the random seed for all components
+   * @param seed New random seed
+   */
+  void setSeed(uint32_t seed);
 
-    private:
-    static std::map<std::string, std::function<WindGenerator(uint32_t)>> presets_;
-    static void initializePresets();
-  };
+  private:
+  std::vector<WindComponent> components_;
+  uint32_t seed_;
+  uint32_t next_component_seed_;
+};
+
+/**
+ * @brief Factory for creating WindGenerator instances with preset configurations
+ */
+class WindPresets
+{
+  public:
+  /**
+   * @brief Get a specific wind preset by name
+   *
+   * @param name Preset name (e.g., "Calm", "SwitchyLight", "StrongSteady")
+   * @param seed Random seed for reproducible patterns
+   * @return WindGenerator object
+   * @throws std::invalid_argument if preset not found
+   */
+  static WindGenerator getPreset(const std::string& name, uint32_t seed = 42);
+
+  /**
+   * @brief List all available preset names
+   *
+   * @return Vector of preset names
+   */
+  static std::vector<std::string> listPresets();
+
+  /**
+   * @brief Check if a preset exists
+   *
+   * @param name Preset name
+   * @return True if preset exists
+   */
+  static bool hasPreset(const std::string& name);
+
+  private:
+  static std::map<std::string, std::function<WindGenerator(uint32_t)>> presets_;
+  static void initializePresets();
+};
 
 } // namespace btk::ballistics

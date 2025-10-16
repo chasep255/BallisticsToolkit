@@ -238,15 +238,14 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Wind generator class
   class_<WindGenerator>("WindGenerator")
-    .constructor<Vector3D, double>()
-    .function("setBias", &WindGenerator::setBias)
-    .function("setAdvection", &WindGenerator::setAdvection)
-    .function("addSine", &WindGenerator::addSine)
-    .function("addRandomCrosswindModes", &WindGenerator::addRandomCrosswindModes)
-    .function("clearModes", &WindGenerator::clearModes)
-    .function("setSwitchy", &WindGenerator::setSwitchy)
-    .function("sample", select_overload<Vector3D(double, double) const>(&WindGenerator::operator()));
+    .constructor<uint32_t>()
+    .function("sample", select_overload<Vector3D(double, double) const>(&WindGenerator::operator()))
+    .function("addWindComponent", &WindGenerator::addWindComponent)
+    .function("setSeed", &WindGenerator::setSeed);
 
   // Wind presets factory
-  class_<WindPresets>("WindPresets").class_function("getPreset", &WindPresets::getPreset).class_function("listPresets", &WindPresets::listPresets).class_function("hasPreset", &WindPresets::hasPreset);
+  class_<WindPresets>("WindPresets")
+    .class_function("getPreset", &WindPresets::getPreset)
+    .class_function("listPresets", &WindPresets::listPresets)
+    .class_function("hasPreset", &WindPresets::hasPreset);
 }

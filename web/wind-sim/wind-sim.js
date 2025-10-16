@@ -79,27 +79,35 @@ function setupUI()
   const clockDisplay = document.getElementById('clockDisplay');
   const populatePresets = () =>
   {
-    // Populate from C++ list if empty
-    if (preset.options.length === 0 || preset.options[0].value !== btk.WindPresets.listPresets().get(0))
-    {
-      preset.innerHTML = '';
-      const names = btk.WindPresets.listPresets();
-      for (let i = 0; i < names.size(); ++i)
-      {
-        const name = names.get(i);
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name.replace(/([A-Z])/g, ' $1').trim();
-        preset.appendChild(opt);
-      }
+    preset.innerHTML = '';
+    const names = btk.WindPresets.listPresets();
+    
+    // Convert C++ vector to JavaScript array
+    const presetNames = [];
+    for (let i = 0; i < names.size(); ++i) {
+      presetNames.push(names.get(i));
     }
+    
+    // Create options
+    for (const name of presetNames) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name.replace(/([A-Z])/g, ' $1').trim();
+      preset.appendChild(opt);
+    }
+    
+    // Set default selection to first preset
+    if (presetNames.length > 0) {
+      preset.value = presetNames[0];
+    }
+    
+    console.log('Loaded presets:', presetNames);
   };
 
   const rebuild = () =>
   {
     state.meters = btk.Conversions.yardsToMeters(parseFloat(distanceYd.value) || 1000);
-    populatePresets();
-    state.preset = preset.value || 'Calm';
+    state.preset = preset.value;
     // Randomize seed if not specified or invalid
     const userSeed = parseInt(seed.value, 10);
     state.seed = Number.isFinite(userSeed) ? userSeed : Math.floor(Math.random() * 1e9);
@@ -109,6 +117,9 @@ function setupUI()
     wind = btk.WindPresets.getPreset(state.preset, state.seed);
   };
 
+  // Load presets once at startup
+  populatePresets();
+  
   // Always animating: rebuild parameters triggers immediate effect
   rebuild();
   startAnimation();
@@ -226,7 +237,6 @@ function drawFrame()
     const vx = wv.x; // tail/head
     const vy = wv.y; // cross (horizontal component we want to emphasize)
     const speed = Math.sqrt(vx * vx + vy * vy);
-    const speedHoriz = Math.abs(vy);
     // Map world X to NDC Y (vertical axis for downrange view)
     const ndcX = 0.0;
     const ndcY = -1 + 2 * (x / state.meters);
@@ -235,8 +245,8 @@ function drawFrame()
     // For downrange view: vy goes left/right, vx goes up/down (tailwind up, headwind down)
     const dirx = vy; // crosswind component (left/right)
     const diry = -vx; // tailwind component (negative because +X is downrange, we want tailwind to point up)
-    // Arrow length scales with horizontal speed only so differences are visible even when vx varies
-    const len = Math.max(0.02, 0.5 * Math.min(1.0, speedHoriz / 5.0));
+    // Arrow length scales with total speed (m/s → scaled 0..1)
+    const len = Math.max(0.02, 0.5 * Math.min(1.0, speed / 5.0));
     const mag = Math.sqrt(dirx * dirx + diry * diry) || 1.0;
     const ux = dirx / mag;
     const uy = diry / mag;
@@ -247,9 +257,9 @@ function drawFrame()
     const bx = ndcX + ux * len;
     const by = ndcY + uy * len;
 
-    // Color ramp: blue->red by horizontal speed (0..20 mph)
-    const mphHoriz = btk.Conversions.mpsToMph(speedHoriz);
-    const s01 = Math.max(0, Math.min(1, mphHoriz / 20.0));
+    // Color ramp: blue->red by total speed (0..20 mph)
+    const mphTotal = btk.Conversions.mpsToMph(speed);
+    const s01 = Math.max(0, Math.min(1, mphTotal / 20.0));
     const r = s01;
     const g = 0.1 + 0.3 * (1.0 - Math.abs(s01 - 0.5) * 2.0); // Reduced green for better contrast
     const b = 1.0 - s01;
@@ -314,8 +324,9 @@ function drawFrame()
       const fracMeters = Math.max(0, Math.min(1, metersAtTick / state.meters));
       const xSample = state.meters * fracMeters; // clamp
       const wv = wind.sample(xSample, t);
-      const vy = wv.y; // horizontal component only
-      const mph = btk.Conversions.mpsToMph(Math.abs(vy));
+      const vx = wv.x,
+        vy = wv.y;
+      const mph = btk.Conversions.mpsToMph(Math.sqrt(vx * vx + vy * vy));
       ctx.fillText(`${mph.toFixed(1)} mph`, wCss - 150, y + 4);
     }
     // Removed top 'Distance' label
