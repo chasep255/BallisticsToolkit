@@ -1,7 +1,7 @@
 .canvas-wrap {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   margin-top: 16px;
   position: relative;
 }
@@ -9,14 +9,18 @@
 #glcanvas {
   border: 1px solid #ddd;
   background: #f8f9fa;
+  width: 100%;
+  height: calc(100vh - 180px);
 }
 
 #overlay {
   position: absolute;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  transform: none;
   pointer-events: none;
+  width: 100%;
+  height: calc(100vh - 180px);
 }
 
 .legend {

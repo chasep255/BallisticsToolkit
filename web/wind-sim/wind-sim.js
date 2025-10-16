@@ -3,6 +3,8 @@ let wind = null;
 let animId = null;
 let startTime = 0;
 let dpr = Math.max(1, window.devicePixelRatio || 1);
+// Smoothing state for flags to avoid flicker/rapid direction flips
+const flagStates = new Map(); // key -> {vx, vy}
 
 function resizeCanvases()
 {
@@ -362,6 +364,137 @@ function drawFrame()
     const disp = `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
     const clockEl = document.getElementById('clockDisplay');
     if (clockEl) clockEl.textContent = disp;
+
+    // ----------- F‑Class style wind flags (every 200 yd) --------------------
+    // Draw along right side; stronger wind → longer streamer, higher freq, more flap
+    const drawFlag = (key, baseX, baseY, vx, vy, tSec, dtSec) => {
+      // Low-pass filter wind sample per-flag
+      let st = flagStates.get(key);
+      if (!st) { st = { vx: vx, vy: vy }; flagStates.set(key, st); }
+      const tau = 1.2; // seconds
+      const alpha = 1 - Math.exp(-Math.max(0.001, dtSec) / tau);
+      st.vx += alpha * (vx - st.vx);
+      st.vy += alpha * (vy - st.vy);
+
+      const speedMs = Math.sqrt(st.vx * st.vx + st.vy * st.vy);
+      const mph = btk.Conversions.mpsToMph(speedMs);
+
+      // Pole (clamped so it doesn't go off-screen)
+      // Pole should be taller than the flag
+      let poleH = 45 + Math.min(15, mph * 0.3);
+      poleH = Math.min(poleH, Math.max(15, baseY - (pad + 20)));
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(baseX, baseY);
+      ctx.lineTo(baseX, baseY - poleH);
+      ctx.stroke();
+
+      // Attachment point at pole top
+      const ax = baseX, ay = baseY - poleH;
+
+      // Realistic flag physics: looking downrange perspective
+      // Wind components: vx = head/tail, vy = crosswind
+      // Flag points in the direction the wind is blowing (downwind)
+      
+      const headwind = st.vx;  // positive = toward us, negative = away from us  
+      const crosswind = st.vy; // positive = right, negative = left
+      
+      // Wind speed determines angle from vertical (0° = limp, 90° = horizontal)
+      const angleDeg = Math.min(85, Math.max(0, mph * 3.5 + Math.pow(mph, 1.2) * 0.8));
+      const angleRad = angleDeg * Math.PI / 180.0;
+      
+      // Flag points in wind direction (not opposite!)
+      // Crosswind component: positive vy = right crosswind, flag points right
+      // Headwind component: positive vx = headwind toward us, flag points toward us (up)
+      const flagDirX = crosswind * Math.sin(angleRad);   // crosswind component
+      const flagDirY = headwind * Math.sin(angleRad);    // headwind component
+      const flagLen = Math.sqrt(flagDirX * flagDirX + flagDirY * flagDirY) || 1.0;
+      const ux = flagDirX / flagLen, uy = flagDirY / flagLen;
+      const px = -uy, py = ux; // perpendicular for flapping
+
+      // Streamer parameters (realistic flag behavior)
+      const length = 35 + Math.min(10, mph * 0.15);      // px, shorter than pole
+      const freq = 0.8 + mph * 0.1;                     // flutter rate increases with wind
+      const ampBase = Math.min(8, 3 + mph * 0.2);        // flutter amplitude
+      const widthPole = 14;                              // px thickness near pole
+      const widthTip  = 5;                               // px thickness near tip
+      const waves = 2 + Math.min(4, Math.floor(mph * 0.2));
+
+      // Wavy ribbon streamer
+      // Build ribbon polygon around centerline (thicker at pole)
+      const segments = 24;
+      const leftPts = [];
+      const rightPts = [];
+      for (let i = 0; i <= segments; ++i) {
+        const s = i / segments;
+        // Realistic flag flutter: starts at pole, grows toward tip
+        const phase = (tSec * freq * 2.0 * Math.PI) + s * waves * 2.0 * Math.PI;
+        const a = ampBase * Math.pow(s, 2.0); // flutter grows quadratically from pole
+        const flutter = Math.sin(phase) * a;
+        
+        // Flag centerline with flutter perpendicular to flag direction
+        const cx = ax + ux * (length * s) + px * flutter;
+        const cy = ay + uy * (length * s) + py * flutter;
+        const w = (1 - s) * widthPole + s * widthTip; // taper
+        leftPts.push(cx + px * (w * 0.5), cy + py * (w * 0.5));
+        rightPts.push(cx - px * (w * 0.5), cy - py * (w * 0.5));
+      }
+      // Two-color fill across width (red upper, yellow lower)
+      // 1) Draw full yellow ribbon
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath();
+      ctx.moveTo(leftPts[0], leftPts[1]);
+      for (let i = 1; i < leftPts.length; ++i) ctx.lineTo(leftPts[i*2], leftPts[i*2+1]);
+      for (let i = rightPts.length - 1; i >= 0; --i) ctx.lineTo(rightPts[i*2], rightPts[i*2+1]);
+      ctx.closePath();
+      ctx.fill();
+
+      // 2) Draw red upper half by shrinking width toward the centerline by 50%
+      const redLeft = [], redRight = [];
+      for (let i = 0; i <= segments; ++i) {
+        const s = i / segments;
+        // Realistic flag flutter: starts at pole, grows toward tip
+        const phase = (tSec * freq * 2.0 * Math.PI) + s * waves * 2.0 * Math.PI;
+        const a = ampBase * Math.pow(s, 2.0); // flutter grows quadratically from pole
+        const flutter = Math.sin(phase) * a;
+        
+        // Flag centerline with flutter perpendicular to flag direction
+        const cx = ax + ux * (length * s) + px * flutter;
+        const cy = ay + uy * (length * s) + py * flutter;
+        const w = (1 - s) * widthPole + s * widthTip;
+        const half = w * 0.25; // half of half-width = quarter of full width
+        // Pick the same side as 'leftPts' for red band (upper visually)
+        redLeft.push(cx + px * (half));
+        redLeft.push(cy + py * (half));
+        redRight.push(cx);
+        redRight.push(cy);
+      }
+      ctx.fillStyle = '#e63946';
+      ctx.beginPath();
+      ctx.moveTo(redLeft[0], redLeft[1]);
+      for (let i = 1; i < redLeft.length/2; ++i) ctx.lineTo(redLeft[i*2], redLeft[i*2+1]);
+      for (let i = redRight.length/2 - 1; i >= 0; --i) ctx.lineTo(redRight[i*2], redRight[i*2+1]);
+      ctx.closePath();
+      ctx.fill();
+
+      // Outline for visual clarity
+      ctx.strokeStyle = '#b07d00';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    };
+
+      // Place flags at 200 yd intervals
+      const marginLeft = 120; // px from left edge to avoid overlapping legend
+      for (let yd = 100; yd <= maxYd; yd += 200) {
+        const frac = 1 - (yd / yards);
+        const y = pad + frac * (hCss - 2 * pad);
+        const xMeters = btk.Conversions.yardsToMeters(yd);
+        const wv = wind.sample(xMeters, t);
+        const baseX = marginLeft;
+        const baseY = y;
+        drawFlag(yd, baseX, baseY, wv.x, wv.y, t, dt);
+      }
   }
 }
 
