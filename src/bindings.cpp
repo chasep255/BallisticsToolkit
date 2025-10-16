@@ -244,8 +244,5 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("setSeed", &WindGenerator::setSeed);
 
   // Wind presets factory
-  class_<WindPresets>("WindPresets")
-    .class_function("getPreset", &WindPresets::getPreset)
-    .class_function("listPresets", &WindPresets::listPresets)
-    .class_function("hasPreset", &WindPresets::hasPreset);
+  class_<WindPresets>("WindPresets").class_function("getPreset", &WindPresets::getPreset).class_function("listPresets", &WindPresets::listPresets).class_function("hasPreset", &WindPresets::hasPreset);
 }

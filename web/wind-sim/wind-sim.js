@@ -81,26 +81,29 @@ function setupUI()
   {
     preset.innerHTML = '';
     const names = btk.WindPresets.listPresets();
-    
+
     // Convert C++ vector to JavaScript array
     const presetNames = [];
-    for (let i = 0; i < names.size(); ++i) {
+    for (let i = 0; i < names.size(); ++i)
+    {
       presetNames.push(names.get(i));
     }
-    
+
     // Create options
-    for (const name of presetNames) {
+    for (const name of presetNames)
+    {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name.replace(/([A-Z])/g, ' $1').trim();
       preset.appendChild(opt);
     }
-    
+
     // Set default selection to first preset
-    if (presetNames.length > 0) {
+    if (presetNames.length > 0)
+    {
       preset.value = presetNames[0];
     }
-    
+
     console.log('Loaded presets:', presetNames);
   };
 
@@ -119,7 +122,7 @@ function setupUI()
 
   // Load presets once at startup
   populatePresets();
-  
+
   // Always animating: rebuild parameters triggers immediate effect
   rebuild();
   startAnimation();
