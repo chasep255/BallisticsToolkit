@@ -19,8 +19,12 @@ Vector3D WindGenerator::operator()(double x_m, double t_s) const
   // Sum all wind components
   for (const auto& component : components_) {
     // Calculate spatial and temporal coordinates for noise sampling
-    double spatial_x = x_m * component.spatial_frequency_;
-    double temporal_t = t_s * component.temporal_frequency_;
+    // Convert period/wavelength to frequencies for noise sampling
+    double spatial_freq = 1.0 / component.wavelength_m_;
+    double temporal_freq = 1.0 / component.period_s_;
+    
+    double spatial_x = x_m * spatial_freq;
+    double temporal_t = t_s * temporal_freq;
     
     // Sample the 2D Perlin noise for both components
     double crosswind_raw = component.crosswind_noise_(spatial_x, temporal_t);
@@ -38,9 +42,9 @@ Vector3D WindGenerator::operator()(double x_m, double t_s) const
   return Vector3D(total_headwind, total_crosswind, 0.0);
 }
 
-void WindGenerator::addWindComponent(double amplitude_scale, double temporal_frequency, double spatial_frequency, double exponent)
+void WindGenerator::addWindComponent(double amplitude_scale, double period_s, double wavelength_m, double exponent)
 {
-  components_.emplace_back(amplitude_scale, temporal_frequency, spatial_frequency, exponent, next_component_seed_);
+  components_.emplace_back(amplitude_scale, period_s, wavelength_m, exponent, next_component_seed_);
   next_component_seed_ += 1000;  // Ensure different seeds for each component
 }
 
@@ -54,8 +58,8 @@ void WindGenerator::setSeed(uint32_t seed)
     uint32_t component_seed = seed + 10000 + (i * 1000);
     components_[i] = WindComponent(
       components_[i].amplitude_scale_,
-      components_[i].temporal_frequency_,
-      components_[i].spatial_frequency_,
+      components_[i].period_s_,
+      components_[i].wavelength_m_,
       components_[i].exponent_,
       component_seed
     );
@@ -71,49 +75,58 @@ void WindPresets::initializePresets()
   // Calm wind - very light and smooth
   presets_["Calm"] = [](uint32_t seed) {
     WindGenerator w(seed);
-    w.addWindComponent(0.8, 0.0001, 0.00001, 0.5);  // Very slow bias (2+ hour cycles)
-    w.addWindComponent(1.5, 0.001, 0.0001, 0.7);  // Very slow changes (20+ min cycles)
-    w.addWindComponent(0.8, 0.01, 0.001, 0.8);    // Gentle micro-variations
+    w.addWindComponent(1.6, 7200.0, 100000.0, 0.5);  // Very slow bias (2+ hour cycles, 100km wavelength)
+    w.addWindComponent(3.0, 1200.0, 10000.0, 0.7);  // Very slow changes (20+ min cycles, 10km wavelength)
+    w.addWindComponent(1.6, 100.0, 1000.0, 0.8);    // Gentle micro-variations (1.7 min, 1km wavelength)
     return w;
   };
   
   // Light breeze - gentle and steady
   presets_["LightBreeze"] = [](uint32_t seed) {
     WindGenerator w(seed);
-    w.addWindComponent(1.2, 0.0001, 0.00001, 0.5);  // Very slow bias (2+ hour cycles)
-    w.addWindComponent(2.2, 0.002, 0.0002, 1.0);  // Slow, predictable (10+ min cycles)
-    w.addWindComponent(1.5, 0.05, 0.002, 1.2);    // Some gentle variation
+    w.addWindComponent(2.4, 7200.0, 100000.0, 0.5);  // Very slow bias (2+ hour cycles, 100km wavelength)
+    w.addWindComponent(4.4, 600.0, 5000.0, 1.0);  // Slow, predictable (10+ min cycles, 5km wavelength)
+    w.addWindComponent(3.0, 20.0, 500.0, 1.2);    // Some gentle variation (20 sec, 500m wavelength)
     return w;
   };
   
   // Moderate wind - more active with some gusts
   presets_["Moderate"] = [](uint32_t seed) {
     WindGenerator w(seed);
-    w.addWindComponent(1.8, 0.0001, 0.00001, 0.5);  // Very slow bias (2+ hour cycles)
-    w.addWindComponent(3.0, 0.005, 0.0005, 1.0);  // Slow background (5+ min cycles)
-    w.addWindComponent(2.2, 0.1, 0.005, 1.5);     // Medium gusts (1-2 min cycles)
-    w.addWindComponent(1.8, 0.5, 0.01, 2.0);      // Quick gusts (30 sec cycles)
+    w.addWindComponent(3.6, 7200.0, 100000.0, 0.5);  // Very slow bias (2+ hour cycles, 100km wavelength)
+    w.addWindComponent(6.0, 300.0, 2000.0, 1.0);  // Slow background (5+ min cycles, 2km wavelength)
+    w.addWindComponent(4.4, 60.0, 200.0, 1.5);     // Medium gusts (1-2 min cycles, 200m wavelength)
+    w.addWindComponent(3.6, 2.0, 100.0, 2.0);      // Quick gusts (2 sec cycles, 100m wavelength)
     return w;
   };
   
-  // Strong wind - very gusty and chaotic
+  // Strong wind - steady with occasional gusts
   presets_["Strong"] = [](uint32_t seed) {
     WindGenerator w(seed);
-    w.addWindComponent(6.0, 0.0001, 0.00001, 0.5);  // Very slow bias (2+ hour cycles)
-    w.addWindComponent(12.0, 0.01, 0.001, 1.2);   // Slow background (3+ min cycles)
-    w.addWindComponent(18.0, 0.2, 0.005, 2.0);     // Strong gusts (15-30 sec cycles)
-    w.addWindComponent(9.0, 1.0, 0.02, 2.5);     // Very spiky micro-gusts (10 sec cycles)
+    w.addWindComponent(8.0, 7200.0, 100000.0, 0.5);  // Very slow bias (2+ hour cycles, 100km wavelength)
+    w.addWindComponent(16.0, 300.0, 2000.0, 1.0);   // Steady background (5+ min cycles, 2km wavelength)
+    w.addWindComponent(12.0, 60.0, 330.0, 1.5);     // Occasional gusts (1-2 min cycles, 330m wavelength)
     return w;
   };
   
   // Variable wind - multiple scales with different spikiness
   presets_["Variable"] = [](uint32_t seed) {
     WindGenerator w(seed);
-    w.addWindComponent(2.0, 0.0001, 0.00001, 0.5);  // Very slow bias (2+ hour cycles)
-    w.addWindComponent(3.8, 0.001, 0.0001, 0.8); // Very slow large-scale (20+ min)
-    w.addWindComponent(3.0, 0.05, 0.002, 1.2);   // Medium scale (2-3 min cycles)
-    w.addWindComponent(2.2, 0.3, 0.01, 1.8);     // Active gusts (1 min cycles)
-    w.addWindComponent(1.5, 1.5, 0.05, 3.0);     // Very spiky micro-turbulence (20 sec cycles)
+    w.addWindComponent(4.0, 7200.0, 100000.0, 0.5);  // Very slow bias (2+ hour cycles, 100km wavelength)
+    w.addWindComponent(7.6, 1200.0, 10000.0, 0.8); // Very slow large-scale (20+ min, 10km wavelength)
+    w.addWindComponent(6.0, 120.0, 500.0, 1.2);   // Medium scale (2-3 min cycles, 500m wavelength)
+    w.addWindComponent(4.4, 20.0, 100.0, 1.8);     // Active gusts (20 sec cycles, 100m wavelength)
+    w.addWindComponent(3.0, 1.3, 20.0, 3.0);     // Very spiky micro-turbulence (1.3 sec cycles, 20m wavelength)
+    return w;
+  };
+  
+  // Shear wind - between moderate and strong with direction changes over 1000 yards
+  presets_["Shear"] = [](uint32_t seed) {
+    WindGenerator w(seed);
+    w.addWindComponent(5.0, 7200.0, 100000.0, 0.5);  // Very slow bias (2+ hour cycles, 100km wavelength)
+    w.addWindComponent(10.0, 300.0, 3000.0, 1.0);   // Steady background (5+ min cycles, 3km wavelength)
+    w.addWindComponent(8.0, 75.0, 250.0, 1.3);     // Medium gusts (1.25 min cycles, 250m wavelength)
+    w.addWindComponent(6.0, 2.5, 67.0, 1.8);      // Direction changes over range (2.5 sec cycles, 67m wavelength)
     return w;
   };
 }

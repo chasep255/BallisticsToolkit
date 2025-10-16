@@ -75,16 +75,16 @@ class PerlinNoise2D
 struct WindComponent
 {
   double amplitude_scale_;      // Overall strength multiplier
-  double temporal_frequency_;   // How fast it changes over time (Hz)
-  double spatial_frequency_;    // How fast it changes over space (cycles/meter)
+  double period_s_;            // How long it takes to cycle (seconds)
+  double wavelength_m_;        // How far apart similar patterns are (meters)
   double exponent_;             // Controls spikiness (1.0 = linear, >1.0 = spiky, <1.0 = smooth)
   
   // 2D Perlin noise generators
   PerlinNoise2D crosswind_noise_;   // For left/right wind component
   PerlinNoise2D headwind_noise_;    // For forward/backward wind component
   
-  WindComponent(double amp_scale, double temp_freq, double spatial_freq, double exponent, uint32_t seed)
-    : amplitude_scale_(amp_scale), temporal_frequency_(temp_freq), spatial_frequency_(spatial_freq), 
+  WindComponent(double amp_scale, double period_s, double wavelength_m, double exponent, uint32_t seed)
+    : amplitude_scale_(amp_scale), period_s_(period_s), wavelength_m_(wavelength_m), 
       exponent_(exponent), crosswind_noise_(seed), headwind_noise_(seed + 1000) {}
 };
 
@@ -113,11 +113,11 @@ class WindGenerator
    * @brief Add a wind component with specified characteristics
    *
    * @param amplitude_scale Overall strength multiplier (m/s)
-   * @param temporal_frequency How fast it changes over time (Hz)
-   * @param spatial_frequency How fast it changes over space (cycles/meter)
+   * @param period_s How long it takes to cycle (seconds)
+   * @param wavelength_m How far apart similar patterns are (meters)
    * @param exponent Controls spikiness (1.0 = linear, >1.0 = spiky, <1.0 = smooth)
    */
-  void addWindComponent(double amplitude_scale, double temporal_frequency, double spatial_frequency, double exponent = 1.0);
+  void addWindComponent(double amplitude_scale, double period_s, double wavelength_m, double exponent = 1.0);
 
   /**
    * @brief Set the random seed for all components

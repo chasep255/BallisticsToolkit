@@ -216,7 +216,7 @@ function drawFrame()
   if (!gl || !wind) return;
   resizeCanvases();
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-  gl.clearColor(0.97, 0.98, 0.98, 1.0); // Light gray background
+  gl.clearColor(0.95, 0.96, 0.97, 1.0); // Slightly darker background for better contrast
   gl.clear(gl.COLOR_BUFFER_BIT);
 
   const now = performance.now();
@@ -245,8 +245,8 @@ function drawFrame()
     // For downrange view: vy goes left/right, vx goes up/down (tailwind up, headwind down)
     const dirx = vy; // crosswind component (left/right)
     const diry = -vx; // tailwind component (negative because +X is downrange, we want tailwind to point up)
-    // Arrow length scales with total speed (m/s → scaled 0..1)
-    const len = Math.max(0.02, 0.5 * Math.min(1.0, speed / 5.0));
+    // Arrow length scales with total speed (m/s → scaled 0..1) - half scale
+    const len = Math.max(0.01, 0.25 * Math.min(1.0, speed / 5.0));
     const mag = Math.sqrt(dirx * dirx + diry * diry) || 1.0;
     const ux = dirx / mag;
     const uy = diry / mag;
@@ -268,6 +268,7 @@ function drawFrame()
     verts.push(ax, ay, bx, by);
     cols.push(r, g, b, r, g, b);
   }
+
 
   gl.useProgram(program);
   const aPos = gl.getAttribLocation(program, 'a_pos');
