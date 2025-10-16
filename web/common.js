@@ -76,7 +76,7 @@ function generateNavigation(currentPageName)
                 <a href="${pathPrefix}index.html" ${isHome ? 'class="active"' : ''}>Home</a>
                 <a href="${pathPrefix}ballistic-calc/ballistic-calc.html" ${isBallisticCalc ? 'class="active"' : ''}>Ballistic Calculator</a>
                 <a href="${pathPrefix}target-sim/target-sim.html" ${isTargetSim ? 'class="active"' : ''}>Target Simulator</a>
-                <a href="${pathPrefix}wind-sim/wind-sim.html" ${isWindSim ? 'class="active"' : ''}>Wind Sim</a>
+                <a href="${pathPrefix}wind-sim/wind-sim.html" ${isWindSim ? 'class="active"' : ''}>Wind Simulator</a>
                 <a href="${pathPrefix}about.html" ${isAbout ? 'class="active"' : ''}>About</a>
             </div>
         </div>

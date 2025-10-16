@@ -20,7 +20,7 @@ Professional web-based ballistics calculator and match simulation suite for long
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
 - **Match Scoring** - Complete NRA scoring with X-counts and group size analysis
 
-### 🌬️ Wind Sim (Beta)
+### 🌬️ Wind Simulator (Beta)
 - **Real-time Wind Visualization** - WebGL arrows show crosswind and head/tail components along the range
 - **Engine-backed Presets** - Preset list loaded from C++ `WindPresets` (single source of truth)
 - **WindGenerator** - New header/cpp implementation with time-coherent "switchy" behavior and spectral turbulence

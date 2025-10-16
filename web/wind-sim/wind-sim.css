@@ -1,0 +1,28 @@
+.canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 16px;
+  position: relative;
+}
+
+#glcanvas {
+  border: 1px solid #ddd;
+  background: #f8f9fa;
+}
+
+#overlay {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.legend {
+  color: #aaa;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+

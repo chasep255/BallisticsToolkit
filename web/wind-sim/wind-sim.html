@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wind Simulator - Ballistics Toolkit</title>
+  <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
+  <link rel="stylesheet" href="../common.css">
+  <link rel="stylesheet" href="wind-sim.css">
+</head>
+<body data-page="wind-sim">
+  <div class="nav-header"></div>
+
+  <div class="app-container">
+      <h1>🌬️ Wind Simulator <span style="font-size:14px; color:#6c757d;">(Beta)</span></h1>
+
+    <div class="params-bar">
+      <div class="param-item">
+        <label for="distanceYd" title="Distance to target in yards">Distance (yd)</label>
+        <input type="number" id="distanceYd" value="1000" step="50" min="100" max="2000" title="Distance to target in yards">
+      </div>
+      <div class="param-item">
+        <label for="preset" title="Wind preset pattern">Preset</label>
+        <select id="preset" title="Wind preset pattern">
+          <option value="Calm">Calm</option>
+          <option value="LightBreeze">Light Breeze</option>
+          <option value="SwitchyLight">Switchy Light</option>
+          <option value="QuarteringTail">Quartering Tail</option>
+          <option value="GustyCrosswind">Gusty Crosswind</option>
+          <option value="SwitchyModerate">Switchy Moderate</option>
+          <option value="StrongSteady">Strong and Steady</option>
+          <option value="StrongSwitchy">Strong and Switchy</option>
+          <option value="MirageCoupledTail">Mirage-Coupled (Tail)</option>
+          <option value="StormyGustFront">Stormy / Gust Front</option>
+          <option value="Gale">Gale</option>
+          <option value="VariableBreeze">Variable Breeze</option>
+          <option value="Coastal">Coastal</option>
+          <option value="MountainValley">Mountain/Valley</option>
+          <option value="ThermalGusts">Thermal Gusts</option>
+          <option value="FrontalPassage">Frontal Passage</option>
+          <option value="LullAndGust">Lull and Gust</option>
+          <option value="ShearLayer">Shear Layer</option>
+        </select>
+      </div>
+      <div class="param-item">
+        <label for="seed" title="Random seed for repeatable patterns">Seed</label>
+        <input type="number" id="seed" value="42" step="1" min="0" title="Random seed">
+      </div>
+      <div class="param-item">
+        <label for="density" title="Arrow density (visual sampling count)">Arrows</label>
+        <input type="number" id="density" value="60" step="10" min="10" max="200" title="Number of arrows rendered">
+      </div>
+      <div class="param-item">
+        <label for="timeScale" title="Simulation time speed multiplier (0.1x–20x)">Time Speed</label>
+        <input type="range" id="timeScale" min="0.1" max="20" step="0.1" value="1.0" title="Simulation time speed multiplier">
+        <div id="timeScaleVal" style="text-align:center; font-size:12px; color:#666;">1.0x</div>
+      </div>
+      <div class="param-item">
+        <label title="Elapsed simulation time">Clock</label>
+        <div id="clockDisplay" style="min-width:90px; padding:6px 10px; border:1px solid #ddd; border-radius:6px; background:#fff; color:#333; text-align:center;">00:00</div>
+      </div>
+    </div>
+
+    
+
+    <div class="canvas-wrap">
+      <canvas id="glcanvas" width="480" height="800"></canvas>
+      <canvas id="overlay" width="480" height="800"></canvas>
+      <div class="legend">Color = speed (blue→red). Arrow points toward wind direction in ground plane.</div>
+    </div>
+  </div>
+
+  <script src="../common.js"></script>
+  <script src="../ballistics_wasm.js"></script>
+  <script src="wind-sim.js"></script>
+</body>
+</html>
+
+
