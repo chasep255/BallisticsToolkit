@@ -74,11 +74,12 @@ function setupUI()
 {
   const distanceYd = document.getElementById('distanceYd');
   const preset = document.getElementById('preset');
-  const seed = document.getElementById('seed');
   const density = document.getElementById('density');
   const timeScale = document.getElementById('timeScale');
   const timeScaleVal = document.getElementById('timeScaleVal');
   const clockDisplay = document.getElementById('clockDisplay');
+  const restartBtn = document.getElementById('restartBtn');
+  const helpBtn = document.getElementById('helpBtn');
   const populatePresets = () =>
   {
     preset.innerHTML = '';
@@ -113,10 +114,8 @@ function setupUI()
   {
     state.meters = btk.Conversions.yardsToMeters(parseFloat(distanceYd.value) || 1000);
     state.preset = preset.value;
-    // Randomize seed if not specified or invalid
-    const userSeed = parseInt(seed.value, 10);
-    state.seed = Number.isFinite(userSeed) ? userSeed : Math.floor(Math.random() * 1e9);
-    seed.value = state.seed;
+    // Generate random seed for each restart
+    state.seed = Math.floor(Math.random() * 1000000);
     state.density = Math.max(10, Math.min(400, parseInt(density.value || '60', 10)));
     // Create a new wind from preset (randomized orientation per seed)
     wind = btk.WindPresets.getPreset(state.preset, state.seed);
@@ -131,8 +130,39 @@ function setupUI()
 
   distanceYd.addEventListener('change', rebuild);
   preset.addEventListener('change', rebuild);
-  seed.addEventListener('change', rebuild);
   density.addEventListener('change', rebuild);
+  
+  // Button event listeners
+  restartBtn.addEventListener('click', () => {
+    rebuild();
+    startAnimation();
+  });
+  
+  helpBtn.addEventListener('click', () => {
+    document.getElementById('helpModal').style.display = 'block';
+  });
+  
+  // Help modal close functionality
+  const helpModal = document.getElementById('helpModal');
+  const helpClose = document.querySelector('.help-close');
+  
+  if (helpClose) {
+    helpClose.addEventListener('click', () => {
+      console.log('Close button clicked');
+      helpModal.style.display = 'none';
+    });
+  } else {
+    console.log('Close button not found');
+  }
+  
+  // Close modal when clicking outside
+  if (helpModal) {
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) {
+        helpModal.style.display = 'none';
+      }
+    });
+  }
   timeScale.addEventListener('input', () =>
   {
     state.timeScale = parseFloat(timeScale.value) || 1.0;
@@ -421,16 +451,20 @@ function drawFrame()
       const widthTip  = 5;                               // px thickness near tip
       const waves = 2 + Math.min(4, Math.floor(mph * 0.2));
 
-      // Wavy ribbon streamer
+      // Wavy ribbon streamer - only flutter when there's significant wind
       // Build ribbon polygon around centerline (thicker at pole)
       const segments = 24;
       const leftPts = [];
       const rightPts = [];
+      
+      // Only flutter if wind speed is significant (reduces constant flapping)
+      const flutterStrength = Math.min(1.0, Math.max(0.0, (mph - 2.0) / 8.0)); // 0-1 based on wind speed
+      
       for (let i = 0; i <= segments; ++i) {
         const s = i / segments;
-        // Realistic flag flutter: starts at pole, grows toward tip
+        // Flutter only when there's wind, and amplitude based on wind speed
         const phase = (tSec * freq * 2.0 * Math.PI) + s * waves * 2.0 * Math.PI;
-        const a = ampBase * Math.pow(s, 2.0); // flutter grows quadratically from pole
+        const a = ampBase * Math.pow(s, 2.0) * flutterStrength; // flutter grows quadratically from pole, scaled by wind
         const flutter = Math.sin(phase) * a;
         
         // Flag centerline with flutter perpendicular to flag direction

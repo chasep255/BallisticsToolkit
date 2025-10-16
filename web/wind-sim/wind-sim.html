@@ -26,10 +26,6 @@
         </select>
       </div>
       <div class="param-item">
-        <label for="seed" title="Random seed for repeatable patterns">Seed</label>
-        <input type="number" id="seed" value="42" step="1" min="0" title="Random seed">
-      </div>
-      <div class="param-item">
         <label for="density" title="Arrow density (visual sampling count)">Arrows</label>
         <input type="number" id="density" value="60" step="10" min="10" max="200" title="Number of arrows rendered">
       </div>
@@ -44,12 +40,77 @@
       </div>
     </div>
 
+    <!-- Control Buttons -->
+    <div style="display: flex; align-items: center; gap: 10px; justify-content: center; margin: 15px 0;">
+      <button id="restartBtn" class="btn btn-primary">Restart</button>
+      <button id="helpBtn" class="btn btn-secondary">Help</button>
+    </div>
+
     
 
     <div class="canvas-wrap">
       <canvas id="glcanvas" width="480" height="800"></canvas>
       <canvas id="overlay" width="480" height="800"></canvas>
       <div class="legend">Color = speed (blue→red). Arrow points toward wind direction in ground plane.</div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="help-modal" style="display: none;">
+    <div class="help-modal-content">
+      <div class="help-modal-header">
+        <h2>🌬️ Wind Simulator Help</h2>
+        <span class="help-close">&times;</span>
+      </div>
+      <div class="help-modal-body">
+        <div class="help-section">
+          <h3>Quick Start</h3>
+          <p>Select a wind preset and watch realistic wind patterns evolve in real-time. Each simulation uses a random seed for unique wind behavior.</p>
+        </div>
+        
+        <div class="help-section">
+          <h3>Wind Presets</h3>
+          <div class="param-help">
+            <strong>Calm:</strong> Very light winds with gentle variations<br><br>
+            <strong>LightBreeze:</strong> Steady light winds with some variation<br><br>
+            <strong>Moderate:</strong> Active winds with occasional gusts<br><br>
+            <strong>Strong:</strong> Steady strong winds with occasional gusts<br><br>
+            <strong>Variable:</strong> Multiple wind scales with different characteristics<br><br>
+            <strong>Shear:</strong> Winds that change direction over the range distance
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Controls</h3>
+          <div class="param-help">
+            <strong>Distance:</strong> Range length in yards (100-2000)<br><br>
+            <strong>Arrows:</strong> Number of wind arrows displayed (10-200)<br><br>
+            <strong>Time Speed:</strong> Simulation speed multiplier (0.1x-20x)<br><br>
+            <strong>Restart:</strong> Generate new random wind pattern<br><br>
+            <strong>Clock:</strong> Shows elapsed simulation time
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Visualization</h3>
+          <div class="param-help">
+            <strong>Wind Arrows:</strong> Show wind direction and speed (color = speed, blue→red)<br><br>
+            <strong>Wind Flags:</strong> Realistic F-class style flags every 200 yards<br><br>
+            <strong>Speed Scale:</strong> Color gradient shows wind speed in mph<br><br>
+            <strong>Distance Markers:</strong> Yard markers with speed readouts
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Technical Details</h3>
+          <div class="param-help">
+            <strong>Wind Generation:</strong> Uses 2D Perlin noise with multiple frequency components to create realistic, time-coherent wind patterns. Each preset combines different spatial and temporal scales to simulate real atmospheric conditions.<br><br>
+            <strong>Perlin Noise:</strong> Generates smooth, natural-looking random patterns that vary continuously in both space and time. Multiple frequency components create complex, realistic wind behavior.<br><br>
+            <strong>Frequency Components:</strong> Each preset uses multiple wind components with different periods (time scales) and wavelengths (spatial scales) to simulate various wind patterns like gusts, steady winds, and large-scale atmospheric variations.<br><br>
+            <strong>Realistic Physics:</strong> Wind flags respond to actual wind speed and direction, with fluttering that increases with wind strength and realistic flag behavior.
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
