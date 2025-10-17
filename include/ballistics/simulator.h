@@ -1,9 +1,9 @@
 #pragma once
 
-#include "physics/atmosphere.h"
 #include "ballistics/bullet.h"
-#include "physics/conversions.h"
 #include "ballistics/trajectory.h"
+#include "physics/atmosphere.h"
+#include "physics/conversions.h"
 #include "physics/vector.h"
 
 namespace btk::ballistics

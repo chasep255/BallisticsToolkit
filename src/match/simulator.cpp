@@ -1,7 +1,7 @@
 #include "match/simulator.h"
+#include "ballistics/simulator.h"
 #include "physics/atmosphere.h"
 #include "physics/conversions.h"
-#include "ballistics/simulator.h"
 #include <algorithm>
 #include <cmath>
 #include <random>
@@ -18,8 +18,8 @@ namespace btk::match
   {
   }
 
-  Simulator::Simulator(const btk::ballistics::Bullet& bullet, double nominal_mv, const btk::match::Target& target, double target_range, const btk::physics::Atmosphere& atmosphere, double mv_sd, double wind_speed_sd,
-                                 double headwind_sd, double updraft_sd, double rifle_accuracy, double timestep)
+  Simulator::Simulator(const btk::ballistics::Bullet& bullet, double nominal_mv, const btk::match::Target& target, double target_range, const btk::physics::Atmosphere& atmosphere, double mv_sd,
+                       double wind_speed_sd, double headwind_sd, double updraft_sd, double rifle_accuracy, double timestep)
     : bullet_(bullet), nominal_mv_(nominal_mv), target_(target), target_range_(target_range), atmosphere_(atmosphere), mv_sd_(mv_sd), wind_speed_sd_(wind_speed_sd), headwind_sd_(headwind_sd),
       updraft_sd_(updraft_sd), rifle_accuracy_(rifle_accuracy), timestep_(timestep), zeroed_bullet_(bullet), rng_(std::random_device{}())
   {
@@ -98,8 +98,8 @@ namespace btk::match
     if(std::isnan(impact_point.getTime()))
     {
       // Shouldn't happen, but handle gracefully
-      SimulatedShot simulatedShot(btk::physics::Conversions::inchesToMeters(999.0), btk::physics::Conversions::inchesToMeters(999.0), 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps, updraft_mps, release_angle_h,
-                                  release_angle_v, 0.0);
+      SimulatedShot simulatedShot(btk::physics::Conversions::inchesToMeters(999.0), btk::physics::Conversions::inchesToMeters(999.0), 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps,
+                                  updraft_mps, release_angle_h, release_angle_v, 0.0);
       shots_.push_back(simulatedShot);
       return simulatedShot;
     }

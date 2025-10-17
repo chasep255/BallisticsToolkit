@@ -2,15 +2,15 @@
 #include <emscripten/val.h>
 
 // Include all our C++ headers
-#include "physics/atmosphere.h"
 #include "ballistics/bullet.h"
-#include "physics/conversions.h"
-#include "match/match.h"
-#include "match/simulator.h"
-#include "match/nra_targets.h"
 #include "ballistics/simulator.h"
-#include "match/target.h"
 #include "ballistics/trajectory.h"
+#include "match/match.h"
+#include "match/nra_targets.h"
+#include "match/simulator.h"
+#include "match/target.h"
+#include "physics/atmosphere.h"
+#include "physics/conversions.h"
 #include "physics/vector.h"
 #include "physics/wind_generator.h"
 
@@ -182,7 +182,10 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   // Removed legacy Hit value_object and AccuracyMetrics/legacy scoring bindings
 
   // NRA Targets
-  class_<btk::match::NRATargets>("NRATargets").class_function("getTarget", &NRATargets::getTarget).class_function("listTargets", &NRATargets::listTargets).class_function("hasTarget", &NRATargets::hasTarget);
+  class_<btk::match::NRATargets>("NRATargets")
+    .class_function("getTarget", &NRATargets::getTarget)
+    .class_function("listTargets", &NRATargets::listTargets)
+    .class_function("hasTarget", &NRATargets::hasTarget);
 
   // SimulatedShot struct
   value_object<SimulatedShot>("SimulatedShot")
@@ -200,7 +203,13 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .field("impactVelocity", &SimulatedShot::impact_velocity);
 
   // Hit class
-  class_<btk::match::Hit>("Hit").constructor<>().constructor<double, double, int, bool>().function("getX", &Hit::getX).function("getY", &Hit::getY).function("getScore", &Hit::getScore).function("isX", &Hit::isX);
+  class_<btk::match::Hit>("Hit")
+    .constructor<>()
+    .constructor<double, double, int, bool>()
+    .function("getX", &Hit::getX)
+    .function("getY", &Hit::getY)
+    .function("getScore", &Hit::getScore)
+    .function("isX", &Hit::isX);
 
   // Match class
   class_<btk::match::Match>("Match")
@@ -246,5 +255,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("setSeed", &WindGenerator::setSeed);
 
   // Wind presets factory
-  class_<btk::physics::WindPresets>("WindPresets").class_function("getPreset", &WindPresets::getPreset).class_function("listPresets", &WindPresets::listPresets).class_function("hasPreset", &WindPresets::hasPreset);
+  class_<btk::physics::WindPresets>("WindPresets")
+    .class_function("getPreset", &WindPresets::getPreset)
+    .class_function("listPresets", &WindPresets::listPresets)
+    .class_function("hasPreset", &WindPresets::hasPreset);
 }

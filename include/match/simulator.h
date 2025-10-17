@@ -1,11 +1,11 @@
 #pragma once
 
-#include "physics/atmosphere.h"
 #include "ballistics/bullet.h"
-#include "physics/conversions.h"
-#include "match/match.h"
 #include "ballistics/simulator.h"
+#include "match/match.h"
 #include "match/target.h"
+#include "physics/atmosphere.h"
+#include "physics/conversions.h"
 #include "physics/vector.h"
 #include <random>
 #include <string>
@@ -67,8 +67,8 @@ namespace btk::match
      * @param rifle_accuracy Rifle/shooter accuracy in rad (angular dispersion diameter)
      * @param timestep Simulation timestep in seconds
      */
-    Simulator(const btk::ballistics::Bullet& bullet, double nominal_mv, const btk::match::Target& target, double target_range, const btk::physics::Atmosphere& atmosphere, double mv_sd, double wind_speed_sd, double headwind_sd,
-                   double updraft_sd, double rifle_accuracy, double timestep = 0.001);
+    Simulator(const btk::ballistics::Bullet& bullet, double nominal_mv, const btk::match::Target& target, double target_range, const btk::physics::Atmosphere& atmosphere, double mv_sd,
+              double wind_speed_sd, double headwind_sd, double updraft_sd, double rifle_accuracy, double timestep = 0.001);
 
     /**
      * @brief Fire a single shot with variability

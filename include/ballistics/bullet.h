@@ -152,7 +152,7 @@ namespace btk::ballistics
     // Flight state (only valid if has_flight_state_ is true)
     btk::physics::Vector3D position_; // m
     btk::physics::Vector3D velocity_; // m/s
-    double spin_rate_;  // rad/s
+    double spin_rate_;                // rad/s
     bool has_flight_state_;
   };
 
