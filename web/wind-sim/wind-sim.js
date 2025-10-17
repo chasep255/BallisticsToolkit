@@ -50,11 +50,15 @@ const state = {
   elapsed: 0
 };
 
-async function init()
+function init()
 {
   try
   {
-    btk = await BallisticsToolkit();
+    btk = window.btk;
+    if (!btk) {
+      console.error('BallisticsToolkit not available');
+      return;
+    }
     setupUI();
     setupGL();
     resizeCanvases();
@@ -66,7 +70,7 @@ async function init()
   }
   catch (e)
   {
-    console.error('Failed to load WASM:', e);
+    console.error('Failed to initialize:', e);
   }
 }
 
@@ -556,4 +560,5 @@ function drawFrame()
   }
 }
 
-window.addEventListener('load', init);
+// Wait for BallisticsToolkit to be ready
+document.addEventListener('btk-ready', init);

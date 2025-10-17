@@ -39,15 +39,19 @@ class TargetSimulator
     this.init();
   }
 
-  async init()
+  init()
   {
     try
     {
       // Show loading
       document.getElementById('loading').classList.add('show');
 
-      // Initialize WebAssembly module
-      this.btk = await BallisticsToolkit();
+      // Get WebAssembly module from window
+      this.btk = window.btk;
+      if (!this.btk) {
+        console.error('BallisticsToolkit not available');
+        return;
+      }
 
       // Hide loading
       document.getElementById('loading').classList.remove('show');
@@ -824,5 +828,8 @@ class TargetSimulator
 // Initialize the application when the page loads
 document.addEventListener('DOMContentLoaded', () =>
 {
-  window.targetSimulator = new TargetSimulator();
+  // Wait for BallisticsToolkit to be ready
+  document.addEventListener('btk-ready', () => {
+    window.targetSimulator = new TargetSimulator();
+  });
 });

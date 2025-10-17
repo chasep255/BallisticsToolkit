@@ -112,15 +112,19 @@
 
     </div>
 
-    <script src="../ballistics_wasm.js"></script>
+    <script src="../ballistics_toolkit.js"></script>
     <script src="ballistic-calc.js"></script>
     <script>
         let ballisticsCalculator = null;
 
         // Initialize WebAssembly module
-        async function initBallisticsCalculator() {
+        function initBallisticsCalculator() {
             try {
-                const btk = await BallisticsToolkit();
+                const btk = window.btk;
+                if (!btk) {
+                    console.error('BallisticsToolkit not available');
+                    return;
+                }
                 ballisticsCalculator = new BallisticsCalculator(btk);
                 console.log('BallisticsCalculator WebAssembly module loaded successfully');
                 
@@ -273,9 +277,7 @@
 
 
         // Initialize when page loads
-        window.addEventListener('load', function() {
-            initBallisticsCalculator();
-        });
+        document.addEventListener('btk-ready', initBallisticsCalculator);
 
     </script>
 
