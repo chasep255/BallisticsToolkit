@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-namespace btk::ballistics
+namespace btk::physics
 {
 
   /**
@@ -246,4 +246,4 @@ namespace btk::ballistics
     static constexpr double radiansPerSecondToHertz(double radps) { return radps / (2.0 * M_PI); }
   };
 
-} // namespace btk::ballistics
+} // namespace btk::physics

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "conversions.h"
-#include "vector.h"
+#include "physics/conversions.h"
+#include "physics/vector.h"
 #include <memory>
 
-namespace btk::ballistics
+namespace btk::physics
 {
 
   /**
@@ -70,4 +70,4 @@ namespace btk::ballistics
     double calculateStandardPressure(double altitude) const; // altitude in m, returns Pa
   };
 
-} // namespace btk::ballistics
+} // namespace btk::physics

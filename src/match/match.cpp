@@ -1,14 +1,14 @@
-#include "match.h"
+#include "match/match.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
-namespace btk::ballistics
+namespace btk::match
 {
 
   // Match implementation
 
-  const Hit& Match::addHit(double x, double y, const Target& target, double bullet_diameter)
+  const Hit& Match::addHit(double x, double y, const btk::match::Target& target, double bullet_diameter)
   {
     bool isX = target.isXRing(x, y, bullet_diameter);
     int score = target.scoreHit(x, y, bullet_diameter);
@@ -111,4 +111,4 @@ namespace btk::ballistics
 
   int Match::getHitCount() const { return hits_.size(); }
 
-} // namespace btk::ballistics
+} // namespace btk::match

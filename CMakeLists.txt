@@ -22,22 +22,13 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s MODULARIZE=1")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORT_NAME='BallisticsToolkit'")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s DISABLE_EXCEPTION_CATCHING=0")
 # WebAssembly executable with embind
-add_executable(ballistics_wasm
-    src/bindings.cpp
-    src/atmosphere.cpp
-    src/trajectory.cpp
-    src/simulator.cpp
-    src/target.cpp
-    src/match.cpp
-    src/nra_targets.cpp
-    src/match_simulator.cpp
-    src/wind_generator.cpp
-)
+file(GLOB_RECURSE SOURCES "src/*.cpp")
+add_executable(ballistics_wasm ${SOURCES})
 
 # Link embind library
 target_link_libraries(ballistics_wasm embind)
 
-target_include_directories(ballistics_wasm PRIVATE include)
+target_include_directories(ballistics_wasm PRIVATE include include/ballistics include/match include/physics)
 
 # Copy web files to build/web directory
 # Create a custom target for web files that always runs

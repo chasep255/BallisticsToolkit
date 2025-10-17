@@ -2,77 +2,79 @@
 #include <emscripten/val.h>
 
 // Include all our C++ headers
-#include "atmosphere.h"
-#include "bullet.h"
-#include "conversions.h"
-#include "match.h"
-#include "match_simulator.h"
-#include "nra_targets.h"
-#include "simulator.h"
-#include "target.h"
-#include "trajectory.h"
-#include "vector.h"
-#include "wind_generator.h"
+#include "physics/atmosphere.h"
+#include "ballistics/bullet.h"
+#include "physics/conversions.h"
+#include "match/match.h"
+#include "match/simulator.h"
+#include "match/nra_targets.h"
+#include "ballistics/simulator.h"
+#include "match/target.h"
+#include "ballistics/trajectory.h"
+#include "physics/vector.h"
+#include "physics/wind_generator.h"
 
 using namespace emscripten;
 using namespace btk::ballistics;
+using namespace btk::match;
+using namespace btk::physics;
 
 // No wrapper needed - direct methods are JavaScript-friendly
 
 EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 {
   // Conversions class - provides all unit conversion functions
-  class_<Conversions>("Conversions")
+  class_<btk::physics::Conversions>("Conversions")
     // Distance conversions
-    .class_function("feetToMeters", &Conversions::feetToMeters)
-    .class_function("metersToFeet", &Conversions::metersToFeet)
-    .class_function("inchesToMeters", &Conversions::inchesToMeters)
-    .class_function("metersToInches", &Conversions::metersToInches)
-    .class_function("yardsToMeters", &Conversions::yardsToMeters)
-    .class_function("metersToYards", &Conversions::metersToYards)
+    .class_function("feetToMeters", &btk::physics::Conversions::feetToMeters)
+    .class_function("metersToFeet", &btk::physics::Conversions::metersToFeet)
+    .class_function("inchesToMeters", &btk::physics::Conversions::inchesToMeters)
+    .class_function("metersToInches", &btk::physics::Conversions::metersToInches)
+    .class_function("yardsToMeters", &btk::physics::Conversions::yardsToMeters)
+    .class_function("metersToYards", &btk::physics::Conversions::metersToYards)
     // Weight conversions
-    .class_function("grainsToKg", &Conversions::grainsToKg)
-    .class_function("kgToGrains", &Conversions::kgToGrains)
-    .class_function("poundsToKg", &Conversions::poundsToKg)
-    .class_function("kgToPounds", &Conversions::kgToPounds)
+    .class_function("grainsToKg", &btk::physics::Conversions::grainsToKg)
+    .class_function("kgToGrains", &btk::physics::Conversions::kgToGrains)
+    .class_function("poundsToKg", &btk::physics::Conversions::poundsToKg)
+    .class_function("kgToPounds", &btk::physics::Conversions::kgToPounds)
     // Velocity conversions
-    .class_function("fpsToMps", &Conversions::fpsToMps)
-    .class_function("mpsToFps", &Conversions::mpsToFps)
-    .class_function("mphToMps", &Conversions::mphToMps)
-    .class_function("mpsToMph", &Conversions::mpsToMph)
+    .class_function("fpsToMps", &btk::physics::Conversions::fpsToMps)
+    .class_function("mpsToFps", &btk::physics::Conversions::mpsToFps)
+    .class_function("mphToMps", &btk::physics::Conversions::mphToMps)
+    .class_function("mpsToMph", &btk::physics::Conversions::mpsToMph)
     // Temperature conversions
-    .class_function("fahrenheitToKelvin", &Conversions::fahrenheitToKelvin)
-    .class_function("kelvinToFahrenheit", &Conversions::kelvinToFahrenheit)
-    .class_function("celsiusToKelvin", &Conversions::celsiusToKelvin)
-    .class_function("kelvinToCelsius", &Conversions::kelvinToCelsius)
+    .class_function("fahrenheitToKelvin", &btk::physics::Conversions::fahrenheitToKelvin)
+    .class_function("kelvinToFahrenheit", &btk::physics::Conversions::kelvinToFahrenheit)
+    .class_function("celsiusToKelvin", &btk::physics::Conversions::celsiusToKelvin)
+    .class_function("kelvinToCelsius", &btk::physics::Conversions::kelvinToCelsius)
     // Angle conversions
-    .class_function("degreesToRadians", &Conversions::degreesToRadians)
-    .class_function("radiansToDegrees", &Conversions::radiansToDegrees)
-    .class_function("moaToRadians", &Conversions::moaToRadians)
-    .class_function("radiansToMoa", &Conversions::radiansToMoa)
-    .class_function("mradToRadians", &Conversions::mradToRadians)
-    .class_function("radiansToMrad", &Conversions::radiansToMrad)
-    .class_function("oclockToRadians", &Conversions::oclockToRadians)
-    .class_function("radiansToOclock", &Conversions::radiansToOclock)
+    .class_function("degreesToRadians", &btk::physics::Conversions::degreesToRadians)
+    .class_function("radiansToDegrees", &btk::physics::Conversions::radiansToDegrees)
+    .class_function("moaToRadians", &btk::physics::Conversions::moaToRadians)
+    .class_function("radiansToMoa", &btk::physics::Conversions::radiansToMoa)
+    .class_function("mradToRadians", &btk::physics::Conversions::mradToRadians)
+    .class_function("radiansToMrad", &btk::physics::Conversions::radiansToMrad)
+    .class_function("oclockToRadians", &btk::physics::Conversions::oclockToRadians)
+    .class_function("radiansToOclock", &btk::physics::Conversions::radiansToOclock)
     // Pressure conversions
-    .class_function("psiToPascals", &Conversions::psiToPascals)
-    .class_function("pascalsToPsi", &Conversions::pascalsToPsi)
-    .class_function("inHgToPascals", &Conversions::inHgToPascals)
-    .class_function("pascalsToInHg", &Conversions::pascalsToInHg)
+    .class_function("psiToPascals", &btk::physics::Conversions::psiToPascals)
+    .class_function("pascalsToPsi", &btk::physics::Conversions::pascalsToPsi)
+    .class_function("inHgToPascals", &btk::physics::Conversions::inHgToPascals)
+    .class_function("pascalsToInHg", &btk::physics::Conversions::pascalsToInHg)
     // Energy conversions
-    .class_function("footPoundsToJoules", &Conversions::footPoundsToJoules)
-    .class_function("joulesToFootPounds", &Conversions::joulesToFootPounds)
-    .class_function("kilowattHoursToJoules", &Conversions::kilowattHoursToJoules)
-    .class_function("joulesToKilowattHours", &Conversions::joulesToKilowattHours)
-    .class_function("caloriesToJoules", &Conversions::caloriesToJoules)
-    .class_function("joulesToCalories", &Conversions::joulesToCalories)
-    .class_function("kilocaloriesToJoules", &Conversions::kilocaloriesToJoules)
-    .class_function("joulesToKilocalories", &Conversions::joulesToKilocalories)
-    .class_function("btuToJoules", &Conversions::btuToJoules)
-    .class_function("joulesToBtu", &Conversions::joulesToBtu);
+    .class_function("footPoundsToJoules", &btk::physics::Conversions::footPoundsToJoules)
+    .class_function("joulesToFootPounds", &btk::physics::Conversions::joulesToFootPounds)
+    .class_function("kilowattHoursToJoules", &btk::physics::Conversions::kilowattHoursToJoules)
+    .class_function("joulesToKilowattHours", &btk::physics::Conversions::joulesToKilowattHours)
+    .class_function("caloriesToJoules", &btk::physics::Conversions::caloriesToJoules)
+    .class_function("joulesToCalories", &btk::physics::Conversions::joulesToCalories)
+    .class_function("kilocaloriesToJoules", &btk::physics::Conversions::kilocaloriesToJoules)
+    .class_function("joulesToKilocalories", &btk::physics::Conversions::joulesToKilocalories)
+    .class_function("btuToJoules", &btk::physics::Conversions::btuToJoules)
+    .class_function("joulesToBtu", &btk::physics::Conversions::joulesToBtu);
 
   // 3D Vector types
-  class_<Vector3D>("Vector3D")
+  class_<btk::physics::Vector3D>("Vector3D")
     .constructor<double, double, double>()
     .property("x", &Vector3D::x)
     .property("y", &Vector3D::y)
@@ -83,7 +85,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("cross", &Vector3D::cross)
     .function("lerp", &Vector3D::lerp);
 
-  class_<Vector2D>("Vector2D")
+  class_<btk::physics::Vector2D>("Vector2D")
     .constructor<double, double>()
     .property("x", &Vector2D::x)
     .property("y", &Vector2D::y)
@@ -95,7 +97,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   // Bullet class
   enum_<DragFunction>("DragFunction").value("G1", DragFunction::G1).value("G7", DragFunction::G7);
 
-  class_<Bullet>("Bullet")
+  class_<btk::ballistics::Bullet>("Bullet")
     .constructor<double, double, double, double, DragFunction>()
     .constructor<const Bullet&, const Vector3D&, const Vector3D&, double>()
     .function("getWeight", &Bullet::getWeight)
@@ -114,7 +116,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .class_function("computeSpinRateFromTwist", &Bullet::computeSpinRateFromTwist);
 
   // Atmosphere class
-  class_<Atmosphere>("Atmosphere")
+  class_<btk::physics::Atmosphere>("Atmosphere")
     .constructor<>()
     .constructor<double, double, double, double>()
     .function("getTemperature", &Atmosphere::getTemperature)
@@ -127,7 +129,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .class_function("atAltitude", &Atmosphere::atAltitude);
 
   // TrajectoryPoint class
-  class_<TrajectoryPoint>("TrajectoryPoint")
+  class_<btk::ballistics::TrajectoryPoint>("TrajectoryPoint")
     .constructor<double, Bullet>()
     .function("getTime", &TrajectoryPoint::getTime)
     .function("getState", &TrajectoryPoint::getState)
@@ -136,7 +138,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getKineticEnergy", &TrajectoryPoint::getKineticEnergy);
 
   // Trajectory class
-  class_<Trajectory>("Trajectory")
+  class_<btk::ballistics::Trajectory>("Trajectory")
     .constructor<>()
     .function("addPoint", &Trajectory::addPoint)
     .function("getPoint", &Trajectory::getPoint)
@@ -150,23 +152,23 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getImpactAngle", &Trajectory::getImpactAngle)
     .function("clear", &Trajectory::clear);
 
-  // Simulator class
-  class_<Simulator>("Simulator")
+  // Ballistics Simulator class
+  class_<btk::ballistics::Simulator>("BallisticsSimulator")
     .constructor<>()
-    .function("setInitialBullet", &Simulator::setInitialBullet)
-    .function("setAtmosphere", &Simulator::setAtmosphere)
-    .function("setWind", &Simulator::setWind)
-    .function("getInitialBullet", &Simulator::getInitialBullet)
-    .function("getCurrentBullet", &Simulator::getCurrentBullet)
-    .function("getAtmosphere", &Simulator::getAtmosphere)
-    .function("getWind", &Simulator::getWind)
-    .function("resetToInitial", &Simulator::resetToInitial)
-    .function("computeZero", &Simulator::computeZero)
-    .function("simulate", &Simulator::simulate)
-    .function("timeStep", &Simulator::timeStep);
+    .function("setInitialBullet", &btk::ballistics::Simulator::setInitialBullet)
+    .function("setAtmosphere", &btk::ballistics::Simulator::setAtmosphere)
+    .function("setWind", &btk::ballistics::Simulator::setWind)
+    .function("getInitialBullet", &btk::ballistics::Simulator::getInitialBullet)
+    .function("getCurrentBullet", &btk::ballistics::Simulator::getCurrentBullet)
+    .function("getAtmosphere", &btk::ballistics::Simulator::getAtmosphere)
+    .function("getWind", &btk::ballistics::Simulator::getWind)
+    .function("resetToInitial", &btk::ballistics::Simulator::resetToInitial)
+    .function("computeZero", &btk::ballistics::Simulator::computeZero)
+    .function("simulate", &btk::ballistics::Simulator::simulate)
+    .function("timeStep", &btk::ballistics::Simulator::timeStep);
 
   // Target class
-  class_<Target>("Target")
+  class_<btk::match::Target>("Target")
     .constructor<const std::string&, double, double, double, double, double, double, double, const std::string&>()
     .function("getName", &Target::getName)
     .function("getDescription", &Target::getDescription)
@@ -180,7 +182,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   // Removed legacy Hit value_object and AccuracyMetrics/legacy scoring bindings
 
   // NRA Targets
-  class_<NRATargets>("NRATargets").class_function("getTarget", &NRATargets::getTarget).class_function("listTargets", &NRATargets::listTargets).class_function("hasTarget", &NRATargets::hasTarget);
+  class_<btk::match::NRATargets>("NRATargets").class_function("getTarget", &NRATargets::getTarget).class_function("listTargets", &NRATargets::listTargets).class_function("hasTarget", &NRATargets::hasTarget);
 
   // SimulatedShot struct
   value_object<SimulatedShot>("SimulatedShot")
@@ -198,10 +200,10 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .field("impactVelocity", &SimulatedShot::impact_velocity);
 
   // Hit class
-  class_<Hit>("Hit").constructor<>().constructor<double, double, int, bool>().function("getX", &Hit::getX).function("getY", &Hit::getY).function("getScore", &Hit::getScore).function("isX", &Hit::isX);
+  class_<btk::match::Hit>("Hit").constructor<>().constructor<double, double, int, bool>().function("getX", &Hit::getX).function("getY", &Hit::getY).function("getScore", &Hit::getScore).function("isX", &Hit::isX);
 
   // Match class
-  class_<Match>("Match")
+  class_<btk::match::Match>("Match")
     .constructor<>()
     .function("addHit", &Match::addHit)
     .function("getHits", &Match::getHits)
@@ -215,18 +217,18 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getXCount", &Match::getXCount)
     .function("getHitCount", &Match::getHitCount);
 
-  // MatchSimulator class
-  class_<MatchSimulator>("MatchSimulator")
-    .constructor<const Bullet&, double, const Target&, double, const Atmosphere&, double, double, double, double, double, double>()
-    .function("fireShot", &MatchSimulator::fireShot)
-    .function("getMatch", &MatchSimulator::getMatch)
-    .function("clearShots", &MatchSimulator::clearShots)
-    .function("getShotCount", &MatchSimulator::getShotCount)
-    .function("getTarget", &MatchSimulator::getTarget)
-    .function("getBullet", &MatchSimulator::getBullet)
-    .function("getBulletDiameter", &MatchSimulator::getBulletDiameter)
-    .function("getShots", &MatchSimulator::getShots)
-    .function("getShot", &MatchSimulator::getShot);
+  // Match Simulator class (in match namespace)
+  class_<btk::match::Simulator>("MatchSimulator")
+    .constructor<const btk::ballistics::Bullet&, double, const btk::match::Target&, double, const btk::physics::Atmosphere&, double, double, double, double, double, double>()
+    .function("fireShot", &btk::match::Simulator::fireShot)
+    .function("getMatch", &btk::match::Simulator::getMatch)
+    .function("clearShots", &btk::match::Simulator::clearShots)
+    .function("getShotCount", &btk::match::Simulator::getShotCount)
+    .function("getTarget", &btk::match::Simulator::getTarget)
+    .function("getBullet", &btk::match::Simulator::getBullet)
+    .function("getBulletDiameter", &btk::match::Simulator::getBulletDiameter)
+    .function("getShots", &btk::match::Simulator::getShots)
+    .function("getShot", &btk::match::Simulator::getShot);
 
   // Register value arrays for easier JavaScript usage
   register_vector<TrajectoryPoint>("TrajectoryPointVector");
@@ -237,12 +239,12 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   // No RingInfo struct needed - direct methods are cleaner
 
   // Wind generator class
-  class_<WindGenerator>("WindGenerator")
+  class_<btk::physics::WindGenerator>("WindGenerator")
     .constructor<uint32_t>()
     .function("sample", select_overload<Vector3D(double, double) const>(&WindGenerator::operator()))
     .function("addWindComponent", &WindGenerator::addWindComponent)
     .function("setSeed", &WindGenerator::setSeed);
 
   // Wind presets factory
-  class_<WindPresets>("WindPresets").class_function("getPreset", &WindPresets::getPreset).class_function("listPresets", &WindPresets::listPresets).class_function("hasPreset", &WindPresets::hasPreset);
+  class_<btk::physics::WindPresets>("WindPresets").class_function("getPreset", &WindPresets::getPreset).class_function("listPresets", &WindPresets::listPresets).class_function("hasPreset", &WindPresets::hasPreset);
 }

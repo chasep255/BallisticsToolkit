@@ -1,17 +1,17 @@
 #pragma once
 
-#include "atmosphere.h"
-#include "bullet.h"
-#include "conversions.h"
-#include "match.h"
-#include "simulator.h"
-#include "target.h"
-#include "vector.h"
+#include "physics/atmosphere.h"
+#include "ballistics/bullet.h"
+#include "physics/conversions.h"
+#include "match/match.h"
+#include "ballistics/simulator.h"
+#include "match/target.h"
+#include "physics/vector.h"
 #include <random>
 #include <string>
 #include <vector>
 
-namespace btk::ballistics
+namespace btk::match
 {
 
   /**
@@ -49,7 +49,7 @@ namespace btk::ballistics
    * - Reuses the zeroed initial state for all shots
    * - Tracks all shots and can compute statistics on demand
    */
-  class MatchSimulator
+  class Simulator
   {
     public:
     /**
@@ -67,7 +67,7 @@ namespace btk::ballistics
      * @param rifle_accuracy Rifle/shooter accuracy in rad (angular dispersion diameter)
      * @param timestep Simulation timestep in seconds
      */
-    MatchSimulator(const Bullet& bullet, double nominal_mv, const Target& target, double target_range, const Atmosphere& atmosphere, double mv_sd, double wind_speed_sd, double headwind_sd,
+    Simulator(const btk::ballistics::Bullet& bullet, double nominal_mv, const btk::match::Target& target, double target_range, const btk::physics::Atmosphere& atmosphere, double mv_sd, double wind_speed_sd, double headwind_sd,
                    double updraft_sd, double rifle_accuracy, double timestep = 0.001);
 
     /**
@@ -97,12 +97,12 @@ namespace btk::ballistics
     /**
      * @brief Get the target for this match
      */
-    const Target& getTarget() const { return target_; }
+    const btk::match::Target& getTarget() const { return target_; }
 
     /**
      * @brief Get the bullet for this match
      */
-    const Bullet& getBullet() const { return bullet_; }
+    const btk::ballistics::Bullet& getBullet() const { return bullet_; }
 
     /**
      * @brief Get the bullet diameter
@@ -123,11 +123,11 @@ namespace btk::ballistics
     const SimulatedShot& getShot(size_t index) const { return shots_[index]; }
 
     private:
-    Bullet bullet_;
+    btk::ballistics::Bullet bullet_;
     double nominal_mv_; // m/s
-    Target target_;
+    btk::match::Target target_;
     double target_range_; // m
-    Atmosphere atmosphere_;
+    btk::physics::Atmosphere atmosphere_;
     double mv_sd_;          // m/s
     double wind_speed_sd_;  // m/s
     double headwind_sd_;    // m/s
@@ -136,10 +136,10 @@ namespace btk::ballistics
     double timestep_;       // s
 
     // Simulator for trajectory calculations
-    Simulator simulator_;
+    btk::ballistics::Simulator simulator_;
 
     // Cached zeroed bullet (original zeroed state)
-    Bullet zeroed_bullet_;
+    btk::ballistics::Bullet zeroed_bullet_;
 
     // Track all shots using Match class
     Match match_;
@@ -151,4 +151,4 @@ namespace btk::ballistics
     mutable std::mt19937 rng_;
   };
 
-} // namespace btk::ballistics
+} // namespace btk::match

@@ -1,14 +1,14 @@
-#include "wind_generator.h"
+#include "physics/wind_generator.h"
 #include <stdexcept>
 
-namespace btk::ballistics
+namespace btk::physics
 {
 
   // ----------- WindGenerator --------------------------------------------------
 
   WindGenerator::WindGenerator(uint32_t seed) : seed_(seed), next_component_seed_(seed + 10000) {}
 
-  Vector3D WindGenerator::operator()(double x_m, double t_s) const
+  btk::physics::Vector3D WindGenerator::operator()(double x_m, double t_s) const
   {
     double total_crosswind = 0.0; // Left/right component
     double total_headwind = 0.0;  // Forward/backward component
@@ -37,7 +37,7 @@ namespace btk::ballistics
       total_headwind += headwind * component.amplitude_scale_;
     }
 
-    return Vector3D(total_headwind, total_crosswind, 0.0);
+    return btk::physics::Vector3D(total_headwind, total_crosswind, 0.0);
   }
 
   void WindGenerator::addWindComponent(double amplitude_scale, double period_s, double wavelength_m, double exponent)
@@ -172,4 +172,4 @@ namespace btk::ballistics
     return presets_.find(name) != presets_.end();
   }
 
-} // namespace btk::ballistics
+} // namespace btk::physics

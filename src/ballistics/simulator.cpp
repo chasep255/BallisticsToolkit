@@ -1,6 +1,6 @@
-#include "simulator.h"
-#include "constants.h"
-#include "conversions.h"
+#include "ballistics/simulator.h"
+#include "ballistics/constants.h"
+#include "physics/conversions.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -75,9 +75,9 @@ namespace btk::ballistics
   // Calculate drag retardation for a specific bullet state
   double Simulator::calculateDragRetardationFor(const Bullet& s) const
   {
-    Vector3D v_rel = s.getVelocity() - wind_;
+    btk::physics::Vector3D v_rel = s.getVelocity() - wind_;
     double v_rel_mag = v_rel.magnitude();
-    double v_fps = Conversions::mpsToFps(v_rel_mag); // use AIR-RELATIVE speed
+    double v_fps = btk::physics::Conversions::mpsToFps(v_rel_mag); // use AIR-RELATIVE speed
 
     auto [a, m] = findDragCoefficients(v_fps, s.getDragFunction());
     if(a <= 0.0 || m <= 0.0)
@@ -85,21 +85,21 @@ namespace btk::ballistics
 
     double density_ratio = atmosphere_.getAirDensity() / Constants::AIR_DENSITY_STANDARD;
     double ret_fps_s = a * std::pow(v_fps, m) * density_ratio / s.getBc();
-    return Conversions::fpsToMps(ret_fps_s);
+    return btk::physics::Conversions::fpsToMps(ret_fps_s);
   }
 
   // Calculate acceleration for a specific bullet state
-  Vector3D Simulator::calculateAccelerationFor(const Bullet& s) const
+  btk::physics::Vector3D Simulator::calculateAccelerationFor(const Bullet& s) const
   {
-    Vector3D v_rel = s.getVelocity() - wind_;
+    btk::physics::Vector3D v_rel = s.getVelocity() - wind_;
     double v_rel_mag = v_rel.magnitude();
 
-    Vector3D gravity(0.0, 0.0, -Constants::GRAVITY);
+    btk::physics::Vector3D gravity(0.0, 0.0, -Constants::GRAVITY);
     if(v_rel_mag <= 0.0)
       return gravity;
 
     double drag_ret = calculateDragRetardationFor(s);
-    Vector3D drag_accel = -drag_ret * (v_rel / v_rel_mag);
+    btk::physics::Vector3D drag_accel = -drag_ret * (v_rel / v_rel_mag);
     return drag_accel + gravity;
   }
 
@@ -110,18 +110,18 @@ namespace btk::ballistics
     resetToInitial();
   }
 
-  void Simulator::setAtmosphere(const Atmosphere& atmosphere) { atmosphere_ = atmosphere; }
+  void Simulator::setAtmosphere(const btk::physics::Atmosphere& atmosphere) { atmosphere_ = atmosphere; }
 
-  void Simulator::setWind(const Vector3D& wind) { wind_ = wind; }
+  void Simulator::setWind(const btk::physics::Vector3D& wind) { wind_ = wind; }
 
   // Getters
   const Bullet& Simulator::getInitialBullet() const { return initial_bullet_; }
 
   const Bullet& Simulator::getCurrentBullet() const { return current_bullet_; }
 
-  const Atmosphere& Simulator::getAtmosphere() const { return atmosphere_; }
+  const btk::physics::Atmosphere& Simulator::getAtmosphere() const { return atmosphere_; }
 
-  const Vector3D& Simulator::getWind() const { return wind_; }
+  const btk::physics::Vector3D& Simulator::getWind() const { return wind_; }
 
   // State management
   void Simulator::resetToInitial()
@@ -140,10 +140,10 @@ namespace btk::ballistics
     for(int i = 0; i < max_iterations; ++i)
     {
       // Create initial velocity vector with elevation angle
-      Vector3D velocity_init(muzzle_velocity * std::cos(best_angle), 0.0, muzzle_velocity * std::sin(best_angle));
+      btk::physics::Vector3D velocity_init(muzzle_velocity * std::cos(best_angle), 0.0, muzzle_velocity * std::sin(best_angle));
 
       // Start at bore height (z=0)
-      Vector3D position_init(0.0, 0.0, 0.0);
+      btk::physics::Vector3D position_init(0.0, 0.0, 0.0);
       Bullet test_state(initial_bullet_, position_init, velocity_init, spin_rate);
 
       // Simulate slightly past zero range to ensure we can interpolate
@@ -176,8 +176,8 @@ namespace btk::ballistics
     }
 
     // Create final initial state at bore height (z=0)
-    Vector3D velocity_final(muzzle_velocity * std::cos(best_angle), 0.0, muzzle_velocity * std::sin(best_angle));
-    Vector3D position_final(0.0, 0.0, 0.0);
+    btk::physics::Vector3D velocity_final(muzzle_velocity * std::cos(best_angle), 0.0, muzzle_velocity * std::sin(best_angle));
+    btk::physics::Vector3D position_final(0.0, 0.0, 0.0);
     Bullet initial_state(initial_bullet_, position_final, velocity_final, spin_rate);
 
     // Update initial bullet with zeroed state
@@ -212,15 +212,15 @@ namespace btk::ballistics
   {
     const Bullet s0 = current_bullet_;
 
-    Vector3D a0 = calculateAccelerationFor(s0);
-    Vector3D vHalf = s0.getVelocity() + a0 * (0.5 * dt);
-    Vector3D xHalf = s0.getPosition() + vHalf * (0.5 * dt);
+    btk::physics::Vector3D a0 = calculateAccelerationFor(s0);
+    btk::physics::Vector3D vHalf = s0.getVelocity() + a0 * (0.5 * dt);
+    btk::physics::Vector3D xHalf = s0.getPosition() + vHalf * (0.5 * dt);
 
     Bullet sHalf(s0, xHalf, vHalf, s0.getSpinRate());
-    Vector3D aHalf = calculateAccelerationFor(sHalf);
+    btk::physics::Vector3D aHalf = calculateAccelerationFor(sHalf);
 
-    Vector3D v1 = s0.getVelocity() + aHalf * dt;
-    Vector3D x1 = s0.getPosition() + vHalf * dt; // RK2 uses midpoint velocity for position
+    btk::physics::Vector3D v1 = s0.getVelocity() + aHalf * dt;
+    btk::physics::Vector3D x1 = s0.getPosition() + vHalf * dt; // RK2 uses midpoint velocity for position
 
     current_bullet_ = Bullet(s0, x1, v1, s0.getSpinRate());
     current_time_ += dt;

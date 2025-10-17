@@ -1,12 +1,12 @@
-#include "target.h"
-#include "conversions.h"
+#include "match/target.h"
+#include "physics/conversions.h"
 #include <iomanip>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
 
-namespace btk::ballistics
+namespace btk::match
 {
 
   Target::Target(const std::string& name, double ring_10, double ring_9, double ring_8, double ring_7, double ring_6, double ring_5, double x_ring, const std::string& description)
@@ -53,4 +53,4 @@ namespace btk::ballistics
 
   double Target::getRingOuterDiameter(int ring) const { return ringDiameter(ring); }
 
-} // namespace btk::ballistics
+} // namespace btk::match

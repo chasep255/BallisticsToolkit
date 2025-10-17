@@ -6,7 +6,7 @@ class BallisticsCalculator
   constructor(btk)
   {
     this.btk = btk;
-    this.simulator = new btk.Simulator();
+    this.simulator = new btk.BallisticsSimulator();
   }
 
   /**

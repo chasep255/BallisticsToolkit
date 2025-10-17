@@ -1,8 +1,8 @@
 #pragma once
 
-#include "constants.h"
-#include "conversions.h"
-#include "vector.h"
+#include "ballistics/constants.h"
+#include "physics/conversions.h"
+#include "physics/vector.h"
 #include <cmath>
 #include <string>
 #include <tuple>
@@ -52,7 +52,7 @@ namespace btk::ballistics
      * @param velocity 3D velocity vector in m/s
      * @param spin_rate Spin rate around the velocity vector in rad/s (for Magnus effects)
      */
-    constexpr Bullet(const Bullet& bullet, const Vector3D& position, const Vector3D& velocity, double spin_rate)
+    constexpr Bullet(const Bullet& bullet, const btk::physics::Vector3D& position, const btk::physics::Vector3D& velocity, double spin_rate)
       : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_), drag_function_(bullet.drag_function_), position_(position), velocity_(velocity),
         spin_rate_(spin_rate), has_flight_state_(true)
     {
@@ -93,8 +93,8 @@ namespace btk::ballistics
     // Flight state methods (only valid if has_flight_state_ is true)
     constexpr bool hasFlightState() const { return has_flight_state_; }
 
-    constexpr const Vector3D& getPosition() const { return position_; } // m
-    constexpr const Vector3D& getVelocity() const { return velocity_; } // m/s
+    constexpr const btk::physics::Vector3D& getPosition() const { return position_; } // m
+    constexpr const btk::physics::Vector3D& getVelocity() const { return velocity_; } // m/s
 
     // Individual component getters (for compatibility)
     constexpr double getPositionX() const { return position_.x; } // m
@@ -150,8 +150,8 @@ namespace btk::ballistics
     DragFunction drag_function_;
 
     // Flight state (only valid if has_flight_state_ is true)
-    Vector3D position_; // m
-    Vector3D velocity_; // m/s
+    btk::physics::Vector3D position_; // m
+    btk::physics::Vector3D velocity_; // m/s
     double spin_rate_;  // rad/s
     bool has_flight_state_;
   };

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "target.h"
+#include "match/target.h"
 #include <map>
 #include <string>
 #include <vector>
 
-namespace btk::ballistics
+namespace btk::match
 {
 
   /**
@@ -23,7 +23,7 @@ namespace btk::ballistics
      * @return Target object
      * @throws std::invalid_argument if target not found
      */
-    static Target getTarget(const std::string& name);
+    static btk::match::Target getTarget(const std::string& name);
 
     /**
      * @brief List all available target names
@@ -41,8 +41,8 @@ namespace btk::ballistics
     static bool hasTarget(const std::string& name);
 
     private:
-    static std::map<std::string, Target> targets_;
+    static std::map<std::string, btk::match::Target> targets_;
     static void initializeTargets();
   };
 
-} // namespace btk::ballistics
+} // namespace btk::match

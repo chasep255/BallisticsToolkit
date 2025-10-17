@@ -1,10 +1,10 @@
 #pragma once
 
-#include "atmosphere.h"
-#include "bullet.h"
-#include "conversions.h"
-#include "trajectory.h"
-#include "vector.h"
+#include "physics/atmosphere.h"
+#include "ballistics/bullet.h"
+#include "physics/conversions.h"
+#include "ballistics/trajectory.h"
+#include "physics/vector.h"
 
 namespace btk::ballistics
 {
@@ -51,14 +51,14 @@ namespace btk::ballistics
      *
      * @param atmosphere Atmosphere object with temperature, altitude, humidity, and pressure
      */
-    void setAtmosphere(const Atmosphere& atmosphere);
+    void setAtmosphere(const btk::physics::Atmosphere& atmosphere);
 
     /**
      * @brief Set wind conditions
      *
      * @param wind Wind vector in Cartesian coordinates (x=downrange m/s, y=crossrange m/s, z=vertical m/s)
      */
-    void setWind(const Vector3D& wind);
+    void setWind(const btk::physics::Vector3D& wind);
 
     // Getters
     /**
@@ -80,14 +80,14 @@ namespace btk::ballistics
      *
      * @return Reference to the current atmosphere object
      */
-    const Atmosphere& getAtmosphere() const;
+    const btk::physics::Atmosphere& getAtmosphere() const;
 
     /**
      * @brief Get wind conditions
      *
      * @return Reference to the current wind vector
      */
-    const Vector3D& getWind() const;
+    const btk::physics::Vector3D& getWind() const;
 
     // State management
     /**
@@ -153,13 +153,13 @@ namespace btk::ballistics
     private:
     // Physics helpers
     double calculateDragRetardationFor(const Bullet& s) const;
-    Vector3D calculateAccelerationFor(const Bullet& s) const;
+    btk::physics::Vector3D calculateAccelerationFor(const Bullet& s) const;
 
     // Internal state
     Bullet initial_bullet_;
     Bullet current_bullet_;
-    Atmosphere atmosphere_;
-    Vector3D wind_;
+    btk::physics::Atmosphere atmosphere_;
+    btk::physics::Vector3D wind_;
     double current_time_;
     Trajectory trajectory_;
   };

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "conversions.h"
-#include "vector.h"
+#include "physics/conversions.h"
+#include "physics/vector.h"
 #include <cmath>
 #include <map>
 #include <string>
 
-namespace btk::ballistics
+namespace btk::match
 {
 
   /**
@@ -84,4 +84,4 @@ namespace btk::ballistics
     double ring_diameters_[7]; // m
   };
 
-} // namespace btk::ballistics
+} // namespace btk::match

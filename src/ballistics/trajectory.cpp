@@ -1,5 +1,5 @@
-#include "trajectory.h"
-#include "conversions.h"
+#include "ballistics/trajectory.h"
+#include "physics/conversions.h"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -139,8 +139,8 @@ namespace btk
       const Bullet& state2 = points_[right].getState();
 
       // Interpolate position and velocity using vector lerp
-      Vector3D pos = state1.getPosition().lerp(state2.getPosition(), t);
-      Vector3D vel = state1.getVelocity().lerp(state2.getVelocity(), t);
+      btk::physics::Vector3D pos = state1.getPosition().lerp(state2.getPosition(), t);
+      btk::physics::Vector3D vel = state1.getVelocity().lerp(state2.getVelocity(), t);
 
       // Interpolate spin rate
       double spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
@@ -219,8 +219,8 @@ namespace btk
       const Bullet& state2 = point2.getState();
 
       // Interpolate position and velocity using vector lerp
-      Vector3D pos = state1.getPosition().lerp(state2.getPosition(), t);
-      Vector3D vel = state1.getVelocity().lerp(state2.getVelocity(), t);
+      btk::physics::Vector3D pos = state1.getPosition().lerp(state2.getPosition(), t);
+      btk::physics::Vector3D vel = state1.getVelocity().lerp(state2.getVelocity(), t);
 
       // Interpolate spin rate
       double spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());

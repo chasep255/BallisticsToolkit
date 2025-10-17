@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vector.h"
+#include "physics/vector.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace btk::ballistics
+namespace btk::physics
 {
 
   // ----------- PerlinNoise2D --------------------------------------------------
@@ -110,7 +110,7 @@ namespace btk::ballistics
      * @param t_s Time in seconds
      * @return Wind vector (m/s)
      */
-    Vector3D operator()(double x_m, double t_s) const;
+    btk::physics::Vector3D operator()(double x_m, double t_s) const;
 
     /**
      * @brief Add a wind component with specified characteristics
@@ -170,4 +170,4 @@ namespace btk::ballistics
     static void initializePresets();
   };
 
-} // namespace btk::ballistics
+} // namespace btk::physics

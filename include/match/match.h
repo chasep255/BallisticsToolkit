@@ -1,13 +1,13 @@
 #pragma once
 
-#include "conversions.h"
-#include "target.h"
-#include "vector.h"
+#include "physics/conversions.h"
+#include "match/target.h"
+#include "physics/vector.h"
 #include <limits>
 #include <string>
 #include <vector>
 
-namespace btk::ballistics
+namespace btk::match
 {
 
   /**
@@ -90,7 +90,7 @@ namespace btk::ballistics
      * @param bullet_diameter Bullet diameter in m (for line breaking, default: 0.0)
      * @return Reference to the created Hit object
      */
-    const Hit& addHit(double x, double y, const Target& target, double bullet_diameter = 0.0);
+    const Hit& addHit(double x, double y, const btk::match::Target& target, double bullet_diameter = 0.0);
 
     /**
      * @brief Get all hits
@@ -178,4 +178,4 @@ namespace btk::ballistics
     void updateAccumulatedMetrics(const Hit& hit);
   };
 
-} // namespace btk::ballistics
+} // namespace btk::match
