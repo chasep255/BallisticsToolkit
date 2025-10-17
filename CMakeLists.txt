@@ -5,6 +5,7 @@ project(BallisticsToolkit VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+
 # Compiler options
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
@@ -30,7 +31,9 @@ add_executable(ballistics_toolkit_wasm ${SOURCES})
 # Link embind library
 target_link_libraries(ballistics_toolkit_wasm embind)
 
-target_include_directories(ballistics_toolkit_wasm PRIVATE include include/ballistics include/match include/physics)
+# Include directories (including GLM)
+target_include_directories(ballistics_toolkit_wasm PRIVATE include third_party/glm)
+
 
 # Copy web files to build/web directory
 # Create a custom target for web files that always runs
