@@ -3,8 +3,8 @@
 #include "ballistics/bullet.h"
 #include "ballistics/trajectory.h"
 #include "physics/atmosphere.h"
-#include "physics/conversions.h"
-#include "physics/vector.h"
+#include "math/conversions.h"
+#include "math/vector.h"
 
 namespace btk::ballistics
 {
@@ -58,7 +58,7 @@ namespace btk::ballistics
      *
      * @param wind Wind vector in Cartesian coordinates (x=downrange m/s, y=crossrange m/s, z=vertical m/s)
      */
-    void setWind(const btk::physics::Vector3D& wind);
+    void setWind(const btk::math::Vector3D& wind);
 
     // Getters
     /**
@@ -87,7 +87,7 @@ namespace btk::ballistics
      *
      * @return Reference to the current wind vector
      */
-    const btk::physics::Vector3D& getWind() const;
+    const btk::math::Vector3D& getWind() const;
 
     // State management
     /**
@@ -153,13 +153,13 @@ namespace btk::ballistics
     private:
     // Physics helpers
     float calculateDragRetardationFor(const Bullet& s) const;
-    btk::physics::Vector3D calculateAccelerationFor(const Bullet& s) const;
+    btk::math::Vector3D calculateAccelerationFor(const Bullet& s) const;
 
     // Internal state
     Bullet initial_bullet_;
     Bullet current_bullet_;
     btk::physics::Atmosphere atmosphere_;
-    btk::physics::Vector3D wind_;
+    btk::math::Vector3D wind_;
     float current_time_;
     Trajectory trajectory_;
   };

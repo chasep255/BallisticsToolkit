@@ -1,7 +1,7 @@
 #pragma once
 
-#include "physics/perlin_noise.h"
-#include "physics/vector.h"
+#include "math/perlin_noise.h"
+#include "math/vector.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -25,8 +25,8 @@ namespace btk::physics
     float exponent_;        // Controls spikiness (1.0f = linear, >1.0f = spiky, <1.0f = smooth)
 
     // 2D Perlin noise generators
-    PerlinNoise crosswind_noise_; // For left/right wind component
-    PerlinNoise headwind_noise_;  // For forward/backward wind component
+    btk::math::PerlinNoise crosswind_noise_; // For left/right wind component
+    btk::math::PerlinNoise headwind_noise_;  // For forward/backward wind component
 
     WindComponent(float amp_scale, float period_s, float wavelength_m, float exponent)
       : amplitude_scale_(amp_scale), period_s_(period_s), wavelength_m_(wavelength_m), exponent_(exponent), crosswind_noise_(), headwind_noise_()
@@ -52,7 +52,7 @@ namespace btk::physics
      * @param t_s Time in seconds
      * @return Wind vector (m/s)
      */
-    btk::physics::Vector3D operator()(float x_m, float t_s) const;
+    btk::math::Vector3D operator()(float x_m, float t_s) const;
 
     /**
      * @brief Add a wind component with specified characteristics

@@ -3,7 +3,7 @@
 #include <cmath>
 #include <string>
 
-namespace btk::physics
+namespace btk::math
 {
 
   /**
@@ -418,4 +418,4 @@ namespace btk::physics
    * @return Interpolated vector
    */
   constexpr Vector3D lerp(const Vector3D& a, const Vector3D& b, float t) { return a.lerp(b, t); }
-} // namespace btk::physics
+} // namespace btk::math

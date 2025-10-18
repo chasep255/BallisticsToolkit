@@ -1,8 +1,8 @@
 #pragma once
 
 #include "ballistics/bullet.h"
-#include "physics/conversions.h"
-#include "physics/vector.h"
+#include "math/conversions.h"
+#include "math/vector.h"
 #include <optional>
 #include <vector>
 

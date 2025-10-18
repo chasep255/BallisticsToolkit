@@ -8,7 +8,7 @@ namespace btk::physics
 
   WindGenerator::WindGenerator() {}
 
-  btk::physics::Vector3D WindGenerator::operator()(float x_m, float t_s) const
+  btk::math::Vector3D WindGenerator::operator()(float x_m, float t_s) const
   {
     float total_crosswind = 0.0f; // Left/right component
     float total_headwind = 0.0f;  // Forward/backward component
@@ -37,7 +37,7 @@ namespace btk::physics
       total_headwind += headwind * component.amplitude_scale_;
     }
 
-    return btk::physics::Vector3D(total_headwind, total_crosswind, 0.0f);
+    return btk::math::Vector3D(total_headwind, total_crosswind, 0.0f);
   }
 
   void WindGenerator::addWindComponent(float amplitude_scale, float period_s, float wavelength_m, float exponent) { components_.emplace_back(amplitude_scale, period_s, wavelength_m, exponent); }

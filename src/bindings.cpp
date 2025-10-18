@@ -10,13 +10,14 @@
 #include "match/simulator.h"
 #include "match/target.h"
 #include "physics/atmosphere.h"
-#include "physics/conversions.h"
-#include "physics/vector.h"
+#include "math/conversions.h"
+#include "math/vector.h"
 #include "physics/wind_generator.h"
 
 using namespace emscripten;
 using namespace btk::ballistics;
 using namespace btk::match;
+using namespace btk::math;
 using namespace btk::physics;
 
 // No wrapper needed - direct methods are JavaScript-friendly
@@ -24,57 +25,57 @@ using namespace btk::physics;
 EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 {
   // Conversions class - provides all unit conversion functions
-  class_<btk::physics::Conversions>("Conversions")
+  class_<Conversions>("Conversions")
     // Distance conversions
-    .class_function("feetToMeters", &btk::physics::Conversions::feetToMeters)
-    .class_function("metersToFeet", &btk::physics::Conversions::metersToFeet)
-    .class_function("inchesToMeters", &btk::physics::Conversions::inchesToMeters)
-    .class_function("metersToInches", &btk::physics::Conversions::metersToInches)
-    .class_function("yardsToMeters", &btk::physics::Conversions::yardsToMeters)
-    .class_function("metersToYards", &btk::physics::Conversions::metersToYards)
+    .class_function("feetToMeters", &Conversions::feetToMeters)
+    .class_function("metersToFeet", &Conversions::metersToFeet)
+    .class_function("inchesToMeters", &Conversions::inchesToMeters)
+    .class_function("metersToInches", &Conversions::metersToInches)
+    .class_function("yardsToMeters", &Conversions::yardsToMeters)
+    .class_function("metersToYards", &Conversions::metersToYards)
     // Weight conversions
-    .class_function("grainsToKg", &btk::physics::Conversions::grainsToKg)
-    .class_function("kgToGrains", &btk::physics::Conversions::kgToGrains)
-    .class_function("poundsToKg", &btk::physics::Conversions::poundsToKg)
-    .class_function("kgToPounds", &btk::physics::Conversions::kgToPounds)
+    .class_function("grainsToKg", &Conversions::grainsToKg)
+    .class_function("kgToGrains", &Conversions::kgToGrains)
+    .class_function("poundsToKg", &Conversions::poundsToKg)
+    .class_function("kgToPounds", &Conversions::kgToPounds)
     // Velocity conversions
-    .class_function("fpsToMps", &btk::physics::Conversions::fpsToMps)
-    .class_function("mpsToFps", &btk::physics::Conversions::mpsToFps)
-    .class_function("mphToMps", &btk::physics::Conversions::mphToMps)
-    .class_function("mpsToMph", &btk::physics::Conversions::mpsToMph)
+    .class_function("fpsToMps", &Conversions::fpsToMps)
+    .class_function("mpsToFps", &Conversions::mpsToFps)
+    .class_function("mphToMps", &Conversions::mphToMps)
+    .class_function("mpsToMph", &Conversions::mpsToMph)
     // Temperature conversions
-    .class_function("fahrenheitToKelvin", &btk::physics::Conversions::fahrenheitToKelvin)
-    .class_function("kelvinToFahrenheit", &btk::physics::Conversions::kelvinToFahrenheit)
-    .class_function("celsiusToKelvin", &btk::physics::Conversions::celsiusToKelvin)
-    .class_function("kelvinToCelsius", &btk::physics::Conversions::kelvinToCelsius)
+    .class_function("fahrenheitToKelvin", &Conversions::fahrenheitToKelvin)
+    .class_function("kelvinToFahrenheit", &Conversions::kelvinToFahrenheit)
+    .class_function("celsiusToKelvin", &Conversions::celsiusToKelvin)
+    .class_function("kelvinToCelsius", &Conversions::kelvinToCelsius)
     // Angle conversions
-    .class_function("degreesToRadians", &btk::physics::Conversions::degreesToRadians)
-    .class_function("radiansToDegrees", &btk::physics::Conversions::radiansToDegrees)
-    .class_function("moaToRadians", &btk::physics::Conversions::moaToRadians)
-    .class_function("radiansToMoa", &btk::physics::Conversions::radiansToMoa)
-    .class_function("mradToRadians", &btk::physics::Conversions::mradToRadians)
-    .class_function("radiansToMrad", &btk::physics::Conversions::radiansToMrad)
-    .class_function("oclockToRadians", &btk::physics::Conversions::oclockToRadians)
-    .class_function("radiansToOclock", &btk::physics::Conversions::radiansToOclock)
+    .class_function("degreesToRadians", &Conversions::degreesToRadians)
+    .class_function("radiansToDegrees", &Conversions::radiansToDegrees)
+    .class_function("moaToRadians", &Conversions::moaToRadians)
+    .class_function("radiansToMoa", &Conversions::radiansToMoa)
+    .class_function("mradToRadians", &Conversions::mradToRadians)
+    .class_function("radiansToMrad", &Conversions::radiansToMrad)
+    .class_function("oclockToRadians", &Conversions::oclockToRadians)
+    .class_function("radiansToOclock", &Conversions::radiansToOclock)
     // Pressure conversions
-    .class_function("psiToPascals", &btk::physics::Conversions::psiToPascals)
-    .class_function("pascalsToPsi", &btk::physics::Conversions::pascalsToPsi)
-    .class_function("inHgToPascals", &btk::physics::Conversions::inHgToPascals)
-    .class_function("pascalsToInHg", &btk::physics::Conversions::pascalsToInHg)
+    .class_function("psiToPascals", &Conversions::psiToPascals)
+    .class_function("pascalsToPsi", &Conversions::pascalsToPsi)
+    .class_function("inHgToPascals", &Conversions::inHgToPascals)
+    .class_function("pascalsToInHg", &Conversions::pascalsToInHg)
     // Energy conversions
-    .class_function("footPoundsToJoules", &btk::physics::Conversions::footPoundsToJoules)
-    .class_function("joulesToFootPounds", &btk::physics::Conversions::joulesToFootPounds)
-    .class_function("kilowattHoursToJoules", &btk::physics::Conversions::kilowattHoursToJoules)
-    .class_function("joulesToKilowattHours", &btk::physics::Conversions::joulesToKilowattHours)
-    .class_function("caloriesToJoules", &btk::physics::Conversions::caloriesToJoules)
-    .class_function("joulesToCalories", &btk::physics::Conversions::joulesToCalories)
-    .class_function("kilocaloriesToJoules", &btk::physics::Conversions::kilocaloriesToJoules)
-    .class_function("joulesToKilocalories", &btk::physics::Conversions::joulesToKilocalories)
-    .class_function("btuToJoules", &btk::physics::Conversions::btuToJoules)
-    .class_function("joulesToBtu", &btk::physics::Conversions::joulesToBtu);
+    .class_function("footPoundsToJoules", &Conversions::footPoundsToJoules)
+    .class_function("joulesToFootPounds", &Conversions::joulesToFootPounds)
+    .class_function("kilowattHoursToJoules", &Conversions::kilowattHoursToJoules)
+    .class_function("joulesToKilowattHours", &Conversions::joulesToKilowattHours)
+    .class_function("caloriesToJoules", &Conversions::caloriesToJoules)
+    .class_function("joulesToCalories", &Conversions::joulesToCalories)
+    .class_function("kilocaloriesToJoules", &Conversions::kilocaloriesToJoules)
+    .class_function("joulesToKilocalories", &Conversions::joulesToKilocalories)
+    .class_function("btuToJoules", &Conversions::btuToJoules)
+    .class_function("joulesToBtu", &Conversions::joulesToBtu);
 
   // 3D Vector types
-  class_<btk::physics::Vector3D>("Vector3D")
+  class_<btk::math::Vector3D>("Vector3D")
     .constructor<float, float, float>()
     .property("x", &Vector3D::x)
     .property("y", &Vector3D::y)
@@ -85,7 +86,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("cross", &Vector3D::cross)
     .function("lerp", &Vector3D::lerp);
 
-  class_<btk::physics::Vector2D>("Vector2D")
+  class_<btk::math::Vector2D>("Vector2D")
     .constructor<float, float>()
     .property("x", &Vector2D::x)
     .property("y", &Vector2D::y)

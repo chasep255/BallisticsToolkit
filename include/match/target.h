@@ -1,7 +1,7 @@
 #pragma once
 
-#include "physics/conversions.h"
-#include "physics/vector.h"
+#include "math/conversions.h"
+#include "math/vector.h"
 #include <cmath>
 #include <map>
 #include <string>

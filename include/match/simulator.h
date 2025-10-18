@@ -5,8 +5,8 @@
 #include "match/match.h"
 #include "match/target.h"
 #include "physics/atmosphere.h"
-#include "physics/conversions.h"
-#include "physics/vector.h"
+#include "math/conversions.h"
+#include "math/vector.h"
 #include <random>
 #include <string>
 #include <vector>

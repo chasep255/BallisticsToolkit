@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <random>
 
-namespace btk::physics
+namespace btk::math
 {
 
   class PerlinNoise
@@ -258,4 +258,4 @@ namespace btk::physics
     }
   };
 
-} // namespace btk::physics
+} // namespace btk::math

@@ -7,7 +7,7 @@
 #define M_PI_F 3.14159265358979323846f
 #endif
 
-namespace btk::physics
+namespace btk::math
 {
 
   /**
@@ -251,4 +251,4 @@ namespace btk::physics
     static constexpr float radiansPerSecondToHertz(float radps) { return radps / (2.0f * M_PI_F); }
   };
 
-} // namespace btk::physics
+} // namespace btk::math

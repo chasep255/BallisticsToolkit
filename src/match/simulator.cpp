@@ -1,7 +1,7 @@
 #include "match/simulator.h"
 #include "ballistics/simulator.h"
 #include "physics/atmosphere.h"
-#include "physics/conversions.h"
+#include "math/conversions.h"
 #include <algorithm>
 #include <cmath>
 #include <random>
@@ -30,7 +30,7 @@ namespace btk::match
     // Zero the rifle once at initialization
     // Zero with nominal BC and MV, no wind, scope at bore height
     float scope_height = 0.0f;
-    btk::physics::Vector3D calm_wind(0.0f, 0.0f, 0.0f);
+    btk::math::Vector3D calm_wind(0.0f, 0.0f, 0.0f);
     simulator_.setWind(calm_wind);
     zeroed_bullet_ = simulator_.computeZero(nominal_mv, scope_height, target_range, timestep, 1000, 1e-6);
   }
@@ -46,8 +46,8 @@ namespace btk::match
     float mv_mps = clipToThreeSigma(mv_dist(rng_), nominal_mv_, mv_sd_mps);
 
     // Tweak the MV by scaling the velocity components
-    btk::physics::Vector3D zeroed_velocity = initial_bullet.getVelocity();
-    btk::physics::Vector3D scaled_velocity = btk::physics::Vector3D(mv_mps * (zeroed_velocity.x / nominal_mv_), zeroed_velocity.y, mv_mps * (zeroed_velocity.z / nominal_mv_));
+    btk::math::Vector3D zeroed_velocity = initial_bullet.getVelocity();
+    btk::math::Vector3D scaled_velocity = btk::math::Vector3D(mv_mps * (zeroed_velocity.x / nominal_mv_), zeroed_velocity.y, mv_mps * (zeroed_velocity.z / nominal_mv_));
 
     // Apply rifle accuracy (uniform distribution within circle of given diameter)
     std::uniform_real_distribution<float> angle_dist(0.0f, 2.0f * M_PI_F);
@@ -65,7 +65,7 @@ namespace btk::match
     float release_angle_v = v_angle_rad;
 
     // Modify velocity components for angular dispersion
-    btk::physics::Vector3D modified_velocity = btk::physics::Vector3D(scaled_velocity.x, scaled_velocity.y + scaled_velocity.x * h_angle_rad, scaled_velocity.z + scaled_velocity.x * v_angle_rad);
+    btk::math::Vector3D modified_velocity = btk::math::Vector3D(scaled_velocity.x, scaled_velocity.y + scaled_velocity.x * h_angle_rad, scaled_velocity.z + scaled_velocity.x * v_angle_rad);
 
     // Create modified bullet with new velocity
     btk::ballistics::Bullet modified_bullet = btk::ballistics::Bullet(initial_bullet, initial_bullet.getPosition(), modified_velocity, initial_bullet.getSpinRate());
@@ -84,7 +84,7 @@ namespace btk::match
     float updraft_mps = clipToThreeSigma(updraft_dist(rng_), 0.0f, updraft_sd_mps);
 
     // Create 3D wind vector (Cartesian coordinates)
-    btk::physics::Vector3D varied_wind(headwind_mps, crosswind_mps, updraft_mps);
+    btk::math::Vector3D varied_wind(headwind_mps, crosswind_mps, updraft_mps);
 
     // Set the modified bullet as initial and wind, then fire
     simulator_.setInitialBullet(modified_bullet);
@@ -98,7 +98,7 @@ namespace btk::match
     if(std::isnan(impact_point.getTime()))
     {
       // Shouldn't happen, but handle gracefully
-      SimulatedShot simulatedShot(btk::physics::Conversions::inchesToMeters(999.0f), btk::physics::Conversions::inchesToMeters(999.0f), 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps,
+      SimulatedShot simulatedShot(btk::math::Conversions::inchesToMeters(999.0f), btk::math::Conversions::inchesToMeters(999.0f), 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps,
                                   updraft_mps, release_angle_h, release_angle_v, 0.0f);
       shots_.push_back(simulatedShot);
       return simulatedShot;

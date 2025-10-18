@@ -1,8 +1,8 @@
 #pragma once
 
 #include "match/target.h"
-#include "physics/conversions.h"
-#include "physics/vector.h"
+#include "math/conversions.h"
+#include "math/vector.h"
 #include <limits>
 #include <string>
 #include <vector>
