@@ -1,5 +1,5 @@
 #include "ballistics/simulator.h"
-#include "ballistics/constants.h"
+#include "physics/constants.h"
 #include "math/conversions.h"
 #include <algorithm>
 #include <array>
@@ -83,7 +83,7 @@ namespace btk::ballistics
     if(a <= 0.0f || m <= 0.0f)
       return 0.0f;
 
-    float density_ratio = atmosphere_.getAirDensity() / Constants::AIR_DENSITY_STANDARD;
+    float density_ratio = atmosphere_.getAirDensity() / btk::physics::Constants::AIR_DENSITY_STANDARD;
     float ret_fps_s = a * std::pow(v_fps, m) * density_ratio / s.getBc();
     return btk::math::Conversions::fpsToMps(ret_fps_s);
   }
@@ -94,7 +94,7 @@ namespace btk::ballistics
     btk::math::Vector3D v_rel = s.getVelocity() - wind_;
     float v_rel_mag = v_rel.magnitude();
 
-    btk::math::Vector3D gravity(0.0f, 0.0f, -Constants::GRAVITY);
+    btk::math::Vector3D gravity(0.0f, 0.0f, -btk::physics::Constants::GRAVITY);
     if(v_rel_mag <= 0.0f)
       return gravity;
 

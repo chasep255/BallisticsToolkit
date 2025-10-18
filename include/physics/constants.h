@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace btk::ballistics
+namespace btk::physics
 {
 
   /**
@@ -34,4 +34,4 @@ namespace btk::ballistics
     static constexpr float HEAT_CAPACITY_RATIO_AIR = 1.4f;  // dimensionless - heat capacity ratio for air
   };
 
-} // namespace btk::ballistics
+} // namespace btk::physics
