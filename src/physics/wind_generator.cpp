@@ -6,7 +6,7 @@ namespace btk::physics
 
   // ----------- WindGenerator --------------------------------------------------
 
-  WindGenerator::WindGenerator(uint32_t seed) : seed_(seed), next_component_seed_(seed + 10000) {}
+  WindGenerator::WindGenerator() {}
 
   btk::physics::Vector3D WindGenerator::operator()(double x_m, double t_s) const
   {
@@ -25,8 +25,8 @@ namespace btk::physics
       double temporal_t = t_s * temporal_freq;
 
       // Sample the 2D Perlin noise for both components
-      double crosswind_raw = component.crosswind_noise_(spatial_x, temporal_t);
-      double headwind_raw = component.headwind_noise_(spatial_x, temporal_t);
+      double crosswind_raw = component.crosswind_noise_.noise2D(spatial_x, temporal_t);
+      double headwind_raw = component.headwind_noise_.noise2D(spatial_x, temporal_t);
 
       // Apply exponent to control spikiness
       double crosswind = std::pow(std::abs(crosswind_raw), component.exponent_) * std::copysign(1.0, crosswind_raw);
@@ -40,35 +40,18 @@ namespace btk::physics
     return btk::physics::Vector3D(total_headwind, total_crosswind, 0.0);
   }
 
-  void WindGenerator::addWindComponent(double amplitude_scale, double period_s, double wavelength_m, double exponent)
-  {
-    components_.emplace_back(amplitude_scale, period_s, wavelength_m, exponent, next_component_seed_);
-    next_component_seed_ += 1000; // Ensure different seeds for each component
-  }
-
-  void WindGenerator::setSeed(uint32_t seed)
-  {
-    seed_ = seed;
-    next_component_seed_ = seed + 10000;
-
-    // Reinitialize all components with new seeds
-    for(size_t i = 0; i < components_.size(); ++i)
-    {
-      uint32_t component_seed = seed + 10000 + (i * 1000);
-      components_[i] = WindComponent(components_[i].amplitude_scale_, components_[i].period_s_, components_[i].wavelength_m_, components_[i].exponent_, component_seed);
-    }
-  }
+  void WindGenerator::addWindComponent(double amplitude_scale, double period_s, double wavelength_m, double exponent) { components_.emplace_back(amplitude_scale, period_s, wavelength_m, exponent); }
 
   // ----------- WindPresets ----------------------------------------------------
 
-  std::map<std::string, std::function<WindGenerator(uint32_t)>> WindPresets::presets_;
+  std::map<std::string, std::function<WindGenerator()>> WindPresets::presets_;
 
   void WindPresets::initializePresets()
   {
     // Calm wind - very light and smooth
-    presets_["Calm"] = [](uint32_t seed)
+    presets_["Calm"] = []()
     {
-      WindGenerator w(seed);
+      WindGenerator w;
       w.addWindComponent(1.6, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
       w.addWindComponent(3.0, 1200.0, 10000.0, 0.7);  // Very slow changes (20+ min cycles, 10km wavelength)
       w.addWindComponent(1.6, 100.0, 1000.0, 0.8);    // Gentle micro-variations (1.7 min, 1km wavelength)
@@ -76,9 +59,9 @@ namespace btk::physics
     };
 
     // Light breeze - gentle and steady
-    presets_["LightBreeze"] = [](uint32_t seed)
+    presets_["LightBreeze"] = []()
     {
-      WindGenerator w(seed);
+      WindGenerator w;
       w.addWindComponent(2.4, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
       w.addWindComponent(4.4, 600.0, 5000.0, 1.0);    // Slow, predictable (10+ min cycles, 5km wavelength)
       w.addWindComponent(3.0, 20.0, 500.0, 1.2);      // Some gentle variation (20 sec, 500m wavelength)
@@ -86,9 +69,9 @@ namespace btk::physics
     };
 
     // Moderate wind - more active with some gusts
-    presets_["Moderate"] = [](uint32_t seed)
+    presets_["Moderate"] = []()
     {
-      WindGenerator w(seed);
+      WindGenerator w;
       w.addWindComponent(3.6, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
       w.addWindComponent(6.0, 300.0, 2000.0, 1.0);    // Slow background (5+ min cycles, 2km wavelength)
       w.addWindComponent(4.4, 60.0, 200.0, 1.5);      // Medium gusts (1-2 min cycles, 200m wavelength)
@@ -97,9 +80,9 @@ namespace btk::physics
     };
 
     // Strong wind - steady with occasional gusts
-    presets_["Strong"] = [](uint32_t seed)
+    presets_["Strong"] = []()
     {
-      WindGenerator w(seed);
+      WindGenerator w;
       w.addWindComponent(8.0, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
       w.addWindComponent(16.0, 300.0, 2000.0, 1.0);   // Steady background (5+ min cycles, 2km wavelength)
       w.addWindComponent(12.0, 60.0, 330.0, 1.5);     // Occasional gusts (1-2 min cycles, 330m wavelength)
@@ -107,9 +90,9 @@ namespace btk::physics
     };
 
     // Variable wind - multiple scales with different spikiness
-    presets_["Variable"] = [](uint32_t seed)
+    presets_["Variable"] = []()
     {
-      WindGenerator w(seed);
+      WindGenerator w;
       w.addWindComponent(4.0, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
       w.addWindComponent(7.6, 1200.0, 10000.0, 0.8);  // Very slow large-scale (20+ min, 10km wavelength)
       w.addWindComponent(6.0, 120.0, 500.0, 1.2);     // Medium scale (2-3 min cycles, 500m wavelength)
@@ -119,9 +102,9 @@ namespace btk::physics
     };
 
     // Shear wind - between moderate and strong with direction changes over 1000 yards
-    presets_["Shear"] = [](uint32_t seed)
+    presets_["Shear"] = []()
     {
-      WindGenerator w(seed);
+      WindGenerator w;
       w.addWindComponent(5.0, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
       w.addWindComponent(10.0, 300.0, 3000.0, 1.0);   // Steady background (5+ min cycles, 3km wavelength)
       w.addWindComponent(8.0, 75.0, 250.0, 1.3);      // Medium gusts (1.25 min cycles, 250m wavelength)
@@ -130,7 +113,7 @@ namespace btk::physics
     };
   }
 
-  WindGenerator WindPresets::getPreset(const std::string& name, uint32_t seed)
+  WindGenerator WindPresets::getPreset(const std::string& name)
   {
     // Always ensure presets are initialized
     if(presets_.empty())
@@ -144,7 +127,7 @@ namespace btk::physics
       throw std::invalid_argument("Unknown wind preset: " + name);
     }
 
-    return it->second(seed);
+    return it->second();
   }
 
   std::vector<std::string> WindPresets::listPresets()

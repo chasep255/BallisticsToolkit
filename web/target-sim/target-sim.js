@@ -48,7 +48,8 @@ class TargetSimulator
 
       // Get WebAssembly module from window
       this.btk = window.btk;
-      if (!this.btk) {
+      if (!this.btk)
+      {
         console.error('BallisticsToolkit not available');
         return;
       }
@@ -829,7 +830,8 @@ class TargetSimulator
 document.addEventListener('DOMContentLoaded', () =>
 {
   // Wait for BallisticsToolkit to be ready
-  document.addEventListener('btk-ready', () => {
+  document.addEventListener('btk-ready', () =>
+  {
     window.targetSimulator = new TargetSimulator();
   });
 });

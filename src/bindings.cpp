@@ -249,10 +249,9 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Wind generator class
   class_<btk::physics::WindGenerator>("WindGenerator")
-    .constructor<uint32_t>()
+    .constructor<>()
     .function("sample", select_overload<Vector3D(double, double) const>(&WindGenerator::operator()))
-    .function("addWindComponent", &WindGenerator::addWindComponent)
-    .function("setSeed", &WindGenerator::setSeed);
+    .function("addWindComponent", &WindGenerator::addWindComponent);
 
   // Wind presets factory
   class_<btk::physics::WindPresets>("WindPresets")

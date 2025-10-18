@@ -45,7 +45,6 @@ const state = {
   meters: 1000,
   density: 60,
   preset: 'Calm',
-  seed: 42,
   timeScale: 1.0,
   elapsed: 0
 };
@@ -55,7 +54,8 @@ function init()
   try
   {
     btk = window.btk;
-    if (!btk) {
+    if (!btk)
+    {
       console.error('BallisticsToolkit not available');
       return;
     }
@@ -118,11 +118,9 @@ function setupUI()
   {
     state.meters = btk.Conversions.yardsToMeters(parseFloat(distanceYd.value) || 1000);
     state.preset = preset.value;
-    // Generate random seed for each restart
-    state.seed = Math.floor(Math.random() * 1000000);
     state.density = Math.max(10, Math.min(400, parseInt(density.value || '60', 10)));
-    // Create a new wind from preset (randomized orientation per seed)
-    wind = btk.WindPresets.getPreset(state.preset, state.seed);
+    // Create a new wind from preset
+    wind = btk.WindPresets.getPreset(state.preset);
   };
 
   // Load presets once at startup
