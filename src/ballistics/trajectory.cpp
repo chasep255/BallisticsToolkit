@@ -13,25 +13,25 @@ namespace btk
   {
 
     // TrajectoryPoint implementation
-    TrajectoryPoint::TrajectoryPoint(double time, const Bullet& state) : time_(time), state_(state) {}
+    TrajectoryPoint::TrajectoryPoint(float time, const Bullet& state) : time_(time), state_(state) {}
 
-    double TrajectoryPoint::getDistance() const { return state_.getPositionX(); }
+    float TrajectoryPoint::getDistance() const { return state_.getPositionX(); }
 
-    double TrajectoryPoint::getVelocity() const { return state_.getTotalVelocity(); }
+    float TrajectoryPoint::getVelocity() const { return state_.getTotalVelocity(); }
 
-    double TrajectoryPoint::getKineticEnergy() const
+    float TrajectoryPoint::getKineticEnergy() const
     {
-      // KE = 0.5 * m * v^2
-      double mass_kg = state_.getWeight();
-      double velocity_mps = state_.getTotalVelocity();
-      double energy_joules = 0.5 * mass_kg * velocity_mps * velocity_mps;
+      // KE = 0.5f * m * v^2
+      float mass_kg = state_.getWeight();
+      float velocity_mps = state_.getTotalVelocity();
+      float energy_joules = 0.5f * mass_kg * velocity_mps * velocity_mps;
       return energy_joules;
     }
 
     // Trajectory implementation
     Trajectory::Trajectory() {}
 
-    void Trajectory::addPoint(double time, const Bullet& state) { points_.emplace_back(time, state); }
+    void Trajectory::addPoint(float time, const Bullet& state) { points_.emplace_back(time, state); }
 
     const TrajectoryPoint& Trajectory::getPoint(size_t index) const
     {
@@ -41,11 +41,11 @@ namespace btk
       return points_[index];
     }
 
-    TrajectoryPoint Trajectory::atDistance(double distance) const
+    TrajectoryPoint Trajectory::atDistance(float distance) const
     {
       if(points_.empty())
       {
-        return TrajectoryPoint(std::numeric_limits<double>::quiet_NaN(), Bullet(0.0, 0.0, 0.0, 0.0));
+        return TrajectoryPoint(std::numeric_limits<float>::quiet_NaN(), Bullet(0.0f, 0.0f, 0.0f, 0.0f));
       }
 
       // Check if target distance is beyond the last point
@@ -67,7 +67,7 @@ namespace btk
       while(left < right - 1)
       {
         size_t mid = left + (right - left) / 2;
-        double mid_distance = points_[mid].getDistance();
+        float mid_distance = points_[mid].getDistance();
 
         if(distance < mid_distance)
         {
@@ -80,14 +80,14 @@ namespace btk
       }
 
       // Now left and right are the two points that bracket the target distance
-      double dist1 = points_[left].getDistance();
-      double dist2 = points_[right].getDistance();
+      float dist1 = points_[left].getDistance();
+      float dist2 = points_[right].getDistance();
 
       // Interpolate between the two points
-      double t = (distance - dist1) / (dist2 - dist1);
+      float t = (distance - dist1) / (dist2 - dist1);
 
       // Interpolate time
-      double interp_time = points_[left].getTime() + t * (points_[right].getTime() - points_[left].getTime());
+      float interp_time = points_[left].getTime() + t * (points_[right].getTime() - points_[left].getTime());
 
       // Interpolate state
       Bullet interp_state = interpolate(points_[left], points_[right], distance);
@@ -95,7 +95,7 @@ namespace btk
       return TrajectoryPoint(interp_time, interp_state);
     }
 
-    std::optional<TrajectoryPoint> Trajectory::atTime(double time) const
+    std::optional<TrajectoryPoint> Trajectory::atTime(float time) const
     {
       if(points_.empty())
       {
@@ -118,7 +118,7 @@ namespace btk
       while(left < right - 1)
       {
         size_t mid = left + (right - left) / 2;
-        double mid_time = points_[mid].getTime();
+        float mid_time = points_[mid].getTime();
         if(time < mid_time)
         {
           right = mid;
@@ -130,10 +130,10 @@ namespace btk
       }
 
       // Interpolate between points_[left] and points_[right] by time
-      double time1 = points_[left].getTime();
-      double time2 = points_[right].getTime();
+      float time1 = points_[left].getTime();
+      float time2 = points_[right].getTime();
 
-      double t = (time - time1) / (time2 - time1);
+      float t = (time - time1) / (time2 - time1);
 
       const Bullet& state1 = points_[left].getState();
       const Bullet& state2 = points_[right].getState();
@@ -143,38 +143,38 @@ namespace btk
       btk::physics::Vector3D vel = state1.getVelocity().lerp(state2.getVelocity(), t);
 
       // Interpolate spin rate
-      double spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
+      float spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
 
       Bullet interp_state(state1, pos, vel, spin);
 
       return TrajectoryPoint(time, interp_state);
     }
 
-    double Trajectory::getTotalDistance() const
+    float Trajectory::getTotalDistance() const
     {
       if(points_.empty())
-        return 0.0;
+        return 0.0f;
 
       return points_.back().getDistance();
     }
 
-    double Trajectory::getTotalTime() const
+    float Trajectory::getTotalTime() const
     {
       if(points_.empty())
-        return 0.0;
+        return 0.0f;
 
       return points_.back().getTime();
     }
 
-    double Trajectory::getMaximumHeight() const
+    float Trajectory::getMaximumHeight() const
     {
       if(points_.empty())
-        return 0.0;
+        return 0.0f;
 
-      double max_height = 0.0;
+      float max_height = 0.0f;
       for(const auto& point : points_)
       {
-        double height = point.getState().getPositionZ();
+        float height = point.getState().getPositionZ();
         if(height > max_height)
         {
           max_height = height;
@@ -184,36 +184,36 @@ namespace btk
       return max_height;
     }
 
-    double Trajectory::getImpactVelocity() const
+    float Trajectory::getImpactVelocity() const
     {
       if(points_.empty())
-        return 0.0;
+        return 0.0f;
 
       return points_.back().getVelocity();
     }
 
-    double Trajectory::getImpactAngle() const
+    float Trajectory::getImpactAngle() const
     {
       if(points_.empty())
-        return 0.0;
+        return 0.0f;
 
       const Bullet& impact_state = points_.back().getState();
-      double vx = impact_state.getVelocityX();
-      double vz = impact_state.getVelocityZ();
+      float vx = impact_state.getVelocityX();
+      float vz = impact_state.getVelocityZ();
 
       // Impact angle is the angle below horizontal
-      double angle_rad = std::atan2(-vz, vx); // Negative vz because it's downward
+      float angle_rad = std::atan2(-vz, vx); // Negative vz because it's downward
       return angle_rad;
     }
 
     void Trajectory::clear() { points_.clear(); }
 
-    Bullet Trajectory::interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2, double distance) const
+    Bullet Trajectory::interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2, float distance) const
     {
-      double dist1 = point1.getDistance();
-      double dist2 = point2.getDistance();
+      float dist1 = point1.getDistance();
+      float dist2 = point2.getDistance();
 
-      double t = (distance - dist1) / (dist2 - dist1);
+      float t = (distance - dist1) / (dist2 - dist1);
 
       const Bullet& state1 = point1.getState();
       const Bullet& state2 = point2.getState();
@@ -223,7 +223,7 @@ namespace btk
       btk::physics::Vector3D vel = state1.getVelocity().lerp(state2.getVelocity(), t);
 
       // Interpolate spin rate
-      double spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
+      float spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
 
       return Bullet(state1, pos, vel, spin);
     }

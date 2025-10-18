@@ -19,26 +19,26 @@ namespace btk::match
    */
   struct SimulatedShot
   {
-    double impact_x;        // Horizontal impact position in m (positive = right)
-    double impact_y;        // Vertical impact position in m (positive = up)
-    int score;              // Shot score (0-10)
-    bool is_x;              // Whether shot is in X-ring
-    double actual_mv;       // Actual muzzle velocity in m/s for this shot
-    double actual_bc;       // Actual ballistic coefficient for this shot
-    double wind_downrange;  // Head/tail wind component in m/s (positive = tailwind)
-    double wind_crossrange; // Crosswind component in m/s (positive = from left)
-    double wind_vertical;   // Up/down draft component in m/s (positive = updraft)
-    double release_angle_h; // Horizontal release angle in rad
-    double release_angle_v; // Vertical release angle in rad
-    double impact_velocity; // Velocity at target impact in m/s
+    float impact_x;        // Horizontal impact position in m (positive = right)
+    float impact_y;        // Vertical impact position in m (positive = up)
+    int score;             // Shot score (0-10)
+    bool is_x;             // Whether shot is in X-ring
+    float actual_mv;       // Actual muzzle velocity in m/s for this shot
+    float actual_bc;       // Actual ballistic coefficient for this shot
+    float wind_downrange;  // Head/tail wind component in m/s (positive = tailwind)
+    float wind_crossrange; // Crosswind component in m/s (positive = from left)
+    float wind_vertical;   // Up/down draft component in m/s (positive = updraft)
+    float release_angle_h; // Horizontal release angle in rad
+    float release_angle_v; // Vertical release angle in rad
+    float impact_velocity; // Velocity at target impact in m/s
 
     SimulatedShot()
-      : impact_x(0.0), impact_y(0.0), score(0), is_x(false), actual_mv(0.0), actual_bc(0.0), wind_downrange(0.0), wind_crossrange(0.0), wind_vertical(0.0), release_angle_h(0.0), release_angle_v(0.0),
-        impact_velocity(0.0)
+      : impact_x(0.0f), impact_y(0.0f), score(0), is_x(false), actual_mv(0.0f), actual_bc(0.0f), wind_downrange(0.0f), wind_crossrange(0.0f), wind_vertical(0.0f), release_angle_h(0.0f),
+        release_angle_v(0.0f), impact_velocity(0.0f)
     {
     }
-    SimulatedShot(double impact_x, double impact_y, int score, bool is_x, double actual_mv, double actual_bc, double wind_downrange, double wind_crossrange, double wind_vertical,
-                  double release_angle_h, double release_angle_v, double impact_velocity);
+    SimulatedShot(float impact_x, float impact_y, int score, bool is_x, float actual_mv, float actual_bc, float wind_downrange, float wind_crossrange, float wind_vertical, float release_angle_h,
+                  float release_angle_v, float impact_velocity);
   };
 
   /**
@@ -67,8 +67,8 @@ namespace btk::match
      * @param rifle_accuracy Rifle/shooter accuracy in rad (angular dispersion diameter)
      * @param timestep Simulation timestep in seconds
      */
-    Simulator(const btk::ballistics::Bullet& bullet, double nominal_mv, const btk::match::Target& target, double target_range, const btk::physics::Atmosphere& atmosphere, double mv_sd,
-              double wind_speed_sd, double headwind_sd, double updraft_sd, double rifle_accuracy, double timestep = 0.001);
+    Simulator(const btk::ballistics::Bullet& bullet, float nominal_mv, const btk::match::Target& target, float target_range, const btk::physics::Atmosphere& atmosphere, float mv_sd,
+              float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float timestep = 0.001f);
 
     /**
      * @brief Fire a single shot with variability
@@ -107,7 +107,7 @@ namespace btk::match
     /**
      * @brief Get the bullet diameter
      */
-    double getBulletDiameter() const
+    float getBulletDiameter() const
     {
       return bullet_.getDiameter(); // m
     }
@@ -124,16 +124,16 @@ namespace btk::match
 
     private:
     btk::ballistics::Bullet bullet_;
-    double nominal_mv_; // m/s
+    float nominal_mv_; // m/s
     btk::match::Target target_;
-    double target_range_; // m
+    float target_range_; // m
     btk::physics::Atmosphere atmosphere_;
-    double mv_sd_;          // m/s
-    double wind_speed_sd_;  // m/s
-    double headwind_sd_;    // m/s
-    double updraft_sd_;     // m/s
-    double rifle_accuracy_; // rad
-    double timestep_;       // s
+    float mv_sd_;          // m/s
+    float wind_speed_sd_;  // m/s
+    float headwind_sd_;    // m/s
+    float updraft_sd_;     // m/s
+    float rifle_accuracy_; // rad
+    float timestep_;       // s
 
     // Simulator for trajectory calculations
     btk::ballistics::Simulator simulator_;

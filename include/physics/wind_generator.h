@@ -19,16 +19,16 @@ namespace btk::physics
    */
   struct WindComponent
   {
-    double amplitude_scale_; // Overall strength multiplier
-    double period_s_;        // How long it takes to cycle (seconds)
-    double wavelength_m_;    // How far apart similar patterns are (meters)
-    double exponent_;        // Controls spikiness (1.0 = linear, >1.0 = spiky, <1.0 = smooth)
+    float amplitude_scale_; // Overall strength multiplier
+    float period_s_;        // How long it takes to cycle (seconds)
+    float wavelength_m_;    // How far apart similar patterns are (meters)
+    float exponent_;        // Controls spikiness (1.0f = linear, >1.0f = spiky, <1.0f = smooth)
 
     // 2D Perlin noise generators
     PerlinNoise crosswind_noise_; // For left/right wind component
     PerlinNoise headwind_noise_;  // For forward/backward wind component
 
-    WindComponent(double amp_scale, double period_s, double wavelength_m, double exponent)
+    WindComponent(float amp_scale, float period_s, float wavelength_m, float exponent)
       : amplitude_scale_(amp_scale), period_s_(period_s), wavelength_m_(wavelength_m), exponent_(exponent), crosswind_noise_(), headwind_noise_()
     {
     }
@@ -52,7 +52,7 @@ namespace btk::physics
      * @param t_s Time in seconds
      * @return Wind vector (m/s)
      */
-    btk::physics::Vector3D operator()(double x_m, double t_s) const;
+    btk::physics::Vector3D operator()(float x_m, float t_s) const;
 
     /**
      * @brief Add a wind component with specified characteristics
@@ -60,9 +60,9 @@ namespace btk::physics
      * @param amplitude_scale Overall strength multiplier (m/s)
      * @param period_s How long it takes to cycle (seconds)
      * @param wavelength_m How far apart similar patterns are (meters)
-     * @param exponent Controls spikiness (1.0 = linear, >1.0 = spiky, <1.0 = smooth)
+     * @param exponent Controls spikiness (1.0f = linear, >1.0f = spiky, <1.0f = smooth)
      */
-    void addWindComponent(double amplitude_scale, double period_s, double wavelength_m, double exponent = 1.0);
+    void addWindComponent(float amplitude_scale, float period_s, float wavelength_m, float exponent = 1.0f);
 
     private:
     std::vector<WindComponent> components_;

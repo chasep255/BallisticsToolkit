@@ -15,7 +15,7 @@ namespace btk::ballistics
   struct ZeroingResult
   {
     Bullet initial_state;
-    double elevation_angle; // rad
+    float elevation_angle; // rad
   };
 
   /**
@@ -34,9 +34,9 @@ namespace btk::ballistics
      * - Bullet: zero state (0 position, 0 velocity, 0 spin)
      * - Atmosphere: standard conditions (15°C, sea level, 50% humidity)
      * - Wind: zero (0, 0, 0) m/s
-     * - Time: 0.0 seconds
+     * - Time: 0.0f seconds
      */
-    Simulator() : initial_bullet_(0.0, 0.0, 0.0, 0.0), current_bullet_(0.0, 0.0, 0.0, 0.0), atmosphere_(), wind_(0.0, 0.0, 0.0), current_time_(0.0), trajectory_() {}
+    Simulator() : initial_bullet_(0.0f, 0.0f, 0.0f, 0.0f), current_bullet_(0.0f, 0.0f, 0.0f, 0.0f), atmosphere_(), wind_(0.0f, 0.0f, 0.0f), current_time_(0.0f), trajectory_() {}
 
     // Setters (individual)
     /**
@@ -102,23 +102,23 @@ namespace btk::ballistics
      * @param muzzle_velocity Muzzle velocity in m/s
      * @param scope_height Scope height above bore in m
      * @param zero_range Zero range in m
-     * @param dt Time step for zeroing calculation in s (default: 0.001)
+     * @param dt Time step for zeroing calculation in s (default: 0.001f)
      * @param max_iterations Maximum iterations for zeroing (default: 50)
-     * @param tolerance Convergence tolerance for zeroing in m (default: 0.001)
-     * @param spin_rate Bullet spin rate in rad/s (default: 0.0)
+     * @param tolerance Convergence tolerance for zeroing in m (default: 0.001f)
+     * @param spin_rate Bullet spin rate in rad/s (default: 0.0f)
      * @return Const reference to the zeroed initial bullet
      */
-    const Bullet& computeZero(double muzzle_velocity, double scope_height, double zero_range, double dt = 0.001, int max_iterations = 20, double tolerance = 0.001, double spin_rate = 0.0);
+    const Bullet& computeZero(float muzzle_velocity, float scope_height, float zero_range, float dt = 0.001f, int max_iterations = 20, float tolerance = 0.001f, float spin_rate = 0.0f);
 
     /**
      * @brief Simulate trajectory from current state to maximum distance
      *
      * @param max_distance Maximum distance to simulate in m
-     * @param dt Time step for simulation in s (default: 0.001)
-     * @param max_time Maximum simulation time in s (default: 60.0)
+     * @param dt Time step for simulation in s (default: 0.001f)
+     * @param max_time Maximum simulation time in s (default: 60.0f)
      * @return Const reference to trajectory object containing all simulation points
      */
-    const Trajectory& simulate(double max_distance, double dt = 0.001, double max_time = 60.0);
+    const Trajectory& simulate(float max_distance, float dt = 0.001f, float max_time = 60.0f);
 
     /**
      * @brief Advance simulation by one time step
@@ -126,7 +126,7 @@ namespace btk::ballistics
      * @param dt Time step in s
      * @return Const reference to the updated current bullet state
      */
-    const Bullet& timeStep(double dt);
+    const Bullet& timeStep(float dt);
 
     // State queries
     /**
@@ -134,14 +134,14 @@ namespace btk::ballistics
      *
      * @return Current bullet X position in m
      */
-    double getCurrentDistance() const;
+    float getCurrentDistance() const;
 
     /**
      * @brief Get current simulation time
      *
      * @return Current simulation time in s
      */
-    double getCurrentTime() const;
+    float getCurrentTime() const;
 
     /**
      * @brief Get the trajectory
@@ -152,7 +152,7 @@ namespace btk::ballistics
 
     private:
     // Physics helpers
-    double calculateDragRetardationFor(const Bullet& s) const;
+    float calculateDragRetardationFor(const Bullet& s) const;
     btk::physics::Vector3D calculateAccelerationFor(const Bullet& s) const;
 
     // Internal state
@@ -160,7 +160,7 @@ namespace btk::ballistics
     Bullet current_bullet_;
     btk::physics::Atmosphere atmosphere_;
     btk::physics::Vector3D wind_;
-    double current_time_;
+    float current_time_;
     Trajectory trajectory_;
   };
 

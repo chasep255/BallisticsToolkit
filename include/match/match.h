@@ -21,7 +21,7 @@ namespace btk::match
     /**
      * @brief Default constructor (zero hit)
      */
-    Hit() : x_(0.0), y_(0.0), score_(0) {}
+    Hit() : x_(0.0f), y_(0.0f), score_(0) {}
 
     /**
      * @brief Construct hit with position and score
@@ -31,21 +31,21 @@ namespace btk::match
      * @param hit_score Score (0-10)
      * @param is_x Whether this is an X-ring hit
      */
-    Hit(double x_position, double y_position, int hit_score, bool is_x) : x_(x_position), y_(y_position), score_(is_x ? 11 : hit_score) {}
+    Hit(float x_position, float y_position, int hit_score, bool is_x) : x_(x_position), y_(y_position), score_(is_x ? 11 : hit_score) {}
 
     /**
      * @brief Get X coordinate
      *
      * @return X coordinate in m
      */
-    double getX() const { return x_; }
+    float getX() const { return x_; }
 
     /**
      * @brief Get Y coordinate
      *
      * @return Y coordinate in m
      */
-    double getY() const { return y_; }
+    float getY() const { return y_; }
 
     /**
      * @brief Get score (0-10)
@@ -62,8 +62,8 @@ namespace btk::match
     bool isX() const { return score_ == 11; }
 
     private:
-    double x_;  // X coordinate in m (positive = right)
-    double y_;  // Y coordinate in m (positive = up)
+    float x_;   // X coordinate in m (positive = right)
+    float y_;   // Y coordinate in m (positive = up)
     int score_; // Score for this hit (11 = X)
   };
 
@@ -87,10 +87,10 @@ namespace btk::match
      * @param x X coordinate in m (positive = right)
      * @param y Y coordinate in m (positive = up)
      * @param target Target for scoring
-     * @param bullet_diameter Bullet diameter in m (for line breaking, default: 0.0)
+     * @param bullet_diameter Bullet diameter in m (for line breaking, default: 0.0f)
      * @return Reference to the created Hit object
      */
-    const Hit& addHit(double x, double y, const btk::match::Target& target, double bullet_diameter = 0.0);
+    const Hit& addHit(float x, float y, const btk::match::Target& target, float bullet_diameter = 0.0f);
 
     /**
      * @brief Get all hits
@@ -116,28 +116,28 @@ namespace btk::match
      *
      * @return Group size in m (diagonal of bounding box)
      */
-    double getGroupSize() const;
+    float getGroupSize() const;
 
     /**
      * @brief Get center of group
      *
      * @return Pair of (x_center, y_center) in m
      */
-    std::pair<double, double> getCenter() const;
+    std::pair<float, float> getCenter() const;
 
     /**
      * @brief Get mean radius from center
      *
      * @return Mean radius in m
      */
-    double getMeanRadius() const;
+    float getMeanRadius() const;
 
     /**
      * @brief Get radial standard deviation
      *
      * @return Radial standard deviation in m
      */
-    double getRadialStandardDeviation() const;
+    float getRadialStandardDeviation() const;
 
     /**
      * @brief Get total score
@@ -164,14 +164,14 @@ namespace btk::match
     std::vector<Hit> hits_;
 
     // Accumulated metrics
-    double sumX_ = 0.0;                                      // m
-    double sumY_ = 0.0;                                      // m
-    double sumX2_ = 0.0;                                     // sum of (x/meter)^2 - dimensionless
-    double sumY2_ = 0.0;                                     // sum of (y/meter)^2 - dimensionless
-    double minX_ = std::numeric_limits<double>::quiet_NaN(); // m
-    double maxX_ = std::numeric_limits<double>::quiet_NaN(); // m
-    double minY_ = std::numeric_limits<double>::quiet_NaN(); // m
-    double maxY_ = std::numeric_limits<double>::quiet_NaN(); // m
+    float sumX_ = 0.0f;                                    // m
+    float sumY_ = 0.0f;                                    // m
+    float sumX2_ = 0.0f;                                   // sum of (x/meter)^2 - dimensionless
+    float sumY2_ = 0.0f;                                   // sum of (y/meter)^2 - dimensionless
+    float minX_ = std::numeric_limits<float>::quiet_NaN(); // m
+    float maxX_ = std::numeric_limits<float>::quiet_NaN(); // m
+    float minY_ = std::numeric_limits<float>::quiet_NaN(); // m
+    float maxY_ = std::numeric_limits<float>::quiet_NaN(); // m
     int totalScore_ = 0;
     int xCount_ = 0;
 

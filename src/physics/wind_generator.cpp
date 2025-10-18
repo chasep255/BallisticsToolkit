@@ -8,39 +8,39 @@ namespace btk::physics
 
   WindGenerator::WindGenerator() {}
 
-  btk::physics::Vector3D WindGenerator::operator()(double x_m, double t_s) const
+  btk::physics::Vector3D WindGenerator::operator()(float x_m, float t_s) const
   {
-    double total_crosswind = 0.0; // Left/right component
-    double total_headwind = 0.0;  // Forward/backward component
+    float total_crosswind = 0.0f; // Left/right component
+    float total_headwind = 0.0f;  // Forward/backward component
 
     // Sum all wind components
     for(const auto& component : components_)
     {
       // Calculate spatial and temporal coordinates for noise sampling
       // Convert period/wavelength to frequencies for noise sampling
-      double spatial_freq = 1.0 / component.wavelength_m_;
-      double temporal_freq = 1.0 / component.period_s_;
+      float spatial_freq = 1.0f / component.wavelength_m_;
+      float temporal_freq = 1.0f / component.period_s_;
 
-      double spatial_x = x_m * spatial_freq;
-      double temporal_t = t_s * temporal_freq;
+      float spatial_x = x_m * spatial_freq;
+      float temporal_t = t_s * temporal_freq;
 
       // Sample the 2D Perlin noise for both components
-      double crosswind_raw = component.crosswind_noise_.noise2D(spatial_x, temporal_t);
-      double headwind_raw = component.headwind_noise_.noise2D(spatial_x, temporal_t);
+      float crosswind_raw = component.crosswind_noise_.noise2D(spatial_x, temporal_t);
+      float headwind_raw = component.headwind_noise_.noise2D(spatial_x, temporal_t);
 
       // Apply exponent to control spikiness
-      double crosswind = std::pow(std::abs(crosswind_raw), component.exponent_) * std::copysign(1.0, crosswind_raw);
-      double headwind = std::pow(std::abs(headwind_raw), component.exponent_) * std::copysign(1.0, headwind_raw);
+      float crosswind = std::pow(std::abs(crosswind_raw), component.exponent_) * std::copysign(1.0f, crosswind_raw);
+      float headwind = std::pow(std::abs(headwind_raw), component.exponent_) * std::copysign(1.0f, headwind_raw);
 
       // Scale by amplitude and add to totals
       total_crosswind += crosswind * component.amplitude_scale_;
       total_headwind += headwind * component.amplitude_scale_;
     }
 
-    return btk::physics::Vector3D(total_headwind, total_crosswind, 0.0);
+    return btk::physics::Vector3D(total_headwind, total_crosswind, 0.0f);
   }
 
-  void WindGenerator::addWindComponent(double amplitude_scale, double period_s, double wavelength_m, double exponent) { components_.emplace_back(amplitude_scale, period_s, wavelength_m, exponent); }
+  void WindGenerator::addWindComponent(float amplitude_scale, float period_s, float wavelength_m, float exponent) { components_.emplace_back(amplitude_scale, period_s, wavelength_m, exponent); }
 
   // ----------- WindPresets ----------------------------------------------------
 
@@ -52,9 +52,9 @@ namespace btk::physics
     presets_["Calm"] = []()
     {
       WindGenerator w;
-      w.addWindComponent(1.6, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
-      w.addWindComponent(3.0, 1200.0, 10000.0, 0.7);  // Very slow changes (20+ min cycles, 10km wavelength)
-      w.addWindComponent(1.6, 100.0, 1000.0, 0.8);    // Gentle micro-variations (1.7 min, 1km wavelength)
+      w.addWindComponent(1.6f, 7200.0f, 100000.0f, 0.5f); // Very slow bias (2+ hour cycles, 100km wavelength)
+      w.addWindComponent(3.0f, 1200.0f, 10000.0f, 0.7f);  // Very slow changes (20+ min cycles, 10km wavelength)
+      w.addWindComponent(1.6f, 100.0f, 1000.0f, 0.8f);    // Gentle micro-variations (1.7f min, 1km wavelength)
       return w;
     };
 
@@ -62,9 +62,9 @@ namespace btk::physics
     presets_["LightBreeze"] = []()
     {
       WindGenerator w;
-      w.addWindComponent(2.4, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
-      w.addWindComponent(4.4, 600.0, 5000.0, 1.0);    // Slow, predictable (10+ min cycles, 5km wavelength)
-      w.addWindComponent(3.0, 20.0, 500.0, 1.2);      // Some gentle variation (20 sec, 500m wavelength)
+      w.addWindComponent(2.4f, 7200.0f, 100000.0f, 0.5f); // Very slow bias (2+ hour cycles, 100km wavelength)
+      w.addWindComponent(4.4f, 600.0f, 5000.0f, 1.0f);    // Slow, predictable (10+ min cycles, 5km wavelength)
+      w.addWindComponent(3.0f, 20.0f, 500.0f, 1.2f);      // Some gentle variation (20 sec, 500m wavelength)
       return w;
     };
 
@@ -72,10 +72,10 @@ namespace btk::physics
     presets_["Moderate"] = []()
     {
       WindGenerator w;
-      w.addWindComponent(3.6, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
-      w.addWindComponent(6.0, 300.0, 2000.0, 1.0);    // Slow background (5+ min cycles, 2km wavelength)
-      w.addWindComponent(4.4, 60.0, 200.0, 1.5);      // Medium gusts (1-2 min cycles, 200m wavelength)
-      w.addWindComponent(3.6, 2.0, 100.0, 2.0);       // Quick gusts (2 sec cycles, 100m wavelength)
+      w.addWindComponent(3.6f, 7200.0f, 100000.0f, 0.5f); // Very slow bias (2+ hour cycles, 100km wavelength)
+      w.addWindComponent(6.0f, 300.0f, 2000.0f, 1.0f);    // Slow background (5+ min cycles, 2km wavelength)
+      w.addWindComponent(4.4f, 60.0f, 200.0f, 1.5f);      // Medium gusts (1-2 min cycles, 200m wavelength)
+      w.addWindComponent(3.6f, 2.0f, 100.0f, 2.0f);       // Quick gusts (2 sec cycles, 100m wavelength)
       return w;
     };
 
@@ -83,9 +83,9 @@ namespace btk::physics
     presets_["Strong"] = []()
     {
       WindGenerator w;
-      w.addWindComponent(8.0, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
-      w.addWindComponent(16.0, 300.0, 2000.0, 1.0);   // Steady background (5+ min cycles, 2km wavelength)
-      w.addWindComponent(12.0, 60.0, 330.0, 1.5);     // Occasional gusts (1-2 min cycles, 330m wavelength)
+      w.addWindComponent(8.0f, 7200.0f, 100000.0f, 0.5f); // Very slow bias (2+ hour cycles, 100km wavelength)
+      w.addWindComponent(16.0f, 300.0f, 2000.0f, 1.0f);   // Steady background (5+ min cycles, 2km wavelength)
+      w.addWindComponent(12.0f, 60.0f, 330.0f, 1.5f);     // Occasional gusts (1-2 min cycles, 330m wavelength)
       return w;
     };
 
@@ -93,11 +93,11 @@ namespace btk::physics
     presets_["Variable"] = []()
     {
       WindGenerator w;
-      w.addWindComponent(4.0, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
-      w.addWindComponent(7.6, 1200.0, 10000.0, 0.8);  // Very slow large-scale (20+ min, 10km wavelength)
-      w.addWindComponent(6.0, 120.0, 500.0, 1.2);     // Medium scale (2-3 min cycles, 500m wavelength)
-      w.addWindComponent(4.4, 20.0, 100.0, 1.8);      // Active gusts (20 sec cycles, 100m wavelength)
-      w.addWindComponent(3.0, 1.3, 20.0, 3.0);        // Very spiky micro-turbulence (1.3 sec cycles, 20m wavelength)
+      w.addWindComponent(4.0f, 7200.0f, 100000.0f, 0.5f); // Very slow bias (2+ hour cycles, 100km wavelength)
+      w.addWindComponent(7.6f, 1200.0f, 10000.0f, 0.8f);  // Very slow large-scale (20+ min, 10km wavelength)
+      w.addWindComponent(6.0f, 120.0f, 500.0f, 1.2f);     // Medium scale (2-3 min cycles, 500m wavelength)
+      w.addWindComponent(4.4f, 20.0f, 100.0f, 1.8f);      // Active gusts (20 sec cycles, 100m wavelength)
+      w.addWindComponent(3.0f, 1.3f, 20.0f, 3.0f);        // Very spiky micro-turbulence (1.3f sec cycles, 20m wavelength)
       return w;
     };
 
@@ -105,10 +105,10 @@ namespace btk::physics
     presets_["Shear"] = []()
     {
       WindGenerator w;
-      w.addWindComponent(5.0, 7200.0, 100000.0, 0.5); // Very slow bias (2+ hour cycles, 100km wavelength)
-      w.addWindComponent(10.0, 300.0, 3000.0, 1.0);   // Steady background (5+ min cycles, 3km wavelength)
-      w.addWindComponent(8.0, 75.0, 250.0, 1.3);      // Medium gusts (1.25 min cycles, 250m wavelength)
-      w.addWindComponent(6.0, 2.5, 67.0, 1.8);        // Direction changes over range (2.5 sec cycles, 67m wavelength)
+      w.addWindComponent(5.0f, 7200.0f, 100000.0f, 0.5f); // Very slow bias (2+ hour cycles, 100km wavelength)
+      w.addWindComponent(10.0f, 300.0f, 3000.0f, 1.0f);   // Steady background (5+ min cycles, 3km wavelength)
+      w.addWindComponent(8.0f, 75.0f, 250.0f, 1.3f);      // Medium gusts (1.25f min cycles, 250m wavelength)
+      w.addWindComponent(6.0f, 2.5f, 67.0f, 1.8f);        // Direction changes over range (2.5f sec cycles, 67m wavelength)
       return w;
     };
   }

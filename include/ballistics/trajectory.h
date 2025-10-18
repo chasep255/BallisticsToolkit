@@ -21,29 +21,29 @@ namespace btk::ballistics
      * @param time Time at this point in s
      * @param state Flying bullet state at this point
      */
-    TrajectoryPoint(double time, const Bullet& state);
+    TrajectoryPoint(float time, const Bullet& state);
 
     // Getters (all return SI base units)
-    double getTime() const { return time_; } // s
+    float getTime() const { return time_; } // s
     const Bullet& getState() const { return state_; }
 
     /**
      * @brief Get distance traveled at this point
      */
-    double getDistance() const; // m
+    float getDistance() const; // m
 
     /**
      * @brief Get velocity at this point
      */
-    double getVelocity() const; // m/s
+    float getVelocity() const; // m/s
 
     /**
      * @brief Get kinetic energy at this point
      */
-    double getKineticEnergy() const; // J
+    float getKineticEnergy() const; // J
 
     private:
-    double time_; // s
+    float time_; // s
     Bullet state_;
   };
 
@@ -64,7 +64,7 @@ namespace btk::ballistics
      * @param time Time at this point in s
      * @param state Flying bullet state at this point
      */
-    void addPoint(double time, const Bullet& state);
+    void addPoint(float time, const Bullet& state);
 
     /**
      * @brief Get the number of points in the trajectory
@@ -91,7 +91,7 @@ namespace btk::ballistics
      * @param distance Distance along trajectory in m
      * @return Trajectory point at the given distance (interpolated), or TrajectoryPoint with NaN time if not found
      */
-    TrajectoryPoint atDistance(double distance) const;
+    TrajectoryPoint atDistance(float distance) const;
 
     /**
      * @brief Get the trajectory point at a specific time
@@ -99,32 +99,32 @@ namespace btk::ballistics
      * @param time Time along trajectory in s
      * @return Trajectory point at the given time (interpolated), or std::nullopt if not found
      */
-    std::optional<TrajectoryPoint> atTime(double time) const;
+    std::optional<TrajectoryPoint> atTime(float time) const;
 
     /**
      * @brief Get the total distance of the trajectory
      */
-    double getTotalDistance() const; // m
+    float getTotalDistance() const; // m
 
     /**
      * @brief Get the total time of flight
      */
-    double getTotalTime() const; // s
+    float getTotalTime() const; // s
 
     /**
      * @brief Get the maximum height reached
      */
-    double getMaximumHeight() const; // m
+    float getMaximumHeight() const; // m
 
     /**
      * @brief Get the impact velocity
      */
-    double getImpactVelocity() const; // m/s
+    float getImpactVelocity() const; // m/s
 
     /**
      * @brief Get the impact angle (angle below horizontal)
      */
-    double getImpactAngle() const; // rad
+    float getImpactAngle() const; // rad
 
     /**
      * @brief Clear all points from the trajectory
@@ -147,7 +147,7 @@ namespace btk::ballistics
      * @param distance Target distance in m
      * @return Interpolated flying bullet state
      */
-    Bullet interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2, double distance) const;
+    Bullet interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2, float distance) const;
   };
 
 } // namespace btk::ballistics

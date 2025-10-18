@@ -7,20 +7,20 @@ namespace btk::physics
 {
 
   /**
-   * @brief 2D vector with double components
+   * @brief 2D vector with float components
    *
    * Provides basic 2D vector operations for ballistics calculations.
    * All operations are constexpr for compile-time evaluation.
    */
   struct Vector2D
   {
-    double x; ///< X component
-    double y; ///< Y component
+    float x; ///< X component
+    float y; ///< Y component
 
     /**
      * @brief Default constructor (zero vector)
      */
-    constexpr Vector2D() : x(0.0), y(0.0) {}
+    constexpr Vector2D() : x(0.0f), y(0.0f) {}
 
     /**
      * @brief Construct vector with specified components
@@ -28,7 +28,7 @@ namespace btk::physics
      * @param x_val X component
      * @param y_val Y component
      */
-    constexpr Vector2D(double x_val, double y_val) : x(x_val), y(y_val) {}
+    constexpr Vector2D(float x_val, float y_val) : x(x_val), y(y_val) {}
 
     // Basic operators
     /**
@@ -53,7 +53,7 @@ namespace btk::physics
      * @param scalar Scalar to multiply by
      * @return Scaled vector
      */
-    constexpr Vector2D operator*(double scalar) const { return Vector2D(x * scalar, y * scalar); }
+    constexpr Vector2D operator*(float scalar) const { return Vector2D(x * scalar, y * scalar); }
 
     /**
      * @brief Element-wise multiplication
@@ -69,7 +69,7 @@ namespace btk::physics
      * @param scalar Scalar to divide by
      * @return Scaled vector
      */
-    constexpr Vector2D operator/(double scalar) const { return Vector2D(x / scalar, y / scalar); }
+    constexpr Vector2D operator/(float scalar) const { return Vector2D(x / scalar, y / scalar); }
 
     /**
      * @brief Element-wise division
@@ -86,7 +86,7 @@ namespace btk::physics
      * @param scalar Scalar to add
      * @return Vector with scalar added to each component
      */
-    constexpr Vector2D operator+(double scalar) const { return Vector2D(x + scalar, y + scalar); }
+    constexpr Vector2D operator+(float scalar) const { return Vector2D(x + scalar, y + scalar); }
 
     /**
      * @brief Subtract scalar from each component
@@ -94,7 +94,7 @@ namespace btk::physics
      * @param scalar Scalar to subtract
      * @return Vector with scalar subtracted from each component
      */
-    constexpr Vector2D operator-(double scalar) const { return Vector2D(x - scalar, y - scalar); }
+    constexpr Vector2D operator-(float scalar) const { return Vector2D(x - scalar, y - scalar); }
 
     /**
      * @brief Unary minus (negation)
@@ -118,14 +118,14 @@ namespace btk::physics
       return *this;
     }
 
-    Vector2D& operator*=(double scalar)
+    Vector2D& operator*=(float scalar)
     {
       x *= scalar;
       y *= scalar;
       return *this;
     }
 
-    Vector2D& operator/=(double scalar)
+    Vector2D& operator/=(float scalar)
     {
       x /= scalar;
       y /= scalar;
@@ -138,7 +138,7 @@ namespace btk::physics
      *
      * @return Vector magnitude
      */
-    constexpr double magnitude() const { return std::sqrt(x * x + y * y); }
+    constexpr float magnitude() const { return std::sqrt(x * x + y * y); }
 
     /**
      * @brief Get normalized (unit) vector
@@ -147,8 +147,8 @@ namespace btk::physics
      */
     constexpr Vector2D normalized() const
     {
-      double mag = magnitude();
-      if(mag > 0.0)
+      float mag = magnitude();
+      if(mag > 0.0f)
         return *this / mag;
       return Vector2D();
     }
@@ -159,41 +159,41 @@ namespace btk::physics
      * @param other Vector to dot with
      * @return Dot product result
      */
-    constexpr double dot(const Vector2D& other) const { return x * other.x + y * other.y; }
+    constexpr float dot(const Vector2D& other) const { return x * other.x + y * other.y; }
 
     /**
      * @brief Linear interpolation between vectors
      *
      * @param other Target vector
-     * @param t Interpolation parameter (0.0 = this vector, 1.0 = other vector)
+     * @param t Interpolation parameter (0.0f = this vector, 1.0f = other vector)
      * @return Interpolated vector
      */
-    constexpr Vector2D lerp(const Vector2D& other, double t) const { return Vector2D(x + t * (other.x - x), y + t * (other.y - y)); }
+    constexpr Vector2D lerp(const Vector2D& other, float t) const { return Vector2D(x + t * (other.x - x), y + t * (other.y - y)); }
   };
 
   // Friend operators for scalar operations from left
-  constexpr Vector2D operator*(double scalar, const Vector2D& vec) { return vec * scalar; }
+  constexpr Vector2D operator*(float scalar, const Vector2D& vec) { return vec * scalar; }
 
-  constexpr Vector2D operator+(double scalar, const Vector2D& vec) { return vec + scalar; }
+  constexpr Vector2D operator+(float scalar, const Vector2D& vec) { return vec + scalar; }
 
-  constexpr Vector2D operator-(double scalar, const Vector2D& vec) { return Vector2D(scalar - vec.x, scalar - vec.y); }
+  constexpr Vector2D operator-(float scalar, const Vector2D& vec) { return Vector2D(scalar - vec.x, scalar - vec.y); }
 
   /**
-   * @brief 3D vector with double components
+   * @brief 3D vector with float components
    *
    * Provides 3D vector operations for ballistics calculations including position,
    * velocity, and acceleration vectors. All operations are constexpr for compile-time evaluation.
    */
   struct Vector3D
   {
-    double x; ///< X component
-    double y; ///< Y component
-    double z; ///< Z component
+    float x; ///< X component
+    float y; ///< Y component
+    float z; ///< Z component
 
     /**
      * @brief Default constructor (zero vector)
      */
-    constexpr Vector3D() : x(0.0), y(0.0), z(0.0) {}
+    constexpr Vector3D() : x(0.0f), y(0.0f), z(0.0f) {}
 
     /**
      * @brief Construct vector with specified components
@@ -202,7 +202,7 @@ namespace btk::physics
      * @param y_val Y component
      * @param z_val Z component
      */
-    constexpr Vector3D(double x_val, double y_val, double z_val) : x(x_val), y(y_val), z(z_val) {}
+    constexpr Vector3D(float x_val, float y_val, float z_val) : x(x_val), y(y_val), z(z_val) {}
 
     // Basic operators
     /**
@@ -227,7 +227,7 @@ namespace btk::physics
      * @param scalar Scalar to multiply by
      * @return Scaled vector
      */
-    constexpr Vector3D operator*(double scalar) const { return Vector3D(x * scalar, y * scalar, z * scalar); }
+    constexpr Vector3D operator*(float scalar) const { return Vector3D(x * scalar, y * scalar, z * scalar); }
 
     /**
      * @brief Element-wise multiplication
@@ -251,7 +251,7 @@ namespace btk::physics
      * @param scalar Scalar to divide by
      * @return Scaled vector
      */
-    constexpr Vector3D operator/(double scalar) const { return Vector3D(x / scalar, y / scalar, z / scalar); }
+    constexpr Vector3D operator/(float scalar) const { return Vector3D(x / scalar, y / scalar, z / scalar); }
 
     // Scalar addition and subtraction
     /**
@@ -260,7 +260,7 @@ namespace btk::physics
      * @param scalar Scalar to add
      * @return Vector with scalar added to each component
      */
-    constexpr Vector3D operator+(double scalar) const { return Vector3D(x + scalar, y + scalar, z + scalar); }
+    constexpr Vector3D operator+(float scalar) const { return Vector3D(x + scalar, y + scalar, z + scalar); }
 
     /**
      * @brief Subtract scalar from each component
@@ -268,7 +268,7 @@ namespace btk::physics
      * @param scalar Scalar to subtract
      * @return Vector with scalar subtracted from each component
      */
-    constexpr Vector3D operator-(double scalar) const { return Vector3D(x - scalar, y - scalar, z - scalar); }
+    constexpr Vector3D operator-(float scalar) const { return Vector3D(x - scalar, y - scalar, z - scalar); }
 
     /**
      * @brief Unary minus (negation)
@@ -312,7 +312,7 @@ namespace btk::physics
      * @param scalar Scalar to multiply by
      * @return Reference to this vector
      */
-    Vector3D& operator*=(double scalar)
+    Vector3D& operator*=(float scalar)
     {
       x *= scalar;
       y *= scalar;
@@ -326,7 +326,7 @@ namespace btk::physics
      * @param scalar Scalar to divide by
      * @return Reference to this vector
      */
-    Vector3D& operator/=(double scalar)
+    Vector3D& operator/=(float scalar)
     {
       x /= scalar;
       y /= scalar;
@@ -340,7 +340,7 @@ namespace btk::physics
      *
      * @return Vector magnitude
      */
-    constexpr double magnitude() const { return std::sqrt(x * x + y * y + z * z); }
+    constexpr float magnitude() const { return std::sqrt(x * x + y * y + z * z); }
 
     /**
      * @brief Get normalized (unit) vector
@@ -349,8 +349,8 @@ namespace btk::physics
      */
     constexpr Vector3D normalized() const
     {
-      double mag = magnitude();
-      if(mag > 0.0)
+      float mag = magnitude();
+      if(mag > 0.0f)
         return *this / mag;
       return Vector3D();
     }
@@ -361,7 +361,7 @@ namespace btk::physics
      * @param other Vector to dot with
      * @return Dot product result
      */
-    constexpr double dot(const Vector3D& other) const { return x * other.x + y * other.y + z * other.z; }
+    constexpr float dot(const Vector3D& other) const { return x * other.x + y * other.y + z * other.z; }
 
     /**
      * @brief Calculate cross product
@@ -375,10 +375,10 @@ namespace btk::physics
      * @brief Linear interpolation between vectors
      *
      * @param other Target vector
-     * @param t Interpolation parameter (0.0 = this vector, 1.0 = other vector)
+     * @param t Interpolation parameter (0.0f = this vector, 1.0f = other vector)
      * @return Interpolated vector
      */
-    constexpr Vector3D lerp(const Vector3D& other, double t) const { return Vector3D(x + t * (other.x - x), y + t * (other.y - y), z + t * (other.z - z)); }
+    constexpr Vector3D lerp(const Vector3D& other, float t) const { return Vector3D(x + t * (other.x - x), y + t * (other.y - y), z + t * (other.z - z)); }
   };
 
   // Friend operators for scalar operations from left
@@ -389,7 +389,7 @@ namespace btk::physics
    * @param vec Vector to multiply
    * @return Scaled vector
    */
-  constexpr Vector3D operator*(double scalar, const Vector3D& vec) { return vec * scalar; }
+  constexpr Vector3D operator*(float scalar, const Vector3D& vec) { return vec * scalar; }
 
   /**
    * @brief Scalar addition from left
@@ -398,7 +398,7 @@ namespace btk::physics
    * @param vec Vector to add to
    * @return Vector with scalar added to each component
    */
-  constexpr Vector3D operator+(double scalar, const Vector3D& vec) { return vec + scalar; }
+  constexpr Vector3D operator+(float scalar, const Vector3D& vec) { return vec + scalar; }
 
   /**
    * @brief Scalar subtraction from left
@@ -407,15 +407,15 @@ namespace btk::physics
    * @param vec Vector to subtract
    * @return Vector with scalar minus each component
    */
-  constexpr Vector3D operator-(double scalar, const Vector3D& vec) { return Vector3D(scalar - vec.x, scalar - vec.y, scalar - vec.z); }
+  constexpr Vector3D operator-(float scalar, const Vector3D& vec) { return Vector3D(scalar - vec.x, scalar - vec.y, scalar - vec.z); }
 
   /**
    * @brief Free function for linear interpolation (alternative syntax)
    *
    * @param a First vector
    * @param b Second vector
-   * @param t Interpolation parameter (0.0 = a, 1.0 = b)
+   * @param t Interpolation parameter (0.0f = a, 1.0f = b)
    * @return Interpolated vector
    */
-  constexpr Vector3D lerp(const Vector3D& a, const Vector3D& b, double t) { return a.lerp(b, t); }
+  constexpr Vector3D lerp(const Vector3D& a, const Vector3D& b, float t) { return a.lerp(b, t); }
 } // namespace btk::physics

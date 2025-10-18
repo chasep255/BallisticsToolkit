@@ -33,12 +33,12 @@ namespace btk::match
      * @param x_ring X-ring diameter in m (defaults to ring_10)
      * @param description Human-readable description
      */
-    Target(const std::string& name, double ring_10, double ring_9, double ring_8, double ring_7, double ring_6, double ring_5, double x_ring = 0.0, const std::string& description = "");
+    Target(const std::string& name, float ring_10, float ring_9, float ring_8, float ring_7, float ring_6, float ring_5, float x_ring = 0.0f, const std::string& description = "");
 
     /**
      * @brief Get diameter of specified ring (0-6, where 6=X, 5=10, etc.)
      */
-    double ringDiameter(int ring) const; // returns m
+    float ringDiameter(int ring) const; // returns m
 
     /**
      * @brief Calculate score for a hit at (x, y) coordinates
@@ -48,7 +48,7 @@ namespace btk::match
      * @param bullet_diameter Bullet diameter in m (for line breaking)
      * @return Score (0-10, where 0 = miss)
      */
-    int scoreHit(double x_position, double y_position, double bullet_diameter = 0.0) const;
+    int scoreHit(float x_position, float y_position, float bullet_diameter = 0.0f) const;
 
     /**
      * @brief Check if hit is in X ring
@@ -57,31 +57,31 @@ namespace btk::match
      * @param y_position Y coordinate in m
      * @param bullet_diameter Bullet diameter in m (for line breaking)
      */
-    bool isXRing(double x_position, double y_position, double bullet_diameter = 0.0) const;
+    bool isXRing(float x_position, float y_position, float bullet_diameter = 0.0f) const;
 
     /**
      * @brief Get inner diameter for a ring
      *
      * @return Inner diameter in m
      */
-    double getRingInnerDiameter(int ring) const;
+    float getRingInnerDiameter(int ring) const;
 
     /**
      * @brief Get outer diameter for a ring
      *
      * @return Outer diameter in m
      */
-    double getRingOuterDiameter(int ring) const;
+    float getRingOuterDiameter(int ring) const;
 
     // Getters
     const std::string& getName() const { return name_; }
     const std::string& getDescription() const { return description_; }
-    double getXRingDiameter() const { return ring_diameters_[6]; } // m
+    float getXRingDiameter() const { return ring_diameters_[6]; } // m
 
     private:
     std::string name_;
     std::string description_;
-    double ring_diameters_[7]; // m
+    float ring_diameters_[7]; // m
   };
 
 } // namespace btk::match

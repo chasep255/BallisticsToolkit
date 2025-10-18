@@ -75,7 +75,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // 3D Vector types
   class_<btk::physics::Vector3D>("Vector3D")
-    .constructor<double, double, double>()
+    .constructor<float, float, float>()
     .property("x", &Vector3D::x)
     .property("y", &Vector3D::y)
     .property("z", &Vector3D::z)
@@ -86,7 +86,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("lerp", &Vector3D::lerp);
 
   class_<btk::physics::Vector2D>("Vector2D")
-    .constructor<double, double>()
+    .constructor<float, float>()
     .property("x", &Vector2D::x)
     .property("y", &Vector2D::y)
     .function("magnitude", &Vector2D::magnitude)
@@ -98,8 +98,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   enum_<DragFunction>("DragFunction").value("G1", DragFunction::G1).value("G7", DragFunction::G7);
 
   class_<btk::ballistics::Bullet>("Bullet")
-    .constructor<double, double, double, double, DragFunction>()
-    .constructor<const Bullet&, const Vector3D&, const Vector3D&, double>()
+    .constructor<float, float, float, float, DragFunction>()
+    .constructor<const Bullet&, const Vector3D&, const Vector3D&, float>()
     .function("getWeight", &Bullet::getWeight)
     .function("getDiameter", &Bullet::getDiameter)
     .function("getLength", &Bullet::getLength)
@@ -118,7 +118,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   // Atmosphere class
   class_<btk::physics::Atmosphere>("Atmosphere")
     .constructor<>()
-    .constructor<double, double, double, double>()
+    .constructor<float, float, float, float>()
     .function("getTemperature", &Atmosphere::getTemperature)
     .function("getAltitude", &Atmosphere::getAltitude)
     .function("getHumidity", &Atmosphere::getHumidity)
@@ -130,7 +130,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // TrajectoryPoint class
   class_<btk::ballistics::TrajectoryPoint>("TrajectoryPoint")
-    .constructor<double, Bullet>()
+    .constructor<float, Bullet>()
     .function("getTime", &TrajectoryPoint::getTime)
     .function("getState", &TrajectoryPoint::getState)
     .function("getDistance", &TrajectoryPoint::getDistance)
@@ -169,7 +169,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Target class
   class_<btk::match::Target>("Target")
-    .constructor<const std::string&, double, double, double, double, double, double, double, const std::string&>()
+    .constructor<const std::string&, float, float, float, float, float, float, float, const std::string&>()
     .function("getName", &Target::getName)
     .function("getDescription", &Target::getDescription)
     .function("getXRingDiameter", &Target::getXRingDiameter)
@@ -205,7 +205,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   // Hit class
   class_<btk::match::Hit>("Hit")
     .constructor<>()
-    .constructor<double, double, int, bool>()
+    .constructor<float, float, int, bool>()
     .function("getX", &Hit::getX)
     .function("getY", &Hit::getY)
     .function("getScore", &Hit::getScore)
@@ -228,7 +228,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Match Simulator class (in match namespace)
   class_<btk::match::Simulator>("MatchSimulator")
-    .constructor<const btk::ballistics::Bullet&, double, const btk::match::Target&, double, const btk::physics::Atmosphere&, double, double, double, double, double, double>()
+    .constructor<const btk::ballistics::Bullet&, float, const btk::match::Target&, float, const btk::physics::Atmosphere&, float, float, float, float, float, float>()
     .function("fireShot", &btk::match::Simulator::fireShot)
     .function("getMatch", &btk::match::Simulator::getMatch)
     .function("clearShots", &btk::match::Simulator::clearShots)
@@ -250,7 +250,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   // Wind generator class
   class_<btk::physics::WindGenerator>("WindGenerator")
     .constructor<>()
-    .function("sample", select_overload<Vector3D(double, double) const>(&WindGenerator::operator()))
+    .function("sample", select_overload<Vector3D(float, float) const>(&WindGenerator::operator()))
     .function("addWindComponent", &WindGenerator::addWindComponent);
 
   // Wind presets factory
