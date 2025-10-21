@@ -170,10 +170,11 @@ class ThreeJSGame
   static PITS_OFFSET = 5;
 
   // Target animation constants
+  static TARGET_SIZE = 2; // yards - size of target frames
   static TARGET_GAP_ABOVE_PITS = 0.2; // Gap between target bottom and pit top when raised
   static TARGET_MAX_HEIGHT = 0; // No additional height when raised (baseHeight already has the gap)
-  static TARGET_HALF_MAST = -(2 + ThreeJSGame.TARGET_GAP_ABOVE_PITS) / 2; // Halfway between raised and lowered
-  static TARGET_MIN_HEIGHT = -(2 + ThreeJSGame.TARGET_GAP_ABOVE_PITS); // Fully lowered (target size + gap)
+  static TARGET_HALF_MAST = -(ThreeJSGame.TARGET_SIZE + ThreeJSGame.TARGET_GAP_ABOVE_PITS) / 2; // Halfway between raised and lowered
+  static TARGET_MIN_HEIGHT = -(ThreeJSGame.TARGET_SIZE + ThreeJSGame.TARGET_GAP_ABOVE_PITS); // Fully lowered (target size + gap)
   static TARGET_ANIMATION_SPEED = 0.75; // yards per second
 
   // Wind flag constants
@@ -204,7 +205,7 @@ class ThreeJSGame
   // Second scope constants
   static SCOPE2_DIAMETER_FRACTION = 0.5; // Same size as first scope
   static SCOPE2_MARGIN = 20; // pixels from edge
-  static SCOPE2_PAN_SPEED = 0.0005; // degrees per frame (50x slower)
+  static SCOPE2_PAN_SPEED = 0.1; // 0.1 inches at target per key press
 
   // ===== INITIALIZATION =====
   constructor(canvas, params = {})
@@ -346,24 +347,30 @@ class ThreeJSGame
     this.scope2X = this.canvas.clientWidth - scope2Size - ThreeJSGame.SCOPE2_MARGIN;
     this.scope2Y = this.canvas.clientHeight - scope2Size - ThreeJSGame.SCOPE2_MARGIN;
     
-    // Calculate FOV for just bigger than target (1.2x target size)
-    const targetFrameWidth = 2; // yards
-    const fovRadians = 2 * Math.atan(targetFrameWidth / this.distance);
+    // Calculate FOV for 1.5x target width
+    const targetFrameWidth = ThreeJSGame.TARGET_SIZE; // yards
+    const fovRadians = Math.atan((1.5 * targetFrameWidth) / this.distance);
     const fovDegrees = fovRadians * 180 / Math.PI;
     
     // Create second scope camera
     this.scope2Camera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.1, 2000);
     this.scope2Camera.position.set(0, 0, ThreeJSGame.CAMERA_EYE_HEIGHT);
     
-    // Point at center of target area
+    // Point at user's target center
     const targetCenterX = this.distance;
-    const targetCenterY = 0;
-    const targetCenterZ = 1.5; // eye level
+    const targetCenterY = this.userTarget.mesh.position.y;
+    const targetCenterZ = this.userTarget.mesh.position.z;
     this.scope2Camera.lookAt(targetCenterX, targetCenterY, targetCenterZ);
     
     // Initialize scope 2 control state
     this.scope2Pitch = 0;
     this.scope2Yaw = 0;
+    
+    // Calculate movement limits (stay within TARGET_SIZE frame, not entire range)
+    const maxYawRadians = Math.atan(targetFrameWidth / (2 * this.distance));
+    const maxPitchRadians = Math.atan(targetFrameWidth / (2 * this.distance));
+    this.scope2MaxYaw = maxYawRadians;
+    this.scope2MaxPitch = maxPitchRadians;
   }
 
   createScopeViewMesh() {
@@ -960,7 +967,7 @@ class ThreeJSGame
   }
 
   setupTargets(rangeLength) {
-    const targetSize = 2; // yards
+    const targetSize = ThreeJSGame.TARGET_SIZE; // yards
     const targetSpacing = 1; // yards between targets
     const totalTargetWidth = targetSize + targetSpacing;
     
@@ -1023,6 +1030,21 @@ class ThreeJSGame
       // Store number box reference for animation
       this.targetFrames[i].numberBox = numberBox;
     }
+    
+    // After the loop, find the center target (closest to Y=0)
+    let centerTargetIndex = 0;
+    let minDistance = Infinity;
+    for (let i = 0; i < this.targetFrames.length; i++) {
+      const yPos = Math.abs(this.targetFrames[i].mesh.position.y);
+      if (yPos < minDistance) {
+        minDistance = yPos;
+        centerTargetIndex = i;
+      }
+    }
+    
+    // Store reference to user's target
+    this.userTarget = this.targetFrames[centerTargetIndex];
+    console.log(`User's target is #${this.userTarget.targetNumber} at Y=${this.userTarget.mesh.position.y.toFixed(2)}`);
     
   }
 
@@ -1449,12 +1471,17 @@ class ThreeJSGame
     // Random demo behavior - every ~3-5 seconds, pick a random target
     if (Math.random() < 0.01) { // ~1% chance per frame at 60fps = ~every 1.7 seconds
       const randomTarget = Math.floor(Math.random() * this.targetFrames.length) + 1;
+      const target = this.targetFrames[randomTarget - 1];
+      
+      // Don't animate the user's target
+      if (target === this.userTarget) {
+        return;
+      }
+      
       const randomAction = Math.random();
       
-      if (randomAction < 0.33) {
+      if (randomAction < 0.5) {
         this.raiseTarget(randomTarget);
-      } else if (randomAction < 0.66) {
-        this.halfMastTarget(randomTarget);
       } else {
         this.lowerTarget(randomTarget);
       }
@@ -1539,36 +1566,48 @@ class ThreeJSGame
   }
 
   updateScope2Camera(deltaTime) {
-    const panSpeed = ThreeJSGame.SCOPE2_PAN_SPEED * deltaTime;
+    // Calculate angular movement for 0.1 inches at current distance
+    const linearMovement = ThreeJSGame.SCOPE2_PAN_SPEED; // 0.1 inches
+    const distanceInches = this.distance * 36; // Convert yards to inches
+    const angularIncrement = Math.atan(linearMovement / distanceInches);
     
-    // Arrow keys: adjust pitch and yaw
+    // Arrow keys: adjust pitch and yaw (per key press, not per frame)
     // Up arrow: increase pitch (tilt up)
     // Down arrow: decrease pitch (tilt down)
-    if (this.scope2Keys.up) this.scope2Pitch += panSpeed;
-    if (this.scope2Keys.down) this.scope2Pitch -= panSpeed;
+    if (this.scope2Keys.up) {
+      this.scope2Pitch += angularIncrement;
+      this.scope2Keys.up = false; // Reset key state after one press
+    }
+    if (this.scope2Keys.down) {
+      this.scope2Pitch -= angularIncrement;
+      this.scope2Keys.down = false; // Reset key state after one press
+    }
     
     // Left arrow: increase yaw (pan left)
     // Right arrow: decrease yaw (pan right)
-    if (this.scope2Keys.left) this.scope2Yaw += panSpeed;
-    if (this.scope2Keys.right) this.scope2Yaw -= panSpeed;
+    if (this.scope2Keys.left) {
+      this.scope2Yaw += angularIncrement;
+      this.scope2Keys.left = false; // Reset key state after one press
+    }
+    if (this.scope2Keys.right) {
+      this.scope2Yaw -= angularIncrement;
+      this.scope2Keys.right = false; // Reset key state after one press
+    }
     
-    // Clamp pitch and yaw to reasonable limits
-    this.scope2Pitch = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.scope2Pitch));
-    this.scope2Yaw = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.scope2Yaw));
+    // Clamp pitch and yaw to target frame limits
+    this.scope2Pitch = Math.max(-this.scope2MaxPitch, Math.min(this.scope2MaxPitch, this.scope2Pitch));
+    this.scope2Yaw = Math.max(-this.scope2MaxYaw, Math.min(this.scope2MaxYaw, this.scope2Yaw));
     
     // Apply rotation to scope 2 camera
-    // Start from main camera position and orientation
-    const targetCenterHeight = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + 1;
+    // Use user's target as the center reference point
     this.scope2Camera.position.copy(this.camera.position);
     this.scope2Camera.up.set(0, 0, 1);
-    
-    // Calculate look-at target with offsets
-    // scope2Yaw controls horizontal (Y-axis) offset at distance
-    // scope2Pitch controls vertical (Z-axis) offset
+
+    // Calculate look-at target with offsets relative to user's target
     const lookX = this.distance;
-    const lookY = this.distance * Math.tan(this.scope2Yaw); // Pan left/right
-    const lookZ = targetCenterHeight + this.distance * Math.tan(this.scope2Pitch); // Tilt up/down
-    
+    const lookY = this.userTarget.mesh.position.y + this.distance * Math.tan(this.scope2Yaw);
+    const lookZ = this.userTarget.mesh.position.z + this.distance * Math.tan(this.scope2Pitch);
+
     this.scope2Camera.lookAt(lookX, lookY, lookZ);
   }
 
