@@ -1,3 +1,27 @@
+// Google Analytics - only load on production domain
+(function() {
+  const hostname = window.location.hostname;
+  const isProduction = hostname === 'ballisticstoolkit.com' || hostname === 'www.ballisticstoolkit.com';
+  
+  if (isProduction) {
+    console.log('Google Analytics is enabled');
+    const GA_MEASUREMENT_ID = 'G-JWTD9KG6D6';
+    
+    // Load gtag.js script dynamically
+    const gtagScript = document.createElement('script');
+    gtagScript.async = true;
+    gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+    document.head.appendChild(gtagScript);
+    
+    // Initialize dataLayer and gtag
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    window.gtag = gtag;
+    gtag('js', new Date());
+    gtag('config', GA_MEASUREMENT_ID);
+  }
+})();
+
 /**
  * Common JavaScript functionality for BallisticsToolkit
  */
