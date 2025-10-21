@@ -181,8 +181,12 @@ class ThreeJSGame
   static FLAG_TIP_WIDTH = 18 / 36;  // 18 inches = 0.5 yards
   static FLAG_LENGTH = 12 / 3;      // 12 feet = 4 yards
   static FLAG_MIN_ANGLE = 5;        // degrees from vertical
-  static FLAG_MAX_ANGLE = 85;       // degrees from vertical
-  static FLAG_DEGREES_PER_MPH = 5;  // angle increase per mph
+  static FLAG_MAX_ANGLE = 90;       // degrees from vertical
+  static FLAG_DEGREES_PER_MPH = (90 - 5) / 20;  // (max - min) / 20 mph = 4 degrees per mph
+  static FLAG_FLAP_FREQUENCY_BASE = 2.0; // Hz at 10 mph
+  static FLAG_FLAP_FREQUENCY_SCALE = 0.1; // Additional Hz per mph
+  static FLAG_FLAP_AMPLITUDE = 0.05; // Max ripple amplitude in yards
+  static FLAG_WAVE_LENGTH = 2.0; // Wavelength along flag length
 
   // Camera settings
   static CAMERA_FOV = 30;
@@ -215,6 +219,8 @@ class ThreeJSGame
     
     // Renderer
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     
@@ -264,47 +270,75 @@ class ThreeJSGame
   }
 
   createFlagGeometry() {
-    // Create trapezoid flag: 48" base (1.33 yds), 18" tip (0.5 yds), 12' long (4 yds)
-    // Flag hangs vertically when no wind, only tip vertices move
+    // Create thick segmented trapezoid flag with 5 segments for flapping animation
+    // 48" base (1.33 yds), 18" tip (0.5 yds), 12' long (4 yds)
     const geometry = new THREE.BufferGeometry();
     
-    // Initial vertices (flag hanging straight down)
-    // Base vertices (fixed to pole): top and bottom at x=0
-    // Tip vertices: hanging down from base
     const halfBase = ThreeJSGame.FLAG_BASE_WIDTH / 2;  // 0.67 yards
     const halfTip = ThreeJSGame.FLAG_TIP_WIDTH / 2;    // 0.25 yards
     const length = ThreeJSGame.FLAG_LENGTH;            // 4 yards
+    const thickness = 0.05; // 2cm thickness for realistic flag
+    const numSegments = 5; // Base + 3 intermediate + tip
     
-    // Vertices for two triangles forming the trapezoid
-    // Triangle 1: top-base, bottom-base, top-tip
-    // Triangle 2: bottom-base, bottom-tip, top-tip
-    const vertices = new Float32Array([
-      // Triangle 1
-      0, 0, halfBase,           // top base (fixed)
-      0, 0, -halfBase,          // bottom base (fixed)
-      0, -length, halfTip,      // top tip (moves) - hanging down
+    // Create vertices for thick flag using multiple layers
+    const vertices = [];
+    const uvs = [];
+    const indices = [];
+    
+    // Create front and back faces for each segment
+    for (let i = 0; i < numSegments; i++) {
+      const t = i / (numSegments - 1); // 0 to 1
       
-      // Triangle 2
-      0, 0, -halfBase,          // bottom base (fixed)
-      0, -length, -halfTip,     // bottom tip (moves) - hanging down
-      0, -length, halfTip       // top tip (moves) - hanging down
-    ]);
-    
-    // UV coordinates (red top, yellow bottom)
-    const uvs = new Float32Array([
-      // Triangle 1
-      0, 0,     // top base
-      0, 1,     // bottom base
-      1, 0,     // top tip
+      // Interpolate width from base to tip
+      const halfWidth = halfBase + (halfTip - halfBase) * t;
       
-      // Triangle 2
-      0, 1,     // bottom base
-      1, 1,     // bottom tip
-      1, 0      // top tip
-    ]);
+      // Position along flag length (hanging down initially)
+      const yPos = -length * t;
+      
+      // Front face vertices (positive X)
+      vertices.push(thickness/2, yPos, halfWidth);   // Top front
+      vertices.push(thickness/2, yPos, -halfWidth);  // Bottom front
+      
+      // Back face vertices (negative X)
+      vertices.push(-thickness/2, yPos, halfWidth);  // Top back
+      vertices.push(-thickness/2, yPos, -halfWidth); // Bottom back
+      
+      // UV coordinates (red top, yellow bottom) for both faces
+      uvs.push(t, 0); // Top front
+      uvs.push(t, 1); // Bottom front
+      uvs.push(t, 0); // Top back
+      uvs.push(t, 1); // Bottom back
+    }
     
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    // Create indices for front and back faces
+    for (let i = 0; i < numSegments - 1; i++) {
+      const idx = i * 4; // 4 vertices per segment (2 front + 2 back)
+      
+      // Front face triangles
+      indices.push(idx, idx + 1, idx + 4);     // First triangle
+      indices.push(idx + 1, idx + 5, idx + 4);  // Second triangle
+      
+      // Back face triangles (reverse winding)
+      indices.push(idx + 2, idx + 6, idx + 3);  // First triangle
+      indices.push(idx + 3, idx + 6, idx + 7);  // Second triangle
+    }
+    
+    // Add side faces to connect front and back
+    for (let i = 0; i < numSegments - 1; i++) {
+      const idx = i * 4;
+      
+      // Top edge side face
+      indices.push(idx, idx + 4, idx + 2);      // First triangle
+      indices.push(idx + 2, idx + 4, idx + 6);  // Second triangle
+      
+      // Bottom edge side face
+      indices.push(idx + 1, idx + 3, idx + 5);  // First triangle
+      indices.push(idx + 3, idx + 7, idx + 5);  // Second triangle
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geometry.setIndex(indices);
     geometry.computeVertexNormals();
     
     return geometry;
@@ -369,13 +403,26 @@ class ThreeJSGame
 
   setupLighting() {
     // Much brighter ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
     this.scene.add(ambientLight);
     
-    // Brighter directional light simulating late morning sun from behind (south)
-    const directionalLight = new THREE.DirectionalLight(0xfff4e6, 2.5); // Much brighter warm morning sunlight
-    directionalLight.position.set(-100, -50, 150); // Behind and higher for morning sun
+    // Brighter directional light simulating sun behind shooter illuminating the range
+    const directionalLight = new THREE.DirectionalLight(0xfff4e6, 2.5); // Brighter warm sunlight
+    // Position sun behind shooter (6 o'clock position) illuminating downrange
+    directionalLight.position.set(-200, 0, 150); // Behind shooter, centered, high up
     directionalLight.castShadow = true;
+    
+    // Configure shadow properties for better quality
+    directionalLight.shadow.mapSize.width = 2048;  // Higher resolution shadows
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 500;
+    directionalLight.shadow.camera.left = -200;
+    directionalLight.shadow.camera.right = 200;
+    directionalLight.shadow.camera.top = 200;
+    directionalLight.shadow.camera.bottom = -200;
+    directionalLight.shadow.bias = -0.0001;  // Reduce shadow acne
+    
     this.scene.add(directionalLight);
   }
 
@@ -386,6 +433,7 @@ class ThreeJSGame
     const brownGroundMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513, side: THREE.DoubleSide }); // Brown
     const brownGround = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
     brownGround.position.set(rangeLength / 2, 0, -0.1); // Center it downrange, slightly lower
+    brownGround.receiveShadow = true;  // Enable shadow receiving on ground
     this.scene.add(brownGround);
     
     // Add a range plane - just the shooting lanes with grass texture
@@ -406,12 +454,17 @@ class ThreeJSGame
     groundMaterial.normalMap = noiseTexture;
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.position.set(rangeLength / 2, 0, 0); // Center it downrange
+    ground.receiveShadow = true;  // Enable shadow receiving on grass
     this.scene.add(ground);
     
     // Add pits at the end of the range
     const pitsGeometry = new THREE.BoxGeometry(ThreeJSGame.PITS_DEPTH, ThreeJSGame.RANGE_LANE_WIDTH, ThreeJSGame.PITS_HEIGHT);
     const pitsMaterial = new THREE.MeshStandardMaterial({ color: 0x8b7355 }); // Grey-brown
     const pits = new THREE.Mesh(pitsGeometry, pitsMaterial);
+    
+    // Enable shadows on pits
+    pits.castShadow = true;
+    pits.receiveShadow = true;
     
     // Position pits at rangeLength - PITS_OFFSET to obscure targets when lowered
     pits.position.set(rangeLength - ThreeJSGame.PITS_OFFSET + ThreeJSGame.PITS_DEPTH / 2, 0, ThreeJSGame.PITS_HEIGHT / 2);
@@ -447,6 +500,10 @@ class ThreeJSGame
       });
       const target = new THREE.Mesh(targetGeometry, targetMaterial);
       
+      // Enable shadows on target
+      target.castShadow = true;
+      target.receiveShadow = true;
+      
       // Position target at exact distance for accurate ballistic simulation - left to right (positive Y to negative Y)
       const yPos = startY - i * totalTargetWidth;
       target.position.set(rangeLength, yPos, targetHeight);
@@ -472,6 +529,11 @@ class ThreeJSGame
         transparent: true
       });
       const numberBox = new THREE.Mesh(numberGeometry, numberMaterial);
+      
+      // Enable shadows on number box
+      numberBox.castShadow = true;
+      numberBox.receiveShadow = true;
+      
       numberBox.position.set(rangeLength, yPos, targetHeight + targetSize + 0.2); // 0.2 yards above target
       this.scene.add(numberBox);
       
@@ -678,19 +740,27 @@ class ThreeJSGame
     for (let yds = ThreeJSGame.POLE_INTERVAL; yds < maxDistance; yds += ThreeJSGame.POLE_INTERVAL)
     {
       const poleGeometry = new THREE.BoxGeometry(ThreeJSGame.POLE_THICKNESS, ThreeJSGame.POLE_THICKNESS, ThreeJSGame.POLE_HEIGHT);
-      const poleMaterial = new THREE.MeshBasicMaterial({ color: 0x808080 }); // Grey
+      const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 }); // Grey
       const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+      
+      // Enable shadow casting and receiving
+      pole.castShadow = true;
+      pole.receiveShadow = true;
       
       pole.position.set(yds, laneBorder, ThreeJSGame.POLE_HEIGHT / 2);
       this.scene.add(pole);
       
-      // Create flag geometry and mesh
-      const flagGeometry = this.createFlagGeometry();
-      const flagMaterial = new THREE.MeshBasicMaterial({ 
-        map: flagTexture,
-        side: THREE.DoubleSide
-      });
-      const flagMesh = new THREE.Mesh(flagGeometry, flagMaterial);
+    // Create flag geometry and mesh
+    const flagGeometry = this.createFlagGeometry();
+    const flagMaterial = new THREE.MeshStandardMaterial({ 
+      map: flagTexture,
+      side: THREE.DoubleSide
+    });
+    const flagMesh = new THREE.Mesh(flagGeometry, flagMaterial);
+    
+    // Enable shadow casting and receiving
+    flagMesh.castShadow = true;
+    flagMesh.receiveShadow = true;
       
       // Position flag at top of pole (center of base at pole top - half base width)
       const flagZ = ThreeJSGame.POLE_HEIGHT - ThreeJSGame.FLAG_BASE_WIDTH / 2;
@@ -705,7 +775,8 @@ class ThreeJSGame
         position: {x: yds, y: laneBorder, z: flagZ},
         currentAngle: ThreeJSGame.FLAG_MIN_ANGLE,
         targetAngle: ThreeJSGame.FLAG_MIN_ANGLE,
-        currentDirection: 0 // yaw rotation in radians
+        currentDirection: 0, // yaw rotation in radians
+        flapPhase: Math.random() * Math.PI * 2 // Random starting phase for variety
       });
     }
     
@@ -764,53 +835,86 @@ class ThreeJSGame
       const dirStep = Math.sign(dirDiff) * Math.min(Math.abs(dirDiff), directionSpeed * deltaTime);
       flag.currentDirection += dirStep;
       
-      // Update flag geometry - only move the tip vertices
-      this.updateFlagGeometry(flag, flag.currentAngle, flag.currentDirection);
+      // Update flap phase based on wind speed
+      const flapFrequency = ThreeJSGame.FLAG_FLAP_FREQUENCY_BASE + windSpeedMph * ThreeJSGame.FLAG_FLAP_FREQUENCY_SCALE;
+      flag.flapPhase += flapFrequency * 2 * Math.PI * deltaTime;
+      
+      // Update flag geometry with flapping
+      this.updateFlagGeometry(flag, flag.currentAngle, flag.currentDirection, windSpeedMph);
     }
   }
 
-  updateFlagGeometry(flag, angleDeg, direction) {
-    // Only update the tip vertices (vertices 2, 4, 5 in the geometry)
-    // Base vertices (0, 1, 3) remain fixed at the pole
-    
+  updateFlagGeometry(flag, angleDeg, direction, windSpeedMph) {
+    // Update all segments with flapping animation for thick flag
     const halfBase = ThreeJSGame.FLAG_BASE_WIDTH / 2;
     const halfTip = ThreeJSGame.FLAG_TIP_WIDTH / 2;
     const length = ThreeJSGame.FLAG_LENGTH;
+    const thickness = 0.05; // Same as in createFlagGeometry
+    const numSegments = 5;
     
     // Convert angle from degrees to radians
     const angleRad = angleDeg * Math.PI / 180;
     
-    // Calculate tip position
-    // When angle is 5 degrees, flag hangs nearly vertical (down)
-    // When angle is 85 degrees, flag is nearly horizontal
-    // The tip moves in a circle around the base, starting from straight down
-    
-    // Pitch angle: 0 = straight down, 90 = horizontal
-    const pitchAngle = angleRad;
-    
-    // Calculate tip offset from base
-    const tipX = Math.sin(pitchAngle) * length * Math.cos(direction);
-    const tipY = Math.sin(pitchAngle) * length * Math.sin(direction);
-    const tipZ = -Math.cos(pitchAngle) * length; // Negative because it starts hanging down
-    
     // Get the position attribute from the geometry
     const positions = flag.flagGeometry.attributes.position.array;
     
-    // Update tip vertices (keeping base vertices fixed at 0,0)
-    // Vertex 2: top tip (Triangle 1)
-    positions[6] = tipX;   // x
-    positions[7] = tipY;   // y
-    positions[8] = tipZ + halfTip;  // z (offset by half tip width)
+    // Calculate flag's local coordinate system
+    // The flag extends in the direction of the wind, then ripples perpendicular to that
+    const cosDir = Math.cos(direction);
+    const sinDir = Math.sin(direction);
+    const cosPitch = Math.cos(angleRad);
+    const sinPitch = Math.sin(angleRad);
     
-    // Vertex 4: bottom tip (Triangle 2)
-    positions[12] = tipX;  // x
-    positions[13] = tipY;  // y
-    positions[14] = tipZ - halfTip; // z (offset by half tip width)
-    
-    // Vertex 5: top tip (Triangle 2, same as vertex 2)
-    positions[15] = tipX;  // x
-    positions[16] = tipY;  // y
-    positions[17] = tipZ + halfTip; // z
+    // Update each segment (4 vertices per segment: 2 front + 2 back)
+    for (let i = 0; i < numSegments; i++) {
+      const t = i / (numSegments - 1); // 0 to 1 from base to tip
+      
+      // Interpolate width from base to tip
+      const halfWidth = halfBase + (halfTip - halfBase) * t;
+      
+      // Base position along flag (before flapping)
+      const segmentX = sinPitch * length * t * cosDir;
+      const segmentY = sinPitch * length * t * sinDir;
+      const segmentZ = -cosPitch * length * t; // Negative because hanging down
+      
+      // Calculate flapping offset
+      // Wave travels along the flag, amplitude increases from base to tip
+      const wavePosition = t * ThreeJSGame.FLAG_WAVE_LENGTH;
+      const waveOffset = Math.sin(flag.flapPhase + wavePosition * 2 * Math.PI) * ThreeJSGame.FLAG_FLAP_AMPLITUDE;
+      const flapAmplitude = waveOffset * t; // Scale from 0 at base to full at tip
+      
+      // Flapping is perpendicular to the flag surface
+      // Calculate perpendicular direction (cross product of flag direction and up vector)
+      const perpX = -sinDir;
+      const perpY = cosDir;
+      const perpZ = 0;
+      
+      // Apply flapping offset
+      const flapX = perpX * flapAmplitude;
+      const flapY = perpY * flapAmplitude;
+      const flapZ = perpZ * flapAmplitude;
+      
+      // Update all 4 vertices for this segment (front and back faces)
+      const idx = i * 4; // 4 vertices per segment
+      
+      // Front face vertices (positive X)
+      positions[idx * 3 + 0] = segmentX + flapX + thickness/2;  // Top front X
+      positions[idx * 3 + 1] = segmentY + flapY;               // Top front Y
+      positions[idx * 3 + 2] = segmentZ + flapZ + halfWidth;  // Top front Z
+      
+      positions[(idx + 1) * 3 + 0] = segmentX + flapX + thickness/2;  // Bottom front X
+      positions[(idx + 1) * 3 + 1] = segmentY + flapY;               // Bottom front Y
+      positions[(idx + 1) * 3 + 2] = segmentZ + flapZ - halfWidth;  // Bottom front Z
+      
+      // Back face vertices (negative X)
+      positions[(idx + 2) * 3 + 0] = segmentX + flapX - thickness/2;  // Top back X
+      positions[(idx + 2) * 3 + 1] = segmentY + flapY;              // Top back Y
+      positions[(idx + 2) * 3 + 2] = segmentZ + flapZ + halfWidth; // Top back Z
+      
+      positions[(idx + 3) * 3 + 0] = segmentX + flapX - thickness/2;  // Bottom back X
+      positions[(idx + 3) * 3 + 1] = segmentY + flapY;              // Bottom back Y
+      positions[(idx + 3) * 3 + 2] = segmentZ + flapZ - halfWidth;  // Bottom back Z
+    }
     
     // Mark the geometry as needing an update
     flag.flagGeometry.attributes.position.needsUpdate = true;
