@@ -4,9 +4,9 @@
 #include "ballistics/simulator.h"
 #include "match/match.h"
 #include "match/target.h"
-#include "physics/atmosphere.h"
 #include "math/conversions.h"
 #include "math/vector.h"
+#include "physics/atmosphere.h"
 #include <random>
 #include <string>
 #include <vector>

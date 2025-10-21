@@ -1,8 +1,8 @@
 #pragma once
 
-#include "physics/constants.h"
 #include "math/conversions.h"
 #include "math/vector.h"
+#include "physics/constants.h"
 #include <cmath>
 #include <string>
 #include <tuple>
@@ -153,7 +153,7 @@ namespace btk::ballistics
     // Flight state (only valid if has_flight_state_ is true)
     btk::math::Vector3D position_; // m
     btk::math::Vector3D velocity_; // m/s
-    float spin_rate_;                 // rad/s
+    float spin_rate_;              // rad/s
     bool has_flight_state_;
   };
 

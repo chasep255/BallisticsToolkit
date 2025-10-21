@@ -1,6 +1,6 @@
 #include "ballistics/simulator.h"
-#include "physics/constants.h"
 #include "math/conversions.h"
+#include "physics/constants.h"
 #include <algorithm>
 #include <array>
 #include <cmath>

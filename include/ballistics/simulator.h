@@ -2,9 +2,9 @@
 
 #include "ballistics/bullet.h"
 #include "ballistics/trajectory.h"
-#include "physics/atmosphere.h"
 #include "math/conversions.h"
 #include "math/vector.h"
+#include "physics/atmosphere.h"
 
 namespace btk::ballistics
 {

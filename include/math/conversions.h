@@ -118,6 +118,10 @@ namespace btk::math
     static constexpr float radiansToTurns(float radians) { return radians / (2.0f * M_PI_F); }
     static constexpr float radiansToOclock(float radians) { return (radians * 180.0f / M_PI_F) / 30.0f; }
 
+    // Direct conversions between angular units
+    static constexpr float mradToMoa(float mrad) { return mrad * 3.43775f; } // 1 mrad = 3.43775 MOA
+    static constexpr float moaToMrad(float moa) { return moa * 0.290888f; }  // 1 MOA = 0.290888 mrad
+
     // ============================================================================
     // PRESSURE CONVERSIONS
     // ============================================================================

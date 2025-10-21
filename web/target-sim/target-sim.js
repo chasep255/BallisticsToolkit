@@ -3,11 +3,14 @@
  * Web GUI for ballistic match simulation using WebAssembly
  */
 
+import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
+
+let btk = null;
+
 class TargetSimulator
 {
   constructor()
   {
-    this.btk = null;
     this.simulator = null;
     this.currentShots = [];
     this.allShots = [];
@@ -16,6 +19,10 @@ class TargetSimulator
     this.totalShots = 0;
     this.totalMatches = 0;
     this.isRunning = false;
+
+    // Performance tracking
+    this.perfStartMs = null;
+    this.perfShotsFired = 0;
 
     // Target display
     this.canvas = null;
@@ -36,40 +43,12 @@ class TargetSimulator
     // UI elements
     this.elements = {};
 
-    this.init();
+    // Initialize UI synchronously
+    this.initializeUI();
+    this.setupEventListeners();
+    Utils.setupHelpModal('helpBtn', 'helpModal');
   }
 
-  init()
-  {
-    try
-    {
-      // Show loading
-      document.getElementById('loading').classList.add('show');
-
-      // Get WebAssembly module from window
-      this.btk = window.btk;
-      if (!this.btk)
-      {
-        console.error('BallisticsToolkit not available');
-        return;
-      }
-
-      // Hide loading
-      document.getElementById('loading').classList.remove('show');
-
-      // Initialize UI
-      this.initializeUI();
-      this.setupEventListeners();
-      Utils.setupHelpModal('helpBtn', 'helpModal');
-
-      console.log('Target Simulator initialized successfully');
-    }
-    catch (error)
-    {
-      console.error('Failed to initialize Target Simulator:', error);
-      document.getElementById('loading').innerHTML = 'Failed to load WebAssembly module';
-    }
-  }
 
   initializeUI()
   {
@@ -155,7 +134,7 @@ class TargetSimulator
     targetSelect.innerHTML = '';
 
     // Get available targets from C++
-    const availableTargets = this.btk.NRATargets.listTargets();
+    const availableTargets = btk.NRATargets.listTargets();
 
     // Add each target as an option directly from C++ vector
     const targetNames = [];
@@ -259,6 +238,9 @@ class TargetSimulator
 
       // Start simulation
       this.isRunning = true;
+      // Start performance timer
+      this.perfStartMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      this.perfShotsFired = 0;
       this.fireNextShot();
 
     }
@@ -272,49 +254,54 @@ class TargetSimulator
 
   stopSimulation()
   {
+    const wasRunning = this.isRunning;
     this.isRunning = false;
     this.elements.runBtn.disabled = false;
     this.elements.stopBtn.disabled = true;
+
+    // If stopped mid-run, log partial performance stats
+    if (wasRunning && this.perfStartMs != null && this.perfShotsFired > 0)
+    {
+      const endMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const totalMs = endMs - this.perfStartMs;
+      const perShotMs = totalMs / this.perfShotsFired;
+      console.log(`Target-Sim stopped: shots=${this.perfShotsFired}, total=${totalMs.toFixed(1)} ms, per-shot=${perShotMs.toFixed(2)} ms`);
+    }
   }
 
   async setupSimulation()
   {
-    // Get parameters
+    // Get parameters and convert to proper units
     const bc = parseFloat(document.getElementById('bc').value);
-    const mv = parseFloat(document.getElementById('mv').value);
-    const diameter = parseFloat(document.getElementById('diameter').value);
+    const dragFunction = document.getElementById('dragFunction').value;
+    const mv = btk.Conversions.fpsToMps(parseFloat(document.getElementById('mv').value));
+    const diameter = btk.Conversions.inchesToMeters(parseFloat(document.getElementById('diameter').value));
     const targetName = document.getElementById('target').value;
-    const range = parseFloat(document.getElementById('range').value);
+    const range = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('range').value));
     const shots = parseInt(document.getElementById('shots').value);
     const matches = parseInt(document.getElementById('matches').value);
-    const mvSd = parseFloat(document.getElementById('mvSd').value);
-    const windSd = parseFloat(document.getElementById('windSd').value);
-    const headwindSd = parseFloat(document.getElementById('headwindSd').value);
-    const updraftSd = parseFloat(document.getElementById('updraftSd').value);
-    const rifleAccuracy = parseFloat(document.getElementById('rifleAccuracy').value);
-    const altitude = parseFloat(document.getElementById('altitude').value);
-    const temperature = parseFloat(document.getElementById('temperature').value);
+    const mvSd = btk.Conversions.fpsToMps(parseFloat(document.getElementById('mvSd').value));
+    const windSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('windSd').value));
+    const headwindSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('headwindSd').value));
+    const updraftSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('updraftSd').value));
+    const rifleAccuracyMrad = btk.Conversions.moaToRadians(parseFloat(document.getElementById('rifleAccuracy').value));
+    const altitude = btk.Conversions.feetToMeters(parseFloat(document.getElementById('altitude').value));
+    const temperature = btk.Conversions.fahrenheitToKelvin(parseFloat(document.getElementById('temperature').value));
     const humidity = parseFloat(document.getElementById('humidity').value) / 100.0;
     // Create bullet
-    const bullet = new this.btk.Bullet(
-      this.btk.Conversions.grainsToKg(0), // Weight not used in 3DOF
-      this.btk.Conversions.inchesToMeters(diameter),
-      this.btk.Conversions.inchesToMeters(0), // Length not used
+    const bullet = new btk.Bullet(
+      btk.Conversions.grainsToKg(0), // Weight not used in 3DOF
+      diameter,
+      btk.Conversions.inchesToMeters(0), // Length not used
       bc,
-      document.getElementById('dragFunction').value === 'G1' ?
-      this.btk.DragFunction.G1 : this.btk.DragFunction.G7
+      dragFunction === 'G1' ? btk.DragFunction.G1 : btk.DragFunction.G7
     );
 
     // Create atmosphere
-    const temp = this.btk.Conversions.fahrenheitToKelvin(temperature);
-    const alt = this.btk.Conversions.feetToMeters(altitude);
-    // Use automatic pressure calculation at altitude
-    const press = 0.0; // This will be calculated automatically
-
-    const atmosphere = new this.btk.Atmosphere(temp, alt, humidity, press);
+    const atmosphere = new btk.Atmosphere(temperature, altitude, humidity, 0.0);
 
     // Get target
-    const target = this.btk.NRATargets.getTarget(targetName);
+    const target = btk.NRATargets.getTarget(targetName);
     if (!target)
     {
       throw new Error(`Unknown target: ${targetName}`);
@@ -322,18 +309,16 @@ class TargetSimulator
 
 
     // Create simulator
-    const rifleAccuracyMrad = this.btk.Conversions.moaToRadians(rifleAccuracy);
-
-    this.simulator = new this.btk.MatchSimulator(
+    this.simulator = new btk.MatchSimulator(
       bullet,
-      this.btk.Conversions.fpsToMps(mv),
+      mv,
       target,
-      this.btk.Conversions.yardsToMeters(range),
+      range,
       atmosphere,
-      this.btk.Conversions.fpsToMps(mvSd),
-      this.btk.Conversions.mphToMps(windSd),
-      this.btk.Conversions.mphToMps(headwindSd),
-      this.btk.Conversions.mphToMps(updraftSd),
+      mvSd,
+      windSd,
+      headwindSd,
+      updraftSd,
       rifleAccuracyMrad,
       0.001 // timestep
     );
@@ -362,6 +347,7 @@ class TargetSimulator
     {
       // Fire shot
       const simulatedShot = this.simulator.fireShot();
+      this.perfShotsFired++;
       this.currentShot++;
       this.currentShots.push(simulatedShot);
       this.allShots.push(simulatedShot);
@@ -419,6 +405,15 @@ class TargetSimulator
     this.isRunning = false;
     this.elements.runBtn.disabled = false;
     this.elements.stopBtn.disabled = true;
+
+    // Log performance summary
+    if (this.perfStartMs != null && this.perfShotsFired > 0)
+    {
+      const endMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const totalMs = endMs - this.perfStartMs;
+      const perShotMs = totalMs / this.perfShotsFired;
+      console.log(`Target-Sim complete: shots=${this.perfShotsFired}, total=${totalMs.toFixed(1)} ms, per-shot=${perShotMs.toFixed(2)} ms`);
+    }
   }
 
   clearResults()
@@ -442,7 +437,7 @@ class TargetSimulator
 
     // Calculate scale based on container width
     const ring8InnerDiameter = target.getRingInnerDiameter(8);
-    const referenceDiameter = this.btk.Conversions.metersToInches(ring8InnerDiameter) * 2; // 8-ring diameter
+    const referenceDiameter = btk.Conversions.metersToInches(ring8InnerDiameter) * 2; // 8-ring diameter
     const baseScale = this.canvas.width * 0.85 / referenceDiameter; // Use width for scaling
     this.targetScale = baseScale * this.zoomFactor;
 
@@ -480,7 +475,7 @@ class TargetSimulator
     for (const spec of ringSpecs)
     {
       const ringInnerDiameter = target.getRingInnerDiameter(spec.ring);
-      const radiusInches = this.btk.Conversions.metersToInches(ringInnerDiameter) / 2;
+      const radiusInches = btk.Conversions.metersToInches(ringInnerDiameter) / 2;
       const radiusPixels = radiusInches * this.targetScale;
 
       // Draw filled circle
@@ -505,7 +500,7 @@ class TargetSimulator
     }
 
     // Draw X-ring
-    const xRingRadius = this.btk.Conversions.metersToInches(target.getXRingDiameter()) / 2 * this.targetScale;
+    const xRingRadius = btk.Conversions.metersToInches(target.getXRingDiameter()) / 2 * this.targetScale;
     this.ctx.beginPath();
     this.ctx.arc(this.targetCenterX, this.targetCenterY, xRingRadius, 0, 2 * Math.PI);
     this.ctx.fillStyle = 'black';
@@ -534,11 +529,11 @@ class TargetSimulator
     }
 
     // Convert shot position to canvas coordinates
-    const xPixels = this.targetCenterX + (this.btk.Conversions.metersToInches(simulatedShot.impactX) * this.targetScale);
-    const yPixels = this.targetCenterY - (this.btk.Conversions.metersToInches(simulatedShot.impactY) * this.targetScale); // Flip Y axis
+    const xPixels = this.targetCenterX + (btk.Conversions.metersToInches(simulatedShot.impactX) * this.targetScale);
+    const yPixels = this.targetCenterY - (btk.Conversions.metersToInches(simulatedShot.impactY) * this.targetScale); // Flip Y axis
 
     // Use actual bullet diameter scaled to pixels
-    const bulletDiameter = this.btk.Conversions.metersToInches(this.simulator.getBulletDiameter());
+    const bulletDiameter = btk.Conversions.metersToInches(this.simulator.getBulletDiameter());
     const holeRadius = (bulletDiameter / 2) * this.targetScale;
 
     // Draw bullet hole (red circle with red outline)
@@ -726,11 +721,11 @@ class TargetSimulator
     const tooltip = this.elements.tooltip;
     tooltip.innerHTML = `
             <div><strong>Shot Details:</strong></div>
-            <div>Impact: X=${this.btk.Conversions.metersToInches(simulatedShot.impactX).toFixed(2)}" Y=${this.btk.Conversions.metersToInches(simulatedShot.impactY).toFixed(2)}"</div>
+            <div>Impact: X=${btk.Conversions.metersToInches(simulatedShot.impactX).toFixed(2)}" Y=${btk.Conversions.metersToInches(simulatedShot.impactY).toFixed(2)}"</div>
             <div>Score: ${simulatedShot.score}${simulatedShot.isX ? 'x' : ''}</div>
-            <div>MV: ${this.btk.Conversions.mpsToFps(simulatedShot.actualMv).toFixed(0)} fps | IV: ${this.btk.Conversions.mpsToFps(simulatedShot.impactVelocity).toFixed(0)} fps</div>
-            <div>Wind: (${this.btk.Conversions.mpsToMph(simulatedShot.windDownrange).toFixed(1)}, ${this.btk.Conversions.mpsToMph(simulatedShot.windCrossrange).toFixed(1)}, ${this.btk.Conversions.mpsToMph(simulatedShot.windVertical).toFixed(1)}) mph</div>
-            <div>Release: (${this.btk.Conversions.radiansToMoa(simulatedShot.releaseAngleH).toFixed(2)}, ${this.btk.Conversions.radiansToMoa(simulatedShot.releaseAngleV).toFixed(2)}) MOA</div>
+            <div>MV: ${btk.Conversions.mpsToFps(simulatedShot.actualMv).toFixed(0)} fps | IV: ${btk.Conversions.mpsToFps(simulatedShot.impactVelocity).toFixed(0)} fps</div>
+            <div>Wind: (${btk.Conversions.mpsToMph(simulatedShot.windDownrange).toFixed(1)}, ${btk.Conversions.mpsToMph(simulatedShot.windCrossrange).toFixed(1)}, ${btk.Conversions.mpsToMph(simulatedShot.windVertical).toFixed(1)}) mph</div>
+            <div>Release: (${btk.Conversions.radiansToMoa(simulatedShot.releaseAngleH).toFixed(2)}, ${btk.Conversions.radiansToMoa(simulatedShot.releaseAngleV).toFixed(2)}) MOA</div>
         `;
     tooltip.style.display = 'block';
     tooltip.style.left = (e.pageX + 15) + 'px';
@@ -826,12 +821,22 @@ class TargetSimulator
   }
 }
 
-// Initialize the application when the page loads
-document.addEventListener('DOMContentLoaded', () =>
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', async () =>
 {
-  // Wait for BallisticsToolkit to be ready
-  document.addEventListener('btk-ready', () =>
+  try
   {
+    btk = await BallisticsToolkit();
+    console.log('BallisticsToolkit WASM module ready');
+
+    // Create simulator instance after WASM is loaded
     window.targetSimulator = new TargetSimulator();
-  });
+    console.log('Target Simulator initialized successfully');
+
+  }
+  catch (error)
+  {
+    console.error('Failed to initialize:', error);
+    document.getElementById('loading').innerHTML = 'Failed to load WebAssembly module';
+  }
 });

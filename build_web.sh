@@ -39,13 +39,7 @@ cd build-wasm
 
 # Use Emscripten's cmake and make wrappers
 emcmake cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
-emmake make -j$(nproc)
-
-# Copy compile_commands.json to project root for IntelliSense
-if [ -f "compile_commands.json" ]; then
-    cp compile_commands.json ../
-    echo "📋 Compilation database copied to project root for IntelliSense"
-fi
+emmake make VERBOSE=1 -j$(nproc)
 
 echo ""
 echo "✅ Build complete!"

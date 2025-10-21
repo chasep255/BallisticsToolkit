@@ -9,9 +9,9 @@
 #include "match/nra_targets.h"
 #include "match/simulator.h"
 #include "match/target.h"
-#include "physics/atmosphere.h"
 #include "math/conversions.h"
 #include "math/vector.h"
+#include "physics/atmosphere.h"
 #include "physics/wind_generator.h"
 
 using namespace emscripten;
@@ -55,6 +55,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .class_function("radiansToMoa", &Conversions::radiansToMoa)
     .class_function("mradToRadians", &Conversions::mradToRadians)
     .class_function("radiansToMrad", &Conversions::radiansToMrad)
+    .class_function("mradToMoa", &Conversions::mradToMoa)
+    .class_function("moaToMrad", &Conversions::moaToMrad)
     .class_function("oclockToRadians", &Conversions::oclockToRadians)
     .class_function("radiansToOclock", &Conversions::radiansToOclock)
     // Pressure conversions

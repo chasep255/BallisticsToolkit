@@ -1,7 +1,7 @@
 #include "match/simulator.h"
 #include "ballistics/simulator.h"
-#include "physics/atmosphere.h"
 #include "math/conversions.h"
+#include "physics/atmosphere.h"
 #include <algorithm>
 #include <cmath>
 #include <random>

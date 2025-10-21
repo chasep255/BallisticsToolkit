@@ -7,6 +7,8 @@
     <link rel="canonical" href="https://www.ballisticstoolkit.com/ballistic-calc/ballistic-calc.html">
     <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
     <link rel="stylesheet" href="../common.css">
+    <script src="../common.js"></script>
+    <script type="module" src="ballistic-calc.js"></script>
 </head>
 <body data-page="ballistic-calc">
     <div class="nav-header">
@@ -83,7 +85,7 @@
         </div>
 
         <div style="text-align: center; margin-top: 20px;">
-            <button id="calculateBtn" class="btn btn-primary" onclick="calculateTrajectory()">Calculate Trajectory</button>
+            <button id="calculateBtn" class="btn btn-primary">Calculate Trajectory</button>
             <button id="helpBtn" class="btn btn-secondary" style="margin-left: 10px;">Help</button>
         </div>
 
@@ -111,175 +113,6 @@
         <div id="error" class="error" style="display: none;"></div>
 
     </div>
-
-    <script src="../ballistics_toolkit.js"></script>
-    <script src="ballistic-calc.js"></script>
-    <script>
-        let ballisticsCalculator = null;
-
-        // Initialize WebAssembly module
-        function initBallisticsCalculator() {
-            try {
-                const btk = window.btk;
-                if (!btk) {
-                    console.error('BallisticsToolkit not available');
-                    return;
-                }
-                ballisticsCalculator = new BallisticsCalculator(btk);
-                console.log('BallisticsCalculator WebAssembly module loaded successfully');
-                
-                // Initialize help modal
-                Utils.setupHelpModal('helpBtn', 'helpModal');
-
-            } catch (error) {
-                console.error('Failed to load BallisticsCalculator WebAssembly module:', error);
-                showError('Failed to load ballistic calculator. Please refresh the page.');
-            }
-        }
-
-
-
-        // Calculate trajectory
-        async function calculateTrajectory() {
-            if (!ballisticsCalculator) {
-                showError('Ballistic calculator not loaded. Please refresh the page.');
-                return;
-            }
-
-            try {
-                showLoading(true);
-                hideError();
-
-                // Get form values
-                const bullet = {
-                    weight: parseFloat(document.getElementById('weight').value),
-                    bc: parseFloat(document.getElementById('bc').value),
-                    dragFunction: document.getElementById('dragFunction').value
-                };
-
-                const atmosphere = {
-                    temperature: parseFloat(document.getElementById('temperature').value),
-                    humidity: parseFloat(document.getElementById('humidity').value),
-                    altitude: parseFloat(document.getElementById('altitude').value)
-                };
-
-                const wind = {
-                    speed: parseFloat(document.getElementById('windSpeed').value),
-                    direction: parseFloat(document.getElementById('windDirection').value)
-                };
-
-                const shot = {
-                    muzzleVelocity: parseFloat(document.getElementById('muzzleVelocity').value),
-                    zeroRange: parseFloat(document.getElementById('zeroRange').value),
-                    scopeHeight: parseFloat(document.getElementById('scopeHeight').value),
-                    maxRange: parseFloat(document.getElementById('maxRange').value),
-                    step: parseFloat(document.getElementById('step').value)
-                };
-
-
-                // Set up simulator
-                ballisticsCalculator.setBullet(bullet);
-                ballisticsCalculator.setAtmosphere(atmosphere);
-                ballisticsCalculator.setWind(wind);
-
-                // Calculate trajectory
-                const trajectory = ballisticsCalculator.calculateTrajectory(shot);
-
-                // Display results
-                displayResults(trajectory);
-
-            } catch (error) {
-                console.error('Error calculating trajectory:', error);
-                showError('Error calculating trajectory: ' + error.message);
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        // Display trajectory results
-        function displayResults(trajectory) {
-            const tableBody = document.getElementById('trajectoryTable').getElementsByTagName('tbody')[0];
-            tableBody.innerHTML = '';
-
-            const angleUnits = document.getElementById('angleUnits').value;
-            
-            // Update table headers to show selected units
-            const headers = document.querySelectorAll('#trajectoryTable th');
-            if (angleUnits === 'mrad') {
-                headers[1].textContent = 'Drop (mrad)';
-                headers[2].textContent = 'Drift (mrad)';
-            } else { // moa
-                headers[1].textContent = 'Drop (MOA)';
-                headers[2].textContent = 'Drift (MOA)';
-            }
-
-            trajectory.forEach(point => {
-                const row = tableBody.insertRow();
-                
-                // Range (yards)
-                row.insertCell(0).textContent = point.range.toFixed(0);
-                
-                // Drop values - convert to selected units
-                const dropMrad = point.dropMoa * 0.2909; // Convert MOA to mrad
-                const dropMoa = ballisticsCalculator.btk.Conversions.radiansToMoa(ballisticsCalculator.btk.Conversions.mradToRadians(dropMrad));
-                
-                let dropValue;
-                if (angleUnits === 'mrad') {
-                    dropValue = dropMrad.toFixed(2);
-                } else { // moa
-                    dropValue = dropMoa.toFixed(2);
-                }
-                row.insertCell(1).textContent = dropValue;
-                
-                // Drift values - convert to selected units
-                const driftMrad = point.drift;
-                const driftMoa = ballisticsCalculator.btk.Conversions.radiansToMoa(ballisticsCalculator.btk.Conversions.mradToRadians(driftMrad));
-                
-                let driftValue;
-                if (angleUnits === 'mrad') {
-                    driftValue = driftMrad.toFixed(2);
-                } else { // moa
-                    driftValue = driftMoa.toFixed(2);
-                }
-                row.insertCell(2).textContent = driftValue;
-                
-                // Velocity (fps)
-                row.insertCell(3).textContent = point.velocity.toFixed(0);
-                
-                // Energy (ft-lbf)
-                row.insertCell(4).textContent = point.energy.toFixed(0);
-                
-                // Time
-                row.insertCell(5).textContent = point.time.toFixed(3);
-            });
-
-            // Show the results table
-            document.getElementById('results').style.display = 'block';
-        }
-
-
-        // Show/hide loading indicator
-        function showLoading(show) {
-            document.getElementById('loading').style.display = show ? 'block' : 'none';
-        }
-
-        // Show error message
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-
-        // Hide error message
-        function hideError() {
-            document.getElementById('error').style.display = 'none';
-        }
-
-
-        // Initialize when page loads
-        document.addEventListener('btk-ready', initBallisticsCalculator);
-
-    </script>
 
     <!-- Help Modal -->
     <div id="helpModal" class="help-modal" style="display: none;">
@@ -363,7 +196,5 @@
             </div>
         </div>
     </div>
-
-    <script src="../common.js"></script>
 </body>
 </html>

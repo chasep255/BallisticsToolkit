@@ -1,256 +1,169 @@
-/**
- * JavaScript wrapper for Ballistics Calculator WebAssembly module using embind API
- */
-class BallisticsCalculator
+import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
+
+let btk = null;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', async () =>
 {
-  constructor(btk)
+  try
   {
-    this.btk = btk;
-    this.simulator = new btk.BallisticsSimulator();
+    btk = await BallisticsToolkit();
+    console.log('BallisticsToolkit WASM module ready');
+
+    // Set up UI
+    Utils.setupHelpModal('helpBtn', 'helpModal');
+    document.getElementById('calculateBtn').addEventListener('click', calculateTrajectory);
+
+  }
+  catch (error)
+  {
+    console.error('Failed to initialize:', error);
+    showError('Failed to load ballistic calculator. Please refresh the page.');
+  }
+});
+
+function calculateTrajectory()
+{
+  if (!btk)
+  {
+    showError('Not loaded. Please refresh the page.');
+    return;
   }
 
-  /**
-   * Set bullet parameters
-   * @param {Object} bullet - Bullet parameters
-   * @param {number} bullet.weight - Weight in grains
-   * @param {number} bullet.bc - Ballistic coefficient
-   * @param {string} bullet.dragFunction - 'G1' or 'G7'
-   */
-  setBullet(bullet)
+  hideError();
+
+  // Get form values and convert to proper units
+  const weight = btk.Conversions.grainsToKg(parseFloat(document.getElementById('weight').value));
+  const bc = parseFloat(document.getElementById('bc').value);
+  const dragFunction = document.getElementById('dragFunction').value;
+  const temperature = btk.Conversions.fahrenheitToKelvin(parseFloat(document.getElementById('temperature').value));
+  const humidity = parseFloat(document.getElementById('humidity').value) / 100.0; // Convert percentage to decimal
+  const altitude = btk.Conversions.feetToMeters(parseFloat(document.getElementById('altitude').value));
+  const muzzleVelocity = btk.Conversions.fpsToMps(parseFloat(document.getElementById('muzzleVelocity').value));
+  const zeroRange = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('zeroRange').value));
+  const scopeHeight = btk.Conversions.inchesToMeters(parseFloat(document.getElementById('scopeHeight').value));
+  const maxRange = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('maxRange').value));
+  const step = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('step').value));
+  const windSpeed = btk.Conversions.mphToMps(parseFloat(document.getElementById('windSpeed').value));
+  const windDirection = btk.Conversions.oclockToRadians(parseFloat(document.getElementById('windDirection').value));
+
+  // Create bullet
+  const bullet = new btk.Bullet(
+    weight,
+    btk.Conversions.inchesToMeters(0.264),
+    btk.Conversions.inchesToMeters(0),
+    bc,
+    dragFunction === 'G1' ? btk.DragFunction.G1 : btk.DragFunction.G7
+  );
+
+  // Create atmosphere
+  const atmosphere = new btk.Atmosphere(temperature, altitude, humidity, 0.0);
+
+  // Create simulator
+  const simulator = new btk.BallisticsSimulator();
+  simulator.setInitialBullet(bullet);
+  simulator.setAtmosphere(atmosphere);
+
+  // Compute zero with no wind
+  simulator.setWind(new btk.Vector3D(0, 0, 0));
+  simulator.computeZero(
+    muzzleVelocity,
+    scopeHeight,
+    zeroRange,
+    0.001, // dt (time step)
+    20, // max_iterations
+    0.001, // tolerance
+    0.0 // spin_rate
+  );
+
+  const windX = -windSpeed * Math.cos(windDirection); // Downrange component (negative = headwind, positive = tailwind)
+  const windY = windSpeed * Math.sin(windDirection); // Crossrange component (positive = from right, negative = from left)
+  const windZ = 0.0; // No vertical component for now
+
+  simulator.setWind(new btk.Vector3D(windX, windY, windZ));
+
+  // Simulate trajectory
+  const trajectoryObj = simulator.simulate(maxRange, 0.001, 60.0);
+
+  // Extract trajectory points at specified intervals
+  const trajectory = [];
+
+  for (let range = 0; range <= maxRange; range += step)
   {
-    if (!this.btk)
-    {
-      throw new Error('BallisticsToolkit module not loaded');
-    }
-    const weight = this.btk.Conversions.grainsToKg(bullet.weight);
-    const diameter = this.btk.Conversions.inchesToMeters(bullet.diameter);
-    const length = this.btk.Conversions.inchesToMeters(bullet.length);
-    const dragFunction = bullet.dragFunction === 'G1' ? this.btk.DragFunction.G1 : this.btk.DragFunction.G7;
-
-    const bulletObj = new this.btk.Bullet(weight, diameter, length, bullet.bc, dragFunction);
-    this.simulator.setInitialBullet(bulletObj);
-  }
-
-
-  /**
-   * Set atmospheric conditions
-   * @param {Object} atmosphere - Atmospheric parameters
-   * @param {number} atmosphere.temperature - Temperature in Fahrenheit
-   * @param {number} atmosphere.humidity - Humidity percentage (0-100)
-   * @param {number} atmosphere.altitude - Altitude in feet
-   */
-  setAtmosphere(atmosphere)
-  {
-    if (!this.btk)
-    {
-      throw new Error('BallisticsToolkit module not loaded');
-    }
-    const temperature = this.btk.Conversions.fahrenheitToKelvin(atmosphere.temperature);
-    const altitude = this.btk.Conversions.feetToMeters(atmosphere.altitude);
-    const humidity = atmosphere.humidity / 100.0; // Convert percentage to decimal
-    const pressure = 0.0; // Use zero pressure to trigger standard pressure calculation
-
-    const atmosphereObj = new this.btk.Atmosphere(temperature, altitude, humidity, pressure);
-    this.simulator.setAtmosphere(atmosphereObj);
-  }
-
-  /**
-   * Set wind conditions
-   * @param {Object} wind - Wind parameters
-   * @param {number} wind.speed - Wind speed in mph
-   * @param {number} wind.direction - Wind direction in clock mode (3=from right, 6=from front, 9=from left, 12=from rear)
-   */
-  setWind(wind)
-  {
-    if (!this.btk)
-    {
-      throw new Error('BallisticsToolkit module not loaded');
-    }
-    const speed = this.btk.Conversions.mphToMps(wind.speed);
-    const direction = this.btk.Conversions.oclockToRadians(wind.direction);
-
-    // Convert from cylindrical (speed, direction) to Cartesian (x, y, z)
-    // o'clock system: 3=from right, 6=headwind, 9=from left, 12=tailwind
-    // direction is in radians: 0°=tailwind, 90°=from right, 180°=headwind, 270°=from left
-    const x = -speed * Math.cos(direction); // Downrange component (negative = headwind, positive = tailwind)
-    const y = speed * Math.sin(direction); // Crossrange component (positive = from right, negative = from left)
-    const z = 0.0; // No vertical component for now
-
-    const windObj = new this.btk.Vector3D(x, y, z);
-    this.simulator.setWind(windObj);
-  }
-
-  /**
-   * Calculate trajectory
-   * @param {Object} shot - Shot parameters
-   * @param {number} shot.muzzleVelocity - Muzzle velocity in fps
-   * @param {number} shot.zeroRange - Zero range in yards
-   * @param {number} shot.scopeHeight - Scope height in inches
-   * @param {number} shot.maxRange - Maximum range in yards
-   * @param {number} shot.step - Step size in yards
-   * @returns {Array} - Trajectory data
-   */
-  calculateTrajectory(shot)
-  {
-    if (!this.btk)
-    {
-      throw new Error('BallisticsToolkit module not loaded');
-    }
-
-    // Create initial bullet state with zeroed position
-    const muzzleVelocity = this.btk.Conversions.fpsToMps(shot.muzzleVelocity);
-    const zeroRange = this.btk.Conversions.yardsToMeters(shot.zeroRange);
-    const scopeHeight = this.btk.Conversions.inchesToMeters(shot.scopeHeight);
-
-    // Compute zeroed initial state using simulator
-    const timeStep = 0.001;
-    const maxIterations = 20;
-    const tolerance = 0.001;
-    const spinRate = 0.0;
-
-    this.simulator.computeZero(muzzleVelocity, scopeHeight, zeroRange, timeStep, maxIterations, tolerance, spinRate);
-
-    const maxRangeDistance = this.btk.Conversions.yardsToMeters(shot.maxRange);
-    const simulationTimeStep = 0.001;
-    const maxTime = 60.0;
-
-    // Simulate using stored state
-    const trajectory = this.simulator.simulate(maxRangeDistance, simulationTimeStep, maxTime);
-
-    // Convert trajectory to JavaScript array, sampling at requested intervals
-    const trajectoryData = [];
-    const stepSize = shot.step; // yards
-    const maxRange = shot.maxRange; // yards
-
-    // Sample trajectory at regular intervals using built-in interpolation
-    for (let range = 0; range <= maxRange; range += stepSize)
-    {
-      const targetRange = this.btk.Conversions.yardsToMeters(range);
-
-      // Use trajectory's built-in interpolation
-      const interpolatedPoint = trajectory.atDistance(targetRange);
-
-      // Check if the point is valid (not NaN time)
-      const time = interpolatedPoint.getTime();
-      if (!isNaN(time))
-      {
-        const state = interpolatedPoint.getState();
-        const position = state.getPosition();
-
-        // Calculate drop and drift in mrad
-        // Drop = (bullet_height - scope_height) / range * 1000
-        // Negative drop means below line of sight
-        const bulletHeightMeters = position.z;
-        const scopeHeightMeters = this.btk.Conversions.inchesToMeters(shot.scopeHeight);
-        const rangeMeters = this.btk.Conversions.yardsToMeters(range);
-
-        const dropMeters = bulletHeightMeters - scopeHeightMeters;
-        const dropMrad = range > 0 ? (dropMeters / rangeMeters) * 1000 : 0;
-
-        // Convert mrad to MOA using conversions
-        const dropMoa = this.btk.Conversions.radiansToMoa(this.btk.Conversions.mradToRadians(dropMrad));
-
-        const driftMeters = position.y; // Y is crosswind drift
-        const driftMrad = range > 0 ? (driftMeters / rangeMeters) * 1000 : 0;
-
-        // Convert drift to Left/Right text
-        // In the coordinate system: positive Y = right drift, negative Y = left drift
-        const driftText = driftMrad > 0.01 ? `Right ${driftMrad.toFixed(2)}` :
-          driftMrad < -0.01 ? `Left ${Math.abs(driftMrad).toFixed(2)}` :
-          '0.00';
-
-        // Get velocity and energy
-        const velocity = state.getTotalVelocity();
-        const energy = this.calculateEnergy(this.simulator.getInitialBullet().getWeight(), velocity);
-
-        trajectoryData.push(
-        {
-          range: range,
-          drop: dropMrad,
-          dropMoa: dropMoa,
-          drift: driftMrad,
-          driftText: driftText,
-          velocity: this.btk.Conversions.mpsToFps(velocity),
-          energy: this.btk.Conversions.joulesToFootPounds(energy),
-          time: time
-        });
-      }
-    }
-
-    return trajectoryData;
-  }
-
-  /**
-   * Calculate kinetic energy
-   * @param {Weight} weight - Bullet weight
-   * @param {Velocity} velocity - Bullet velocity
-   * @returns {Energy} - Kinetic energy
-   */
-  calculateEnergy(weight, velocity)
-  {
-    // KE = 0.5 * m * v^2
-    const mass = weight; // weight is already in kg
-    const speed = velocity; // velocity is already in m/s
-    const energyJoules = 0.5 * mass * speed * speed;
-    return energyJoules; // Return raw joules
-  }
-
-
-  /**
-   * Get trajectory point at specific range
-   * @param {number} range - Range in yards
-   * @returns {Object|null} - Trajectory point or null if not found
-   */
-  getTrajectoryPoint(range)
-  {
-    if (!this.trajectory)
-    {
-      return null;
-    }
-
-    // Convert yards to meters for C++ API
-    const rangeMeters = this.btk.Conversions.yardsToMeters(range);
-
-    // Use the C++ trajectory interpolation
-    const point = this.trajectory.atDistance(rangeMeters);
-
-    // Check if point is valid (not NaN time)
-    if (isNaN(point.getTime()))
-    {
-      return null;
-    }
-
-    // Convert back to imperial units for JavaScript
+    const point = trajectoryObj.atDistance(range);
     const state = point.getState();
     const position = state.getPosition();
-    const velocity = state.getVelocity();
 
-    return {
-      range: range,
-      drop: this.btk.Conversions.radiansToMoa(point.getState().getPositionZ() / rangeMeters),
-      drift: this.btk.Conversions.radiansToMoa(point.getState().getPositionY() / rangeMeters),
-      velocity: this.btk.Conversions.mpsToFps(velocity.magnitude()),
-      energy: this.calculateEnergy(state.getWeight(), velocity.magnitude()),
+    // Calculate drop relative to scope height
+    const bulletHeight = position.z;
+    const dropMeters = bulletHeight - scopeHeight;
+    const dropMrad = range > 0 ? (dropMeters / range) * 1000 : 0;
+
+    // Calculate drift (crosswind component)
+    const driftMeters = position.y;
+    const driftMrad = range > 0 ? (driftMeters / range) * 1000 : 0;
+
+    trajectory.push(
+    {
+      range: btk.Conversions.metersToYards(range),
+      drop: dropMrad,
+      drift: driftMrad,
+      velocity: btk.Conversions.mpsToFps(state.getTotalVelocity()),
+      energy: point.getKineticEnergy(),
       time: point.getTime()
-    };
+    });
   }
 
-  /**
-   * Clean up resources
-   */
-  destroy()
+  // Display results
+  displayResults(trajectory);
+}
+
+function displayResults(trajectory)
+{
+  const tableBody = document.getElementById('trajectoryTable').getElementsByTagName('tbody')[0];
+  tableBody.innerHTML = '';
+
+  const angleUnits = document.getElementById('angleUnits').value;
+
+  // Update table headers
+  const headers = document.querySelectorAll('#trajectoryTable th');
+  headers[1].textContent = angleUnits === 'mrad' ? 'Drop (mrad)' : 'Drop (MOA)';
+  headers[2].textContent = angleUnits === 'mrad' ? 'Drift (mrad)' : 'Drift (MOA)';
+
+  trajectory.forEach(point =>
   {
-    // With embind, objects are automatically garbage collected
-    this.simulator = null;
-  }
+    const row = tableBody.insertRow();
+
+    row.insertCell(0).textContent = point.range.toFixed(0);
+
+    // Drop (in mrad from calculator)
+    const dropValue = angleUnits === 'mrad' ?
+      point.drop.toFixed(2) :
+      btk.Conversions.mradToMoa(point.drop).toFixed(2);
+    row.insertCell(1).textContent = dropValue;
+
+    // Drift (in mrad from calculator)
+    const driftValue = angleUnits === 'mrad' ?
+      point.drift.toFixed(2) :
+      btk.Conversions.mradToMoa(point.drift).toFixed(2);
+    row.insertCell(2).textContent = driftValue;
+
+    row.insertCell(3).textContent = point.velocity.toFixed(0);
+    row.insertCell(4).textContent = point.energy.toFixed(0);
+    row.insertCell(5).textContent = point.time.toFixed(3);
+  });
+
+  document.getElementById('results').style.display = 'block';
 }
 
-// Export for use in modules
-if (typeof module !== 'undefined' && module.exports)
+function showError(message)
 {
-  module.exports = BallisticsCalculator;
+  const errorDiv = document.getElementById('error');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
 }
-else if (typeof window !== 'undefined')
+
+function hideError()
 {
-  window.BallisticsCalculator = BallisticsCalculator;
+  document.getElementById('error').style.display = 'none';
 }

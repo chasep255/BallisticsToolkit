@@ -24,6 +24,10 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORT_NAME='Ballistics
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s EXPORT_ES6=1")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s SINGLE_FILE=1")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s DISABLE_EXCEPTION_CATCHING=0")
+# WebGL support - using OpenGL ES 3.0 via Emscripten
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s USE_WEBGL2=1")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s FULL_ES3=1")
+
 # WebAssembly executable with embind
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 add_executable(ballistics_toolkit_wasm ${SOURCES})
@@ -31,8 +35,11 @@ add_executable(ballistics_toolkit_wasm ${SOURCES})
 # Link embind library
 target_link_libraries(ballistics_toolkit_wasm embind)
 
-# Include directories (including GLM)
-target_include_directories(ballistics_toolkit_wasm PRIVATE include third_party/glm)
+# Include directories (including GLM and Graphics)
+target_include_directories(ballistics_toolkit_wasm PRIVATE 
+  include 
+  third_party/glm
+)
 
 
 # Copy web files to build/web directory

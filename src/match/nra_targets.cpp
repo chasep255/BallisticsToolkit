@@ -94,17 +94,17 @@ namespace btk::match
                                   btk::math::Conversions::inchesToMeters(10.0f), "800/900/1000 yd slow fire"));
 
     // F-Class Target Centers (paste-over targets)
-    targets_.emplace("MR-63FCA", Target("MR-63FCA", btk::math::Conversions::inchesToMeters(2.85f), btk::math::Conversions::inchesToMeters(5.85f),
-                                        btk::math::Conversions::inchesToMeters(8.85f), btk::math::Conversions::inchesToMeters(11.85f), btk::math::Conversions::inchesToMeters(17.85f),
-                                        btk::math::Conversions::inchesToMeters(23.85f), btk::math::Conversions::inchesToMeters(1.42f), "300 yd F-Class repair center"));
+    targets_.emplace("MR-63FCA", Target("MR-63FCA", btk::math::Conversions::inchesToMeters(2.85f), btk::math::Conversions::inchesToMeters(5.85f), btk::math::Conversions::inchesToMeters(8.85f),
+                                        btk::math::Conversions::inchesToMeters(11.85f), btk::math::Conversions::inchesToMeters(17.85f), btk::math::Conversions::inchesToMeters(23.85f),
+                                        btk::math::Conversions::inchesToMeters(1.42f), "300 yd F-Class repair center"));
 
-    targets_.emplace("MR-65FCA", Target("MR-65FCA", btk::math::Conversions::inchesToMeters(5.00f), btk::math::Conversions::inchesToMeters(10.00f),
-                                        btk::math::Conversions::inchesToMeters(15.00f), btk::math::Conversions::inchesToMeters(20.00f), btk::math::Conversions::inchesToMeters(25.00f),
-                                        btk::math::Conversions::inchesToMeters(30.00f), btk::math::Conversions::inchesToMeters(2.50f), "500 yd F-Class repair center"));
+    targets_.emplace("MR-65FCA", Target("MR-65FCA", btk::math::Conversions::inchesToMeters(5.00f), btk::math::Conversions::inchesToMeters(10.00f), btk::math::Conversions::inchesToMeters(15.00f),
+                                        btk::math::Conversions::inchesToMeters(20.00f), btk::math::Conversions::inchesToMeters(25.00f), btk::math::Conversions::inchesToMeters(30.00f),
+                                        btk::math::Conversions::inchesToMeters(2.50f), "500 yd F-Class repair center"));
 
-    targets_.emplace("MR-1FCA", Target("MR-1FCA", btk::math::Conversions::inchesToMeters(6.00f), btk::math::Conversions::inchesToMeters(12.00f),
-                                       btk::math::Conversions::inchesToMeters(18.00f), btk::math::Conversions::inchesToMeters(24.00f), btk::math::Conversions::inchesToMeters(30.00f),
-                                       btk::math::Conversions::inchesToMeters(36.00f), btk::math::Conversions::inchesToMeters(3.00f), "600 yd F-Class repair center"));
+    targets_.emplace("MR-1FCA", Target("MR-1FCA", btk::math::Conversions::inchesToMeters(6.00f), btk::math::Conversions::inchesToMeters(12.00f), btk::math::Conversions::inchesToMeters(18.00f),
+                                       btk::math::Conversions::inchesToMeters(24.00f), btk::math::Conversions::inchesToMeters(30.00f), btk::math::Conversions::inchesToMeters(36.00f),
+                                       btk::math::Conversions::inchesToMeters(3.00f), "600 yd F-Class repair center"));
 
     targets_.emplace("LR-FCA", Target("LR-FCA", btk::math::Conversions::inchesToMeters(10.00f), btk::math::Conversions::inchesToMeters(20.00f), btk::math::Conversions::inchesToMeters(30.00f),
                                       btk::math::Conversions::inchesToMeters(44.00f), btk::math::Conversions::inchesToMeters(60.00f), btk::math::Conversions::inchesToMeters(72.00f),

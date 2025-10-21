@@ -7,6 +7,8 @@
   <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
   <link rel="stylesheet" href="../common.css">
   <link rel="stylesheet" href="wind-sim.css">
+  <script src="../common.js"></script>
+  <script type="module" src="wind-sim.js"></script>
 </head>
 <body data-page="wind-sim">
   <div class="nav-header"></div>
@@ -48,6 +50,8 @@
 
     
 
+    <div id="error" class="error" style="display: none;"></div>
+    
     <div class="canvas-wrap">
       <canvas id="glcanvas" width="480" height="800"></canvas>
       <canvas id="overlay" width="480" height="800"></canvas>
@@ -113,10 +117,6 @@
       </div>
     </div>
   </div>
-
-  <script src="../common.js"></script>
-  <script src="../ballistics_toolkit.js"></script>
-  <script src="wind-sim.js"></script>
 </body>
 </html>
 

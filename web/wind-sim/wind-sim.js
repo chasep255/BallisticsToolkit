@@ -1,3 +1,5 @@
+import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
+
 let btk = null;
 let wind = null;
 let animId = null;
@@ -49,16 +51,13 @@ const state = {
   elapsed: 0
 };
 
-function init()
+async function init()
 {
   try
   {
-    btk = window.btk;
-    if (!btk)
-    {
-      console.error('BallisticsToolkit not available');
-      return;
-    }
+    // Load WASM module
+    btk = await BallisticsToolkit();
+    console.log('BallisticsToolkit WASM module ready');
     setupUI();
     setupGL();
     resizeCanvases();
@@ -558,5 +557,32 @@ function drawFrame()
   }
 }
 
-// Wait for BallisticsToolkit to be ready
-document.addEventListener('btk-ready', init);
+function showError(message)
+{
+  const errorDiv = document.getElementById('error');
+  if (errorDiv)
+  {
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+  }
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', async () =>
+{
+  try
+  {
+    btk = await BallisticsToolkit();
+    console.log('BallisticsToolkit WASM module ready');
+
+    // Initialize UI and graphics
+    await init();
+    console.log('Wind Simulator initialized successfully');
+
+  }
+  catch (error)
+  {
+    console.error('Failed to initialize:', error);
+    showError('Failed to load wind simulator. Please refresh the page.');
+  }
+});
