@@ -166,13 +166,23 @@ class ThreeJSGame
 
   // Pits dimensions in yards
   static PITS_HEIGHT = 3;
-  static PITS_DEPTH = 10;
+  static PITS_DEPTH = 1;
+  static PITS_OFFSET = 5;
 
   // Target animation constants
+  static TARGET_GAP_ABOVE_PITS = 0.2; // Gap between target bottom and pit top when raised
   static TARGET_MAX_HEIGHT = 0; // No additional height when raised (baseHeight already has the gap)
-  static TARGET_HALF_MAST = -(2 + 0.2) / 2; // Halfway between raised and lowered
-  static TARGET_MIN_HEIGHT = -(2 + 0.2); // Fully lowered (target size + gap)
+  static TARGET_HALF_MAST = -(2 + ThreeJSGame.TARGET_GAP_ABOVE_PITS) / 2; // Halfway between raised and lowered
+  static TARGET_MIN_HEIGHT = -(2 + ThreeJSGame.TARGET_GAP_ABOVE_PITS); // Fully lowered (target size + gap)
   static TARGET_ANIMATION_SPEED = 0.75; // yards per second
+
+  // Wind flag constants
+  static FLAG_BASE_WIDTH = 48 / 36; // 48 inches = 1.33 yards
+  static FLAG_TIP_WIDTH = 18 / 36;  // 18 inches = 0.5 yards
+  static FLAG_LENGTH = 12 / 3;      // 12 feet = 4 yards
+  static FLAG_MIN_ANGLE = 5;        // degrees from vertical
+  static FLAG_MAX_ANGLE = 85;       // degrees from vertical
+  static FLAG_DEGREES_PER_MPH = 5;  // angle increase per mph
 
   // Camera settings
   static CAMERA_FOV = 30;
@@ -234,6 +244,72 @@ class ThreeJSGame
     console.log('Wind Game initialized');
   }
 
+  createFlagTexture() {
+    // Create a canvas for red/yellow flag
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    
+    // Top half red
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(0, 0, 256, 128);
+    
+    // Bottom half yellow
+    ctx.fillStyle = '#ffff00';
+    ctx.fillRect(0, 128, 256, 128);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
+  }
+
+  createFlagGeometry() {
+    // Create trapezoid flag: 48" base (1.33 yds), 18" tip (0.5 yds), 12' long (4 yds)
+    // Flag hangs vertically when no wind, only tip vertices move
+    const geometry = new THREE.BufferGeometry();
+    
+    // Initial vertices (flag hanging straight down)
+    // Base vertices (fixed to pole): top and bottom at x=0
+    // Tip vertices: hanging down from base
+    const halfBase = ThreeJSGame.FLAG_BASE_WIDTH / 2;  // 0.67 yards
+    const halfTip = ThreeJSGame.FLAG_TIP_WIDTH / 2;    // 0.25 yards
+    const length = ThreeJSGame.FLAG_LENGTH;            // 4 yards
+    
+    // Vertices for two triangles forming the trapezoid
+    // Triangle 1: top-base, bottom-base, top-tip
+    // Triangle 2: bottom-base, bottom-tip, top-tip
+    const vertices = new Float32Array([
+      // Triangle 1
+      0, 0, halfBase,           // top base (fixed)
+      0, 0, -halfBase,          // bottom base (fixed)
+      0, -length, halfTip,      // top tip (moves) - hanging down
+      
+      // Triangle 2
+      0, 0, -halfBase,          // bottom base (fixed)
+      0, -length, -halfTip,     // bottom tip (moves) - hanging down
+      0, -length, halfTip       // top tip (moves) - hanging down
+    ]);
+    
+    // UV coordinates (red top, yellow bottom)
+    const uvs = new Float32Array([
+      // Triangle 1
+      0, 0,     // top base
+      0, 1,     // bottom base
+      1, 0,     // top tip
+      
+      // Triangle 2
+      0, 1,     // bottom base
+      1, 1,     // bottom tip
+      1, 0      // top tip
+    ]);
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometry.computeVertexNormals();
+    
+    return geometry;
+  }
+
   createNoiseTexture() {
     // Create a canvas for dense grass texture
     const canvas = document.createElement('canvas');
@@ -269,11 +345,11 @@ class ThreeJSGame
     
     ctx.putImageData(imageData, 0, 0);
     
-    // Create Three.js texture with higher repeat for density
+    // Create Three.js texture with proper wrapping
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(8, 8); // More repeats for denser texture
+    texture.repeat.set(4, 4); // Reduced repeats to avoid visible seams
     return texture;
   }
 
@@ -282,20 +358,22 @@ class ThreeJSGame
     // Camera: BTK coords (X=downrange, Y=crossrange, Z=up)
     const aspect = this.canvas.clientWidth / this.canvas.clientHeight;
     this.camera = new THREE.PerspectiveCamera(ThreeJSGame.CAMERA_FOV, aspect, 0.1, this.distance + 10);
-    this.camera.position.set(0, 0, ThreeJSGame.CAMERA_EYE_HEIGHT); // At shooter position, eye level
+    // Camera positioned 1 yard behind muzzle, at target center height when raised
+    const targetCenterHeight = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + 1; // pits + gap + half target height
+    this.camera.position.set(-1, 0, targetCenterHeight); // 1 yard behind muzzle, at target center height
     this.camera.up.set(0, 0, 1); // Z is up
-    this.camera.lookAt(100, 0, ThreeJSGame.CAMERA_EYE_HEIGHT); // Look downrange at eye level initially
+    this.camera.lookAt(this.distance, 0, targetCenterHeight); // Look at target distance at same height
     
     console.log('Camera setup complete');
   }
 
   setupLighting() {
-    // Brighter ambient light for late morning
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    // Much brighter ambient light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
     this.scene.add(ambientLight);
     
-    // Directional light simulating late morning sun from behind (south)
-    const directionalLight = new THREE.DirectionalLight(0xfff4e6, 1.2); // Warm morning sunlight
+    // Brighter directional light simulating late morning sun from behind (south)
+    const directionalLight = new THREE.DirectionalLight(0xfff4e6, 2.5); // Much brighter warm morning sunlight
     directionalLight.position.set(-100, -50, 150); // Behind and higher for morning sun
     directionalLight.castShadow = true;
     this.scene.add(directionalLight);
@@ -307,7 +385,7 @@ class ThreeJSGame
     const brownGroundGeometry = new THREE.PlaneGeometry(rangeLength, ThreeJSGame.RANGE_TOTAL_WIDTH);
     const brownGroundMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513, side: THREE.DoubleSide }); // Brown
     const brownGround = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
-    brownGround.position.set(rangeLength / 2, 0, 0); // Center it downrange
+    brownGround.position.set(rangeLength / 2, 0, -0.1); // Center it downrange, slightly lower
     this.scene.add(brownGround);
     
     // Add a range plane - just the shooting lanes with grass texture
@@ -315,7 +393,7 @@ class ThreeJSGame
     
     // Create grass material with dense texture variation
     const groundMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x1a4d1a,
+      color: 0x2d5a2d, // Brighter, more vibrant green
       side: THREE.DoubleSide,
       roughness: 0.9,
       metalness: 0.0,
@@ -335,8 +413,8 @@ class ThreeJSGame
     const pitsMaterial = new THREE.MeshStandardMaterial({ color: 0x8b7355 }); // Grey-brown
     const pits = new THREE.Mesh(pitsGeometry, pitsMaterial);
     
-    // Position at the end of the range
-    pits.position.set(rangeLength + ThreeJSGame.PITS_DEPTH / 2, 0, ThreeJSGame.PITS_HEIGHT / 2);
+    // Position pits at rangeLength - PITS_OFFSET to obscure targets when lowered
+    pits.position.set(rangeLength - ThreeJSGame.PITS_OFFSET + ThreeJSGame.PITS_DEPTH / 2, 0, ThreeJSGame.PITS_HEIGHT / 2);
     this.scene.add(pits);
     
     // Add target frames above the pits
@@ -355,7 +433,7 @@ class ThreeJSGame
     const maxTargets = Math.floor(rangeWidth / totalTargetWidth);
     
     // Position targets above the pits - centered on the range width
-    const targetHeight = ThreeJSGame.PITS_HEIGHT + 0.2 + targetSize / 2;
+    const targetHeight = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + targetSize / 2;
     const totalTargetsWidth = maxTargets * targetSize + (maxTargets - 1) * targetSpacing; // Total width including spacing
     const startY = totalTargetsWidth / 2 - targetSize / 2; // Start from left (positive Y), centered
     
@@ -369,9 +447,9 @@ class ThreeJSGame
       });
       const target = new THREE.Mesh(targetGeometry, targetMaterial);
       
-      // Position target 0.1 yards in front of pits - left to right (positive Y to negative Y)
+      // Position target at exact distance for accurate ballistic simulation - left to right (positive Y to negative Y)
       const yPos = startY - i * totalTargetWidth;
-      target.position.set(rangeLength + 0.1, yPos, targetHeight);
+      target.position.set(rangeLength, yPos, targetHeight);
       this.scene.add(target);
       
       // Store target frame for animation
@@ -394,7 +472,7 @@ class ThreeJSGame
         transparent: true
       });
       const numberBox = new THREE.Mesh(numberGeometry, numberMaterial);
-      numberBox.position.set(rangeLength + 0.1, yPos, targetHeight + targetSize + 0.2); // 0.2 yards above target
+      numberBox.position.set(rangeLength, yPos, targetHeight + targetSize + 0.2); // 0.2 yards above target
       this.scene.add(numberBox);
       
       // Store number box reference for animation
@@ -588,9 +666,14 @@ class ThreeJSGame
   {
     console.log('Creating wind flags...');
     
+    // Create flag texture once
+    const flagTexture = this.createFlagTexture();
+    
     // Create flag poles every 100 yards from 100 to target distance at the border of the 50-yard lane
     const maxDistance = this.distance; // yards
     const laneBorder = ThreeJSGame.RANGE_LANE_WIDTH / 2; // yards from center (border of 50-yard lane)
+    
+    this.flagMeshes = [];
     
     for (let yds = ThreeJSGame.POLE_INTERVAL; yds < maxDistance; yds += ThreeJSGame.POLE_INTERVAL)
     {
@@ -600,50 +683,138 @@ class ThreeJSGame
       
       pole.position.set(yds, laneBorder, ThreeJSGame.POLE_HEIGHT / 2);
       this.scene.add(pole);
+      
+      // Create flag geometry and mesh
+      const flagGeometry = this.createFlagGeometry();
+      const flagMaterial = new THREE.MeshBasicMaterial({ 
+        map: flagTexture,
+        side: THREE.DoubleSide
+      });
+      const flagMesh = new THREE.Mesh(flagGeometry, flagMaterial);
+      
+      // Position flag at top of pole (center of base at pole top - half base width)
+      const flagZ = ThreeJSGame.POLE_HEIGHT - ThreeJSGame.FLAG_BASE_WIDTH / 2;
+      flagMesh.position.set(yds, laneBorder, flagZ);
+      this.scene.add(flagMesh);
+      
+      // Store flag data for animation
+      this.flagMeshes.push({
+        pole: pole,
+        flagGeometry: flagGeometry,
+        flagMesh: flagMesh,
+        position: {x: yds, y: laneBorder, z: flagZ},
+        currentAngle: ThreeJSGame.FLAG_MIN_ANGLE,
+        targetAngle: ThreeJSGame.FLAG_MIN_ANGLE,
+        currentDirection: 0 // yaw rotation in radians
+      });
     }
     
-    // No main flag pole - just the range markers
-    this.flagPositions = [];
-    
-    // No main flag pole - just the range markers
-    this.flagMeshes = [];
-    
-    console.log('Wind flags setup complete');
+    console.log(`Created ${this.flagMeshes.length} wind flags`);
   }
 
   updateFlags(gameTime)
   {
     this.time = gameTime;
 
-    // Update each flag mesh based on wind - FLAG GEOMETRY COMMENTED OUT
+    // Smooth interpolation speed (radians per second for direction, degrees per second for angle)
+    const deltaTime = 1/60; // Assume 60 FPS
+    const angleSpeed = 30; // degrees per second
+    const directionSpeed = 1.0; // radians per second
+
+    // Update each flag mesh based on wind
     for (let i = 0; i < this.flagMeshes.length; i++)
     {
-      const flagMesh = this.flagMeshes[i];
-      const pos = flagMesh.position;
-      const x_m = pos[0];
+      const flag = this.flagMeshes[i];
+      const pos = flag.position;
+      
+      // Get wind at flag position (convert yards to meters for BTK)
+      const x_m = btk.Conversions.yardsToMeters(pos.x);
+      const y_m = btk.Conversions.yardsToMeters(pos.y);
+      const z_m = btk.Conversions.yardsToMeters(pos.z);
       const t_s = this.time;
 
-      // Get wind at this position and time
+      // Get wind vector at this position and time
       const windVector = this.windGenerator.sample(x_m, t_s);
-      const windX = windVector.x; // Headwind
-      const windY = windVector.y; // Crosswind
+      const windX = windVector.x; // Downrange (m/s)
+      const windY = windVector.y; // Crossrange (m/s)
 
-      // Calculate wind direction and strength
-      const windDir = Math.atan2(windY, windX);
+      // Calculate wind magnitude and direction
       const windSpeedMps = Math.sqrt(windX * windX + windY * windY);
       const windSpeedMph = btk.Conversions.mpsToMph(windSpeedMps);
-
-      // Log wind info for debugging
-      if (i === 0) // Only log for first flag to avoid spam
-      {
-        console.log(`Wind at ${x_m.toFixed(1)}m: ${windSpeedMph.toFixed(1)} mph, direction: ${(windDir * 180 / Math.PI).toFixed(1)}°`);
-      }
-
-      // FLAG GEOMETRY UPDATE COMMENTED OUT
-      // if (flagMesh.flag) {
-      //   // ... all the flag geometry code ...
-      // }
+      
+      // Calculate target angle based on wind speed
+      const targetAngleDeg = Math.min(
+        ThreeJSGame.FLAG_MIN_ANGLE + windSpeedMph * ThreeJSGame.FLAG_DEGREES_PER_MPH,
+        ThreeJSGame.FLAG_MAX_ANGLE
+      );
+      
+      // Calculate wind direction (yaw)
+      const targetDirection = Math.atan2(windY, windX);
+      
+      // Smooth interpolate current angle toward target
+      const angleDiff = targetAngleDeg - flag.currentAngle;
+      const angleStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), angleSpeed * deltaTime);
+      flag.currentAngle += angleStep;
+      
+      // Smooth interpolate current direction toward target
+      let dirDiff = targetDirection - flag.currentDirection;
+      // Normalize to [-PI, PI]
+      while (dirDiff > Math.PI) dirDiff -= 2 * Math.PI;
+      while (dirDiff < -Math.PI) dirDiff += 2 * Math.PI;
+      const dirStep = Math.sign(dirDiff) * Math.min(Math.abs(dirDiff), directionSpeed * deltaTime);
+      flag.currentDirection += dirStep;
+      
+      // Update flag geometry - only move the tip vertices
+      this.updateFlagGeometry(flag, flag.currentAngle, flag.currentDirection);
     }
+  }
+
+  updateFlagGeometry(flag, angleDeg, direction) {
+    // Only update the tip vertices (vertices 2, 4, 5 in the geometry)
+    // Base vertices (0, 1, 3) remain fixed at the pole
+    
+    const halfBase = ThreeJSGame.FLAG_BASE_WIDTH / 2;
+    const halfTip = ThreeJSGame.FLAG_TIP_WIDTH / 2;
+    const length = ThreeJSGame.FLAG_LENGTH;
+    
+    // Convert angle from degrees to radians
+    const angleRad = angleDeg * Math.PI / 180;
+    
+    // Calculate tip position
+    // When angle is 5 degrees, flag hangs nearly vertical (down)
+    // When angle is 85 degrees, flag is nearly horizontal
+    // The tip moves in a circle around the base, starting from straight down
+    
+    // Pitch angle: 0 = straight down, 90 = horizontal
+    const pitchAngle = angleRad;
+    
+    // Calculate tip offset from base
+    const tipX = Math.sin(pitchAngle) * length * Math.cos(direction);
+    const tipY = Math.sin(pitchAngle) * length * Math.sin(direction);
+    const tipZ = -Math.cos(pitchAngle) * length; // Negative because it starts hanging down
+    
+    // Get the position attribute from the geometry
+    const positions = flag.flagGeometry.attributes.position.array;
+    
+    // Update tip vertices (keeping base vertices fixed at 0,0)
+    // Vertex 2: top tip (Triangle 1)
+    positions[6] = tipX;   // x
+    positions[7] = tipY;   // y
+    positions[8] = tipZ + halfTip;  // z (offset by half tip width)
+    
+    // Vertex 4: bottom tip (Triangle 2)
+    positions[12] = tipX;  // x
+    positions[13] = tipY;  // y
+    positions[14] = tipZ - halfTip; // z (offset by half tip width)
+    
+    // Vertex 5: top tip (Triangle 2, same as vertex 2)
+    positions[15] = tipX;  // x
+    positions[16] = tipY;  // y
+    positions[17] = tipZ + halfTip; // z
+    
+    // Mark the geometry as needing an update
+    flag.flagGeometry.attributes.position.needsUpdate = true;
+    flag.flagGeometry.computeVertexNormals();
   }
 
   updateTargetAnimations(gameTime) {
@@ -721,10 +892,10 @@ class ThreeJSGame
     {
       flagMesh.pole.geometry.dispose();
       flagMesh.pole.material.dispose();
-      flagMesh.flag.geometry.dispose();
-      flagMesh.flag.material.dispose();
+      flagMesh.flagMesh.geometry.dispose();
+      flagMesh.flagMesh.material.dispose();
       this.scene.remove(flagMesh.pole);
-      this.scene.remove(flagMesh.flag);
+      this.scene.remove(flagMesh.flagMesh);
     }
     
     this.renderer.dispose();
