@@ -200,6 +200,11 @@ class ThreeJSGame
   static SCOPE_MIN_MAGNIFICATION = 2; // minimum 2x zoom
   static SCOPE_MAX_MAGNIFICATION = 100; // maximum 10x zoom
   static SCOPE_MAGNIFICATION_STEP = 0.5; // zoom step size
+  
+  // Second scope constants
+  static SCOPE2_DIAMETER_FRACTION = 0.5; // Same size as first scope
+  static SCOPE2_MARGIN = 20; // pixels from edge
+  static SCOPE2_PAN_SPEED = 0.0005; // degrees per frame (50x slower)
 
   // ===== INITIALIZATION =====
   constructor(canvas, params = {})
@@ -264,6 +269,7 @@ class ThreeJSGame
     });
     this.overlayMesh = new THREE.Mesh(overlayGeom, overlayMat);
     this.overlayMesh.frustumCulled = false;
+    this.overlayMesh.renderOrder = 10; // Render on top of scope view meshes
     this.overlayScene.add(this.overlayMesh);
     
     // Create scope overlay
@@ -273,10 +279,6 @@ class ThreeJSGame
     // Setup resize handler
     window.addEventListener('resize', () => this.onResize());
     
-    // Setup camera, lighting, and range
-    this.setupCamera();
-    this.setupLighting();
-    this.setupScopeControls();
     // Wind generator
     this.windGenerator = null;
     
@@ -289,7 +291,14 @@ class ThreeJSGame
     this.targetAnimationTime = 0;
     this.targetAnimationSpeed = 2.0; // cycles per second
     
+    // Setup camera, lighting, and range
+    this.setupCamera();
+    this.setupLighting();
     this.setupRange();
+    this.createScope2Overlay();
+    this.createScope2ViewMesh();
+    this.setupScopeControls();
+    this.setupScope2Controls();
 
     // Initialize
     this.createWindGenerator();
@@ -319,6 +328,42 @@ class ThreeJSGame
     this.scopeTempCanvas.width = renderSize;
     this.scopeTempCanvas.height = renderSize;
     this.scopeTempCtx = this.scopeTempCanvas.getContext('2d');
+  }
+
+  createScope2Overlay() {
+    // Create second scope (bottom-right)
+    const scope2Size = Math.floor(this.canvas.clientHeight * ThreeJSGame.SCOPE2_DIAMETER_FRACTION);
+    const scope2RenderSize = scope2Size * 2;
+    
+    this.scope2RenderTarget = new THREE.WebGLRenderTarget(scope2RenderSize, scope2RenderSize, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      samples: 4
+    });
+    
+    this.scope2Size = scope2Size;
+    this.scope2X = this.canvas.clientWidth - scope2Size - ThreeJSGame.SCOPE2_MARGIN;
+    this.scope2Y = this.canvas.clientHeight - scope2Size - ThreeJSGame.SCOPE2_MARGIN;
+    
+    // Calculate FOV for just bigger than target (1.2x target size)
+    const targetFrameWidth = 2; // yards
+    const fovRadians = 2 * Math.atan(targetFrameWidth / this.distance);
+    const fovDegrees = fovRadians * 180 / Math.PI;
+    
+    // Create second scope camera
+    this.scope2Camera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.1, 2000);
+    this.scope2Camera.position.set(0, 0, ThreeJSGame.CAMERA_EYE_HEIGHT);
+    
+    // Point at center of target area
+    const targetCenterX = this.distance;
+    const targetCenterY = 0;
+    const targetCenterZ = 1.5; // eye level
+    this.scope2Camera.lookAt(targetCenterX, targetCenterY, targetCenterZ);
+    
+    // Initialize scope 2 control state
+    this.scope2Pitch = 0;
+    this.scope2Yaw = 0;
   }
 
   createScopeViewMesh() {
@@ -369,15 +414,71 @@ class ThreeJSGame
     
     this.scopeViewMesh = new THREE.Mesh(scopeGeom, scopeMat);
     this.scopeViewMesh.position.set(overlayX, overlayY, 0.001); // Convert to overlay coordinates
-    this.scopeViewMesh.renderOrder = 5; // Render before the canvas overlay
+    this.scopeViewMesh.renderOrder = 1; // Render before the canvas overlay
     this.scopeViewMesh.frustumCulled = false;
     
     this.overlayScene.add(this.scopeViewMesh);
     console.log('Scope view mesh created at position:', overlayX, overlayY, 'size:', size);
   }
 
+  createScope2ViewMesh() {
+    const scope2Size = this.scope2Size;
+    const scope2X = this.scope2X;
+    const scope2Y = this.scope2Y;
+    
+    // Convert screen coordinates to overlay camera coordinates for scope 2
+    const canvasW = this.canvas.clientWidth;
+    const canvasH = this.canvas.clientHeight;
+    const scope2OverlayX = scope2X + scope2Size/2 - canvasW/2;
+    const scope2OverlayY = canvasH/2 - (scope2Y + scope2Size/2);
+    
+    // Create circular mask texture for scope 2
+    const scope2MaskCanvas = document.createElement('canvas');
+    scope2MaskCanvas.width = scope2Size;
+    scope2MaskCanvas.height = scope2Size;
+    const scope2MaskCtx = scope2MaskCanvas.getContext('2d');
+    
+    const scope2Cx = scope2Size / 2;
+    const scope2Cy = scope2Size / 2;
+    const scope2R = scope2Size / 2 - 5;
+    
+    // Black background (transparent)
+    scope2MaskCtx.fillStyle = 'black';
+    scope2MaskCtx.fillRect(0, 0, scope2Size, scope2Size);
+    
+    // White circle (visible)
+    scope2MaskCtx.fillStyle = 'white';
+    scope2MaskCtx.beginPath();
+    scope2MaskCtx.arc(scope2Cx, scope2Cy, scope2R, 0, Math.PI * 2);
+    scope2MaskCtx.fill();
+    
+    const scope2MaskTexture = new THREE.CanvasTexture(scope2MaskCanvas);
+    
+    // Create scope 2 view mesh
+    const scope2Geom = new THREE.PlaneGeometry(scope2Size, scope2Size);
+    const scope2Mat = new THREE.MeshBasicMaterial({
+      map: this.scope2RenderTarget.texture,
+      alphaMap: scope2MaskTexture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+    
+    this.scope2ViewMesh = new THREE.Mesh(scope2Geom, scope2Mat);
+    this.scope2ViewMesh.position.set(scope2OverlayX, scope2OverlayY, 0.001);
+    this.scope2ViewMesh.renderOrder = 1; // Render before the canvas overlay
+    this.scope2ViewMesh.frustumCulled = false;
+    
+    this.overlayScene.add(this.scope2ViewMesh);
+    console.log('Scope 2 view mesh created at position:', scope2OverlayX, scope2OverlayY, 'size:', scope2Size);
+    console.log('Scope 2 view mesh added to overlay scene. Total children:', this.overlayScene.children.length);
+  }
+
   drawScopeToCanvas() {
     const ctx = this.overlayCtx;
+    
+    // Draw first scope border (bottom-left)
     const size = this.scopeSize;
     const x = this.scopeX;
     const y = this.scopeY;
@@ -390,6 +491,60 @@ class ThreeJSGame
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Draw second scope border and crosshair (bottom-right)
+    const scope2Size = this.scope2Size;
+    const scope2X = this.scope2X;
+    const scope2Y = this.scope2Y;
+    const cx2 = scope2X + scope2Size/2;
+    const cy2 = scope2Y + scope2Size/2;
+    const r2 = scope2Size/2 - 5;
+    
+    // Draw circular border for scope 2
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(cx2, cy2, r2, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Draw rifle scope crosshair for scope 2
+    ctx.strokeStyle = 'red';
+    ctx.fillStyle = 'red';
+    ctx.lineWidth = 2;
+    
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(cx2, cy2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Horizontal crosshair lines (left and right of center)
+    const crosshairLen = r2 * 0.4; // 40% of radius
+    const gap = 8; // Gap around center dot
+    
+    // Left horizontal line
+    ctx.beginPath();
+    ctx.moveTo(cx2 - crosshairLen, cy2);
+    ctx.lineTo(cx2 - gap, cy2);
+    ctx.stroke();
+    
+    // Right horizontal line
+    ctx.beginPath();
+    ctx.moveTo(cx2 + gap, cy2);
+    ctx.lineTo(cx2 + crosshairLen, cy2);
+    ctx.stroke();
+    
+    // Vertical crosshair lines (above and below center)
+    // Top vertical line
+    ctx.beginPath();
+    ctx.moveTo(cx2, cy2 - crosshairLen);
+    ctx.lineTo(cx2, cy2 - gap);
+    ctx.stroke();
+    
+    // Bottom vertical line
+    ctx.beginPath();
+    ctx.moveTo(cx2, cy2 + gap);
+    ctx.lineTo(cx2, cy2 + crosshairLen);
     ctx.stroke();
   }
 
@@ -422,6 +577,18 @@ class ThreeJSGame
       const overlayX = this.scopeX + this.scopeSize/2 - this.canvas.clientWidth/2;
       const overlayY = this.canvas.clientHeight/2 - (this.scopeY + this.scopeSize/2);
       this.scopeViewMesh.position.set(overlayX, overlayY, 0.001);
+    }
+    
+    // Recalculate scope 2 position/size (bottom-right corner)
+    this.scope2Size = Math.floor(this.canvas.clientHeight * ThreeJSGame.SCOPE2_DIAMETER_FRACTION);
+    this.scope2X = this.canvas.clientWidth - this.scope2Size - ThreeJSGame.SCOPE2_MARGIN;
+    this.scope2Y = this.canvas.clientHeight - this.scope2Size - ThreeJSGame.SCOPE2_MARGIN;
+    
+    // Update scope 2 view mesh position (convert to overlay coordinates)
+    if (this.scope2ViewMesh) {
+      const scope2OverlayX = this.scope2X + this.scope2Size/2 - this.canvas.clientWidth/2;
+      const scope2OverlayY = this.canvas.clientHeight/2 - (this.scope2Y + this.scope2Size/2);
+      this.scope2ViewMesh.position.set(scope2OverlayX, scope2OverlayY, 0.001);
     }
   }
 
@@ -689,6 +856,60 @@ class ThreeJSGame
     document.addEventListener('keyup', this.scopeKeyUpHandler);
   }
 
+  setupScope2Controls() {
+    // Initialize scope 2 key states
+    this.scope2Keys = { up: false, down: false, left: false, right: false };
+    
+    // Add keyboard event listeners for scope 2 controls (arrow keys)
+    this.scope2KeyDownHandler = (event) => {
+      // Only handle scope 2 keys if no modifier keys are pressed
+      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) {
+        return; // Let browser handle shortcuts
+      }
+      
+      if (event.key === 'ArrowUp') {
+        this.scope2Keys.up = true;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (event.key === 'ArrowDown') {
+        this.scope2Keys.down = true;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (event.key === 'ArrowLeft') {
+        this.scope2Keys.left = true;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (event.key === 'ArrowRight') {
+        this.scope2Keys.right = true;
+        event.preventDefault(); // Prevent page scrolling
+      }
+      // All other keys pass through to browser normally
+    };
+    
+    this.scope2KeyUpHandler = (event) => {
+      // Only handle scope 2 keys if no modifier keys are pressed
+      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) {
+        return; // Let browser handle shortcuts
+      }
+      
+      if (event.key === 'ArrowUp') {
+        this.scope2Keys.up = false;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (event.key === 'ArrowDown') {
+        this.scope2Keys.down = false;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (event.key === 'ArrowLeft') {
+        this.scope2Keys.left = false;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (event.key === 'ArrowRight') {
+        this.scope2Keys.right = false;
+        event.preventDefault(); // Prevent page scrolling
+      }
+      // All other keys pass through to browser normally
+    };
+    
+    // Add event listeners
+    document.addEventListener('keydown', this.scope2KeyDownHandler);
+    document.addEventListener('keyup', this.scope2KeyUpHandler);
+  }
+
   setupRange() {
     const rangeLength = this.distance; // yards
     // Add brown ground that's wider than the range
@@ -935,9 +1156,10 @@ class ThreeJSGame
     // Update target frame animations
     this.updateTargetAnimations(this.time);
     
-    // Update scope camera orientation
+    // Update scope camera orientations
     const deltaTime = 1/60; // Assume 60 FPS for consistent updates
     this.updateScopeCamera(deltaTime);
+    this.updateScope2Camera(deltaTime);
   
     
     // 1) Render main scene first
@@ -949,6 +1171,12 @@ class ThreeJSGame
     this.renderer.setRenderTarget(this.scopeRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.scopeCamera);
+    this.renderer.setRenderTarget(null);
+
+    // 2b) Render scene to scope 2 RT
+    this.renderer.setRenderTarget(this.scope2RenderTarget);
+    this.renderer.clear();
+    this.renderer.render(this.scene, this.scope2Camera);
     this.renderer.setRenderTarget(null);
 
     // 3) Composite overlay canvas (after scope RT is ready)
@@ -1310,6 +1538,40 @@ class ThreeJSGame
     this.scopeCamera.lookAt(lookX, lookY, lookZ);
   }
 
+  updateScope2Camera(deltaTime) {
+    const panSpeed = ThreeJSGame.SCOPE2_PAN_SPEED * deltaTime;
+    
+    // Arrow keys: adjust pitch and yaw
+    // Up arrow: increase pitch (tilt up)
+    // Down arrow: decrease pitch (tilt down)
+    if (this.scope2Keys.up) this.scope2Pitch += panSpeed;
+    if (this.scope2Keys.down) this.scope2Pitch -= panSpeed;
+    
+    // Left arrow: increase yaw (pan left)
+    // Right arrow: decrease yaw (pan right)
+    if (this.scope2Keys.left) this.scope2Yaw += panSpeed;
+    if (this.scope2Keys.right) this.scope2Yaw -= panSpeed;
+    
+    // Clamp pitch and yaw to reasonable limits
+    this.scope2Pitch = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.scope2Pitch));
+    this.scope2Yaw = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.scope2Yaw));
+    
+    // Apply rotation to scope 2 camera
+    // Start from main camera position and orientation
+    const targetCenterHeight = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + 1;
+    this.scope2Camera.position.copy(this.camera.position);
+    this.scope2Camera.up.set(0, 0, 1);
+    
+    // Calculate look-at target with offsets
+    // scope2Yaw controls horizontal (Y-axis) offset at distance
+    // scope2Pitch controls vertical (Z-axis) offset
+    const lookX = this.distance;
+    const lookY = this.distance * Math.tan(this.scope2Yaw); // Pan left/right
+    const lookZ = targetCenterHeight + this.distance * Math.tan(this.scope2Pitch); // Tilt up/down
+    
+    this.scope2Camera.lookAt(lookX, lookY, lookZ);
+  }
+
 
   // ===== CLEANUP =====
   destroy()
@@ -1331,12 +1593,23 @@ class ThreeJSGame
     if (this.scopeRenderTarget) {
       this.scopeRenderTarget.dispose();
     }
+    if (this.scope2RenderTarget) {
+      this.scope2RenderTarget.dispose();
+    }
     if (this.overlayTexture) {
       this.overlayTexture.dispose();
     }
     if (this.overlayMesh) {
       this.overlayMesh.geometry.dispose();
       this.overlayMesh.material.dispose();
+    }
+    if (this.scopeViewMesh) {
+      this.scopeViewMesh.geometry.dispose();
+      this.scopeViewMesh.material.dispose();
+    }
+    if (this.scope2ViewMesh) {
+      this.scope2ViewMesh.geometry.dispose();
+      this.scope2ViewMesh.material.dispose();
     }
     
     // Remove scope keyboard event listeners
@@ -1345,6 +1618,12 @@ class ThreeJSGame
     }
     if (this.scopeKeyUpHandler) {
       document.removeEventListener('keyup', this.scopeKeyUpHandler);
+    }
+    if (this.scope2KeyDownHandler) {
+      document.removeEventListener('keydown', this.scope2KeyDownHandler);
+    }
+    if (this.scope2KeyUpHandler) {
+      document.removeEventListener('keyup', this.scope2KeyUpHandler);
     }
     
     this.renderer.dispose();
