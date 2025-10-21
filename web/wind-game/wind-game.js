@@ -268,6 +268,7 @@ class ThreeJSGame
     
     // Create scope overlay
     this.createScopeOverlay();
+    this.createScopeViewMesh();
     
     // Setup resize handler
     window.addEventListener('resize', () => this.onResize());
@@ -320,6 +321,61 @@ class ThreeJSGame
     this.scopeTempCtx = this.scopeTempCanvas.getContext('2d');
   }
 
+  createScopeViewMesh() {
+    const size = this.scopeSize;
+    const x = this.scopeX;
+    const y = this.scopeY;
+    
+    // Convert screen coordinates to overlay camera coordinates
+    // Overlay camera: left=-canvasW/2, right=canvasW/2, top=canvasH/2, bottom=-canvasH/2
+    const canvasW = this.canvas.clientWidth;
+    const canvasH = this.canvas.clientHeight;
+    // Three.js meshes are positioned by center, so offset by half size
+    const overlayX = x + size/2 - canvasW/2;
+    const overlayY = canvasH/2 - (y + size/2); // Flip Y coordinate and offset by half size
+    
+    // Create circular mask texture
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = size;
+    maskCanvas.height = size;
+    const maskCtx = maskCanvas.getContext('2d');
+    
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2 - 5;
+    
+    // Black background (transparent)
+    maskCtx.fillStyle = 'black';
+    maskCtx.fillRect(0, 0, size, size);
+    
+    // White circle (visible)
+    maskCtx.fillStyle = 'white';
+    maskCtx.beginPath();
+    maskCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    maskCtx.fill();
+    
+    const maskTexture = new THREE.CanvasTexture(maskCanvas);
+    
+    // Create scope view mesh
+    const scopeGeom = new THREE.PlaneGeometry(size, size);
+    const scopeMat = new THREE.MeshBasicMaterial({
+      map: this.scopeRenderTarget.texture,
+      alphaMap: maskTexture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+    
+    this.scopeViewMesh = new THREE.Mesh(scopeGeom, scopeMat);
+    this.scopeViewMesh.position.set(overlayX, overlayY, 0.001); // Convert to overlay coordinates
+    this.scopeViewMesh.renderOrder = 5; // Render before the canvas overlay
+    this.scopeViewMesh.frustumCulled = false;
+    
+    this.overlayScene.add(this.scopeViewMesh);
+    console.log('Scope view mesh created at position:', overlayX, overlayY, 'size:', size);
+  }
+
   drawScopeToCanvas() {
     const ctx = this.overlayCtx;
     const size = this.scopeSize;
@@ -329,41 +385,7 @@ class ThreeJSGame
     const cy = y + size/2;
     const r = size/2 - 5;
     
-    // Create circular clipping path
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.clip();
-    
-    // Draw scope render target texture
-    // Read pixels from render target
-    const pixels = new Uint8Array(this.scopeRenderTarget.width * this.scopeRenderTarget.height * 4);
-    this.renderer.readRenderTargetPixels(
-      this.scopeRenderTarget, 
-      0, 0, 
-      this.scopeRenderTarget.width, 
-      this.scopeRenderTarget.height, 
-      pixels
-    );
-    
-    // Convert to image data and draw
-    const imageData = this.scopeTempCtx.createImageData(
-      this.scopeTempCanvas.width, 
-      this.scopeTempCanvas.height
-    );
-    imageData.data.set(pixels);
-    this.scopeTempCtx.putImageData(imageData, 0, 0);
-    
-    // Flip vertically (WebGL has origin at bottom-left)
-    ctx.save();
-    ctx.translate(x + size/2, y + size/2);
-    ctx.scale(1, -1);
-    ctx.drawImage(this.scopeTempCanvas, -size/2, -size/2, size, size);
-    ctx.restore();
-    
-    ctx.restore();
-    
-    // Draw circular border
+    // Just draw the circular border - scope content will be handled by Three.js mesh
     ctx.strokeStyle = 'black';
     ctx.lineWidth = 4;
     ctx.beginPath();
@@ -394,6 +416,13 @@ class ThreeJSGame
     this.scopeSize = Math.floor(this.canvas.clientHeight * ThreeJSGame.SCOPE_DIAMETER_FRACTION);
     this.scopeX = ThreeJSGame.SCOPE_MARGIN;
     this.scopeY = this.canvas.clientHeight - this.scopeSize - ThreeJSGame.SCOPE_MARGIN;
+    
+    // Update scope view mesh position (convert to overlay coordinates)
+    if (this.scopeViewMesh) {
+      const overlayX = this.scopeX + this.scopeSize/2 - this.canvas.clientWidth/2;
+      const overlayY = this.canvas.clientHeight/2 - (this.scopeY + this.scopeSize/2);
+      this.scopeViewMesh.position.set(overlayX, overlayY, 0.001);
+    }
   }
 
   createFlagTexture() {
@@ -909,13 +938,7 @@ class ThreeJSGame
     // Update scope camera orientation
     const deltaTime = 1/60; // Assume 60 FPS for consistent updates
     this.updateScopeCamera(deltaTime);
-    
-    // Point camera at the flag
-    // if (this.flagPositions.length > 0)
-    // {
-    //   const flagPos = this.flagPositions[0];
-    //   this.camera.lookAt(flagPos[0], flagPos[1], 6); // Look at mid-height of flag (6 yards)
-    // }
+  
     
     // 1) Render main scene first
     this.renderer.setRenderTarget(null);
@@ -930,7 +953,7 @@ class ThreeJSGame
 
     // 3) Composite overlay canvas (after scope RT is ready)
     this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-    this.drawScopeToCanvas();
+    this.drawScopeToCanvas(); // Just draws the border
     // Future: this.drawWindIndicator(), this.drawScoreDisplay(), etc.
     this.overlayTexture.needsUpdate = true;
 
