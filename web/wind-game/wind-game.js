@@ -192,6 +192,15 @@ class ThreeJSGame
   static CAMERA_FOV = 30;
   static CAMERA_EYE_HEIGHT = 1.5;
 
+  // Spotting scope constants
+  static SCOPE_DIAMETER_FRACTION = 0.5; // 1/3 of screen height (smaller scope)
+  static SCOPE_MARGIN = 20; // pixels from screen edges
+  static SCOPE_MAGNIFICATION = 4; // 4x zoom relative to main camera
+  static SCOPE_PAN_SPEED = 0.1; // radians per second (much slower)
+  static SCOPE_MIN_MAGNIFICATION = 2; // minimum 2x zoom
+  static SCOPE_MAX_MAGNIFICATION = 100; // maximum 10x zoom
+  static SCOPE_MAGNIFICATION_STEP = 0.5; // zoom step size
+
   // ===== INITIALIZATION =====
   constructor(canvas, params = {})
   {
@@ -223,12 +232,50 @@ class ThreeJSGame
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.autoClear = false; // We'll clear manually
+
+    // Create 2D overlay canvas
+    this.overlayCanvas = document.createElement('canvas');
+    this.overlayCanvas.width = this.canvas.clientWidth;
+    this.overlayCanvas.height = this.canvas.clientHeight;
+    this.overlayCtx = this.overlayCanvas.getContext('2d');
+    this.overlayTexture = new THREE.CanvasTexture(this.overlayCanvas);
+
+    // Create overlay scene with single full-screen quad
+    this.overlayScene = new THREE.Scene();
+    this.overlayCamera = new THREE.OrthographicCamera(
+      -this.canvas.clientWidth / 2, this.canvas.clientWidth / 2,
+      this.canvas.clientHeight / 2, -this.canvas.clientHeight / 2,
+      0, 10
+    );
+    this.overlayCamera.position.z = 1;
+
+    // Single full-screen mesh for overlay
+    const overlayGeom = new THREE.PlaneGeometry(
+      this.canvas.clientWidth, 
+      this.canvas.clientHeight
+    );
+    const overlayMat = new THREE.MeshBasicMaterial({
+      map: this.overlayTexture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+    this.overlayMesh = new THREE.Mesh(overlayGeom, overlayMat);
+    this.overlayMesh.frustumCulled = false;
+    this.overlayScene.add(this.overlayMesh);
     
-    console.log('Renderer setup complete');
+    // Create scope overlay
+    this.createScopeOverlay();
+    
+    // Setup resize handler
+    window.addEventListener('resize', () => this.onResize());
     
     // Setup camera, lighting, and range
     this.setupCamera();
     this.setupLighting();
+    this.setupScopeControls();
     // Wind generator
     this.windGenerator = null;
     
@@ -248,6 +295,105 @@ class ThreeJSGame
     this.createWindFlags();
     
     console.log('Wind Game initialized');
+  }
+
+  createScopeOverlay() {
+    const scopeSize = Math.floor(this.canvas.clientHeight * ThreeJSGame.SCOPE_DIAMETER_FRACTION);
+    const renderSize = scopeSize * 2;
+    
+    this.scopeRenderTarget = new THREE.WebGLRenderTarget(renderSize, renderSize, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      samples: 4
+    });
+    
+    this.scopeSize = scopeSize;
+    this.scopeX = ThreeJSGame.SCOPE_MARGIN;
+    // Position at bottom of screen instead of top
+    this.scopeY = this.canvas.clientHeight - scopeSize - ThreeJSGame.SCOPE_MARGIN;
+    
+    // Create a temporary canvas for reading render target pixels
+    this.scopeTempCanvas = document.createElement('canvas');
+    this.scopeTempCanvas.width = renderSize;
+    this.scopeTempCanvas.height = renderSize;
+    this.scopeTempCtx = this.scopeTempCanvas.getContext('2d');
+  }
+
+  drawScopeToCanvas() {
+    const ctx = this.overlayCtx;
+    const size = this.scopeSize;
+    const x = this.scopeX;
+    const y = this.scopeY;
+    const cx = x + size/2;
+    const cy = y + size/2;
+    const r = size/2 - 5;
+    
+    // Create circular clipping path
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.clip();
+    
+    // Draw scope render target texture
+    // Read pixels from render target
+    const pixels = new Uint8Array(this.scopeRenderTarget.width * this.scopeRenderTarget.height * 4);
+    this.renderer.readRenderTargetPixels(
+      this.scopeRenderTarget, 
+      0, 0, 
+      this.scopeRenderTarget.width, 
+      this.scopeRenderTarget.height, 
+      pixels
+    );
+    
+    // Convert to image data and draw
+    const imageData = this.scopeTempCtx.createImageData(
+      this.scopeTempCanvas.width, 
+      this.scopeTempCanvas.height
+    );
+    imageData.data.set(pixels);
+    this.scopeTempCtx.putImageData(imageData, 0, 0);
+    
+    // Flip vertically (WebGL has origin at bottom-left)
+    ctx.save();
+    ctx.translate(x + size/2, y + size/2);
+    ctx.scale(1, -1);
+    ctx.drawImage(this.scopeTempCanvas, -size/2, -size/2, size, size);
+    ctx.restore();
+    
+    ctx.restore();
+    
+    // Draw circular border
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  onResize() {
+    this.overlayCanvas.width = this.canvas.clientWidth;
+    this.overlayCanvas.height = this.canvas.clientHeight;
+    this.overlayTexture.needsUpdate = true;
+    
+    // Update overlay camera
+    this.overlayCamera.left = -this.canvas.clientWidth / 2;
+    this.overlayCamera.right = this.canvas.clientWidth / 2;
+    this.overlayCamera.top = this.canvas.clientHeight / 2;
+    this.overlayCamera.bottom = -this.canvas.clientHeight / 2;
+    this.overlayCamera.updateProjectionMatrix();
+    
+    // Update overlay mesh size
+    this.overlayMesh.geometry.dispose();
+    this.overlayMesh.geometry = new THREE.PlaneGeometry(
+      this.canvas.clientWidth, 
+      this.canvas.clientHeight
+    );
+    
+    // Recalculate scope position/size (bottom-left corner)
+    this.scopeSize = Math.floor(this.canvas.clientHeight * ThreeJSGame.SCOPE_DIAMETER_FRACTION);
+    this.scopeX = ThreeJSGame.SCOPE_MARGIN;
+    this.scopeY = this.canvas.clientHeight - this.scopeSize - ThreeJSGame.SCOPE_MARGIN;
   }
 
   createFlagTexture() {
@@ -398,32 +544,120 @@ class ThreeJSGame
     this.camera.up.set(0, 0, 1); // Z is up
     this.camera.lookAt(this.distance, 0, targetCenterHeight); // Look at target distance at same height
     
-    console.log('Camera setup complete');
+    // Scope camera setup
+    const scopeFOV = ThreeJSGame.CAMERA_FOV / ThreeJSGame.SCOPE_MAGNIFICATION; // 30° / 4 = 7.5°
+    this.scopeCamera = new THREE.PerspectiveCamera(scopeFOV, 1.0, 0.1, this.distance + 10);
+    this.scopeCamera.position.copy(this.camera.position); // Same position as main camera
+    this.scopeCamera.up.set(0, 0, 1); // Z is up
+    this.scopeCamera.lookAt(this.distance, 0, targetCenterHeight); // Same initial look direction
+    
+    // Initialize scope viewing angles to match current camera direction
+    // Calculate initial yaw (looking straight downrange = 0)
+    this.scopeYaw = 0;
+    // Calculate initial pitch (looking straight ahead = 0)
+    this.scopePitch = 0;
+    // Initialize scope magnification
+    this.scopeMagnification = ThreeJSGame.SCOPE_MAGNIFICATION;
   }
 
   setupLighting() {
-    // Much brighter ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+    // Brighter ambient light for overall scene illumination
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     this.scene.add(ambientLight);
     
-    // Brighter directional light simulating sun behind shooter illuminating the range
-    const directionalLight = new THREE.DirectionalLight(0xfff4e6, 2.5); // Brighter warm sunlight
-    // Position sun behind shooter (6 o'clock position) illuminating downrange
-    directionalLight.position.set(-200, 0, 150); // Behind shooter, centered, high up
+    // Strong directional light (sun) for bright scene with vivid shadows
+    const directionalLight = new THREE.DirectionalLight(0xfffaf0, 2.5); // Bright warm sunlight
+    // Position sun behind and to the left of shooter (7.5 o'clock position)
+    directionalLight.position.set(-500, -200, 400); // Behind shooter, high up
     directionalLight.castShadow = true;
     
     // Configure shadow properties for better quality
-    directionalLight.shadow.mapSize.width = 2048;  // Higher resolution shadows
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 500;
-    directionalLight.shadow.camera.left = -200;
-    directionalLight.shadow.camera.right = 200;
-    directionalLight.shadow.camera.top = 200;
-    directionalLight.shadow.camera.bottom = -200;
-    directionalLight.shadow.bias = -0.0001;  // Reduce shadow acne
+    directionalLight.shadow.mapSize.width = 4096;  // Higher resolution shadows
+    directionalLight.shadow.mapSize.height = 4096;
+    directionalLight.shadow.camera.near = 10;
+    directionalLight.shadow.camera.far = 1500;
+    // Wider shadow camera to cover the entire range
+    directionalLight.shadow.camera.left = -100;
+    directionalLight.shadow.camera.right = 1100;
+    directionalLight.shadow.camera.top = 100;
+    directionalLight.shadow.camera.bottom = -100;
+    directionalLight.shadow.bias = -0.0005;  // Reduce shadow acne
+    directionalLight.shadow.normalBias = 0.02; // Additional bias for smooth surfaces
     
     this.scene.add(directionalLight);
+    
+    // Optional: Add a subtle fill light from the front to soften shadows
+    const fillLight = new THREE.DirectionalLight(0xadd8e6, 0.3); // Soft blue fill
+    fillLight.position.set(500, 0, 100); // From downrange
+    this.scene.add(fillLight);
+  }
+
+  setupScopeControls() {
+    // Initialize scope key states
+    this.scopeKeys = { w: false, a: false, s: false, d: false, e: false, q: false };
+    
+    // Add keyboard event listeners for scope controls
+    this.scopeKeyDownHandler = (event) => {
+      // Only handle scope keys if no modifier keys are pressed
+      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) {
+        return; // Let browser handle shortcuts
+      }
+      
+      const key = event.key.toLowerCase();
+      if (key === 'w') {
+        this.scopeKeys.w = true;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 'a') {
+        this.scopeKeys.a = true;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 's') {
+        this.scopeKeys.s = true;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 'd') {
+        this.scopeKeys.d = true;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 'e') {
+        this.scopeKeys.e = true;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 'q') {
+        this.scopeKeys.q = true;
+        event.preventDefault(); // Prevent page scrolling
+      }
+      // All other keys pass through to browser normally
+    };
+    
+    this.scopeKeyUpHandler = (event) => {
+      // Only handle scope keys if no modifier keys are pressed
+      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) {
+        return; // Let browser handle shortcuts
+      }
+      
+      const key = event.key.toLowerCase();
+      if (key === 'w') {
+        this.scopeKeys.w = false;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 'a') {
+        this.scopeKeys.a = false;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 's') {
+        this.scopeKeys.s = false;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 'd') {
+        this.scopeKeys.d = false;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 'e') {
+        this.scopeKeys.e = false;
+        event.preventDefault(); // Prevent page scrolling
+      } else if (key === 'q') {
+        this.scopeKeys.q = false;
+        event.preventDefault(); // Prevent page scrolling
+      }
+      // All other keys pass through to browser normally
+    };
+    
+    // Add event listeners
+    document.addEventListener('keydown', this.scopeKeyDownHandler);
+    document.addEventListener('keyup', this.scopeKeyUpHandler);
   }
 
   setupRange() {
@@ -441,11 +675,11 @@ class ThreeJSGame
     
     // Create grass material with dense texture variation
     const groundMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x2d5a2d, // Brighter, more vibrant green
+      color: 0x5a9a5a, // Bright, vibrant grass green
       side: THREE.DoubleSide,
-      roughness: 0.9,
+      roughness: 0.85,
       metalness: 0.0,
-      bumpScale: 1.5 // Increased for more visible texture
+      bumpScale: 0.8 // Subtle texture for grass blades
     });
     
     // Add some noise for texture
@@ -473,7 +707,6 @@ class ThreeJSGame
     // Add target frames above the pits
     this.setupTargets(rangeLength);
     
-    console.log('Range setup complete');
   }
 
   setupTargets(rangeLength) {
@@ -541,7 +774,6 @@ class ThreeJSGame
       this.targetFrames[i].numberBox = numberBox;
     }
     
-    console.log(`Added ${maxTargets} target frames above pits`);
   }
 
   createTargetTexture() {
@@ -589,15 +821,6 @@ class ThreeJSGame
       context.strokeStyle = spec.fill === 'black' ? 'white' : 'black';
       context.lineWidth = 2;
       context.stroke();
-      
-      // Add ring numbers horizontally on white rings
-      if (spec.ring >= 5 && spec.ring <= 9 && spec.fill === 'white') {
-        context.fillStyle = 'black';
-        context.font = 'bold 40px Arial';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(spec.ring.toString(), centerX, centerY - radiusPixels + 50);
-      }
     }
     
     // Draw X-ring
@@ -659,7 +882,6 @@ class ThreeJSGame
   {
     // Create wind generator from preset
     this.windGenerator = btk.WindPresets.getPreset(this.windPreset);
-    console.log('Wind generator created for preset:', this.windPreset);
   }
 
   // ===== RENDERING =====
@@ -684,15 +906,37 @@ class ThreeJSGame
     // Update target frame animations
     this.updateTargetAnimations(this.time);
     
-    // Point camera at the flag
-    if (this.flagPositions.length > 0)
-    {
-      const flagPos = this.flagPositions[0];
-      this.camera.lookAt(flagPos[0], flagPos[1], 6); // Look at mid-height of flag (6 yards)
-    }
+    // Update scope camera orientation
+    const deltaTime = 1/60; // Assume 60 FPS for consistent updates
+    this.updateScopeCamera(deltaTime);
     
-    // Render the scene
+    // Point camera at the flag
+    // if (this.flagPositions.length > 0)
+    // {
+    //   const flagPos = this.flagPositions[0];
+    //   this.camera.lookAt(flagPos[0], flagPos[1], 6); // Look at mid-height of flag (6 yards)
+    // }
+    
+    // 1) Render main scene first
+    this.renderer.setRenderTarget(null);
+    this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
+
+    // 2) Render scene to scope RT
+    this.renderer.setRenderTarget(this.scopeRenderTarget);
+    this.renderer.clear();
+    this.renderer.render(this.scene, this.scopeCamera);
+    this.renderer.setRenderTarget(null);
+
+    // 3) Composite overlay canvas (after scope RT is ready)
+    this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+    this.drawScopeToCanvas();
+    // Future: this.drawWindIndicator(), this.drawScoreDisplay(), etc.
+    this.overlayTexture.needsUpdate = true;
+
+    // 4) Render overlay on top (clear depth only, not color)
+    this.renderer.clearDepth();
+    this.renderer.render(this.overlayScene, this.overlayCamera);
   }
 
   start()
@@ -726,7 +970,6 @@ class ThreeJSGame
 
   createWindFlags()
   {
-    console.log('Creating wind flags...');
     
     // Create flag texture once
     const flagTexture = this.createFlagTexture();
@@ -780,7 +1023,6 @@ class ThreeJSGame
       });
     }
     
-    console.log(`Created ${this.flagMeshes.length} wind flags`);
   }
 
   updateFlags(gameTime)
@@ -986,6 +1228,66 @@ class ThreeJSGame
     target.animating = true;
   }
 
+  updateScopeCamera(deltaTime) {
+    // Calculate pan speed that slows down linearly with magnification
+    // At 2x mag: full speed, at 100x mag: 1/50th speed
+    const speedFactor = 2.0 / this.scopeMagnification; // 2x = 1.0, 100x = 0.02
+    const panSpeed = ThreeJSGame.SCOPE_PAN_SPEED * deltaTime * speedFactor;
+    
+    // W/S: adjust pitch (tilt up/down)
+    // W = tilt up (positive pitch)
+    // S = tilt down (negative pitch)
+    if (this.scopeKeys.w) this.scopePitch += panSpeed;
+    if (this.scopeKeys.s) this.scopePitch -= panSpeed;
+    
+    // A/D: pan left/right (move crossrange position)
+    // A = pan left (negative Y in BTK coords)
+    // D = pan right (positive Y in BTK coords)
+    if (this.scopeKeys.a) this.scopeYaw += panSpeed;
+    if (this.scopeKeys.d) this.scopeYaw -= panSpeed;
+    
+    // E/Q: adjust magnification (exponential scaling)
+    // E = increase magnification
+    // Q = decrease magnification
+    if (this.scopeKeys.e) {
+      this.scopeMagnification = Math.min(
+        ThreeJSGame.SCOPE_MAX_MAGNIFICATION,
+        this.scopeMagnification * Math.pow(1.1, deltaTime * 10) // 10% increase per second
+      );
+    }
+    if (this.scopeKeys.q) {
+      this.scopeMagnification = Math.max(
+        ThreeJSGame.SCOPE_MIN_MAGNIFICATION,
+        this.scopeMagnification / Math.pow(1.1, deltaTime * 10) // 10% decrease per second
+      );
+    }
+    
+    // Clamp pitch and yaw to reasonable limits
+    this.scopePitch = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.scopePitch));
+    this.scopeYaw = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.scopeYaw));
+    
+    // Update scope camera FOV based on current magnification
+    const scopeFOV = ThreeJSGame.CAMERA_FOV / this.scopeMagnification;
+    this.scopeCamera.fov = scopeFOV;
+    this.scopeCamera.updateProjectionMatrix();
+    
+    // Apply rotation to scope camera
+    // Start from main camera position and orientation
+    const targetCenterHeight = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + 1;
+    this.scopeCamera.position.copy(this.camera.position);
+    this.scopeCamera.up.set(0, 0, 1);
+    
+    // Calculate look-at target with offsets
+    // scopeYaw controls horizontal (Y-axis) offset at distance
+    // scopePitch controls vertical (Z-axis) offset
+    const lookX = this.distance;
+    const lookY = this.distance * Math.tan(this.scopeYaw); // Pan left/right
+    const lookZ = targetCenterHeight + this.distance * Math.tan(this.scopePitch); // Tilt up/down
+    
+    this.scopeCamera.lookAt(lookX, lookY, lookZ);
+  }
+
+
   // ===== CLEANUP =====
   destroy()
   {
@@ -1000,6 +1302,26 @@ class ThreeJSGame
       flagMesh.flagMesh.material.dispose();
       this.scene.remove(flagMesh.pole);
       this.scene.remove(flagMesh.flagMesh);
+    }
+    
+    // Clean up scope resources
+    if (this.scopeRenderTarget) {
+      this.scopeRenderTarget.dispose();
+    }
+    if (this.overlayTexture) {
+      this.overlayTexture.dispose();
+    }
+    if (this.overlayMesh) {
+      this.overlayMesh.geometry.dispose();
+      this.overlayMesh.material.dispose();
+    }
+    
+    // Remove scope keyboard event listeners
+    if (this.scopeKeyDownHandler) {
+      document.removeEventListener('keydown', this.scopeKeyDownHandler);
+    }
+    if (this.scopeKeyUpHandler) {
+      document.removeEventListener('keyup', this.scopeKeyUpHandler);
     }
     
     this.renderer.dispose();
