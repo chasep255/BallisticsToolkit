@@ -131,8 +131,7 @@ namespace btk::ballistics
      * @param time_offset Time offset for wind sampling
      * @return Const reference to trajectory object containing all simulation points
      */
-    const Trajectory& simulate(float max_distance, float dt, float max_time, 
-                              const btk::physics::WindGenerator& wind_gen, float time_offset);
+    const Trajectory& simulate(float max_distance, float dt, float max_time, const btk::physics::WindGenerator& wind_gen, float time_offset);
 
     /**
      * @brief Advance simulation by one time step

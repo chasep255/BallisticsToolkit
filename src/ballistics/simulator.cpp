@@ -208,8 +208,7 @@ namespace btk::ballistics
   }
 
   // Simulate trajectory with wind generator sampling
-  const Trajectory& Simulator::simulate(float max_distance, float dt, float max_time, 
-                                        const btk::physics::WindGenerator& wind_gen, float time_offset)
+  const Trajectory& Simulator::simulate(float max_distance, float dt, float max_time, const btk::physics::WindGenerator& wind_gen, float time_offset)
   {
     // Add initial point
     trajectory_.addPoint(current_time_, current_bullet_);
@@ -223,10 +222,10 @@ namespace btk::ballistics
       float x = current_bullet_.getPositionX();
       float t = time_offset + current_time_;
       wind_ = wind_gen(x, t);
-      
+
       // Step forward
       timeStep(dt);
-      
+
       if(current_bullet_.getPositionX() > max_distance)
         break;
     }
