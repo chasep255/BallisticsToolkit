@@ -394,6 +394,11 @@ class ThreeJSGame
     this.rifleAccuracyMoa = 0; // Store rifle accuracy (MOA)
     this.lastShotMarker = null; // Red marker for last shot
 
+    // Audio system
+    this.audioContext = null;
+    this.shotSound = null;
+    this.audioMuted = false;
+
     // HUD elements
     this.hudElements = {
       container: document.getElementById('shotHud'),
@@ -418,8 +423,68 @@ class ThreeJSGame
     // Initialize
     this.createWindGenerator();
     this.createWindFlags();
+    this.initializeAudio();
 
     console.log('F-Class Simulator initialized');
+  }
+
+  // ===== AUDIO SYSTEM =====
+  
+  /**
+   * Initialize audio system and load shot sound
+   */
+  async initializeAudio() {
+    try {
+      // Create audio context
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Load shot sound
+      await this.loadShotSound();
+      
+      console.log('Audio system initialized');
+    } catch (error) {
+      console.warn('Could not initialize audio system:', error);
+    }
+  }
+
+  /**
+   * Load shot sound from audio file
+   */
+  async loadShotSound() {
+    try {
+      const response = await fetch('audio/shot1.mp3');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      this.shotSound = await this.audioContext.decodeAudioData(arrayBuffer);
+      
+      console.log('Shot sound loaded successfully');
+    } catch (error) {
+      console.warn('Could not load shot sound:', error);
+      this.shotSound = null;
+    }
+  }
+
+  /**
+   * Play shot sound when firing
+   */
+  playShotSound() {
+    if (this.audioMuted || !this.shotSound || !this.audioContext) {
+      return;
+    }
+
+    try {
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.shotSound;
+      source.connect(this.audioContext.destination);
+      source.start();
+      
+      console.log('Shot sound played');
+    } catch (error) {
+      console.warn('Could not play shot sound:', error);
+    }
   }
 
   createSpottingScopeOverlay()
@@ -2291,6 +2356,9 @@ class ThreeJSGame
       console.log('Match complete! 60 shots fired. Please restart to start a new match.');
       return;
     }
+
+    // Play shot sound
+    this.playShotSound();
 
     try
     {
