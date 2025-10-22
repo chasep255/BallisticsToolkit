@@ -1,0 +1,65 @@
+.canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 16px;
+  position: relative;
+}
+
+#gameCanvas {
+  border: 1px solid #ddd;
+  background: #f8f9fa;
+  width: 100%;
+  height: calc(100vh - 200px);
+}
+
+.game-info {
+  color: #666;
+  font-size: 12px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* Game-specific UI overlays - simplified */
+
+/* Shot Statistics HUD */
+.shot-hud {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #333;
+  border-radius: 8px;
+  padding: 12px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  min-width: 180px;
+  z-index: 1000;
+}
+
+.hud-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 4px 0;
+  gap: 12px;
+}
+
+.hud-label {
+  font-weight: 600;
+  color: #333;
+  font-size: 13px;
+}
+
+.hud-value {
+  font-weight: bold;
+  color: #0066cc;
+  font-size: 14px;
+  text-align: right;
+}
+
+.hud-separator {
+  height: 1px;
+  background: #ccc;
+  margin: 6px 0;
+}

@@ -5,6 +5,7 @@
 #include "math/conversions.h"
 #include "math/vector.h"
 #include "physics/atmosphere.h"
+#include "physics/wind_generator.h"
 
 namespace btk::ballistics
 {
@@ -119,6 +120,19 @@ namespace btk::ballistics
      * @return Const reference to trajectory object containing all simulation points
      */
     const Trajectory& simulate(float max_distance, float dt = 0.001f, float max_time = 60.0f);
+
+    /**
+     * @brief Simulate trajectory with wind generator sampling
+     *
+     * @param max_distance Maximum distance to simulate in m
+     * @param dt Time step for simulation in s
+     * @param max_time Maximum simulation time in s
+     * @param wind_gen Wind generator for position/time-dependent wind
+     * @param time_offset Time offset for wind sampling
+     * @return Const reference to trajectory object containing all simulation points
+     */
+    const Trajectory& simulate(float max_distance, float dt, float max_time, 
+                              const btk::physics::WindGenerator& wind_gen, float time_offset);
 
     /**
      * @brief Advance simulation by one time step

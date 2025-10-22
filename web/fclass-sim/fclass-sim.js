@@ -9,7 +9,7 @@ let webglGame = null;
 // Initialize the game
 async function init()
 {
-  console.log('Wind Game initialized');
+  console.log('F-Class Simulator initialized');
 }
 
 function setupUI()
@@ -78,38 +78,35 @@ function restartGame()
 
 function getGameParams()
 {
+  const fclassMode = document.getElementById('fclassMode').value;
+  
+  // Parse F-Class mode to get distance (format: "fclass-300", "fclass-500", etc.)
+  const distance = fclassMode.split('-')[1];
+  const distanceYards = parseInt(distance);
+  
+  // Map F-Class distances to correct targets
+  let targetType;
+  if (distanceYards === 300) {
+    targetType = 'MR-63FCA';
+  } else if (distanceYards === 500) {
+    targetType = 'MR-65FCA';
+  } else if (distanceYards === 600) {
+    targetType = 'MR-1FCA';
+  } else if (distanceYards >= 800) {
+    targetType = 'LR-FCA';
+  } else {
+    throw new Error(`Invalid F-Class distance: ${distanceYards} yards. Valid distances are: 300, 500, 600, 800, 900, 1000`);
+  }
+  
   return {
-    distance: parseInt(document.getElementById('distanceYd').value),
-    target: document.getElementById('target').value,
-    windPreset: document.getElementById('windPreset').value
+    distance: distanceYards,
+    target: targetType,
+    windPreset: document.getElementById('windPreset').value,
+    fclassMode: fclassMode
   };
 }
 
-function populateTargetDropdown()
-{
-  const targetSelect = document.getElementById('target');
-  targetSelect.innerHTML = '';
-
-  const availableTargets = btk.NRATargets.listTargets();
-  const targetNames = [];
-
-  for (let i = 0; i < availableTargets.size(); i++)
-  {
-    const targetName = availableTargets.get(i);
-    targetNames.push(targetName);
-
-    const option = document.createElement('option');
-    option.value = targetName;
-    option.textContent = targetName;
-    targetSelect.appendChild(option);
-  }
-
-  const defaultTarget = targetNames.includes('MR-1FCA') ? 'MR-1FCA' : targetNames[0];
-  if (defaultTarget)
-  {
-    targetSelect.value = defaultTarget;
-  }
-}
+// Target dropdown no longer needed - targets are determined by F-Class mode
 
 function populateWindPresetDropdown()
 {
@@ -175,6 +172,7 @@ class ThreeJSGame
   static TARGET_MAX_HEIGHT = 0; // No additional height when raised (baseHeight already has the gap)
   static TARGET_HALF_MAST = -(ThreeJSGame.TARGET_SIZE + ThreeJSGame.TARGET_GAP_ABOVE_PITS) / 2; // Halfway between raised and lowered
   static TARGET_MIN_HEIGHT = -(ThreeJSGame.TARGET_SIZE + ThreeJSGame.TARGET_GAP_ABOVE_PITS); // Fully lowered (target size + gap)
+  static TARGET_CENTER_HEIGHT = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + ThreeJSGame.TARGET_SIZE / 2; // Target center height when raised
   static TARGET_ANIMATION_SPEED = 0.75; // yards per second
   
   // Debug and animation constants
@@ -295,6 +293,28 @@ class ThreeJSGame
     this.targetFrames = [];
     this.targetAnimationTime = 0;
     this.targetAnimationSpeed = 2.0; // cycles per second
+
+    // ===== SHOT FIRING =====
+    this.ballisticSimulator = null;  // btk.Simulator
+    this.match = null;                // btk.Match
+    this.btkTarget = null;            // btk.Target object
+    this.bullet = null;               // btk.Bullet
+    this.bulletDiameter = 0;
+    this.zeroedBullet = null;         // Zeroed initial state
+    this.nominalMV = 0;               // Store nominal MV for variations (fps)
+    this.mvSd = 0;                    // Store MV standard deviation (fps)
+    this.rifleAccuracyMoa = 0;        // Store rifle accuracy (MOA)
+    this.lastShotMarker = null;       // Red marker for last shot
+    
+    // HUD elements
+    this.hudElements = {
+      container: document.getElementById('shotHud'),
+      shots: document.getElementById('hudShots'),
+      score: document.getElementById('hudScore'),
+      lastScore: document.getElementById('hudLastScore'),
+      mv: document.getElementById('hudMV'),
+      impactV: document.getElementById('hudImpactV')
+    };
     
     // Setup camera, lighting, and range
     this.setupCamera();
@@ -304,12 +324,13 @@ class ThreeJSGame
     this.createRifleScopeViewMesh();
     this.setupSpottingScopeControls();
     this.setupRifleScopeControls();
+    this.setupShotFiringControls();
 
     // Initialize
     this.createWindGenerator();
     this.createWindFlags();
     
-    console.log('Wind Game initialized');
+    console.log('F-Class Simulator initialized');
   }
 
   createSpottingScopeOverlay() {
@@ -525,8 +546,8 @@ class ThreeJSGame
     ctx.stroke();
     
     // Draw rifle scope crosshair
-    ctx.strokeStyle = 'red';
-    ctx.fillStyle = 'red';
+    ctx.strokeStyle = '#808080'; // Medium grey
+    ctx.fillStyle = '#808080';   // Medium grey
     ctx.lineWidth = 2;
     
     // Center dot
@@ -751,7 +772,7 @@ class ThreeJSGame
     const aspect = this.canvas.clientWidth / this.canvas.clientHeight;
     this.camera = new THREE.PerspectiveCamera(ThreeJSGame.CAMERA_FOV, aspect, 0.1, this.distance + 10);
     // Camera positioned 1 yard behind muzzle, at target center height when raised
-    const targetCenterHeight = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + 1; // pits + gap + half target height
+    const targetCenterHeight = ThreeJSGame.TARGET_CENTER_HEIGHT;
     this.camera.position.set(-1, 0, targetCenterHeight); // 1 yard behind muzzle, at target center height
     this.camera.up.set(0, 0, 1); // Z is up
     this.camera.lookAt(this.distance, 0, targetCenterHeight); // Look at target distance at same height
@@ -986,7 +1007,7 @@ class ThreeJSGame
     const maxTargets = Math.floor(rangeWidth / totalTargetWidth);
     
     // Position targets above the pits - centered on the range width
-    const targetHeight = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + targetSize / 2;
+    const targetHeight = ThreeJSGame.TARGET_CENTER_HEIGHT;
     const totalTargetsWidth = maxTargets * targetSize + (maxTargets - 1) * targetSpacing; // Total width including spacing
     const startY = totalTargetsWidth / 2 - targetSize / 2; // Start from left (positive Y), centered
     
@@ -1060,7 +1081,7 @@ class ThreeJSGame
 
   createTargetTexture() {
     // Get the actual target from BTK for accurate dimensions
-    const target = btk.NRATargets.getTarget(this.target);
+    const target = btk.NRATargets.getTarget(String(this.target));
     
     // Create canvas - use 1024x1024 for high resolution
     const canvas = document.createElement('canvas');
@@ -1222,12 +1243,26 @@ class ThreeJSGame
     this.renderer.render(this.overlayScene, this.overlayCamera);
   }
 
-  start()
+  async start()
   {
     if (this.isRunning) return;
 
     this.gameStartTime = performance.now();
     this.time = 0;
+    
+    // Setup ballistic system for shot firing
+    try {
+      await this.setupBallisticSystem();
+    } catch (error) {
+      console.error('Failed to setup ballistic system:', error);
+      throw error;
+    }
+    
+    // Show HUD
+    if (this.hudElements.container) {
+      this.hudElements.container.style.display = 'block';
+    }
+    this.updateHUD();
     
     this.isRunning = true;
     const gameLoop = () =>
@@ -1248,6 +1283,11 @@ class ThreeJSGame
     {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
+    }
+    
+    // Hide HUD
+    if (this.hudElements.container) {
+      this.hudElements.container.style.display = 'none';
     }
   }
 
@@ -1644,6 +1684,451 @@ class ThreeJSGame
   }
 
 
+  // ===== SHOT FIRING METHODS =====
+
+  /**
+   * Setup ballistic system with zeroing
+   */
+  async setupBallisticSystem()
+  {
+    try {
+      // Get bullet parameters from UI
+      const mvFps = parseFloat(document.getElementById('mv').value);
+      const bc = parseFloat(document.getElementById('bc').value);
+      const dragFunction = document.getElementById('dragFunction').value;
+      const diameterInches = parseFloat(document.getElementById('diameter').value);
+      const mvSdFps = parseFloat(document.getElementById('mvSd').value);
+      const rifleAccuracyMoa = parseFloat(document.getElementById('rifleAccuracy').value);
+      
+      this.nominalMV = mvFps;  // Store in fps
+      this.bulletDiameter = diameterInches;      // Store in inches
+      this.mvSd = mvSdFps;      // Store in fps
+      this.rifleAccuracyMoa = rifleAccuracyMoa;  // Store in MOA
+      
+      // Get game parameters
+      const gameParams = getGameParams();
+      console.log('Getting target:', gameParams.target, typeof gameParams.target);
+      this.btkTarget = btk.NRATargets.getTarget(String(gameParams.target));
+      const range = btk.Conversions.yardsToMeters(gameParams.distance);
+      
+      // Create bullet
+      this.bullet = new btk.Bullet(
+        btk.Conversions.grainsToKg(0),
+        btk.Conversions.inchesToMeters(this.bulletDiameter),  // Convert at call
+        btk.Conversions.inchesToMeters(0),
+        bc,
+        dragFunction === 'G1' ? btk.DragFunction.G1 : btk.DragFunction.G7
+      );
+      
+      // Create atmosphere (default conditions)
+      const atmosphere = new btk.Atmosphere(
+        btk.Conversions.fahrenheitToKelvin(59),
+        btk.Conversions.feetToMeters(0),
+        0.5,
+        0.0
+      );
+      
+      // Create ballistic simulator
+      this.ballisticSimulator = new btk.BallisticsSimulator();
+      this.ballisticSimulator.setInitialBullet(this.bullet);
+      this.ballisticSimulator.setAtmosphere(atmosphere);
+      this.ballisticSimulator.setWind(new btk.Vector3D(0, 0, 0));
+      
+      // Calculate target center coordinates for the selected target
+      this.targetCenterCoords = this.calculateTargetCenterCoords();
+      
+      // Custom zeroing routine to hit target center (accounting for Y offset)
+      const mvMps = btk.Conversions.fpsToMps(this.nominalMV);  // Convert to m/s
+      this.zeroedBullet = this.computeZeroToTarget(mvMps, range);
+      
+      // Create match object for recording shots
+      this.match = new btk.Match();
+      
+      console.log('Ballistic system zeroed on target at', gameParams.distance, 'yards');
+    } catch (error) {
+      console.error('Failed to setup ballistic system:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate the center coordinates of the selected target
+   */
+  calculateTargetCenterCoords()
+  {
+    // Get the target position from the 3D scene
+    if (!this.userTarget || !this.userTarget.mesh) {
+      console.error('User target not found');
+      return { x: this.distance, y: 0, z: ThreeJSGame.TARGET_CENTER_HEIGHT };
+    }
+    
+    // Get the actual position from the 3D mesh
+    const mesh = this.userTarget.mesh;
+    const position = mesh.position;
+    
+    console.log(`Three.js target position: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
+    
+    // Convert from Three.js coordinates to BTK coordinates
+    // Three.js: X=downrange, Y=crossrange, Z=up (based on actual output)
+    // BTK: X=downrange, Y=crossrange, Z=up
+    const x = position.x; // Three.js X (downrange) -> BTK X (downrange)
+    const y = position.y; // Three.js Y (crossrange) -> BTK Y (crossrange)  
+    const z = position.z; // Three.js Z (up) -> BTK Z (up)
+    
+    console.log(`Target center coordinates: (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}) yards`);
+    
+    return { x, y, z };
+  }
+
+  /**
+   * Custom zeroing routine to hit target center accounting for Y offset
+   */
+  computeZeroToTarget(mv, range_m)
+  {
+    // Use the actual target center coordinates from the 3D scene
+    const targetX = btk.Conversions.yardsToMeters(this.targetCenterCoords.x);
+    const targetY = btk.Conversions.yardsToMeters(this.targetCenterCoords.y);
+    const targetZ = btk.Conversions.yardsToMeters(this.targetCenterCoords.z);
+    
+    console.log(`Zeroing to target at (${targetX.toFixed(2)}, ${targetY.toFixed(2)}, ${targetZ.toFixed(2)}) meters`);
+    
+    // Initial angles - start with reasonable elevation and windage
+    let elevation = 0.1; // Start with 0.1 radian elevation (about 6 degrees)
+    let windage = 0.0;   // Start with no windage
+    
+    const dt = 0.001;
+    const maxIterations = 1000;
+    const tolerance = 0.001; // 1mm tolerance
+    
+    for (let iter = 0; iter < maxIterations; iter++) {
+      // Create velocity vector from angles
+      const vx = mv * Math.cos(elevation) * Math.cos(windage);
+      const vy = mv * Math.cos(elevation) * Math.sin(windage);
+      const vz = mv * Math.sin(elevation);
+      
+      const vel = new btk.Vector3D(vx, vy, vz);
+      const pos = new btk.Vector3D(0, 0, 0); // Start at muzzle
+      const bullet = new btk.Bullet(this.bullet, pos, vel, 0.0);
+      
+      // Simulate trajectory
+      this.ballisticSimulator.setInitialBullet(bullet);
+      this.ballisticSimulator.resetToInitial();
+      this.ballisticSimulator.setWind(new btk.Vector3D(0, 0, 0)); // No wind for zeroing
+      
+      const trajectory = this.ballisticSimulator.simulate(range_m * 1.1, dt, 5.0);
+      const pointAtRange = trajectory.atDistance(range_m);
+      
+      if (isNaN(pointAtRange.getTime())) {
+        console.log('Trajectory failed at iteration', iter);
+        break;
+      }
+      
+      const bulletPos = pointAtRange.getState().getPosition();
+      const errorX = bulletPos.x - targetX;
+      const errorY = bulletPos.y - targetY;
+      const errorZ = bulletPos.z - targetZ;
+      const totalError = Math.sqrt(errorX*errorX + errorY*errorY + errorZ*errorZ);
+      
+      if (iter % 10 === 0) {
+        console.log(`Iter ${iter}: Error=(${errorX.toFixed(3)}, ${errorY.toFixed(3)}, ${errorZ.toFixed(3)}) total=${totalError.toFixed(3)}m`);
+        console.log(`  Angles: elevation=${(elevation * 180/Math.PI).toFixed(2)}°, windage=${(windage * 180/Math.PI).toFixed(2)}°`);
+      }
+      
+      if (totalError < tolerance) {
+        console.log(`Zeroing converged after ${iter} iterations`);
+        console.log(`Final bullet position: (${bulletPos.x.toFixed(2)}, ${bulletPos.y.toFixed(2)}, ${bulletPos.z.toFixed(2)}) meters`);
+        console.log(`Target position: (${targetX.toFixed(2)}, ${targetY.toFixed(2)}, ${targetZ.toFixed(2)}) meters`);
+        break;
+      }
+      
+      // Adjust angles based on errors - more aggressive correction
+      const correctionFactor = 0.5;
+      elevation -= errorZ * correctionFactor / range_m; // Adjust elevation for height error
+      windage -= errorY * correctionFactor / range_m;   // Adjust windage for crossrange error
+      
+      // Keep angles reasonable
+      elevation = Math.max(-Math.PI/2, Math.min(Math.PI/2, elevation));
+      windage = Math.max(-Math.PI/2, Math.min(Math.PI/2, windage));
+    }
+    
+    // Create final velocity from converged angles
+    const finalVx = mv * Math.cos(elevation) * Math.cos(windage);
+    const finalVy = mv * Math.cos(elevation) * Math.sin(windage);
+    const finalVz = mv * Math.sin(elevation);
+    
+    const finalVel = new btk.Vector3D(finalVx, finalVy, finalVz);
+    const finalPos = new btk.Vector3D(0, 0, 0);
+    const zeroedBullet = new btk.Bullet(this.bullet, finalPos, finalVel, 0.0);
+    
+    console.log(`Final zeroed velocity: (${finalVx.toFixed(2)}, ${finalVy.toFixed(2)}, ${finalVz.toFixed(2)}) m/s`);
+    console.log(`Final angles: elevation=${(elevation * 180/Math.PI).toFixed(2)}°, windage=${(windage * 180/Math.PI).toFixed(2)}°`);
+    console.log(`Velocity magnitude: ${finalVel.magnitude().toFixed(2)} m/s`);
+    
+    return zeroedBullet;
+  }
+
+  /**
+   * Display a 1" red marker for the last shot
+   */
+  displayLastShotMarker(relativeX, relativeY)
+  {
+    // Remove any existing last shot marker
+    if (this.lastShotMarker) {
+      this.scene.remove(this.lastShotMarker);
+      this.lastShotMarker.geometry.dispose();
+      this.lastShotMarker.material.dispose();
+      this.lastShotMarker = null;
+    }
+    
+    
+    // Parameters are already in yards (no conversion needed)
+    
+    // Create 1" red sphere marker (1 inch = 0.02778 yards, so 0.5" radius)
+    const markerGeometry = new THREE.SphereGeometry(0.5 * 0.02778, 8, 8); // 1" diameter = 0.5" radius in yards
+    const markerMaterial = new THREE.MeshBasicMaterial({ 
+      color: new THREE.Color(1, 0, 0), // Explicit red RGB
+      toneMapped: false  // Don't apply tone mapping/lighting
+    });
+    
+    this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
+    
+    // Position at target center with relative offset
+    this.lastShotMarker.position.set(
+      this.distance - 0.1,        // Slightly in front of target (yards)
+      this.targetCenterCoords.y + relativeX,  // Target center Y + crossrange offset
+      this.targetCenterCoords.z + relativeY   // Target center Z + height offset
+    );
+    
+    console.log(`Shot marker at: (${this.lastShotMarker.position.x.toFixed(2)}, ${this.lastShotMarker.position.y.toFixed(2)}, ${this.lastShotMarker.position.z.toFixed(2)}) yards`);
+    console.log(`Relative impact: (${relativeX.toFixed(2)}, ${relativeY.toFixed(2)}) yards`);
+    
+    this.scene.add(this.lastShotMarker);
+  }
+
+  /**
+   * Update the HUD with current shot statistics
+   */
+  updateHUD()
+  {
+    if (!this.hudElements.container) return;
+    
+    const shotCount = this.match ? this.match.getHitCount() : 0;
+    const totalScore = this.match ? this.match.getTotalScore() : 0;
+    const xCount = this.match ? this.match.getXCount() : 0;
+    
+    // Update shot count and score
+    this.hudElements.shots.textContent = shotCount;
+    this.hudElements.score.textContent = `${totalScore}-${xCount}x`;
+    
+    // Update last shot data
+    if (this.lastShotData) {
+      const scoreText = `${this.lastShotData.score}${this.lastShotData.isX ? 'x' : ''}`;
+      this.hudElements.lastScore.textContent = scoreText;
+      this.hudElements.mv.textContent = `${Math.round(this.lastShotData.mvFps)} fps`;
+      this.hudElements.impactV.textContent = `${Math.round(this.lastShotData.impactVelocityFps)} fps`;
+    } else {
+      this.hudElements.lastScore.textContent = '--';
+      this.hudElements.mv.textContent = '-- fps';
+      this.hudElements.impactV.textContent = '-- fps';
+    }
+  }
+
+  /**
+   * Fire a shot and display the impact
+   */
+  fireShot()
+  {
+    if (!this.ballisticSimulator || !this.userTarget) {
+      console.error('Ballistic simulator not initialized');
+      return;
+    }
+    
+    try {
+      const range = this.distance;
+      const dt = 0.001;
+      
+    // Apply MV variation in fps, then convert to m/s for BTK
+    const mvVariationFps = (Math.random() - 0.5) * 2.0 * this.mvSd;  // fps
+    const actualMVFps = this.nominalMV + mvVariationFps;              // fps
+    const actualMV = btk.Conversions.fpsToMps(actualMVFps);          // m/s for BTK
+    
+    // Rifle accuracy as uniform distribution within a circle (diameter)
+    // Generate random point within unit circle using rejection sampling
+    let accuracyX, accuracyY;
+    do {
+      accuracyX = (Math.random() - 0.5) * 2.0; // -1 to 1
+      accuracyY = (Math.random() - 0.5) * 2.0; // -1 to 1
+    } while (accuracyX * accuracyX + accuracyY * accuracyY > 1.0);
+    
+    // Rifle accuracy in MOA, convert to radians for angular error
+    const accuracyMoa = this.rifleAccuracyMoa;
+    const accuracyRad = btk.Conversions.moaToRadians(accuracyMoa);
+    const accuracyRadius = accuracyRad / 2.0;  // Convert diameter to radius
+    const accuracyErrorH = accuracyX * accuracyRadius;  // radians
+    const accuracyErrorV = accuracyY * accuracyRadius;  // radians
+    
+    // Apply scope aim and accuracy errors to the zeroed velocity
+    const zeroVel = this.zeroedBullet.getVelocity();
+    const zeroVelMag = zeroVel.magnitude();
+    const zeroVelNorm = zeroVel.normalized();
+    
+    // Apply scope aim as small angular adjustments to the zeroed direction
+    const yawAdjustment = this.rifleScopeYaw + accuracyErrorH;
+    const pitchAdjustment = -(this.rifleScopePitch + accuracyErrorV); // Invert pitch for correct behavior
+    
+    // Create new velocity by rotating the zeroed velocity
+    const cosYaw = Math.cos(yawAdjustment);
+    const sinYaw = Math.sin(yawAdjustment);
+    const cosPitch = Math.cos(pitchAdjustment);
+    const sinPitch = Math.sin(pitchAdjustment);
+    
+    // Rotate zeroed velocity by scope adjustments
+    const rotatedVel = new btk.Vector3D(
+      zeroVelNorm.x * cosPitch * cosYaw - zeroVelNorm.y * sinYaw + zeroVelNorm.z * sinPitch * cosYaw,
+      zeroVelNorm.x * cosPitch * sinYaw + zeroVelNorm.y * cosYaw + zeroVelNorm.z * sinPitch * sinYaw,
+      -zeroVelNorm.x * sinPitch + zeroVelNorm.z * cosPitch
+    );
+    
+    // Scale by actual MV
+    const variedVel = new btk.Vector3D(
+      rotatedVel.x * actualMV,
+      rotatedVel.y * actualMV,
+      rotatedVel.z * actualMV
+    );
+    
+    // Create bullet with varied initial state - start from muzzle (z=0)
+    const bulletStartPos = new btk.Vector3D(0, 0, 0);
+    
+    const variedBullet = new btk.Bullet(
+      this.zeroedBullet,
+      bulletStartPos,
+      variedVel,
+      this.zeroedBullet.getSpinRate()
+    );
+      
+      // Reset simulator with varied bullet
+      this.ballisticSimulator.setInitialBullet(variedBullet);
+      this.ballisticSimulator.resetToInitial();
+      
+      // Simulate with wind generator
+      const rangeMeters = btk.Conversions.yardsToMeters(range);
+      const trajectory = this.ballisticSimulator.simulateWithWind(rangeMeters, dt, 3.0, this.windGenerator, this.time);
+      const pointAtTarget = trajectory.atDistance(rangeMeters);
+      
+      // Get bullet position and velocity at target
+      const bulletState = pointAtTarget.getState();
+      const bulletPos = bulletState.getPosition();
+      const bulletVel = bulletState.getVelocity();
+      const impactVelocity = bulletVel.magnitude(); // m/s
+      
+      // Calculate impact relative to target center using actual target coordinates
+      const targetX = btk.Conversions.yardsToMeters(this.targetCenterCoords.x);
+      const targetY = btk.Conversions.yardsToMeters(this.targetCenterCoords.y);
+      const targetZ = btk.Conversions.yardsToMeters(this.targetCenterCoords.z);
+      
+      // Impact relative to target center
+      const relativeX = bulletPos.y - targetY;
+      const relativeY = bulletPos.z - targetZ;
+      
+      // Debug logging
+      console.log(`Bullet impact: (${bulletPos.x.toFixed(2)}, ${bulletPos.y.toFixed(2)}, ${bulletPos.z.toFixed(2)}) meters`);
+      console.log(`Target center: (${targetX.toFixed(2)}, ${targetY.toFixed(2)}, ${targetZ.toFixed(2)}) meters`);
+      console.log(`Impact relative: (${btk.Conversions.metersToInches(relativeX).toFixed(2)}", ${btk.Conversions.metersToInches(relativeY).toFixed(2)}")`);
+      
+      // Record hit in match
+      const bulletDiameterMeters = btk.Conversions.inchesToMeters(this.bulletDiameter);
+      const hit = this.match.addHit(relativeX, relativeY, this.btkTarget, bulletDiameterMeters);
+      
+      // Store for HUD (convert to fps)
+      this.lastShotData = {
+        score: hit.getScore(),
+        isX: hit.isX(),
+        mvFps: actualMVFps,
+        impactVelocityFps: btk.Conversions.mpsToFps(impactVelocity)
+      };
+      
+      // Mark the last shot with a red marker (convert to yards)
+      const relativeXYards = btk.Conversions.metersToYards(relativeX);
+      const relativeYYards = btk.Conversions.metersToYards(relativeY);
+      this.displayLastShotMarker(relativeXYards, relativeYYards);
+      
+      // Update HUD display
+      this.updateHUD();
+      
+      console.log(`Shot ${this.match.getHitCount()}: Score=${hit.getScore()}${hit.isX() ? 'x' : ''}, Impact=(${btk.Conversions.metersToInches(relativeX).toFixed(2)}", ${btk.Conversions.metersToInches(relativeY).toFixed(2)}")`);
+      console.log(`Match: ${this.match.getTotalScore()}-${this.match.getXCount()}x, Group=${btk.Conversions.metersToInches(this.match.getGroupSize()).toFixed(2)}"`);
+      
+      return hit;
+    } catch (error) {
+      console.error('Failed to fire shot:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Display shot impact on the target
+   * @param {number} relativeX - Crossrange impact position (meters)
+   * @param {number} relativeY - Vertical impact position (meters)
+   * @param {number} score - Shot score
+   * @param {boolean} isX - Whether shot is X-ring
+   */
+  displayShotImpact(relativeX, relativeY, score, isX)
+  {
+    if (!this.userTarget) return;
+    
+    // Create shot impact marker
+    const shotGeometry = new THREE.SphereGeometry(this.bulletDiameter / 2, 8, 8);
+    const shotMaterial = new THREE.MeshBasicMaterial({ 
+      color: isX ? 0xffff00 : (score >= 9 ? 0xff0000 : 0xff8800)
+    });
+    const shotMesh = new THREE.Mesh(shotGeometry, shotMaterial);
+    
+    // Position on user target
+    shotMesh.position.set(
+      this.userTarget.mesh.position.x,
+      this.userTarget.mesh.position.y + relativeX,
+      this.userTarget.mesh.position.z + relativeY
+    );
+    
+    this.scene.add(shotMesh);
+    
+    if (!this.shotMarkers) this.shotMarkers = [];
+    this.shotMarkers.push(shotMesh);
+  }
+
+  /**
+   * Clear all shot markers from the scene
+   */
+  clearShotMarkers()
+  {
+    if (this.shotMarkers) {
+      this.shotMarkers.forEach(marker => {
+        this.scene.remove(marker);
+        marker.geometry.dispose();
+        marker.material.dispose();
+      });
+      this.shotMarkers = [];
+    }
+    
+    // Clear match data
+    if (this.match) {
+      this.match.clear();
+    }
+  }
+
+  /**
+   * Setup shot firing controls (space bar to fire)
+   */
+  setupShotFiringControls()
+  {
+    document.addEventListener('keydown', (event) => {
+      if (event.code === 'Space' && this.isRunning && this.ballisticSimulator) {
+        event.preventDefault();
+        this.fireShot();
+      }
+    });
+  }
+
   // ===== CLEANUP =====
   destroy()
   {
@@ -1659,6 +2144,9 @@ class ThreeJSGame
       this.scene.remove(flagMesh.pole);
       this.scene.remove(flagMesh.flagMesh);
     }
+    
+    // Clean up shot markers
+    this.clearShotMarkers();
     
     // Clean up scope resources
     if (this.scopeRenderTarget) {
@@ -1703,6 +2191,38 @@ class ThreeJSGame
 
 
 
+// Help menu functionality
+function setupHelpMenu() {
+  const helpBtn = document.getElementById('helpBtn');
+  const helpModal = document.getElementById('helpModal');
+  const helpClose = document.querySelector('.help-close');
+
+  if (helpBtn) {
+    helpBtn.addEventListener('click', () => {
+      if (helpModal) {
+        helpModal.style.display = 'block';
+      }
+    });
+  }
+
+  if (helpClose) {
+    helpClose.addEventListener('click', () => {
+      if (helpModal) {
+        helpModal.style.display = 'none';
+      }
+    });
+  }
+
+  // Close modal when clicking outside of it
+  if (helpModal) {
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) {
+        helpModal.style.display = 'none';
+      }
+    });
+  }
+}
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', async () =>
 {
@@ -1711,8 +2231,8 @@ document.addEventListener('DOMContentLoaded', async () =>
     btk = await BallisticsToolkit();
     await init();
     setupUI();
-    populateTargetDropdown();
     populateWindPresetDropdown();
+    setupHelpMenu();
   }
   catch (err)
   {

@@ -207,6 +207,33 @@ namespace btk::ballistics
     return trajectory_;
   }
 
+  // Simulate trajectory with wind generator sampling
+  const Trajectory& Simulator::simulate(float max_distance, float dt, float max_time, 
+                                        const btk::physics::WindGenerator& wind_gen, float time_offset)
+  {
+    // Add initial point
+    trajectory_.addPoint(current_time_, current_bullet_);
+
+    float start_time = current_time_;
+    float max_sim_time = start_time + max_time;
+
+    while(current_time_ < max_sim_time)
+    {
+      // Sample wind at current position
+      float x = current_bullet_.getPositionX();
+      float t = time_offset + current_time_;
+      wind_ = wind_gen(x, t);
+      
+      // Step forward
+      timeStep(dt);
+      
+      if(current_bullet_.getPositionX() > max_distance)
+        break;
+    }
+
+    return trajectory_;
+  }
+
   // Time step using stored state
   const Bullet& Simulator::timeStep(float dt)
   {

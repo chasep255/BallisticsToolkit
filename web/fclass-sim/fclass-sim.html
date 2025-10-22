@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F-Class Simulator - Ballistics Toolkit</title>
+  <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
+  <link rel="stylesheet" href="../common.css">
+  <link rel="stylesheet" href="fclass-sim.css">
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="../common.js"></script>
+  <script type="module" src="fclass-sim.js"></script>
+</head>
+<body data-page="fclass-sim">
+  <div class="nav-header"></div>
+
+  <div class="app-container">
+        <h1>🎯 F-Class Simulator</h1>
+
+    <div class="params-bar">
+      <div class="param-item">
+        <label for="fclassMode" title="F-Class shooting discipline">F-Class Mode</label>
+        <select id="fclassMode" title="F-Class shooting discipline">
+          <option value="fclass-300">F-Class (300 yards)</option>
+          <option value="fclass-500">F-Class (500 yards)</option>
+          <option value="fclass-600">F-Class (600 yards)</option>
+          <option value="fclass-800">F-Class (800 yards)</option>
+          <option value="fclass-900">F-Class (900 yards)</option>
+          <option value="fclass-1000" selected>F-Class (1000 yards)</option>
+        </select>
+      </div>
+      <div class="param-item">
+        <label for="windPreset" title="Wind conditions">Wind</label>
+        <select id="windPreset" title="Wind conditions">
+          <!-- Options will be populated dynamically from C++ -->
+        </select>
+      </div>
+    </div>
+
+    <!-- Bullet Parameters -->
+    <div class="params-bar">
+      <div class="param-item">
+        <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
+        <input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">
+      </div>
+      <div class="param-item">
+        <label for="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">Drag</label>
+        <select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">
+          <option value="G1">G1</option>
+          <option value="G7" selected>G7</option>
+        </select>
+      </div>
+      <div class="param-item">
+        <label for="mv" title="Muzzle velocity in feet per second">MV (fps)</label>
+        <input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second">
+      </div>
+      <div class="param-item">
+        <label for="diameter" title="Bullet diameter in inches (e.g., 0.264 for 6.5mm)">Dia (in)</label>
+        <input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches (e.g., 0.264 for 6.5mm)">
+      </div>
+      <div class="param-item">
+        <label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label>
+        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps">
+      </div>
+      <div class="param-item">
+        <label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label>
+        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">
+      </div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div style="display: flex; align-items: center; gap: 10px; justify-content: center; margin: 15px 0;">
+      <button id="startBtn" class="btn btn-primary">Start Game</button>
+      <button id="restartBtn" class="btn btn-secondary" style="display: none;">Restart</button>
+      <button id="helpBtn" class="btn btn-secondary">Help</button>
+    </div>
+
+    <div id="error" class="error" style="display: none;"></div>
+    
+    <div class="canvas-wrap">
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+      
+      <!-- Shot Statistics HUD -->
+      <div id="shotHud" class="shot-hud" style="display: none;">
+        <div class="hud-section">
+          <div class="hud-label">Shots:</div>
+          <div id="hudShots" class="hud-value">0</div>
+        </div>
+        <div class="hud-section">
+          <div class="hud-label">Score:</div>
+          <div id="hudScore" class="hud-value">0-0x</div>
+        </div>
+        <div class="hud-separator"></div>
+        <div class="hud-section">
+          <div class="hud-label">Last Shot:</div>
+          <div id="hudLastScore" class="hud-value">--</div>
+        </div>
+        <div class="hud-section">
+          <div class="hud-label">MV:</div>
+          <div id="hudMV" class="hud-value">-- fps</div>
+        </div>
+        <div class="hud-section">
+          <div class="hud-label">Impact V:</div>
+          <div id="hudImpactV" class="hud-value">-- fps</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="help-modal" style="display: none;">
+    <div class="help-modal-content">
+      <div class="help-modal-header">
+                <h2>🎯 F-Class Simulator Help</h2>
+        <span class="help-close">&times;</span>
+      </div>
+      <div class="help-modal-body">
+        <div class="help-section">
+          <h3>Overview</h3>
+          <p>F-Class Simulator is an interactive 3D shooting simulator that recreates the experience of long-range F-Class competition shooting. Practice reading wind, managing ballistics, and making precise shots at standard F-Class distances from 300 to 1000 yards.</p>
+        </div>
+        
+        <div class="help-section">
+          <h3>Controls</h3>
+          <div class="param-help">
+            <strong>Spotting Scope (Left):</strong><br>
+            - WASD keys: Pan and tilt the scope view<br>
+            - E key: Increase magnification<br>
+            - Q key: Decrease magnification<br>
+            - Range: 2x to 100x magnification<br><br>
+            
+            <strong>Rifle Scope (Right):</strong><br>
+            - Arrow keys: Adjust aim point (0.1" increments)<br>
+            - Fixed magnification optimized for shooting<br>
+            - Crosshair shows current aim point<br><br>
+            
+            <strong>Firing:</strong><br>
+            - Space bar: Fire a shot<br>
+            - Each shot is recorded and scored automatically
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>F-Class Competition</h3>
+          <div class="param-help">
+            <strong>Standard Distances:</strong> 300, 500, 600, 800, 900, and 1000 yards<br><br>
+            <strong>Target Types:</strong> NRA F-Class targets (MR63-FCA, MR65-FCA, MR1-FCA, LR-FCA) are automatically selected based on distance<br><br>
+            <strong>Scoring:</strong> Standard NRA scoring with 10-ring (X-ring) precision. Shots are scored based on impact position, with bullet diameter affecting line-breaking decisions<br><br>
+            <strong>Match Format:</strong> Unlimited shots for practice. Shot statistics and cumulative score are displayed in the HUD
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Ballistic Parameters</h3>
+          <div class="param-help">
+            <strong>BC (Ballistic Coefficient):</strong> Measures aerodynamic efficiency. Higher values = less wind drift and drop. Range: 0.001-1.0<br><br>
+            <strong>Drag Function:</strong> G7 recommended for modern boat-tail bullets, G1 for flat-base or older projectiles<br><br>
+            <strong>MV (Muzzle Velocity):</strong> Initial bullet velocity in fps. Critical for trajectory and time-of-flight<br><br>
+            <strong>Diameter:</strong> Bullet caliber in inches. Affects line-breaking scoring rules<br><br>
+            <strong>MV σ (Standard Deviation):</strong> Muzzle velocity variation in fps. Lower is better. Default: 7 fps<br><br>
+            <strong>Accuracy (MOA):</strong> Rifle+shooter precision. 1 MOA ≈ 1 inch at 100 yards. Default: 0.25 MOA
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Wind Reading</h3>
+          <div class="param-help">
+            <strong>Wind Flags:</strong> Observe flag angle and flapping to estimate wind speed. Flags point in wind direction<br><br>
+            <strong>Wind Presets:</strong> Select from Calm, LightBreeze, Moderate, Shear, Strong, or Variable conditions<br><br>
+            <strong>Wind Effects:</strong> Wind causes horizontal (crossrange) drift. The effect increases with distance and time-of-flight<br><br>
+            <strong>Strategy:</strong> Use the spotting scope to observe flags downrange. Adjust your aim point based on wind reading and previous shot impacts
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>HUD (Shot Statistics)</h3>
+          <div class="param-help">
+            <strong>Shots:</strong> Total shots fired in current session<br><br>
+            <strong>Score:</strong> Cumulative match score in "XXX-Yx" format (points-X count)<br><br>
+            <strong>Last Shot:</strong> Most recent shot score (10, 9, 8, etc.) with X-ring indicator<br><br>
+            <strong>MV:</strong> Actual muzzle velocity of last shot (includes random variation)<br><br>
+            <strong>Impact V:</strong> Bullet velocity at target impact for last shot
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Tips for Success</h3>
+          <div class="param-help">
+            - Start with calm wind conditions to learn the basics<br>
+            - Use the spotting scope to observe downrange conditions<br>
+            - Watch the red shot marker to see your last impact<br>
+            - Make small adjustments to your aim point (0.1" increments)<br>
+            - Pay attention to wind flag behavior along the entire range<br>
+            - Higher BC bullets drift less in the wind<br>
+            - Lower MV standard deviation = more consistent impacts<br>
+            - Practice at shorter distances before attempting 1000 yards
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

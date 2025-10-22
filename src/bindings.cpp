@@ -167,7 +167,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getWind", &btk::ballistics::Simulator::getWind)
     .function("resetToInitial", &btk::ballistics::Simulator::resetToInitial)
     .function("computeZero", &btk::ballistics::Simulator::computeZero)
-    .function("simulate", &btk::ballistics::Simulator::simulate)
+    .function("simulate", select_overload<const Trajectory&(float, float, float)>(&btk::ballistics::Simulator::simulate))
+    .function("simulateWithWind", select_overload<const Trajectory&(float, float, float, const WindGenerator&, float)>(&btk::ballistics::Simulator::simulate))
     .function("timeStep", &btk::ballistics::Simulator::timeStep);
 
   // Target class

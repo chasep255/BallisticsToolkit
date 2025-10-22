@@ -29,6 +29,15 @@ Professional web-based ballistics calculator and match simulation suite for long
 - **Controls** - Distance, preset, seed, arrow density, and time speed (0.1x–20x)
 - Note: This feature is experimental and evolving
 
+### 🎮 F-Class Simulator
+- **Interactive 3D Shooting** - Realistic F-Class competition simulation with 3D visualization
+- **Dual Scope System** - Spotting scope for wind reading, rifle scope for aiming
+- **Realistic Ballistics** - Full ballistic simulation with wind effects and shot statistics
+- **F-Class Distances** - Standard competition ranges from 300-1000 yards
+- **NRA Target Integration** - Automatic target selection based on distance
+- **Wind Reading Practice** - Interactive wind flags and atmospheric conditions
+- **Shot Statistics** - Real-time HUD with scoring, velocity, and impact data
+
 ## Quick Start
 
 ### Ballistic Calculator
@@ -50,6 +59,17 @@ Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/
 4. **Environment** - Altitude, temperature, humidity, pressure
 
 Watch realistic shot impacts on NRA targets with detailed logging and statistical analysis.
+
+### F-Class Simulator
+Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html) for interactive 3D shooting practice:
+
+1. **F-Class Mode** - Select distance (300-1000 yards) and target type
+2. **Ballistic Setup** - Configure bullet parameters (BC, MV, diameter, accuracy)
+3. **Wind Conditions** - Choose from realistic wind presets
+4. **Shooting Practice** - Use dual scopes to read wind and aim shots
+5. **Shot Analysis** - Review HUD statistics and shot impacts
+
+Experience realistic F-Class competition shooting with wind reading, ballistic calculations, and NRA scoring.
 
 ## Building from Source
 

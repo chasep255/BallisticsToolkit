@@ -1,21 +1,27 @@
 // Google Analytics - only load on production domain
-(function() {
+(function()
+{
   const hostname = window.location.hostname;
   const isProduction = hostname === 'ballisticstoolkit.com' || hostname === 'www.ballisticstoolkit.com';
-  
-  if (isProduction) {
+
+  if (isProduction)
+  {
     console.log('Google Analytics is enabled');
     const GA_MEASUREMENT_ID = 'G-JWTD9KG6D6';
-    
+
     // Load gtag.js script dynamically
     const gtagScript = document.createElement('script');
     gtagScript.async = true;
     gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
     document.head.appendChild(gtagScript);
-    
+
     // Initialize dataLayer and gtag
     window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
+
+    function gtag()
+    {
+      dataLayer.push(arguments);
+    }
     window.gtag = gtag;
     gtag('js', new Date());
     gtag('config', GA_MEASUREMENT_ID);
@@ -58,6 +64,8 @@ function generateNavigation(currentPageName)
   const isBallisticCalc = currentPageName === 'ballistic-calc';
   const isTargetSim = currentPageName === 'target-sim';
   const isWindSim = currentPageName === 'wind-sim';
+  const isWindGame = currentPageName === 'wind-game';
+  const isFClassSim = currentPageName === 'fclass-sim';
   const isAbout = currentPageName === 'about';
 
   const navHTML = `
@@ -71,6 +79,7 @@ function generateNavigation(currentPageName)
                 <a href="${pathPrefix}ballistic-calc/ballistic-calc.html" ${isBallisticCalc ? 'class="active"' : ''}>Ballistic Calculator</a>
                 <a href="${pathPrefix}target-sim/target-sim.html" ${isTargetSim ? 'class="active"' : ''}>Target Simulator</a>
                 <a href="${pathPrefix}wind-sim/wind-sim.html" ${isWindSim ? 'class="active"' : ''}>Wind Simulator</a>
+                <a href="${pathPrefix}fclass-sim/fclass-sim.html" ${isFClassSim ? 'class="active"' : ''}>F-Class Simulator</a>
                 <a href="${pathPrefix}about.html" ${isAbout ? 'class="active"' : ''}>About</a>
             </div>
         </div>
