@@ -383,6 +383,7 @@ class ThreeJSGame
       container: document.getElementById('shotHud'),
       shots: document.getElementById('hudShots'),
       score: document.getElementById('hudScore'),
+      dropped: document.getElementById('hudDropped'),
       lastScore: document.getElementById('hudLastScore'),
       mv: document.getElementById('hudMV'),
       impactV: document.getElementById('hudImpactV')
@@ -1982,9 +1983,22 @@ class ThreeJSGame
     const totalScore = this.match ? this.match.getTotalScore() : 0;
     const xCount = this.match ? this.match.getXCount() : 0;
     
-    // Update shot count and score
-    this.hudElements.shots.textContent = shotCount;
+    // Update shot count and score (F-Class match is 60 shots)
+    if (shotCount >= 60) {
+      this.hudElements.shots.textContent = '60/60 (Complete!)';
+      this.hudElements.shots.style.color = '#28a745'; // Green for complete
+    } else {
+      this.hudElements.shots.textContent = `${shotCount}/60`;
+      this.hudElements.shots.style.color = ''; // Reset color
+    }
     this.hudElements.score.textContent = `${totalScore}-${xCount}x`;
+    
+    // Calculate dropped points (10 - score for each shot, 1 - X for each X)
+    const maxPossibleScore = shotCount * 10; // 10 points per shot
+    const maxPossibleX = shotCount; // 1 X per shot
+    const droppedPoints = maxPossibleScore - totalScore;
+    const droppedX = maxPossibleX - xCount;
+    this.hudElements.dropped.textContent = `${droppedPoints}-${droppedX}x`;
     
     // Update last shot data
     if (this.lastShotData) {
@@ -2000,12 +2014,79 @@ class ThreeJSGame
   }
 
   /**
+   * Show match completion notification
+   */
+  showMatchCompleteNotification()
+  {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #28a745;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: bold;
+      text-align: center;
+      z-index: 10001;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      border: 2px solid #1e7e34;
+    `;
+    
+    const totalScore = this.match.getTotalScore();
+    const xCount = this.match.getXCount();
+    const groupSize = btk.Conversions.metersToInches(this.match.getGroupSize()).toFixed(2);
+    const shotCount = this.match.getHitCount();
+    const maxPossibleScore = shotCount * 10;
+    const maxPossibleX = shotCount;
+    const droppedPoints = maxPossibleScore - totalScore;
+    const droppedX = maxPossibleX - xCount;
+    
+    notification.innerHTML = `
+      <div style="font-size: 24px; margin-bottom: 10px;">🎯 Match Complete!</div>
+      <div>Final Score: ${totalScore}-${xCount}x</div>
+      <div>Dropped: ${droppedPoints}-${droppedX}x</div>
+      <div>Group Size: ${groupSize}"</div>
+      <div style="margin-top: 15px; font-size: 14px; opacity: 0.9;">Click Restart to start a new match</div>
+      <button onclick="this.parentElement.remove()" style="
+        margin-top: 15px;
+        padding: 8px 16px;
+        background: #1e7e34;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      ">Dismiss</button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.remove();
+      }
+    }, 10000);
+  }
+
+  /**
    * Fire a shot and display the impact
    */
   fireShot()
   {
     if (!this.ballisticSimulator || !this.userTarget) {
       console.error('Ballistic simulator not initialized');
+      return;
+    }
+    
+    // Check if match is complete (60 shots for F-Class)
+    const currentShots = this.match ? this.match.getHitCount() : 0;
+    if (currentShots >= 60) {
+      console.log('Match complete! 60 shots fired. Please restart to start a new match.');
       return;
     }
     
@@ -2399,6 +2480,11 @@ ThreeJSGame.prototype.updateBulletAnimation = function() {
         impactVelocityFps: data.impactVelocityFps
       };
       this.updateHUD();
+      
+      // Check if match is complete (60 shots)
+      if (this.match.getHitCount() >= 60) {
+        this.showMatchCompleteNotification();
+      }
       
       // Log the final results
       console.log(`Shot ${this.match.getHitCount()}: Score=${hit.getScore()}${hit.isX() ? 'x' : ''}, Impact=(${btk.Conversions.metersToInches(data.relativeX).toFixed(2)}", ${btk.Conversions.metersToInches(data.relativeY).toFixed(2)}")`);
