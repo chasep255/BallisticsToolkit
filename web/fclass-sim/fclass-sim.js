@@ -12,6 +12,69 @@ async function init()
   console.log('F-Class Simulator initialized');
 }
 
+// Lock canvas size once on page load
+function lockCanvasSize() {
+  const canvas = document.getElementById('gameCanvas');
+  
+  // Detect mobile devices and small screens
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isTouchOnly = !window.matchMedia('(hover: hover)').matches;
+  const screenWidth = window.innerWidth;
+  const minRecommendedWidth = 800;
+  
+  if (isMobile || isTouchOnly) {
+    console.warn('Mobile device detected - F-Class Simulator is designed for desktop use');
+    showWarning('Mobile Device', 'This simulator is designed for desktop use with keyboard and mouse controls.');
+  }
+  
+  if (screenWidth < minRecommendedWidth) {
+    console.warn(`Screen too narrow: ${screenWidth}px (recommended: ${minRecommendedWidth}px+)`);
+    showWarning('Screen Too Small', `Please maximize your browser window. Current: ${screenWidth}px, Recommended: ${minRecommendedWidth}px+`);
+  }
+  
+  // Read canvas size from CSS (will be square due to aspect-ratio: 1)
+  const canvasWidth = canvas.clientWidth;
+  const canvasHeight = canvas.clientHeight;
+  console.log(`Canvas dimensions locked at: ${canvasWidth}x${canvasHeight}`);
+  
+  // Lock canvas size permanently - no resizing allowed
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  canvas.style.width = canvasWidth + 'px';
+  canvas.style.height = canvasHeight + 'px';
+  canvas.style.maxWidth = canvasWidth + 'px';
+  canvas.style.maxHeight = canvasHeight + 'px';
+  canvas.style.minWidth = canvasWidth + 'px';
+  canvas.style.minHeight = canvasHeight + 'px';
+  canvas.style.aspectRatio = 'none'; // Override CSS aspect-ratio
+  
+  // Store locked dimensions for game instances to use
+  canvas.dataset.lockedWidth = canvasWidth;
+  canvas.dataset.lockedHeight = canvasHeight;
+}
+
+function showWarning(title, message) {
+  const warning = document.createElement('div');
+  warning.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #ff9800;
+    color: #000;
+    padding: 16px;
+    text-align: center;
+    z-index: 10000;
+    font-family: system-ui, -apple-system, sans-serif;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  `;
+  warning.innerHTML = `
+    <strong>${title}:</strong> ${message}
+    <button style="margin-left: 16px; padding: 4px 12px; cursor: pointer;" onclick="this.parentElement.remove()">Dismiss</button>
+  `;
+  document.body.insertBefore(warning, document.body.firstChild);
+}
+
 function setupUI()
 {
   // Start button
@@ -193,7 +256,7 @@ class ThreeJSGame
 
   // Camera settings
   static CAMERA_FOV = 30;
-  static CAMERA_EYE_HEIGHT = 1.5;
+  static CAMERA_EYE_HEIGHT = 0.1;
 
   // Spotting scope constants (WASD pan, EQ zoom)
   static SPOTTING_SCOPE_DIAMETER_FRACTION = 0.5; // Fraction of screen height
@@ -206,8 +269,11 @@ class ThreeJSGame
   // Rifle scope constants (arrow keys pan, fixed zoom for targeting)
   static RIFLE_SCOPE_DIAMETER_FRACTION = 0.5; // Same size as spotting scope
   static RIFLE_SCOPE_MARGIN = 20; // pixels from edge
-  static RIFLE_SCOPE_PAN_SPEED = 0.1; // inches at target per key press
+  static RIFLE_SCOPE_PAN_SPEED = 0.1; // MOA per key press
   static RIFLE_SCOPE_FOV_MULTIPLIER = 1.5; // Show 1.5x target width
+  static RIFLE_SCOPE_ZOOM_MIN = 0.5; // Minimum FOV multiplier (zoomed in)
+  static RIFLE_SCOPE_ZOOM_MAX = 3.0; // Maximum FOV multiplier (zoomed out)
+  static RIFLE_SCOPE_ZOOM_STEP = 0.1; // Zoom change per key press
 
   // ===== INITIALIZATION =====
   constructor(canvas, params = {})
@@ -234,35 +300,42 @@ class ThreeJSGame
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb); // Sky blue background
     
-    // Renderer
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    // Renderer with logarithmic depth buffer for better precision at long range
+    this.renderer = new THREE.WebGLRenderer({ 
+      canvas, 
+      antialias: true,
+      logarithmicDepthBuffer: true // Better depth precision for 1000+ yard distances
+    });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    // Read locked canvas dimensions (locked once on page load)
+    this.canvasWidth = parseInt(canvas.dataset.lockedWidth) || canvas.clientWidth;
+    this.canvasHeight = parseInt(canvas.dataset.lockedHeight) || canvas.clientHeight;
+    console.log(`Game using canvas dimensions: ${this.canvasWidth}x${this.canvasHeight}`);
+    
+    
+    this.renderer.setSize(this.canvasWidth, this.canvasHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.autoClear = false; // We'll clear manually
 
     // Create 2D overlay canvas
     this.overlayCanvas = document.createElement('canvas');
-    this.overlayCanvas.width = this.canvas.clientWidth;
-    this.overlayCanvas.height = this.canvas.clientHeight;
+    this.overlayCanvas.width = this.canvasWidth;
+    this.overlayCanvas.height = this.canvasHeight;
     this.overlayCtx = this.overlayCanvas.getContext('2d');
     this.overlayTexture = new THREE.CanvasTexture(this.overlayCanvas);
 
     // Create overlay scene with single full-screen quad
     this.overlayScene = new THREE.Scene();
     this.overlayCamera = new THREE.OrthographicCamera(
-      -this.canvas.clientWidth / 2, this.canvas.clientWidth / 2,
-      this.canvas.clientHeight / 2, -this.canvas.clientHeight / 2,
+      -this.canvasWidth / 2, this.canvasWidth / 2,
+      this.canvasHeight / 2, -this.canvasHeight / 2,
       0, 10
     );
     this.overlayCamera.position.z = 1;
 
     // Single full-screen mesh for overlay
-    const overlayGeom = new THREE.PlaneGeometry(
-      this.canvas.clientWidth, 
-      this.canvas.clientHeight
-    );
+    const overlayGeom = new THREE.PlaneGeometry(this.canvasWidth, this.canvasHeight);
     const overlayMat = new THREE.MeshBasicMaterial({
       map: this.overlayTexture,
       transparent: true,
@@ -279,8 +352,7 @@ class ThreeJSGame
     this.createSpottingScopeOverlay();
     this.createScopeViewMesh();
     
-    // Setup resize handler
-    window.addEventListener('resize', () => this.onResize());
+    // No resize handler needed - canvas size is completely locked
     
     // Wind generator
     this.windGenerator = null;
@@ -334,26 +406,42 @@ class ThreeJSGame
   }
 
   createSpottingScopeOverlay() {
-    const scopeSize = Math.floor(this.canvas.clientHeight * ThreeJSGame.SPOTTING_SCOPE_DIAMETER_FRACTION);
+    // Add 10px padding on each side to prevent overlap
+    const availableWidth = this.canvasWidth - 20; // 10px padding on each side
+    const availableHeight = this.canvasHeight - 20; // 10px padding on each side
+    const maxScopeSize = Math.min(availableWidth, availableHeight);
+    const scopeSize = Math.floor(maxScopeSize * ThreeJSGame.SPOTTING_SCOPE_DIAMETER_FRACTION);
     const renderSize = scopeSize * 2;
     
-    this.scopeRenderTarget = new THREE.WebGLRenderTarget(renderSize, renderSize, {
+    this.spottingScopeRenderTarget = new THREE.WebGLRenderTarget(renderSize, renderSize, {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
       samples: 4
     });
     
-    this.scopeSize = scopeSize;
-    this.scopeX = ThreeJSGame.SPOTTING_SCOPE_MARGIN;
-    // Position at bottom of screen instead of top
-    this.scopeY = this.canvas.clientHeight - scopeSize - ThreeJSGame.SPOTTING_SCOPE_MARGIN;
+    this.spottingScopeSize = scopeSize;
+    this.spottingScopeX = 10; // 10px padding from left edge
+    // Position at bottom of screen with padding
+    this.spottingScopeY = this.canvasHeight - scopeSize - 10; // 10px padding from bottom
     
     // Create a temporary canvas for reading render target pixels
-    this.scopeTempCanvas = document.createElement('canvas');
-    this.scopeTempCanvas.width = renderSize;
-    this.scopeTempCanvas.height = renderSize;
-    this.scopeTempCtx = this.scopeTempCanvas.getContext('2d');
+    this.spottingScopeTempCanvas = document.createElement('canvas');
+    this.spottingScopeTempCanvas.width = renderSize;
+    this.spottingScopeTempCanvas.height = renderSize;
+    this.spottingScopeTempCtx = this.spottingScopeTempCanvas.getContext('2d');
+    
+    // Create spotting scope camera
+    const scopeFOV = ThreeJSGame.CAMERA_FOV / ThreeJSGame.SCOPE_MAGNIFICATION; // 30° / 4 = 7.5°
+    this.spottingScopeCamera = new THREE.PerspectiveCamera(scopeFOV, 1.0, 0.5, this.distance * 1.5);
+    this.spottingScopeCamera.position.set(-1, 0, ThreeJSGame.CAMERA_EYE_HEIGHT);
+    this.spottingScopeCamera.up.set(0, 0, 1);
+    this.spottingScopeCamera.lookAt(this.distance, 0, ThreeJSGame.CAMERA_EYE_HEIGHT);
+    
+    // Initialize control state
+    this.spottingScopeYaw = 0;
+    this.spottingScopePitch = 0;
+    this.spottingScopeMagnification = 4;
   }
 
   /**
@@ -363,7 +451,11 @@ class ThreeJSGame
    */
   createRifleScopeOverlay() {
     // Create rifle scope (bottom-right)
-    const rifleScopeSize = Math.floor(this.canvas.clientHeight * ThreeJSGame.RIFLE_SCOPE_DIAMETER_FRACTION);
+    // Add 10px padding on each side to prevent overlap
+    const availableWidth = this.canvasWidth - 20; // 10px padding on each side
+    const availableHeight = this.canvasHeight - 20; // 10px padding on each side
+    const maxScopeSize = Math.min(availableWidth, availableHeight);
+    const rifleScopeSize = Math.floor(maxScopeSize * ThreeJSGame.RIFLE_SCOPE_DIAMETER_FRACTION);
     const rifleScopeRenderSize = rifleScopeSize * 2;
     
     this.rifleScopeRenderTarget = new THREE.WebGLRenderTarget(rifleScopeRenderSize, rifleScopeRenderSize, {
@@ -374,8 +466,8 @@ class ThreeJSGame
     });
     
     this.rifleScopeSize = rifleScopeSize;
-    this.rifleScopeX = this.canvas.clientWidth - rifleScopeSize - ThreeJSGame.RIFLE_SCOPE_MARGIN;
-    this.rifleScopeY = this.canvas.clientHeight - rifleScopeSize - ThreeJSGame.RIFLE_SCOPE_MARGIN;
+    this.rifleScopeX = this.canvasWidth - rifleScopeSize - 10; // 10px padding from right edge
+    this.rifleScopeY = this.canvasHeight - rifleScopeSize - 10; // 10px padding from bottom
     
     // Calculate FOV for 1.5x target width
     const targetFrameWidth = ThreeJSGame.TARGET_SIZE; // yards
@@ -383,7 +475,7 @@ class ThreeJSGame
     const fovDegrees = fovRadians * 180 / Math.PI;
     
     // Create rifle scope camera
-    this.rifleScopeCamera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.1, 2000);
+    this.rifleScopeCamera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.5, this.distance * 1.5);
     this.rifleScopeCamera.position.set(0, 0, ThreeJSGame.CAMERA_EYE_HEIGHT);
     
     // Point at user's target center
@@ -395,23 +487,25 @@ class ThreeJSGame
     // Initialize rifle scope control state
     this.rifleScopePitch = 0;
     this.rifleScopeYaw = 0;
+    this.rifleScopeZoom = ThreeJSGame.RIFLE_SCOPE_FOV_MULTIPLIER; // Current zoom level (FOV multiplier)
     
-    // Calculate movement limits (stay within TARGET_SIZE frame, not entire range)
-    const maxYawRadians = Math.atan(targetFrameWidth / (2 * this.distance));
-    const maxPitchRadians = Math.atan(targetFrameWidth / (2 * this.distance));
+    // Calculate movement limits (allow 3x target radius for scope bounding box)
+    const scopeBoundingBoxSize = targetFrameWidth * 3; // 3x target size
+    const maxYawRadians = Math.atan(scopeBoundingBoxSize / (2 * this.distance));
+    const maxPitchRadians = Math.atan(scopeBoundingBoxSize / (2 * this.distance));
     this.rifleScopeMaxYaw = maxYawRadians;
     this.rifleScopeMaxPitch = maxPitchRadians;
   }
 
   createScopeViewMesh() {
-    const size = this.scopeSize;
-    const x = this.scopeX;
-    const y = this.scopeY;
+    const size = this.spottingScopeSize;
+    const x = this.spottingScopeX;
+    const y = this.spottingScopeY;
     
     // Convert screen coordinates to overlay camera coordinates
     // Overlay camera: left=-canvasW/2, right=canvasW/2, top=canvasH/2, bottom=-canvasH/2
-    const canvasW = this.canvas.clientWidth;
-    const canvasH = this.canvas.clientHeight;
+    const canvasW = this.canvasWidth;
+    const canvasH = this.canvasHeight;
     // Three.js meshes are positioned by center, so offset by half size
     const overlayX = x + size/2 - canvasW/2;
     const overlayY = canvasH/2 - (y + size/2); // Flip Y coordinate and offset by half size
@@ -441,7 +535,7 @@ class ThreeJSGame
     // Create scope view mesh
     const scopeGeom = new THREE.PlaneGeometry(size, size);
     const scopeMat = new THREE.MeshBasicMaterial({
-      map: this.scopeRenderTarget.texture,
+      map: this.spottingScopeRenderTarget.texture,
       alphaMap: maskTexture,
       transparent: true,
       depthTest: false,
@@ -449,12 +543,12 @@ class ThreeJSGame
       toneMapped: false
     });
     
-    this.scopeViewMesh = new THREE.Mesh(scopeGeom, scopeMat);
-    this.scopeViewMesh.position.set(overlayX, overlayY, 0.001); // Convert to overlay coordinates
-    this.scopeViewMesh.renderOrder = 1; // Render before the canvas overlay
-    this.scopeViewMesh.frustumCulled = false;
+    this.spottingScopeViewMesh = new THREE.Mesh(scopeGeom, scopeMat);
+    this.spottingScopeViewMesh.position.set(overlayX, overlayY, 0.001); // Convert to overlay coordinates
+    this.spottingScopeViewMesh.renderOrder = 1; // Render before the canvas overlay
+    this.spottingScopeViewMesh.frustumCulled = false;
     
-    this.overlayScene.add(this.scopeViewMesh);
+    this.overlayScene.add(this.spottingScopeViewMesh);
     console.log('Scope view mesh created at position:', overlayX, overlayY, 'size:', size);
   }
 
@@ -464,8 +558,8 @@ class ThreeJSGame
     const rifleScopeY = this.rifleScopeY;
     
     // Convert screen coordinates to overlay camera coordinates for rifle scope
-    const canvasW = this.canvas.clientWidth;
-    const canvasH = this.canvas.clientHeight;
+    const canvasW = this.canvasWidth;
+    const canvasH = this.canvasHeight;
     const rifleScopeOverlayX = rifleScopeX + rifleScopeSize/2 - canvasW/2;
     const rifleScopeOverlayY = canvasH/2 - (rifleScopeY + rifleScopeSize/2);
     
@@ -516,9 +610,9 @@ class ThreeJSGame
     const ctx = this.overlayCtx;
     
     // Draw first scope border (bottom-left)
-    const size = this.scopeSize;
-    const x = this.scopeX;
-    const y = this.scopeY;
+    const size = this.spottingScopeSize;
+    const x = this.spottingScopeX;
+    const y = this.spottingScopeY;
     const cx = x + size/2;
     const cy = y + size/2;
     const r = size/2 - 5;
@@ -585,49 +679,6 @@ class ThreeJSGame
     ctx.stroke();
   }
 
-  onResize() {
-    this.overlayCanvas.width = this.canvas.clientWidth;
-    this.overlayCanvas.height = this.canvas.clientHeight;
-    this.overlayTexture.needsUpdate = true;
-    
-    // Update overlay camera
-    this.overlayCamera.left = -this.canvas.clientWidth / 2;
-    this.overlayCamera.right = this.canvas.clientWidth / 2;
-    this.overlayCamera.top = this.canvas.clientHeight / 2;
-    this.overlayCamera.bottom = -this.canvas.clientHeight / 2;
-    this.overlayCamera.updateProjectionMatrix();
-    
-    // Update overlay mesh size
-    this.overlayMesh.geometry.dispose();
-    this.overlayMesh.geometry = new THREE.PlaneGeometry(
-      this.canvas.clientWidth, 
-      this.canvas.clientHeight
-    );
-    
-    // Recalculate scope position/size (bottom-left corner)
-    this.scopeSize = Math.floor(this.canvas.clientHeight * ThreeJSGame.SCOPE_DIAMETER_FRACTION);
-    this.scopeX = ThreeJSGame.SCOPE_MARGIN;
-    this.scopeY = this.canvas.clientHeight - this.scopeSize - ThreeJSGame.SCOPE_MARGIN;
-    
-    // Update scope view mesh position (convert to overlay coordinates)
-    if (this.scopeViewMesh) {
-      const overlayX = this.scopeX + this.scopeSize/2 - this.canvas.clientWidth/2;
-      const overlayY = this.canvas.clientHeight/2 - (this.scopeY + this.scopeSize/2);
-      this.scopeViewMesh.position.set(overlayX, overlayY, 0.001);
-    }
-    
-    // Recalculate rifle scope position/size (bottom-right corner)
-    this.rifleScopeSize = Math.floor(this.canvas.clientHeight * ThreeJSGame.RIFLE_SCOPE_DIAMETER_FRACTION);
-    this.rifleScopeX = this.canvas.clientWidth - this.rifleScopeSize - ThreeJSGame.RIFLE_SCOPE_MARGIN;
-    this.rifleScopeY = this.canvas.clientHeight - this.rifleScopeSize - ThreeJSGame.RIFLE_SCOPE_MARGIN;
-    
-    // Update rifle scope view mesh position (convert to overlay coordinates)
-    if (this.rifleScopeViewMesh) {
-      const rifleScopeOverlayX = this.rifleScopeX + this.rifleScopeSize/2 - this.canvas.clientWidth/2;
-      const rifleScopeOverlayY = this.canvas.clientHeight/2 - (this.rifleScopeY + this.rifleScopeSize/2);
-      this.rifleScopeViewMesh.position.set(rifleScopeOverlayX, rifleScopeOverlayY, 0.001);
-    }
-  }
 
   createFlagTexture() {
     // Create a canvas for red/yellow flag
@@ -769,28 +820,15 @@ class ThreeJSGame
   // ===== SCENE SETUP =====
   setupCamera() {
     // Camera: BTK coords (X=downrange, Y=crossrange, Z=up)
-    const aspect = this.canvas.clientWidth / this.canvas.clientHeight;
-    this.camera = new THREE.PerspectiveCamera(ThreeJSGame.CAMERA_FOV, aspect, 0.1, this.distance + 10);
+    const aspect = this.canvasWidth / this.canvasHeight;
+    // Use logarithmic depth buffer for better precision at long range
+    // Near plane at 0.5 yards, far plane well beyond target
+    this.camera = new THREE.PerspectiveCamera(ThreeJSGame.CAMERA_FOV, aspect, 0.5, this.distance * 1.5);
     // Camera positioned 1 yard behind muzzle, at target center height when raised
     const targetCenterHeight = ThreeJSGame.TARGET_CENTER_HEIGHT;
     this.camera.position.set(-1, 0, targetCenterHeight); // 1 yard behind muzzle, at target center height
     this.camera.up.set(0, 0, 1); // Z is up
     this.camera.lookAt(this.distance, 0, targetCenterHeight); // Look at target distance at same height
-    
-    // Scope camera setup
-    const scopeFOV = ThreeJSGame.CAMERA_FOV / ThreeJSGame.SCOPE_MAGNIFICATION; // 30° / 4 = 7.5°
-    this.scopeCamera = new THREE.PerspectiveCamera(scopeFOV, 1.0, 0.1, this.distance + 10);
-    this.scopeCamera.position.copy(this.camera.position); // Same position as main camera
-    this.scopeCamera.up.set(0, 0, 1); // Z is up
-    this.scopeCamera.lookAt(this.distance, 0, targetCenterHeight); // Same initial look direction
-    
-    // Initialize scope viewing angles to match current camera direction
-    // Calculate initial yaw (looking straight downrange = 0)
-    this.scopeYaw = 0;
-    // Calculate initial pitch (looking straight ahead = 0)
-    this.scopePitch = 0;
-    // Initialize scope magnification
-    this.spottingScopeMagnification = 4; // Initial magnification
   }
 
   setupLighting() {
@@ -827,10 +865,10 @@ class ThreeJSGame
 
   setupSpottingScopeControls() {
     // Initialize scope key states
-    this.scopeKeys = { w: false, a: false, s: false, d: false, e: false, q: false };
+    this.spottingScopeKeys = { w: false, a: false, s: false, d: false, e: false, q: false };
     
     // Add keyboard event listeners for scope controls
-    this.scopeKeyDownHandler = (event) => {
+    this.spottingScopeKeyDownHandler = (event) => {
       // Only handle scope keys if no modifier keys are pressed
       if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) {
         return; // Let browser handle shortcuts
@@ -838,28 +876,28 @@ class ThreeJSGame
       
       const key = event.key.toLowerCase();
       if (key === 'w') {
-        this.scopeKeys.w = true;
+        this.spottingScopeKeys.w = true;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 'a') {
-        this.scopeKeys.a = true;
+        this.spottingScopeKeys.a = true;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 's') {
-        this.scopeKeys.s = true;
+        this.spottingScopeKeys.s = true;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 'd') {
-        this.scopeKeys.d = true;
+        this.spottingScopeKeys.d = true;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 'e') {
-        this.scopeKeys.e = true;
+        this.spottingScopeKeys.e = true;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 'q') {
-        this.scopeKeys.q = true;
+        this.spottingScopeKeys.q = true;
         event.preventDefault(); // Prevent page scrolling
       }
       // All other keys pass through to browser normally
     };
     
-    this.scopeKeyUpHandler = (event) => {
+    this.spottingScopeKeyUpHandler = (event) => {
       // Only handle scope keys if no modifier keys are pressed
       if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) {
         return; // Let browser handle shortcuts
@@ -867,30 +905,30 @@ class ThreeJSGame
       
       const key = event.key.toLowerCase();
       if (key === 'w') {
-        this.scopeKeys.w = false;
+        this.spottingScopeKeys.w = false;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 'a') {
-        this.scopeKeys.a = false;
+        this.spottingScopeKeys.a = false;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 's') {
-        this.scopeKeys.s = false;
+        this.spottingScopeKeys.s = false;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 'd') {
-        this.scopeKeys.d = false;
+        this.spottingScopeKeys.d = false;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 'e') {
-        this.scopeKeys.e = false;
+        this.spottingScopeKeys.e = false;
         event.preventDefault(); // Prevent page scrolling
       } else if (key === 'q') {
-        this.scopeKeys.q = false;
+        this.spottingScopeKeys.q = false;
         event.preventDefault(); // Prevent page scrolling
       }
       // All other keys pass through to browser normally
     };
     
     // Add event listeners
-    document.addEventListener('keydown', this.scopeKeyDownHandler);
-    document.addEventListener('keyup', this.scopeKeyUpHandler);
+    document.addEventListener('keydown', this.spottingScopeKeyDownHandler);
+    document.addEventListener('keyup', this.spottingScopeKeyUpHandler);
   }
 
   setupRifleScopeControls() {
@@ -916,6 +954,16 @@ class ThreeJSGame
       } else if (event.key === 'ArrowRight') {
         this.rifleScopeKeys.right = true;
         event.preventDefault(); // Prevent page scrolling
+      } else if (event.key === '+' || event.key === '=') {
+        // Zoom in (decrease FOV multiplier)
+        this.rifleScopeZoom = Math.max(ThreeJSGame.RIFLE_SCOPE_ZOOM_MIN, this.rifleScopeZoom - ThreeJSGame.RIFLE_SCOPE_ZOOM_STEP);
+        this.updateRifleScopeZoom();
+        event.preventDefault();
+      } else if (event.key === '-' || event.key === '_') {
+        // Zoom out (increase FOV multiplier)
+        this.rifleScopeZoom = Math.min(ThreeJSGame.RIFLE_SCOPE_ZOOM_MAX, this.rifleScopeZoom + ThreeJSGame.RIFLE_SCOPE_ZOOM_STEP);
+        this.updateRifleScopeZoom();
+        event.preventDefault();
       }
       // All other keys pass through to browser normally
     };
@@ -1203,6 +1251,9 @@ class ThreeJSGame
       // FPS logging removed for cleaner output
     }
 
+    // Update bullet animation (if any)
+    this.updateBulletAnimation();
+
     // Update and render flags
     this.updateFlags(this.time);
     
@@ -1221,9 +1272,9 @@ class ThreeJSGame
     this.renderer.render(this.scene, this.camera);
 
     // 2) Render scene to scope RT
-    this.renderer.setRenderTarget(this.scopeRenderTarget);
+    this.renderer.setRenderTarget(this.spottingScopeRenderTarget);
     this.renderer.clear();
-    this.renderer.render(this.scene, this.scopeCamera);
+    this.renderer.render(this.scene, this.spottingScopeCamera);
     this.renderer.setRenderTarget(null);
 
     // 2b) Render scene to scope 2 RT
@@ -1576,25 +1627,25 @@ class ThreeJSGame
     // W/S: adjust pitch (tilt up/down)
     // W = tilt up (positive pitch)
     // S = tilt down (negative pitch)
-    if (this.scopeKeys.w) this.scopePitch += panSpeed;
-    if (this.scopeKeys.s) this.scopePitch -= panSpeed;
+    if (this.spottingScopeKeys.w) this.spottingScopePitch += panSpeed;
+    if (this.spottingScopeKeys.s) this.spottingScopePitch -= panSpeed;
     
     // A/D: pan left/right (move crossrange position)
     // A = pan left (negative Y in BTK coords)
     // D = pan right (positive Y in BTK coords)
-    if (this.scopeKeys.a) this.scopeYaw += panSpeed;
-    if (this.scopeKeys.d) this.scopeYaw -= panSpeed;
+    if (this.spottingScopeKeys.a) this.spottingScopeYaw += panSpeed;
+    if (this.spottingScopeKeys.d) this.spottingScopeYaw -= panSpeed;
     
     // E/Q: adjust magnification (exponential scaling)
     // E = increase magnification
     // Q = decrease magnification
-    if (this.scopeKeys.e) {
+    if (this.spottingScopeKeys.e) {
       this.spottingScopeMagnification = Math.min(
         ThreeJSGame.SPOTTING_SCOPE_MAX_MAGNIFICATION,
         this.spottingScopeMagnification * Math.pow(1.1, deltaTime * 10) // 10% increase per second
       );
     }
-    if (this.scopeKeys.q) {
+    if (this.spottingScopeKeys.q) {
       this.spottingScopeMagnification = Math.max(
         ThreeJSGame.SPOTTING_SCOPE_MIN_MAGNIFICATION,
         this.spottingScopeMagnification / Math.pow(1.1, deltaTime * 10) // 10% decrease per second
@@ -1602,28 +1653,28 @@ class ThreeJSGame
     }
     
     // Clamp pitch and yaw to reasonable limits
-    this.scopePitch = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.scopePitch));
-    this.scopeYaw = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.scopeYaw));
+    this.spottingScopePitch = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.spottingScopePitch));
+    this.spottingScopeYaw = Math.max(-Math.PI/6, Math.min(Math.PI/6, this.spottingScopeYaw));
     
     // Update scope camera FOV based on current magnification
     const scopeFOV = ThreeJSGame.CAMERA_FOV / this.spottingScopeMagnification;
-    this.scopeCamera.fov = scopeFOV;
-    this.scopeCamera.updateProjectionMatrix();
+    this.spottingScopeCamera.fov = scopeFOV;
+    this.spottingScopeCamera.updateProjectionMatrix();
     
     // Apply rotation to scope camera
     // Start from main camera position and orientation
     const targetCenterHeight = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + 1;
-    this.scopeCamera.position.copy(this.camera.position);
-    this.scopeCamera.up.set(0, 0, 1);
+    this.spottingScopeCamera.position.copy(this.camera.position);
+    this.spottingScopeCamera.up.set(0, 0, 1);
     
     // Calculate look-at target with offsets
     // scopeYaw controls horizontal (Y-axis) offset at distance
     // scopePitch controls vertical (Z-axis) offset
     const lookX = this.distance;
-    const lookY = this.distance * Math.tan(this.scopeYaw); // Pan left/right
-    const lookZ = targetCenterHeight + this.distance * Math.tan(this.scopePitch); // Tilt up/down
+    const lookY = this.distance * Math.tan(this.spottingScopeYaw); // Pan left/right
+    const lookZ = targetCenterHeight + this.distance * Math.tan(this.spottingScopePitch); // Tilt up/down
     
-    this.scopeCamera.lookAt(lookX, lookY, lookZ);
+    this.spottingScopeCamera.lookAt(lookX, lookY, lookZ);
   }
 
   /**
@@ -1638,10 +1689,9 @@ class ThreeJSGame
       return;
     }
     
-    // Calculate angular movement for 0.1 inches at current distance
-    const linearMovement = ThreeJSGame.RIFLE_SCOPE_PAN_SPEED; // 0.1 inches
-    const distanceInches = this.distance * 36; // Convert yards to inches
-    const angularIncrement = Math.atan(linearMovement / distanceInches);
+    // Calculate angular movement in radians from MOA
+    const moaIncrement = ThreeJSGame.RIFLE_SCOPE_PAN_SPEED; // 0.1 MOA per key press
+    const angularIncrement = moaIncrement * (Math.PI / 180) / 60; // Convert MOA to radians
     
     // Arrow keys: adjust pitch and yaw (per key press, not per frame)
     // Up arrow: increase pitch (tilt up)
@@ -1681,6 +1731,22 @@ class ThreeJSGame
     const lookZ = this.userTarget.mesh.position.z + this.distance * Math.tan(this.rifleScopePitch);
 
     this.rifleScopeCamera.lookAt(lookX, lookY, lookZ);
+  }
+
+  updateRifleScopeZoom()
+  {
+    if (!this.rifleScopeCamera) return;
+    
+    // Recalculate FOV based on current zoom level
+    const targetFrameWidth = ThreeJSGame.TARGET_SIZE; // yards
+    const fovRadians = Math.atan((this.rifleScopeZoom * targetFrameWidth) / this.distance);
+    const fovDegrees = fovRadians * 180 / Math.PI;
+    
+    // Update camera FOV
+    this.rifleScopeCamera.fov = fovDegrees;
+    this.rifleScopeCamera.updateProjectionMatrix();
+    
+    console.log(`Rifle scope zoom: ${this.rifleScopeZoom.toFixed(2)}x (FOV: ${fovDegrees.toFixed(1)}°)`);
   }
 
 
@@ -2013,6 +2079,8 @@ class ThreeJSGame
       // Simulate with wind generator
       const rangeMeters = btk.Conversions.yardsToMeters(range);
       const trajectory = this.ballisticSimulator.simulateWithWind(rangeMeters, dt, 3.0, this.windGenerator, this.time);
+      // Store for animation
+      this.lastTrajectory = trajectory;
       const pointAtTarget = trajectory.atDistance(rangeMeters);
       
       // Get bullet position and velocity at target
@@ -2030,35 +2098,17 @@ class ThreeJSGame
       const relativeX = bulletPos.y - targetY;
       const relativeY = bulletPos.z - targetZ;
       
-      // Debug logging
-      console.log(`Bullet impact: (${bulletPos.x.toFixed(2)}, ${bulletPos.y.toFixed(2)}, ${bulletPos.z.toFixed(2)}) meters`);
-      console.log(`Target center: (${targetX.toFixed(2)}, ${targetY.toFixed(2)}, ${targetZ.toFixed(2)}) meters`);
-      console.log(`Impact relative: (${btk.Conversions.metersToInches(relativeX).toFixed(2)}", ${btk.Conversions.metersToInches(relativeY).toFixed(2)}")`);
-      
-      // Record hit in match
-      const bulletDiameterMeters = btk.Conversions.inchesToMeters(this.bulletDiameter);
-      const hit = this.match.addHit(relativeX, relativeY, this.btkTarget, bulletDiameterMeters);
-      
-      // Store for HUD (convert to fps)
-      this.lastShotData = {
-        score: hit.getScore(),
-        isX: hit.isX(),
+      // Store all shot data for processing after animation completes
+      this.pendingShotData = {
+        relativeX: relativeX,  // meters
+        relativeY: relativeY,  // meters
         mvFps: actualMVFps,
-        impactVelocityFps: btk.Conversions.mpsToFps(impactVelocity)
+        impactVelocityFps: btk.Conversions.mpsToFps(impactVelocity),
+        bulletDiameterMeters: btk.Conversions.inchesToMeters(this.bulletDiameter)
       };
       
-      // Mark the last shot with a red marker (convert to yards)
-      const relativeXYards = btk.Conversions.metersToYards(relativeX);
-      const relativeYYards = btk.Conversions.metersToYards(relativeY);
-      this.displayLastShotMarker(relativeXYards, relativeYYards);
-      
-      // Update HUD display
-      this.updateHUD();
-      
-      console.log(`Shot ${this.match.getHitCount()}: Score=${hit.getScore()}${hit.isX() ? 'x' : ''}, Impact=(${btk.Conversions.metersToInches(relativeX).toFixed(2)}", ${btk.Conversions.metersToInches(relativeY).toFixed(2)}")`);
-      console.log(`Match: ${this.match.getTotalScore()}-${this.match.getXCount()}x, Group=${btk.Conversions.metersToInches(this.match.getGroupSize()).toFixed(2)}"`);
-      
-      return hit;
+      // Log that animation is starting
+      console.log(`Bullet fired - animation starting...`);
     } catch (error) {
       console.error('Failed to fire shot:', error);
       throw error;
@@ -2122,9 +2172,19 @@ class ThreeJSGame
   setupShotFiringControls()
   {
     document.addEventListener('keydown', (event) => {
-      if (event.code === 'Space' && this.isRunning && this.ballisticSimulator) {
-        event.preventDefault();
-        this.fireShot();
+      if (event.code === 'Space') {
+        if (this.bulletAnim) {
+          // Bullet animation in progress - ignore spacebar completely
+          event.preventDefault();
+          return;
+        }
+        
+        if (this.isRunning && this.ballisticSimulator) {
+          event.preventDefault();
+          this.fireShot();
+          // Start bullet animation for this shot if trajectory is available
+          this.startBulletAnimation();
+        }
       }
     });
   }
@@ -2148,9 +2208,23 @@ class ThreeJSGame
     // Clean up shot markers
     this.clearShotMarkers();
     
+    // Clean up bullet mesh and glow
+    if (this.bulletMesh) {
+      this.scene.remove(this.bulletMesh);
+      this.bulletMesh.geometry.dispose();
+      this.bulletMesh.material.dispose();
+      this.bulletMesh = null;
+    }
+    if (this.bulletGlowSprite) {
+      this.scene.remove(this.bulletGlowSprite);
+      this.bulletGlowSprite.material.map.dispose();
+      this.bulletGlowSprite.material.dispose();
+      this.bulletGlowSprite = null;
+    }
+    
     // Clean up scope resources
-    if (this.scopeRenderTarget) {
-      this.scopeRenderTarget.dispose();
+    if (this.spottingScopeRenderTarget) {
+      this.spottingScopeRenderTarget.dispose();
     }
     if (this.rifleScopeRenderTarget) {
       this.rifleScopeRenderTarget.dispose();
@@ -2162,9 +2236,9 @@ class ThreeJSGame
       this.overlayMesh.geometry.dispose();
       this.overlayMesh.material.dispose();
     }
-    if (this.scopeViewMesh) {
-      this.scopeViewMesh.geometry.dispose();
-      this.scopeViewMesh.material.dispose();
+    if (this.spottingScopeViewMesh) {
+      this.spottingScopeViewMesh.geometry.dispose();
+      this.spottingScopeViewMesh.material.dispose();
     }
     if (this.rifleScopeViewMesh) {
       this.rifleScopeViewMesh.geometry.dispose();
@@ -2172,11 +2246,11 @@ class ThreeJSGame
     }
     
     // Remove scope keyboard event listeners
-    if (this.scopeKeyDownHandler) {
-      document.removeEventListener('keydown', this.scopeKeyDownHandler);
+    if (this.spottingScopeKeyDownHandler) {
+      document.removeEventListener('keydown', this.spottingScopeKeyDownHandler);
     }
-    if (this.scopeKeyUpHandler) {
-      document.removeEventListener('keyup', this.scopeKeyUpHandler);
+    if (this.spottingScopeKeyUpHandler) {
+      document.removeEventListener('keyup', this.spottingScopeKeyUpHandler);
     }
     if (this.rifleScopeKeyDownHandler) {
       document.removeEventListener('keydown', this.rifleScopeKeyDownHandler);
@@ -2189,6 +2263,153 @@ class ThreeJSGame
   }
 }
 
+
+
+// ===== Bullet Animation Helpers =====
+
+ThreeJSGame.prototype.createBulletGlowTexture = function() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  
+  // Create radial gradient for motion blur effect
+  const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)'); // Very faint white center
+  gradient.addColorStop(0.2, 'rgba(200, 200, 200, 0.2)'); // Light gray
+  gradient.addColorStop(0.5, 'rgba(150, 150, 150, 0.1)'); // Faint gray
+  gradient.addColorStop(0.8, 'rgba(100, 100, 100, 0.05)'); // Very faint
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Transparent edge
+  
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 128, 128);
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+};
+
+ThreeJSGame.prototype.startBulletAnimation = function() {
+  if (!this.lastTrajectory) 
+    return;
+
+  if (!this.bulletMaterial) {
+    // Copper color: #B87333 (RGB: 184, 115, 51)
+    this.bulletMaterial = new THREE.MeshBasicMaterial({ 
+      color: new THREE.Color(0.722, 0.451, 0.200), // Copper color
+      toneMapped: false 
+    });
+  }
+  
+  if (!this.bulletGeometry) {
+    // Use actual bullet diameter from UI parameters
+    const radiusYards = btk.Conversions.inchesToYards(this.bulletDiameter) / 2.0;
+    this.bulletGeometry = new THREE.SphereGeometry(radiusYards, 16, 16);
+  }
+
+  if (!this.bulletMesh) {
+    this.bulletMesh = new THREE.Mesh(this.bulletGeometry, this.bulletMaterial);
+    this.bulletMesh.castShadow = true;
+    this.bulletMesh.receiveShadow = false;
+    this.scene.add(this.bulletMesh);
+  }
+  
+  // Create pressure wave glow sprite
+  if (!this.bulletGlowSprite) {
+    const glowTexture = this.createBulletGlowTexture();
+    const glowMaterial = new THREE.SpriteMaterial({ 
+      map: glowTexture, 
+      transparent: true,
+      blending: THREE.NormalBlending, // Subtle blur instead of bright glow
+      depthWrite: false
+    });
+    this.bulletGlowSprite = new THREE.Sprite(glowMaterial);
+    // Make blur larger for motion trail effect
+    const glowSize = btk.Conversions.inchesToYards(this.bulletDiameter) * 15.0;
+    this.bulletGlowSprite.scale.set(glowSize, glowSize, 1);
+    this.scene.add(this.bulletGlowSprite);
+  }
+  
+  // Make bullet and glow visible for new animation
+  this.bulletMesh.visible = true;
+  this.bulletGlowSprite.visible = true;
+
+  // Animation state
+  const totalTimeS = this.lastTrajectory.getTotalTime();
+  this.bulletAnim = {
+    totalTimeS,
+    startTimeMs: performance.now()
+  };
+
+  // Initialize position at t=0
+  const optPoint0 = this.lastTrajectory.atTime(0);
+  if (optPoint0 !== undefined) {
+    const p0 = optPoint0.getState().getPosition();
+    const x = btk.Conversions.metersToYards(p0.x);
+    const y = btk.Conversions.metersToYards(p0.y);
+    const z = btk.Conversions.metersToYards(p0.z);
+    this.bulletMesh.position.set(x, y, z);
+  }
+};
+
+ThreeJSGame.prototype.updateBulletAnimation = function() {
+  if (!this.bulletAnim || !this.bulletMesh || !this.lastTrajectory) return;
+
+  // Compute elapsed time (1x real-time)
+  const now = performance.now();
+  const elapsedRealS = (now - this.bulletAnim.startTimeMs) / 1000.0;
+  let t = elapsedRealS;
+  if (t >= this.bulletAnim.totalTimeS) {
+    // Clamp to end and stop animating; keep bullet at impact for a brief time
+    t = this.bulletAnim.totalTimeS;
+  }
+
+  const optPoint = this.lastTrajectory.atTime(t);
+  if (optPoint !== undefined) {
+    const pos = optPoint.getState().getPosition();
+    const x = btk.Conversions.metersToYards(pos.x);
+    const y = btk.Conversions.metersToYards(pos.y);
+    const z = btk.Conversions.metersToYards(pos.z);
+    this.bulletMesh.position.set(x, y, z);
+    this.bulletGlowSprite.position.set(x, y, z);
+  }
+
+  // End animation when time reaches total
+  if (t >= this.bulletAnim.totalTimeS) {
+    // Hide bullet mesh, glow, and end animation
+    this.bulletMesh.visible = false;
+    this.bulletGlowSprite.visible = false;
+    
+    // Process shot completion: score hit, show marker, update HUD
+    if (this.pendingShotData) {
+      const data = this.pendingShotData;
+      
+      // NOW score the hit (add to match)
+      const hit = this.match.addHit(data.relativeX, data.relativeY, this.btkTarget, data.bulletDiameterMeters);
+      
+      // Show the shot marker (convert to yards for display)
+      const relativeXYards = btk.Conversions.metersToYards(data.relativeX);
+      const relativeYYards = btk.Conversions.metersToYards(data.relativeY);
+      this.displayLastShotMarker(relativeXYards, relativeYYards);
+      
+      // Update HUD with shot data
+      this.lastShotData = {
+        score: hit.getScore(),
+        isX: hit.isX(),
+        mvFps: data.mvFps,
+        impactVelocityFps: data.impactVelocityFps
+      };
+      this.updateHUD();
+      
+      // Log the final results
+      console.log(`Shot ${this.match.getHitCount()}: Score=${hit.getScore()}${hit.isX() ? 'x' : ''}, Impact=(${btk.Conversions.metersToInches(data.relativeX).toFixed(2)}", ${btk.Conversions.metersToInches(data.relativeY).toFixed(2)}")`);
+      console.log(`Match: ${this.match.getTotalScore()}-${this.match.getXCount()}x, Group=${btk.Conversions.metersToInches(this.match.getGroupSize()).toFixed(2)}"`);
+      
+      this.pendingShotData = null;
+    }
+    
+    this.bulletAnim = null;
+  }
+};
 
 
 // Help menu functionality
@@ -2231,6 +2452,7 @@ document.addEventListener('DOMContentLoaded', async () =>
     btk = await BallisticsToolkit();
     await init();
     setupUI();
+    lockCanvasSize(); // Lock canvas size once on page load
     populateWindPresetDropdown();
     setupHelpMenu();
   }

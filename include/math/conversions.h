@@ -35,6 +35,10 @@ namespace btk::math
     static constexpr float metersToInches(float meters) { return meters * 39.3701f; }
     static constexpr float metersToYards(float meters) { return meters * 1.09361f; }
     static constexpr float metersToMiles(float meters) { return meters * 0.000621371f; }
+
+    // Direct conversions between imperial units
+    static constexpr float inchesToYards(float inches) { return inches / 36.0f; }
+    static constexpr float yardsToInches(float yards) { return yards * 36.0f; }
     static constexpr float metersToCentimeters(float meters) { return meters * 100.0f; }
     static constexpr float metersToMillimeters(float meters) { return meters * 1000.0f; }
     static constexpr float metersToKilometers(float meters) { return meters * 0.001f; }

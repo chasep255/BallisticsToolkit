@@ -33,6 +33,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .class_function("metersToInches", &Conversions::metersToInches)
     .class_function("yardsToMeters", &Conversions::yardsToMeters)
     .class_function("metersToYards", &Conversions::metersToYards)
+    .class_function("inchesToYards", &Conversions::inchesToYards)
+    .class_function("yardsToInches", &Conversions::yardsToInches)
     // Weight conversions
     .class_function("grainsToKg", &Conversions::grainsToKg)
     .class_function("kgToGrains", &Conversions::kgToGrains)
@@ -154,6 +156,9 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getImpactVelocity", &Trajectory::getImpactVelocity)
     .function("getImpactAngle", &Trajectory::getImpactAngle)
     .function("clear", &Trajectory::clear);
+
+  // Register optional<TrajectoryPoint> binding
+  register_optional<btk::ballistics::TrajectoryPoint>();
 
   // Ballistics Simulator class
   class_<btk::ballistics::Simulator>("BallisticsSimulator")
