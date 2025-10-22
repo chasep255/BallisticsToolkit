@@ -2,6 +2,15 @@ import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 
 let btk = null;
 
+// F-Class distance to target mapping
+const FCLASS_DISTANCE_TO_TARGET = {
+  300: 'MR-63FCA',
+  500: 'MR-65FCA',
+  600: 'MR-1FCA',
+  800: 'LR-FCA',
+  900: 'LR-FCA',
+  1000: 'LR-FCA'
+};
 
 // WebGL game instance
 let webglGame = null;
@@ -21,7 +30,7 @@ function lockCanvasSize()
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const isTouchOnly = !window.matchMedia('(hover: hover)').matches;
   const screenWidth = window.innerWidth;
-  const minRecommendedWidth = 800;
+  const minRecommendedWidth = FClassSimulator.MIN_SCREEN_WIDTH;
 
   if (isMobile || isTouchOnly)
   {
@@ -64,7 +73,7 @@ function showWarning(title, message)
     top: 0;
     left: 0;
     right: 0;
-    background: #ff9800;
+    background: ${FClassSimulator.WARNING_COLOR};
     color: #000;
     padding: 16px;
     text-align: center;
@@ -103,7 +112,7 @@ function startGame()
 
     // Create new Three.js game instance (constructor handles all init)
     const canvas = document.getElementById('gameCanvas');
-    webglGame = new ThreeJSGame(canvas, params);
+    webglGame = new FClassSimulator(canvas, params);
     webglGame.start();
 
     // Update UI
@@ -133,7 +142,7 @@ function restartGame()
 
     // Create new Three.js game instance with updated parameters
     const canvas = document.getElementById('gameCanvas');
-    webglGame = new ThreeJSGame(canvas, params);
+    webglGame = new FClassSimulator(canvas, params);
     webglGame.start();
 
     console.log('Game restarted with params:', params);
@@ -153,24 +162,8 @@ function getGameParams()
   const distanceYards = parseInt(distance);
 
   // Map F-Class distances to correct targets
-  let targetType;
-  if (distanceYards === 300)
-  {
-    targetType = 'MR-63FCA';
-  }
-  else if (distanceYards === 500)
-  {
-    targetType = 'MR-65FCA';
-  }
-  else if (distanceYards === 600)
-  {
-    targetType = 'MR-1FCA';
-  }
-  else if (distanceYards >= 800)
-  {
-    targetType = 'LR-FCA';
-  }
-  else
+  const targetType = FCLASS_DISTANCE_TO_TARGET[distanceYards];
+  if (!targetType)
   {
     throw new Error(`Invalid F-Class distance: ${distanceYards} yards. Valid distances are: 300, 500, 600, 800, 900, 1000`);
   }
@@ -225,41 +218,36 @@ function populateWindPresetDropdown()
   }
 }
 
-// Three.js Game Renderer Class
-class ThreeJSGame
+// F-Class Shooting Simulator Class
+class FClassSimulator
 {
   // ===== CONSTANTS =====
-  // Range dimensions in yards
+
+  // === RANGE & PHYSICAL DIMENSIONS ===
   static RANGE_TOTAL_WIDTH = 200;
   static RANGE_LANE_WIDTH = 50;
-
-  // Flag pole dimensions in yards
   static POLE_HEIGHT = 12;
   static POLE_THICKNESS = 0.1;
   static POLE_INTERVAL = 100;
-
-  // Pits dimensions in yards
   static PITS_HEIGHT = 3;
   static PITS_DEPTH = 1;
   static PITS_OFFSET = 5;
 
-  // Target animation constants
+  // === TARGET ANIMATION ===
   static TARGET_SIZE = 2; // yards - size of target frames
   static TARGET_GAP_ABOVE_PITS = 0.2; // Gap between target bottom and pit top when raised
   static TARGET_MAX_HEIGHT = 0; // No additional height when raised (baseHeight already has the gap)
-  static TARGET_HALF_MAST = -(ThreeJSGame.TARGET_SIZE + ThreeJSGame.TARGET_GAP_ABOVE_PITS) / 2; // Halfway between raised and lowered
-  static TARGET_MIN_HEIGHT = -(ThreeJSGame.TARGET_SIZE + ThreeJSGame.TARGET_GAP_ABOVE_PITS); // Fully lowered (target size + gap)
-  static TARGET_CENTER_HEIGHT = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + ThreeJSGame.TARGET_SIZE / 2; // Target center height when raised
+  static TARGET_HALF_MAST = -(FClassSimulator.TARGET_SIZE + FClassSimulator.TARGET_GAP_ABOVE_PITS) / 2; // Halfway between raised and lowered
+  static TARGET_MIN_HEIGHT = -(FClassSimulator.TARGET_SIZE + FClassSimulator.TARGET_GAP_ABOVE_PITS); // Fully lowered (target size + gap)
+  static TARGET_CENTER_HEIGHT = FClassSimulator.PITS_HEIGHT + FClassSimulator.TARGET_GAP_ABOVE_PITS + FClassSimulator.TARGET_SIZE / 2; // Target center height when raised
   static TARGET_ANIMATION_SPEED = 0.75; // yards per second
 
-  // Debug and animation constants
-  static DEBUG = false;
-  static RANDOM_ANIMATION_CHANCE = 0.01; // ~1% per frame at 60fps
-
-  // Wind flag constants
-  static FLAG_BASE_WIDTH = 48 / 36; // 48 inches = 1.33 yards
-  static FLAG_TIP_WIDTH = 18 / 36; // 18 inches = 0.5 yards
-  static FLAG_LENGTH = 12 / 3; // 12 feet = 4 yards
+  // === WIND VISUALIZATION ===
+  // Wind flags (manual conversions since BTK not available at class definition time)
+  static FLAG_BASE_WIDTH = 48 / 36; // 48 inches = 1.33 yards (btk.Conversions.inchesToYards(48))
+  static FLAG_TIP_WIDTH = 18 / 36; // 18 inches = 0.5 yards (btk.Conversions.inchesToYards(18))
+  static FLAG_LENGTH = 12 / 3; // 12 feet = 4 yards (btk.Conversions.feetToYards(12))
+  static FLAG_THICKNESS = 0.05; // 2cm thickness for realistic flag
   static FLAG_MIN_ANGLE = 5; // degrees from vertical
   static FLAG_MAX_ANGLE = 90; // degrees from vertical
   static FLAG_DEGREES_PER_MPH = (90 - 5) / 20; // (max - min) / 20 mph = 4 degrees per mph
@@ -268,9 +256,31 @@ class ThreeJSGame
   static FLAG_FLAP_AMPLITUDE = 0.05; // Max ripple amplitude in yards
   static FLAG_WAVE_LENGTH = 2.0; // Wavelength along flag length
 
-  // Camera settings
+
+  // === CAMERA SETTINGS ===
   static CAMERA_FOV = 30;
   static CAMERA_EYE_HEIGHT = 0.1;
+
+
+  // === DEBUG & ANIMATION ===
+  static DEBUG = false;
+  static RANDOM_ANIMATION_CHANCE = 0.01; // ~1% per frame at 60fps
+
+  // === UI & DISPLAY ===
+  static MIN_SCREEN_WIDTH = 800;
+  static WARNING_COLOR = '#ff9800';
+  static COLOR_X_RING = 0xffff00;
+  static COLOR_HIGH_SCORE = 0xff0000;
+  static COLOR_LOW_SCORE = 0xff8800;
+  static SCORE_THRESHOLD_RED = 9;
+
+  // === MATCH & SCORING ===
+  static FCLASS_MATCH_SHOTS = 60;
+
+  // === ANIMATION & TIMING ===
+  static ASSUMED_FPS = 60;
+  static FLAG_ANGLE_INTERPOLATION_SPEED = 30; // degrees per second
+  static FLAG_DIRECTION_INTERPOLATION_SPEED = 1.0; // radians per second
 
   // Spotting scope constants (WASD pan, EQ zoom)
   static SPOTTING_SCOPE_DIAMETER_FRACTION = 0.5; // Fraction of screen height
@@ -289,7 +299,7 @@ class ThreeJSGame
   static RIFLE_SCOPE_ZOOM_MAX = 3.0; // Maximum FOV multiplier (zoomed out)
   static RIFLE_SCOPE_ZOOM_STEP = 0.1; // Zoom change per key press
 
-  // ===== INITIALIZATION =====
+  // ===== CONSTRUCTOR & INITIALIZATION =====
   constructor(canvas, params = {})
   {
     this.canvas = canvas;
@@ -429,20 +439,24 @@ class ThreeJSGame
   }
 
   // ===== AUDIO SYSTEM =====
-  
+
   /**
    * Initialize audio system and load shot sound
    */
-  async initializeAudio() {
-    try {
+  async initializeAudio()
+  {
+    try
+    {
       // Create audio context
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      
+      this.audioContext = new(window.AudioContext || window.webkitAudioContext)();
+
       // Load shot sound
       await this.loadShotSound();
-      
+
       console.log('Audio system initialized');
-    } catch (error) {
+    }
+    catch (error)
+    {
       console.warn('Could not initialize audio system:', error);
     }
   }
@@ -450,18 +464,23 @@ class ThreeJSGame
   /**
    * Load shot sound from audio file
    */
-  async loadShotSound() {
-    try {
+  async loadShotSound()
+  {
+    try
+    {
       const response = await fetch('audio/shot1.mp3');
-      if (!response.ok) {
+      if (!response.ok)
+      {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const arrayBuffer = await response.arrayBuffer();
       this.shotSound = await this.audioContext.decodeAudioData(arrayBuffer);
-      
+
       console.log('Shot sound loaded successfully');
-    } catch (error) {
+    }
+    catch (error)
+    {
       console.warn('Could not load shot sound:', error);
       this.shotSound = null;
     }
@@ -470,22 +489,29 @@ class ThreeJSGame
   /**
    * Play shot sound when firing
    */
-  playShotSound() {
-    if (this.audioMuted || !this.shotSound || !this.audioContext) {
+  playShotSound()
+  {
+    if (this.audioMuted || !this.shotSound || !this.audioContext)
+    {
       return;
     }
 
-    try {
+    try
+    {
       const source = this.audioContext.createBufferSource();
       source.buffer = this.shotSound;
       source.connect(this.audioContext.destination);
       source.start();
-      
+
       console.log('Shot sound played');
-    } catch (error) {
+    }
+    catch (error)
+    {
       console.warn('Could not play shot sound:', error);
     }
   }
+
+  // ===== SCOPE SYSTEM =====
 
   createSpottingScopeOverlay()
   {
@@ -493,7 +519,7 @@ class ThreeJSGame
     const availableWidth = this.canvasWidth - 20; // 10px padding on each side
     const availableHeight = this.canvasHeight - 20; // 10px padding on each side
     const maxScopeSize = Math.min(availableWidth, availableHeight);
-    const scopeSize = Math.floor(maxScopeSize * ThreeJSGame.SPOTTING_SCOPE_DIAMETER_FRACTION);
+    const scopeSize = Math.floor(maxScopeSize * FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION);
     const renderSize = scopeSize * 2;
 
     this.spottingScopeRenderTarget = new THREE.WebGLRenderTarget(renderSize, renderSize,
@@ -516,11 +542,11 @@ class ThreeJSGame
     this.spottingScopeTempCtx = this.spottingScopeTempCanvas.getContext('2d');
 
     // Create spotting scope camera
-    const scopeFOV = ThreeJSGame.CAMERA_FOV / ThreeJSGame.SCOPE_MAGNIFICATION; // 30° / 4 = 7.5°
+    const scopeFOV = FClassSimulator.CAMERA_FOV / FClassSimulator.SCOPE_MAGNIFICATION; // 30° / 4 = 7.5°
     this.spottingScopeCamera = new THREE.PerspectiveCamera(scopeFOV, 1.0, 0.5, this.distance * 1.5);
-    this.spottingScopeCamera.position.set(-1, 0, ThreeJSGame.CAMERA_EYE_HEIGHT);
+    this.spottingScopeCamera.position.set(-1, 0, FClassSimulator.CAMERA_EYE_HEIGHT);
     this.spottingScopeCamera.up.set(0, 0, 1);
-    this.spottingScopeCamera.lookAt(this.distance, 0, ThreeJSGame.CAMERA_EYE_HEIGHT);
+    this.spottingScopeCamera.lookAt(this.distance, 0, FClassSimulator.CAMERA_EYE_HEIGHT);
 
     // Initialize control state
     this.spottingScopeYaw = 0;
@@ -540,7 +566,7 @@ class ThreeJSGame
     const availableWidth = this.canvasWidth - 20; // 10px padding on each side
     const availableHeight = this.canvasHeight - 20; // 10px padding on each side
     const maxScopeSize = Math.min(availableWidth, availableHeight);
-    const rifleScopeSize = Math.floor(maxScopeSize * ThreeJSGame.RIFLE_SCOPE_DIAMETER_FRACTION);
+    const rifleScopeSize = Math.floor(maxScopeSize * FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION);
     const rifleScopeRenderSize = rifleScopeSize * 2;
 
     this.rifleScopeRenderTarget = new THREE.WebGLRenderTarget(rifleScopeRenderSize, rifleScopeRenderSize,
@@ -556,13 +582,13 @@ class ThreeJSGame
     this.rifleScopeY = this.canvasHeight - rifleScopeSize - 10; // 10px padding from bottom
 
     // Calculate FOV for 1.5x target width
-    const targetFrameWidth = ThreeJSGame.TARGET_SIZE; // yards
-    const fovRadians = Math.atan((ThreeJSGame.RIFLE_SCOPE_FOV_MULTIPLIER * targetFrameWidth) / this.distance);
+    const targetFrameWidth = FClassSimulator.TARGET_SIZE; // yards
+    const fovRadians = Math.atan((FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER * targetFrameWidth) / this.distance);
     const fovDegrees = fovRadians * 180 / Math.PI;
 
     // Create rifle scope camera
     this.rifleScopeCamera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.5, this.distance * 1.5);
-    this.rifleScopeCamera.position.set(0, 0, ThreeJSGame.CAMERA_EYE_HEIGHT);
+    this.rifleScopeCamera.position.set(0, 0, FClassSimulator.CAMERA_EYE_HEIGHT);
 
     // Point at user's target center
     const targetCenterX = this.distance;
@@ -573,7 +599,7 @@ class ThreeJSGame
     // Initialize rifle scope control state
     this.rifleScopePitch = 0;
     this.rifleScopeYaw = 0;
-    this.rifleScopeZoom = ThreeJSGame.RIFLE_SCOPE_FOV_MULTIPLIER; // Current zoom level (FOV multiplier)
+    this.rifleScopeZoom = FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER; // Current zoom level (FOV multiplier)
 
     // Calculate movement limits (allow 3x target radius for scope bounding box)
     const scopeBoundingBoxSize = targetFrameWidth * 3; // 3x target size
@@ -770,6 +796,7 @@ class ThreeJSGame
     ctx.stroke();
   }
 
+  // ===== FLAG SYSTEM =====
 
   createFlagTexture()
   {
@@ -791,41 +818,75 @@ class ThreeJSGame
     return texture;
   }
 
+  // Helper method - calculates vertex positions for one flag segment
+  calculateFlagSegmentPosition(segmentIndex, angleDeg, direction, flapPhase)
+  {
+    const halfBase = FClassSimulator.FLAG_BASE_WIDTH / 2;
+    const halfTip = FClassSimulator.FLAG_TIP_WIDTH / 2;
+    const length = FClassSimulator.FLAG_LENGTH;
+    const thickness = FClassSimulator.FLAG_THICKNESS;
+    const numSegments = 5;
+
+    const t = segmentIndex / (numSegments - 1);
+    const halfWidth = halfBase + (halfTip - halfBase) * t;
+
+    // Calculate position with wind angle and flapping
+    const angleRad = angleDeg * Math.PI / 180;
+    const cosDir = Math.cos(direction);
+    const sinDir = Math.sin(direction);
+    const cosPitch = Math.cos(angleRad);
+    const sinPitch = Math.sin(angleRad);
+
+    const segmentX = sinPitch * length * t * cosDir;
+    const segmentY = sinPitch * length * t * sinDir;
+    const segmentZ = -cosPitch * length * t;
+
+    // Flapping animation
+    const wavePosition = t * FClassSimulator.FLAG_WAVE_LENGTH;
+    const waveOffset = Math.sin(flapPhase + wavePosition * 2 * Math.PI) * FClassSimulator.FLAG_FLAP_AMPLITUDE;
+    const flapAmplitude = waveOffset * t;
+
+    const perpX = -sinDir;
+    const perpY = cosDir;
+    const flapX = perpX * flapAmplitude;
+    const flapY = perpY * flapAmplitude;
+    const flapZ = 0;
+
+    // Return 4 vertices: [topFront, bottomFront, topBack, bottomBack]
+    return {
+      topFront: [segmentX + flapX + thickness / 2, segmentY + flapY, segmentZ + flapZ + halfWidth],
+      bottomFront: [segmentX + flapX + thickness / 2, segmentY + flapY, segmentZ + flapZ - halfWidth],
+      topBack: [segmentX + flapX - thickness / 2, segmentY + flapY, segmentZ + flapZ + halfWidth],
+      bottomBack: [segmentX + flapX - thickness / 2, segmentY + flapY, segmentZ + flapZ - halfWidth]
+    };
+  }
+
+
   createFlagGeometry()
   {
     // Create thick segmented trapezoid flag with 5 segments for flapping animation
-    // 48" base (1.33 yds), 18" tip (0.5 yds), 12' long (4 yds)
+    // Uses helper method for initial positions (no wind, no flapping)
     const geometry = new THREE.BufferGeometry();
-
-    const halfBase = ThreeJSGame.FLAG_BASE_WIDTH / 2; // 0.67 yards
-    const halfTip = ThreeJSGame.FLAG_TIP_WIDTH / 2; // 0.25 yards
-    const length = ThreeJSGame.FLAG_LENGTH; // 4 yards
-    const thickness = 0.05; // 2cm thickness for realistic flag
-    const numSegments = 5; // Base + 3 intermediate + tip
+    const numSegments = 5;
 
     // Create vertices for thick flag using multiple layers
     const vertices = [];
     const uvs = [];
     const indices = [];
 
-    // Create front and back faces for each segment
+    // Create front and back faces for each segment using helper
     for (let i = 0; i < numSegments; i++)
     {
       const t = i / (numSegments - 1); // 0 to 1
 
-      // Interpolate width from base to tip
-      const halfWidth = halfBase + (halfTip - halfBase) * t;
+      // Get initial positions (no wind, no flapping)
+      const positions = this.calculateFlagSegmentPosition(i, 0, 0, 0);
 
-      // Position along flag length (hanging down initially)
-      const yPos = -length * t;
-
-      // Front face vertices (positive X)
-      vertices.push(thickness / 2, yPos, halfWidth); // Top front
-      vertices.push(thickness / 2, yPos, -halfWidth); // Bottom front
-
-      // Back face vertices (negative X)
-      vertices.push(-thickness / 2, yPos, halfWidth); // Top back
-      vertices.push(-thickness / 2, yPos, -halfWidth); // Bottom back
+      // Add vertices in order: topFront, bottomFront, topBack, bottomBack
+      vertices.push(...positions.topFront);
+      vertices.push(...positions.bottomFront);
+      vertices.push(...positions.topBack);
+      vertices.push(...positions.bottomBack);
 
       // UV coordinates (red top, yellow bottom) for both faces
       uvs.push(t, 0); // Top front
@@ -869,6 +930,8 @@ class ThreeJSGame
 
     return geometry;
   }
+
+  // ===== RANGE & SCENE SETUP =====
 
   createNoiseTexture()
   {
@@ -922,9 +985,9 @@ class ThreeJSGame
     const aspect = this.canvasWidth / this.canvasHeight;
     // Use logarithmic depth buffer for better precision at long range
     // Near plane at 0.5 yards, far plane well beyond target
-    this.camera = new THREE.PerspectiveCamera(ThreeJSGame.CAMERA_FOV, aspect, 0.5, this.distance * 1.5);
+    this.camera = new THREE.PerspectiveCamera(FClassSimulator.CAMERA_FOV, aspect, 0.5, this.distance * 1.5);
     // Camera positioned 1 yard behind muzzle, at target center height when raised
-    const targetCenterHeight = ThreeJSGame.TARGET_CENTER_HEIGHT;
+    const targetCenterHeight = FClassSimulator.TARGET_CENTER_HEIGHT;
     this.camera.position.set(-1, 0, targetCenterHeight); // 1 yard behind muzzle, at target center height
     this.camera.up.set(0, 0, 1); // Z is up
     this.camera.lookAt(this.distance, 0, targetCenterHeight); // Look at target distance at same height
@@ -1107,14 +1170,14 @@ class ThreeJSGame
       else if (event.key === '+' || event.key === '=')
       {
         // Zoom in (decrease FOV multiplier)
-        this.rifleScopeZoom = Math.max(ThreeJSGame.RIFLE_SCOPE_ZOOM_MIN, this.rifleScopeZoom - ThreeJSGame.RIFLE_SCOPE_ZOOM_STEP);
+        this.rifleScopeZoom = Math.max(FClassSimulator.RIFLE_SCOPE_ZOOM_MIN, this.rifleScopeZoom - FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
         this.updateRifleScopeZoom();
         event.preventDefault();
       }
       else if (event.key === '-' || event.key === '_')
       {
         // Zoom out (increase FOV multiplier)
-        this.rifleScopeZoom = Math.min(ThreeJSGame.RIFLE_SCOPE_ZOOM_MAX, this.rifleScopeZoom + ThreeJSGame.RIFLE_SCOPE_ZOOM_STEP);
+        this.rifleScopeZoom = Math.min(FClassSimulator.RIFLE_SCOPE_ZOOM_MAX, this.rifleScopeZoom + FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
         this.updateRifleScopeZoom();
         event.preventDefault();
       }
@@ -1162,7 +1225,7 @@ class ThreeJSGame
   {
     const rangeLength = this.distance; // yards
     // Add brown ground that's wider than the range
-    const brownGroundGeometry = new THREE.PlaneGeometry(rangeLength, ThreeJSGame.RANGE_TOTAL_WIDTH);
+    const brownGroundGeometry = new THREE.PlaneGeometry(rangeLength, FClassSimulator.RANGE_TOTAL_WIDTH);
     const brownGroundMaterial = new THREE.MeshStandardMaterial(
     {
       color: 0x8b4513,
@@ -1174,7 +1237,7 @@ class ThreeJSGame
     this.scene.add(brownGround);
 
     // Add a range plane - just the shooting lanes with grass texture
-    const groundGeometry = new THREE.PlaneGeometry(rangeLength, ThreeJSGame.RANGE_LANE_WIDTH);
+    const groundGeometry = new THREE.PlaneGeometry(rangeLength, FClassSimulator.RANGE_LANE_WIDTH);
 
     // Create grass material with dense texture variation
     const groundMaterial = new THREE.MeshStandardMaterial(
@@ -1196,7 +1259,7 @@ class ThreeJSGame
     this.scene.add(ground);
 
     // Add pits at the end of the range
-    const pitsGeometry = new THREE.BoxGeometry(ThreeJSGame.PITS_DEPTH, ThreeJSGame.RANGE_LANE_WIDTH, ThreeJSGame.PITS_HEIGHT);
+    const pitsGeometry = new THREE.BoxGeometry(FClassSimulator.PITS_DEPTH, FClassSimulator.RANGE_LANE_WIDTH, FClassSimulator.PITS_HEIGHT);
     const pitsMaterial = new THREE.MeshStandardMaterial(
     {
       color: 0x8b7355
@@ -1208,7 +1271,7 @@ class ThreeJSGame
     pits.receiveShadow = true;
 
     // Position pits at rangeLength - PITS_OFFSET to obscure targets when lowered
-    pits.position.set(rangeLength - ThreeJSGame.PITS_OFFSET + ThreeJSGame.PITS_DEPTH / 2, 0, ThreeJSGame.PITS_HEIGHT / 2);
+    pits.position.set(rangeLength - FClassSimulator.PITS_OFFSET + FClassSimulator.PITS_DEPTH / 2, 0, FClassSimulator.PITS_HEIGHT / 2);
     this.scene.add(pits);
 
     // Add target frames above the pits
@@ -1218,16 +1281,16 @@ class ThreeJSGame
 
   setupTargets(rangeLength)
   {
-    const targetSize = ThreeJSGame.TARGET_SIZE; // yards
+    const targetSize = FClassSimulator.TARGET_SIZE; // yards
     const targetSpacing = 1; // yards between targets
     const totalTargetWidth = targetSize + targetSpacing;
 
     // Calculate how many targets fit in the range width
-    const rangeWidth = ThreeJSGame.RANGE_LANE_WIDTH;
+    const rangeWidth = FClassSimulator.RANGE_LANE_WIDTH;
     const maxTargets = Math.floor(rangeWidth / totalTargetWidth);
 
     // Position targets above the pits - centered on the range width
-    const targetHeight = ThreeJSGame.TARGET_CENTER_HEIGHT;
+    const targetHeight = FClassSimulator.TARGET_CENTER_HEIGHT;
     const totalTargetsWidth = maxTargets * targetSize + (maxTargets - 1) * targetSpacing; // Total width including spacing
     const startY = totalTargetsWidth / 2 - targetSize / 2; // Start from left (positive Y), centered
 
@@ -1305,6 +1368,8 @@ class ThreeJSGame
 
   }
 
+  // ===== TARGET SYSTEM =====
+
   createTargetTexture()
   {
     // Get the actual target from BTK for accurate dimensions
@@ -1356,7 +1421,7 @@ class ThreeJSGame
     for (const spec of ringSpecs)
     {
       const ringDiameterMeters = target.getRingInnerDiameter(spec.ring);
-      const ringDiameterYards = ringDiameterMeters * 1.09361; // meters to yards
+      const ringDiameterYards = btk.Conversions.metersToYards(ringDiameterMeters);
       const radiusPixels = (ringDiameterYards / 2) * pixelsPerYard;
 
       // Draw filled circle
@@ -1373,7 +1438,7 @@ class ThreeJSGame
 
     // Draw X-ring
     const xRingDiameterMeters = target.getXRingDiameter();
-    const xRingDiameterYards = xRingDiameterMeters * 1.09361;
+    const xRingDiameterYards = btk.Conversions.metersToYards(xRingDiameterMeters);
     const xRingRadius = (xRingDiameterYards / 2) * pixelsPerYard;
 
     context.beginPath();
@@ -1426,7 +1491,7 @@ class ThreeJSGame
     return new THREE.CanvasTexture(canvas);
   }
 
-  // ===== WIND SIMULATION =====
+  // ===== GAME LOOP & LIFECYCLE =====
   createWindGenerator()
   {
     // Create wind generator from preset
@@ -1459,7 +1524,7 @@ class ThreeJSGame
     this.updateTargetAnimations(this.time);
 
     // Update scope camera orientations
-    const deltaTime = 1 / 60; // Assume 60 FPS for consistent updates
+    const deltaTime = 1 / FClassSimulator.ASSUMED_FPS; // Assume 60 FPS for consistent updates
     this.updateSpottingScopeCamera(deltaTime);
     this.updateRifleScopeCamera(deltaTime);
 
@@ -1553,13 +1618,13 @@ class ThreeJSGame
 
     // Create flag poles every 100 yards from 100 to target distance at the border of the 50-yard lane
     const maxDistance = this.distance; // yards
-    const laneBorder = ThreeJSGame.RANGE_LANE_WIDTH / 2; // yards from center (border of 50-yard lane)
+    const laneBorder = FClassSimulator.RANGE_LANE_WIDTH / 2; // yards from center (border of 50-yard lane)
 
     this.flagMeshes = [];
 
-    for (let yds = ThreeJSGame.POLE_INTERVAL; yds < maxDistance; yds += ThreeJSGame.POLE_INTERVAL)
+    for (let yds = FClassSimulator.POLE_INTERVAL; yds < maxDistance; yds += FClassSimulator.POLE_INTERVAL)
     {
-      const poleGeometry = new THREE.BoxGeometry(ThreeJSGame.POLE_THICKNESS, ThreeJSGame.POLE_THICKNESS, ThreeJSGame.POLE_HEIGHT);
+      const poleGeometry = new THREE.BoxGeometry(FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_HEIGHT);
       const poleMaterial = new THREE.MeshStandardMaterial(
       {
         color: 0x808080
@@ -1570,7 +1635,7 @@ class ThreeJSGame
       pole.castShadow = true;
       pole.receiveShadow = true;
 
-      pole.position.set(yds, laneBorder, ThreeJSGame.POLE_HEIGHT / 2);
+      pole.position.set(yds, laneBorder, FClassSimulator.POLE_HEIGHT / 2);
       this.scene.add(pole);
 
       // Create flag geometry and mesh
@@ -1587,7 +1652,7 @@ class ThreeJSGame
       flagMesh.receiveShadow = true;
 
       // Position flag at top of pole (center of base at pole top - half base width)
-      const flagZ = ThreeJSGame.POLE_HEIGHT - ThreeJSGame.FLAG_BASE_WIDTH / 2;
+      const flagZ = FClassSimulator.POLE_HEIGHT - FClassSimulator.FLAG_BASE_WIDTH / 2;
       flagMesh.position.set(yds, laneBorder, flagZ);
       this.scene.add(flagMesh);
 
@@ -1603,8 +1668,8 @@ class ThreeJSGame
           y: laneBorder,
           z: flagZ
         },
-        currentAngle: ThreeJSGame.FLAG_MIN_ANGLE,
-        targetAngle: ThreeJSGame.FLAG_MIN_ANGLE,
+        currentAngle: FClassSimulator.FLAG_MIN_ANGLE,
+        targetAngle: FClassSimulator.FLAG_MIN_ANGLE,
         currentDirection: 0, // yaw rotation in radians
         flapPhase: Math.random() * Math.PI * 2 // Random starting phase for variety
       });
@@ -1612,14 +1677,16 @@ class ThreeJSGame
 
   }
 
+
+
   updateFlags(gameTime)
   {
     this.time = gameTime;
 
     // Smooth interpolation speed (radians per second for direction, degrees per second for angle)
-    const deltaTime = 1 / 60; // Assume 60 FPS
-    const angleSpeed = 30; // degrees per second
-    const directionSpeed = 1.0; // radians per second
+    const deltaTime = 1 / FClassSimulator.ASSUMED_FPS; // Assume 60 FPS
+    const angleSpeed = FClassSimulator.FLAG_ANGLE_INTERPOLATION_SPEED; // degrees per second
+    const directionSpeed = FClassSimulator.FLAG_DIRECTION_INTERPOLATION_SPEED; // radians per second
 
     // Update each flag mesh based on wind
     for (let i = 0; i < this.flagMeshes.length; i++)
@@ -1644,8 +1711,8 @@ class ThreeJSGame
 
       // Calculate target angle based on wind speed
       const targetAngleDeg = Math.min(
-        ThreeJSGame.FLAG_MIN_ANGLE + windSpeedMph * ThreeJSGame.FLAG_DEGREES_PER_MPH,
-        ThreeJSGame.FLAG_MAX_ANGLE
+        FClassSimulator.FLAG_MIN_ANGLE + windSpeedMph * FClassSimulator.FLAG_DEGREES_PER_MPH,
+        FClassSimulator.FLAG_MAX_ANGLE
       );
 
       // Calculate wind direction (yaw)
@@ -1665,86 +1732,50 @@ class ThreeJSGame
       flag.currentDirection += dirStep;
 
       // Update flap phase based on wind speed
-      const flapFrequency = ThreeJSGame.FLAG_FLAP_FREQUENCY_BASE + windSpeedMph * ThreeJSGame.FLAG_FLAP_FREQUENCY_SCALE;
+      const flapFrequency = FClassSimulator.FLAG_FLAP_FREQUENCY_BASE + windSpeedMph * FClassSimulator.FLAG_FLAP_FREQUENCY_SCALE;
       flag.flapPhase += flapFrequency * 2 * Math.PI * deltaTime;
 
       // Update flag geometry with flapping
-      this.updateFlagGeometry(flag, flag.currentAngle, flag.currentDirection, windSpeedMph);
+      this.updateFlagVertices(flag, flag.currentAngle, flag.currentDirection, windSpeedMph);
     }
   }
 
-  updateFlagGeometry(flag, angleDeg, direction, windSpeedMph)
+
+  updateFlagVertices(flag, angleDeg, direction, windSpeedMph)
   {
     // Update all segments with flapping animation for thick flag
-    const halfBase = ThreeJSGame.FLAG_BASE_WIDTH / 2;
-    const halfTip = ThreeJSGame.FLAG_TIP_WIDTH / 2;
-    const length = ThreeJSGame.FLAG_LENGTH;
-    const thickness = 0.05; // Same as in createFlagGeometry
+    // Uses helper method for position calculations
     const numSegments = 5;
-
-    // Convert angle from degrees to radians
-    const angleRad = angleDeg * Math.PI / 180;
 
     // Get the position attribute from the geometry
     const positions = flag.flagGeometry.attributes.position.array;
 
-    // Calculate flag's local coordinate system
-    // The flag extends in the direction of the wind, then ripples perpendicular to that
-    const cosDir = Math.cos(direction);
-    const sinDir = Math.sin(direction);
-    const cosPitch = Math.cos(angleRad);
-    const sinPitch = Math.sin(angleRad);
-
     // Update each segment (4 vertices per segment: 2 front + 2 back)
     for (let i = 0; i < numSegments; i++)
     {
-      const t = i / (numSegments - 1); // 0 to 1 from base to tip
-
-      // Interpolate width from base to tip
-      const halfWidth = halfBase + (halfTip - halfBase) * t;
-
-      // Base position along flag (before flapping)
-      const segmentX = sinPitch * length * t * cosDir;
-      const segmentY = sinPitch * length * t * sinDir;
-      const segmentZ = -cosPitch * length * t; // Negative because hanging down
-
-      // Calculate flapping offset
-      // Wave travels along the flag, amplitude increases from base to tip
-      const wavePosition = t * ThreeJSGame.FLAG_WAVE_LENGTH;
-      const waveOffset = Math.sin(flag.flapPhase + wavePosition * 2 * Math.PI) * ThreeJSGame.FLAG_FLAP_AMPLITUDE;
-      const flapAmplitude = waveOffset * t; // Scale from 0 at base to full at tip
-
-      // Flapping is perpendicular to the flag surface
-      // Calculate perpendicular direction (cross product of flag direction and up vector)
-      const perpX = -sinDir;
-      const perpY = cosDir;
-      const perpZ = 0;
-
-      // Apply flapping offset
-      const flapX = perpX * flapAmplitude;
-      const flapY = perpY * flapAmplitude;
-      const flapZ = perpZ * flapAmplitude;
+      // Get positions using helper method with actual wind parameters
+      const segmentPositions = this.calculateFlagSegmentPosition(i, angleDeg, direction, flag.flapPhase);
 
       // Update all 4 vertices for this segment (front and back faces)
       const idx = i * 4; // 4 vertices per segment
 
       // Front face vertices (positive X)
-      positions[idx * 3 + 0] = segmentX + flapX + thickness / 2; // Top front X
-      positions[idx * 3 + 1] = segmentY + flapY; // Top front Y
-      positions[idx * 3 + 2] = segmentZ + flapZ + halfWidth; // Top front Z
+      positions[idx * 3 + 0] = segmentPositions.topFront[0]; // Top front X
+      positions[idx * 3 + 1] = segmentPositions.topFront[1]; // Top front Y
+      positions[idx * 3 + 2] = segmentPositions.topFront[2]; // Top front Z
 
-      positions[(idx + 1) * 3 + 0] = segmentX + flapX + thickness / 2; // Bottom front X
-      positions[(idx + 1) * 3 + 1] = segmentY + flapY; // Bottom front Y
-      positions[(idx + 1) * 3 + 2] = segmentZ + flapZ - halfWidth; // Bottom front Z
+      positions[(idx + 1) * 3 + 0] = segmentPositions.bottomFront[0]; // Bottom front X
+      positions[(idx + 1) * 3 + 1] = segmentPositions.bottomFront[1]; // Bottom front Y
+      positions[(idx + 1) * 3 + 2] = segmentPositions.bottomFront[2]; // Bottom front Z
 
       // Back face vertices (negative X)
-      positions[(idx + 2) * 3 + 0] = segmentX + flapX - thickness / 2; // Top back X
-      positions[(idx + 2) * 3 + 1] = segmentY + flapY; // Top back Y
-      positions[(idx + 2) * 3 + 2] = segmentZ + flapZ + halfWidth; // Top back Z
+      positions[(idx + 2) * 3 + 0] = segmentPositions.topBack[0]; // Top back X
+      positions[(idx + 2) * 3 + 1] = segmentPositions.topBack[1]; // Top back Y
+      positions[(idx + 2) * 3 + 2] = segmentPositions.topBack[2]; // Top back Z
 
-      positions[(idx + 3) * 3 + 0] = segmentX + flapX - thickness / 2; // Bottom back X
-      positions[(idx + 3) * 3 + 1] = segmentY + flapY; // Bottom back Y
-      positions[(idx + 3) * 3 + 2] = segmentZ + flapZ - halfWidth; // Bottom back Z
+      positions[(idx + 3) * 3 + 0] = segmentPositions.bottomBack[0]; // Bottom back X
+      positions[(idx + 3) * 3 + 1] = segmentPositions.bottomBack[1]; // Bottom back Y
+      positions[(idx + 3) * 3 + 2] = segmentPositions.bottomBack[2]; // Bottom back Z
     }
 
     // Mark the geometry as needing an update
@@ -1754,7 +1785,7 @@ class ThreeJSGame
 
   updateTargetAnimations(gameTime)
   {
-    const deltaTime = 1 / 60; // Assume 60 FPS for consistent animation
+    const deltaTime = 1 / FClassSimulator.ASSUMED_FPS; // Assume 60 FPS for consistent animation
 
     for (let i = 0; i < this.targetFrames.length; i++)
     {
@@ -1765,7 +1796,7 @@ class ThreeJSGame
       if (targetFrame.animating)
       {
         const direction = Math.sign(targetFrame.targetHeightGoal - targetFrame.currentHeight);
-        const moveDistance = ThreeJSGame.TARGET_ANIMATION_SPEED * deltaTime * direction;
+        const moveDistance = FClassSimulator.TARGET_ANIMATION_SPEED * deltaTime * direction;
         const newHeight = targetFrame.currentHeight + moveDistance;
 
         // Check if we've reached or passed the goal
@@ -1792,7 +1823,7 @@ class ThreeJSGame
     }
 
     // Random demo behavior - every ~3-5 seconds, pick a random target
-    if (Math.random() < ThreeJSGame.RANDOM_ANIMATION_CHANCE)
+    if (Math.random() < FClassSimulator.RANDOM_ANIMATION_CHANCE)
     { // ~1% chance per frame at 60fps = ~every 1.7 seconds
       const randomTarget = Math.floor(Math.random() * this.targetFrames.length) + 1;
       const target = this.targetFrames[randomTarget - 1];
@@ -1831,21 +1862,21 @@ class ThreeJSGame
     }
 
     const target = this.targetFrames[targetNumber - 1];
-    target.targetHeightGoal = ThreeJSGame.TARGET_MAX_HEIGHT;
+    target.targetHeightGoal = FClassSimulator.TARGET_MAX_HEIGHT;
     target.animating = true;
   }
 
   lowerTarget(targetNumber)
   {
     const target = this.targetFrames[targetNumber - 1];
-    target.targetHeightGoal = ThreeJSGame.TARGET_MIN_HEIGHT;
+    target.targetHeightGoal = FClassSimulator.TARGET_MIN_HEIGHT;
     target.animating = true;
   }
 
   halfMastTarget(targetNumber)
   {
     const target = this.targetFrames[targetNumber - 1];
-    target.targetHeightGoal = ThreeJSGame.TARGET_HALF_MAST;
+    target.targetHeightGoal = FClassSimulator.TARGET_HALF_MAST;
     target.animating = true;
   }
 
@@ -1854,7 +1885,7 @@ class ThreeJSGame
     // Calculate pan speed that slows down linearly with magnification
     // At 2x mag: full speed, at 100x mag: 1/50th speed
     const speedFactor = 2.0 / this.spottingScopeMagnification; // 2x = 1.0, 100x = 0.02
-    const panSpeed = ThreeJSGame.SPOTTING_SCOPE_PAN_SPEED * deltaTime * speedFactor;
+    const panSpeed = FClassSimulator.SPOTTING_SCOPE_PAN_SPEED * deltaTime * speedFactor;
 
     // W/S: adjust pitch (tilt up/down)
     // W = tilt up (positive pitch)
@@ -1874,14 +1905,14 @@ class ThreeJSGame
     if (this.spottingScopeKeys.e)
     {
       this.spottingScopeMagnification = Math.min(
-        ThreeJSGame.SPOTTING_SCOPE_MAX_MAGNIFICATION,
+        FClassSimulator.SPOTTING_SCOPE_MAX_MAGNIFICATION,
         this.spottingScopeMagnification * Math.pow(1.1, deltaTime * 10) // 10% increase per second
       );
     }
     if (this.spottingScopeKeys.q)
     {
       this.spottingScopeMagnification = Math.max(
-        ThreeJSGame.SPOTTING_SCOPE_MIN_MAGNIFICATION,
+        FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION,
         this.spottingScopeMagnification / Math.pow(1.1, deltaTime * 10) // 10% decrease per second
       );
     }
@@ -1891,13 +1922,13 @@ class ThreeJSGame
     this.spottingScopeYaw = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, this.spottingScopeYaw));
 
     // Update scope camera FOV based on current magnification
-    const scopeFOV = ThreeJSGame.CAMERA_FOV / this.spottingScopeMagnification;
+    const scopeFOV = FClassSimulator.CAMERA_FOV / this.spottingScopeMagnification;
     this.spottingScopeCamera.fov = scopeFOV;
     this.spottingScopeCamera.updateProjectionMatrix();
 
     // Apply rotation to scope camera
     // Start from main camera position and orientation
-    const targetCenterHeight = ThreeJSGame.PITS_HEIGHT + ThreeJSGame.TARGET_GAP_ABOVE_PITS + 1;
+    const targetCenterHeight = FClassSimulator.PITS_HEIGHT + FClassSimulator.TARGET_GAP_ABOVE_PITS + 1;
     this.spottingScopeCamera.position.copy(this.camera.position);
     this.spottingScopeCamera.up.set(0, 0, 1);
 
@@ -1926,7 +1957,7 @@ class ThreeJSGame
     }
 
     // Calculate angular movement in radians from MOA
-    const moaIncrement = ThreeJSGame.RIFLE_SCOPE_PAN_SPEED; // 0.1 MOA per key press
+    const moaIncrement = FClassSimulator.RIFLE_SCOPE_PAN_SPEED; // 0.1 MOA per key press
     const angularIncrement = moaIncrement * (Math.PI / 180) / 60; // Convert MOA to radians
 
     // Arrow keys: adjust pitch and yaw (per key press, not per frame)
@@ -1978,7 +2009,7 @@ class ThreeJSGame
     if (!this.rifleScopeCamera) return;
 
     // Recalculate FOV based on current zoom level
-    const targetFrameWidth = ThreeJSGame.TARGET_SIZE; // yards
+    const targetFrameWidth = FClassSimulator.TARGET_SIZE; // yards
     const fovRadians = Math.atan((this.rifleScopeZoom * targetFrameWidth) / this.distance);
     const fovDegrees = fovRadians * 180 / Math.PI;
 
@@ -1990,7 +2021,7 @@ class ThreeJSGame
   }
 
 
-  // ===== SHOT FIRING METHODS =====
+  // ===== BALLISTICS & SHOOTING =====
 
   /**
    * Setup ballistic system with zeroing
@@ -2072,7 +2103,7 @@ class ThreeJSGame
       return {
         x: this.distance,
         y: 0,
-        z: ThreeJSGame.TARGET_CENTER_HEIGHT
+        z: FClassSimulator.TARGET_CENTER_HEIGHT
       };
     }
 
@@ -2189,6 +2220,8 @@ class ThreeJSGame
     return zeroedBullet;
   }
 
+  // ===== UI & DISPLAY =====
+
   /**
    * Display a 1" red marker for the last shot
    */
@@ -2241,14 +2274,14 @@ class ThreeJSGame
     const xCount = this.match ? this.match.getXCount() : 0;
 
     // Update shot count and score (F-Class match is 60 shots)
-    if (shotCount >= 60)
+    if (shotCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
     {
-      this.hudElements.shots.textContent = '60/60 (Complete!)';
+      this.hudElements.shots.textContent = `${FClassSimulator.FCLASS_MATCH_SHOTS}/${FClassSimulator.FCLASS_MATCH_SHOTS} (Complete!)`;
       this.hudElements.shots.style.color = '#28a745'; // Green for complete
     }
     else
     {
-      this.hudElements.shots.textContent = `${shotCount}/60`;
+      this.hudElements.shots.textContent = `${shotCount}/${FClassSimulator.FCLASS_MATCH_SHOTS}`;
       this.hudElements.shots.style.color = ''; // Reset color
     }
     this.hudElements.score.textContent = `${totalScore}-${xCount}x`;
@@ -2351,9 +2384,9 @@ class ThreeJSGame
 
     // Check if match is complete (60 shots for F-Class)
     const currentShots = this.match ? this.match.getHitCount() : 0;
-    if (currentShots >= 60)
+    if (currentShots >= FClassSimulator.FCLASS_MATCH_SHOTS)
     {
-      console.log('Match complete! 60 shots fired. Please restart to start a new match.');
+      console.log(`Match complete! ${FClassSimulator.FCLASS_MATCH_SHOTS} shots fired. Please restart to start a new match.`);
       return;
     }
 
@@ -2484,7 +2517,7 @@ class ThreeJSGame
     const shotGeometry = new THREE.SphereGeometry(this.bulletDiameter / 2, 8, 8);
     const shotMaterial = new THREE.MeshBasicMaterial(
     {
-      color: isX ? 0xffff00 : (score >= 9 ? 0xff0000 : 0xff8800)
+      color: isX ? FClassSimulator.COLOR_X_RING : (score >= FClassSimulator.SCORE_THRESHOLD_RED ? FClassSimulator.COLOR_HIGH_SCORE : FClassSimulator.COLOR_LOW_SCORE)
     });
     const shotMesh = new THREE.Mesh(shotGeometry, shotMaterial);
 
@@ -2551,7 +2584,174 @@ class ThreeJSGame
     });
   }
 
+  // ===== BULLET ANIMATION =====
+
+  createBulletGlowTexture()
+  {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+
+    // Create radial gradient for motion blur effect
+    const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)'); // Very faint white center
+    gradient.addColorStop(0.2, 'rgba(200, 200, 200, 0.2)'); // Light gray
+    gradient.addColorStop(0.5, 'rgba(150, 150, 150, 0.1)'); // Faint gray
+    gradient.addColorStop(0.8, 'rgba(100, 100, 100, 0.05)'); // Very faint
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Transparent edge
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 128, 128);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
+  }
+
+  startBulletAnimation()
+  {
+    if (!this.lastTrajectory)
+      return;
+
+    if (!this.bulletMaterial)
+    {
+      // Copper color: #B87333 (RGB: 184, 115, 51)
+      this.bulletMaterial = new THREE.MeshBasicMaterial(
+      {
+        color: new THREE.Color(0.722, 0.451, 0.200), // Copper color
+        toneMapped: false
+      });
+    }
+
+    if (!this.bulletGeometry)
+    {
+      // Use actual bullet diameter from UI parameters
+      const radiusYards = btk.Conversions.inchesToYards(this.bulletDiameter) / 2.0;
+      this.bulletGeometry = new THREE.SphereGeometry(radiusYards, 16, 16);
+    }
+
+    if (!this.bulletMesh)
+    {
+      this.bulletMesh = new THREE.Mesh(this.bulletGeometry, this.bulletMaterial);
+      this.bulletMesh.castShadow = true;
+      this.bulletMesh.receiveShadow = false;
+      this.scene.add(this.bulletMesh);
+    }
+
+    // Create pressure wave glow sprite
+    if (!this.bulletGlowSprite)
+    {
+      const glowTexture = this.createBulletGlowTexture();
+      const glowMaterial = new THREE.SpriteMaterial(
+      {
+        map: glowTexture,
+        transparent: true,
+        blending: THREE.NormalBlending, // Subtle blur instead of bright glow
+        depthWrite: false
+      });
+      this.bulletGlowSprite = new THREE.Sprite(glowMaterial);
+      // Make blur larger for motion trail effect
+      const glowSize = btk.Conversions.inchesToYards(this.bulletDiameter) * 15.0;
+      this.bulletGlowSprite.scale.set(glowSize, glowSize, 1);
+      this.scene.add(this.bulletGlowSprite);
+    }
+
+    // Make bullet and glow visible for new animation
+    this.bulletMesh.visible = true;
+    this.bulletGlowSprite.visible = true;
+
+    // Animation state
+    const totalTimeS = this.lastTrajectory.getTotalTime();
+    this.bulletAnim = {
+      totalTimeS,
+      startTimeMs: performance.now()
+    };
+
+    // Initialize position at t=0
+    const optPoint0 = this.lastTrajectory.atTime(0);
+    if (optPoint0 !== undefined)
+    {
+      const p0 = optPoint0.getState().getPosition();
+      const x = btk.Conversions.metersToYards(p0.x);
+      const y = btk.Conversions.metersToYards(p0.y);
+      const z = btk.Conversions.metersToYards(p0.z);
+      this.bulletMesh.position.set(x, y, z);
+    }
+  }
+
+  updateBulletAnimation()
+  {
+    if (!this.bulletAnim || !this.bulletMesh || !this.lastTrajectory) return;
+
+    // Compute elapsed time (1x real-time)
+    const now = performance.now();
+    const elapsedRealS = (now - this.bulletAnim.startTimeMs) / 1000.0;
+    let t = elapsedRealS;
+    if (t >= this.bulletAnim.totalTimeS)
+    {
+      // Clamp to end and stop animating; keep bullet at impact for a brief time
+      t = this.bulletAnim.totalTimeS;
+    }
+
+    const optPoint = this.lastTrajectory.atTime(t);
+    if (optPoint !== undefined)
+    {
+      const pos = optPoint.getState().getPosition();
+      const x = btk.Conversions.metersToYards(pos.x);
+      const y = btk.Conversions.metersToYards(pos.y);
+      const z = btk.Conversions.metersToYards(pos.z);
+      this.bulletMesh.position.set(x, y, z);
+      this.bulletGlowSprite.position.set(x, y, z);
+    }
+
+    // End animation when time reaches total
+    if (t >= this.bulletAnim.totalTimeS)
+    {
+      // Hide bullet mesh, glow, and end animation
+      this.bulletMesh.visible = false;
+      this.bulletGlowSprite.visible = false;
+
+      // Process shot completion: score hit, show marker, update HUD
+      if (this.pendingShotData)
+      {
+        const data = this.pendingShotData;
+
+        // NOW score the hit (add to match)
+        const hit = this.match.addHit(data.relativeX, data.relativeY, this.btkTarget, data.bulletDiameterMeters);
+
+        // Show the shot marker (convert to yards for display)
+        const relativeXYards = btk.Conversions.metersToYards(data.relativeX);
+        const relativeYYards = btk.Conversions.metersToYards(data.relativeY);
+        this.displayLastShotMarker(relativeXYards, relativeYYards);
+
+        // Update HUD with shot data
+        this.lastShotData = {
+          score: hit.getScore(),
+          isX: hit.isX(),
+          mvFps: data.mvFps,
+          impactVelocityFps: data.impactVelocityFps
+        };
+        this.updateHUD();
+
+        // Check if match is complete (60 shots)
+        if (this.match.getHitCount() >= FClassSimulator.FCLASS_MATCH_SHOTS)
+        {
+          this.showMatchCompleteNotification();
+        }
+
+        // Log the final results
+        console.log(`Shot ${this.match.getHitCount()}: Score=${hit.getScore()}${hit.isX() ? 'x' : ''}, Impact=(${btk.Conversions.metersToInches(data.relativeX).toFixed(2)}", ${btk.Conversions.metersToInches(data.relativeY).toFixed(2)}")`);
+        console.log(`Match: ${this.match.getTotalScore()}-${this.match.getXCount()}x, Group=${btk.Conversions.metersToInches(this.match.getGroupSize()).toFixed(2)}"`);
+
+        this.pendingShotData = null;
+      }
+
+      this.bulletAnim = null;
+    }
+  }
+
   // ===== CLEANUP =====
+
   destroy()
   {
     this.stop();
@@ -2566,6 +2766,7 @@ class ThreeJSGame
       this.scene.remove(flagMesh.pole);
       this.scene.remove(flagMesh.flagMesh);
     }
+
 
     // Clean up shot markers
     this.clearShotMarkers();
@@ -2639,171 +2840,6 @@ class ThreeJSGame
 
 
 
-// ===== Bullet Animation Helpers =====
-
-ThreeJSGame.prototype.createBulletGlowTexture = function()
-{
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-
-  // Create radial gradient for motion blur effect
-  const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)'); // Very faint white center
-  gradient.addColorStop(0.2, 'rgba(200, 200, 200, 0.2)'); // Light gray
-  gradient.addColorStop(0.5, 'rgba(150, 150, 150, 0.1)'); // Faint gray
-  gradient.addColorStop(0.8, 'rgba(100, 100, 100, 0.05)'); // Very faint
-  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Transparent edge
-
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 128, 128);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  return texture;
-};
-
-ThreeJSGame.prototype.startBulletAnimation = function()
-{
-  if (!this.lastTrajectory)
-    return;
-
-  if (!this.bulletMaterial)
-  {
-    // Copper color: #B87333 (RGB: 184, 115, 51)
-    this.bulletMaterial = new THREE.MeshBasicMaterial(
-    {
-      color: new THREE.Color(0.722, 0.451, 0.200), // Copper color
-      toneMapped: false
-    });
-  }
-
-  if (!this.bulletGeometry)
-  {
-    // Use actual bullet diameter from UI parameters
-    const radiusYards = btk.Conversions.inchesToYards(this.bulletDiameter) / 2.0;
-    this.bulletGeometry = new THREE.SphereGeometry(radiusYards, 16, 16);
-  }
-
-  if (!this.bulletMesh)
-  {
-    this.bulletMesh = new THREE.Mesh(this.bulletGeometry, this.bulletMaterial);
-    this.bulletMesh.castShadow = true;
-    this.bulletMesh.receiveShadow = false;
-    this.scene.add(this.bulletMesh);
-  }
-
-  // Create pressure wave glow sprite
-  if (!this.bulletGlowSprite)
-  {
-    const glowTexture = this.createBulletGlowTexture();
-    const glowMaterial = new THREE.SpriteMaterial(
-    {
-      map: glowTexture,
-      transparent: true,
-      blending: THREE.NormalBlending, // Subtle blur instead of bright glow
-      depthWrite: false
-    });
-    this.bulletGlowSprite = new THREE.Sprite(glowMaterial);
-    // Make blur larger for motion trail effect
-    const glowSize = btk.Conversions.inchesToYards(this.bulletDiameter) * 15.0;
-    this.bulletGlowSprite.scale.set(glowSize, glowSize, 1);
-    this.scene.add(this.bulletGlowSprite);
-  }
-
-  // Make bullet and glow visible for new animation
-  this.bulletMesh.visible = true;
-  this.bulletGlowSprite.visible = true;
-
-  // Animation state
-  const totalTimeS = this.lastTrajectory.getTotalTime();
-  this.bulletAnim = {
-    totalTimeS,
-    startTimeMs: performance.now()
-  };
-
-  // Initialize position at t=0
-  const optPoint0 = this.lastTrajectory.atTime(0);
-  if (optPoint0 !== undefined)
-  {
-    const p0 = optPoint0.getState().getPosition();
-    const x = btk.Conversions.metersToYards(p0.x);
-    const y = btk.Conversions.metersToYards(p0.y);
-    const z = btk.Conversions.metersToYards(p0.z);
-    this.bulletMesh.position.set(x, y, z);
-  }
-};
-
-ThreeJSGame.prototype.updateBulletAnimation = function()
-{
-  if (!this.bulletAnim || !this.bulletMesh || !this.lastTrajectory) return;
-
-  // Compute elapsed time (1x real-time)
-  const now = performance.now();
-  const elapsedRealS = (now - this.bulletAnim.startTimeMs) / 1000.0;
-  let t = elapsedRealS;
-  if (t >= this.bulletAnim.totalTimeS)
-  {
-    // Clamp to end and stop animating; keep bullet at impact for a brief time
-    t = this.bulletAnim.totalTimeS;
-  }
-
-  const optPoint = this.lastTrajectory.atTime(t);
-  if (optPoint !== undefined)
-  {
-    const pos = optPoint.getState().getPosition();
-    const x = btk.Conversions.metersToYards(pos.x);
-    const y = btk.Conversions.metersToYards(pos.y);
-    const z = btk.Conversions.metersToYards(pos.z);
-    this.bulletMesh.position.set(x, y, z);
-    this.bulletGlowSprite.position.set(x, y, z);
-  }
-
-  // End animation when time reaches total
-  if (t >= this.bulletAnim.totalTimeS)
-  {
-    // Hide bullet mesh, glow, and end animation
-    this.bulletMesh.visible = false;
-    this.bulletGlowSprite.visible = false;
-
-    // Process shot completion: score hit, show marker, update HUD
-    if (this.pendingShotData)
-    {
-      const data = this.pendingShotData;
-
-      // NOW score the hit (add to match)
-      const hit = this.match.addHit(data.relativeX, data.relativeY, this.btkTarget, data.bulletDiameterMeters);
-
-      // Show the shot marker (convert to yards for display)
-      const relativeXYards = btk.Conversions.metersToYards(data.relativeX);
-      const relativeYYards = btk.Conversions.metersToYards(data.relativeY);
-      this.displayLastShotMarker(relativeXYards, relativeYYards);
-
-      // Update HUD with shot data
-      this.lastShotData = {
-        score: hit.getScore(),
-        isX: hit.isX(),
-        mvFps: data.mvFps,
-        impactVelocityFps: data.impactVelocityFps
-      };
-      this.updateHUD();
-
-      // Check if match is complete (60 shots)
-      if (this.match.getHitCount() >= 60)
-      {
-        this.showMatchCompleteNotification();
-      }
-
-      // Log the final results
-      console.log(`Shot ${this.match.getHitCount()}: Score=${hit.getScore()}${hit.isX() ? 'x' : ''}, Impact=(${btk.Conversions.metersToInches(data.relativeX).toFixed(2)}", ${btk.Conversions.metersToInches(data.relativeY).toFixed(2)}")`);
-      console.log(`Match: ${this.match.getTotalScore()}-${this.match.getXCount()}x, Group=${btk.Conversions.metersToInches(this.match.getGroupSize()).toFixed(2)}"`);
-
-      this.pendingShotData = null;
-    }
-
-    this.bulletAnim = null;
-  }
-};
 
 
 // Help menu functionality
