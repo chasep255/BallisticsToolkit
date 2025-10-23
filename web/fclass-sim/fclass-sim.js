@@ -302,114 +302,97 @@ class FClassSimulator
   // ===== CONSTRUCTOR & INITIALIZATION =====
   constructor(canvas, params = {})
   {
+    // ===== CORE STATE =====
     this.canvas = canvas;
     this.isRunning = false;
     this.animationId = null;
 
-    // Game parameters as instance properties
+    // Game parameters
     this.distance = params.distance || 1000;
     this.target = params.target || 'MR-1FCA';
     this.windPreset = params.windPreset || 'Calm';
 
-    // Game time tracking
+    // Time tracking
     this.gameStartTime = 0;
-    this.time = 0;
-
-    // FPS tracking
     this.lastTime = 0;
     this.frameCount = 0;
     this.fps = 0;
 
-    // Three.js setup
+    // ===== THREE.JS CORE =====
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87ceeb); // Sky blue background
+    this.scene.background = new THREE.Color(0x87ceeb);
 
-    // Renderer with logarithmic depth buffer for better precision at long range
-    this.renderer = new THREE.WebGLRenderer(
-    {
-      canvas,
-      antialias: true,
-      logarithmicDepthBuffer: true // Better depth precision for 1000+ yard distances
-    });
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    // Read locked canvas dimensions (locked once on page load)
+    // Renderer setup
     this.canvasWidth = parseInt(canvas.dataset.lockedWidth) || canvas.clientWidth;
     this.canvasHeight = parseInt(canvas.dataset.lockedHeight) || canvas.clientHeight;
-    console.log(`Game using canvas dimensions: ${this.canvasWidth}x${this.canvasHeight}`);
-
-
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.setSize(this.canvasWidth, this.canvasHeight);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.autoClear = false; // We'll clear manually
+    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+    this.renderer.autoClear = false;
 
-    // Create 2D overlay canvas
+    // Animation clock and cached time values
+    this.clock = new THREE.Clock();
+    this.currentAbsTime = 0;
+    this.currentDeltaTime = 0;
+
+    // Geometry cache for reuse
+    this._geoBoxCache = {};
+
+    // ===== OVERLAY SYSTEM =====
     this.overlayCanvas = document.createElement('canvas');
     this.overlayCanvas.width = this.canvasWidth;
     this.overlayCanvas.height = this.canvasHeight;
     this.overlayCtx = this.overlayCanvas.getContext('2d');
     this.overlayTexture = new THREE.CanvasTexture(this.overlayCanvas);
 
-    // Create overlay scene with single full-screen quad
     this.overlayScene = new THREE.Scene();
     this.overlayCamera = new THREE.OrthographicCamera(
       -this.canvasWidth / 2, this.canvasWidth / 2,
-      this.canvasHeight / 2, -this.canvasHeight / 2,
-      0, 10
+      this.canvasHeight / 2, -this.canvasHeight / 2, 0, 10
     );
     this.overlayCamera.position.z = 1;
 
-    // Single full-screen mesh for overlay
     const overlayGeom = new THREE.PlaneGeometry(this.canvasWidth, this.canvasHeight);
-    const overlayMat = new THREE.MeshBasicMaterial(
-    {
-      map: this.overlayTexture,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false
+    const overlayMat = new THREE.MeshBasicMaterial({
+      map: this.overlayTexture, transparent: true, depthTest: false, depthWrite: false, toneMapped: false
     });
     this.overlayMesh = new THREE.Mesh(overlayGeom, overlayMat);
     this.overlayMesh.frustumCulled = false;
-    this.overlayMesh.renderOrder = 10; // Render on top of scope view meshes
+    this.overlayMesh.renderOrder = 10;
     this.overlayScene.add(this.overlayMesh);
 
-    // Create spotting scope overlay
-    this.createSpottingScopeOverlay();
-    this.createScopeViewMesh();
-
-    // No resize handler needed - canvas size is completely locked
-
-    // Wind generator
+    // ===== WIND & ENVIRONMENT =====
     this.windGenerator = null;
-
-    // Wind flag properties
     this.flagMeshes = [];
     this.flagPositions = [];
 
-    // Target animation properties
+    // ===== TARGETS =====
     this.targetFrames = [];
     this.targetAnimationTime = 0;
-    this.targetAnimationSpeed = 2.0; // cycles per second
+    this.targetAnimationSpeed = 2.0;
 
-    // ===== SHOT FIRING =====
-    this.ballisticSimulator = null; // btk.Simulator
-    this.match = null; // btk.Match
-    this.btkTarget = null; // btk.Target object
-    this.bullet = null; // btk.Bullet
+    // ===== BALLISTICS & SHOOTING =====
+    this.ballisticSimulator = null;
+    this.match = null;
+    this.btkTarget = null;
+    this.bullet = null;
     this.bulletDiameter = 0;
-    this.zeroedBullet = null; // Zeroed initial state
-    this.nominalMV = 0; // Store nominal MV for variations (fps)
-    this.mvSd = 0; // Store MV standard deviation (fps)
-    this.rifleAccuracyMoa = 0; // Store rifle accuracy (MOA)
-    this.lastShotMarker = null; // Red marker for last shot
+    this.zeroedBullet = null;
+    this.nominalMV = 0;
+    this.mvSd = 0;
+    this.rifleAccuracyMoa = 0;
+    this.lastShotMarker = null;
 
-    // Audio system
+    // ===== AUDIO =====
     this.audioContext = null;
     this.shotSound = null;
     this.audioMuted = false;
 
-    // HUD elements
+    // ===== HUD =====
     this.hudElements = {
       container: document.getElementById('shotHud'),
       shots: document.getElementById('hudShots'),
@@ -420,22 +403,39 @@ class FClassSimulator
       impactV: document.getElementById('hudImpactV')
     };
 
-    // Setup camera, lighting, and range
+    // ===== SCENE SETUP =====
     this.setupCamera();
     this.setupLighting();
     this.setupRange();
+
+    // ===== SCOPES =====
+    this.createSpottingScopeOverlay();
+    this.createScopeViewMesh();
     this.createRifleScopeOverlay();
     this.createRifleScopeViewMesh();
+
+    // ===== INPUT =====
     this.setupSpottingScopeControls();
     this.setupRifleScopeControls();
     this.setupShotFiringControls();
 
-    // Initialize
+    // ===== INITIALIZATION =====
     this.createWindGenerator();
     this.createWindFlags();
     this.initializeAudio();
 
     console.log('F-Class Simulator initialized');
+  }
+
+  // ===== TIME ACCESSORS =====
+  getTime()
+  {
+    return this.currentAbsTime;
+  }
+
+  getDeltaTime()
+  {
+    return this.currentDeltaTime;
   }
 
   // ===== AUDIO SYSTEM =====
@@ -512,6 +512,29 @@ class FClassSimulator
   }
 
   // ===== SCOPE SYSTEM =====
+
+  createCircularMaskTexture(size)
+  {
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = size;
+    maskCanvas.height = size;
+    const maskCtx = maskCanvas.getContext('2d');
+
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2 - 5;
+
+    maskCtx.fillStyle = 'black';
+    maskCtx.fillRect(0, 0, size, size);
+
+    maskCtx.fillStyle = 'white';
+    maskCtx.beginPath();
+    maskCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    maskCtx.fill();
+
+    const maskTexture = new THREE.CanvasTexture(maskCanvas);
+    return maskTexture;
+  }
 
   createSpottingScopeOverlay()
   {
@@ -624,26 +647,7 @@ class FClassSimulator
     const overlayY = canvasH / 2 - (y + size / 2); // Flip Y coordinate and offset by half size
 
     // Create circular mask texture
-    const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = size;
-    maskCanvas.height = size;
-    const maskCtx = maskCanvas.getContext('2d');
-
-    const cx = size / 2;
-    const cy = size / 2;
-    const r = size / 2 - 5;
-
-    // Black background (transparent)
-    maskCtx.fillStyle = 'black';
-    maskCtx.fillRect(0, 0, size, size);
-
-    // White circle (visible)
-    maskCtx.fillStyle = 'white';
-    maskCtx.beginPath();
-    maskCtx.arc(cx, cy, r, 0, Math.PI * 2);
-    maskCtx.fill();
-
-    const maskTexture = new THREE.CanvasTexture(maskCanvas);
+    const maskTexture = this.createCircularMaskTexture(size);
 
     // Create scope view mesh
     const scopeGeom = new THREE.PlaneGeometry(size, size);
@@ -679,26 +683,7 @@ class FClassSimulator
     const rifleScopeOverlayY = canvasH / 2 - (rifleScopeY + rifleScopeSize / 2);
 
     // Create circular mask texture for rifle scope
-    const rifleScopeMaskCanvas = document.createElement('canvas');
-    rifleScopeMaskCanvas.width = rifleScopeSize;
-    rifleScopeMaskCanvas.height = rifleScopeSize;
-    const rifleScopeMaskCtx = rifleScopeMaskCanvas.getContext('2d');
-
-    const rifleScopeCx = rifleScopeSize / 2;
-    const rifleScopeCy = rifleScopeSize / 2;
-    const rifleScopeR = rifleScopeSize / 2 - 5;
-
-    // Black background (transparent)
-    rifleScopeMaskCtx.fillStyle = 'black';
-    rifleScopeMaskCtx.fillRect(0, 0, rifleScopeSize, rifleScopeSize);
-
-    // White circle (visible)
-    rifleScopeMaskCtx.fillStyle = 'white';
-    rifleScopeMaskCtx.beginPath();
-    rifleScopeMaskCtx.arc(rifleScopeCx, rifleScopeCy, rifleScopeR, 0, Math.PI * 2);
-    rifleScopeMaskCtx.fill();
-
-    const rifleScopeMaskTexture = new THREE.CanvasTexture(rifleScopeMaskCanvas);
+    const rifleScopeMaskTexture = this.createCircularMaskTexture(rifleScopeSize);
 
     // Create rifle scope view mesh
     const rifleScopeGeom = new THREE.PlaneGeometry(rifleScopeSize, rifleScopeSize);
@@ -972,6 +957,8 @@ class FClassSimulator
 
     // Create Three.js texture with proper wrapping
     const texture = new THREE.CanvasTexture(canvas);
+    const maxAniso = this.renderer.capabilities.getMaxAnisotropy?.() || 1;
+    texture.anisotropy = maxAniso;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(4, 4); // Reduced repeats to avoid visible seams
@@ -1029,195 +1016,45 @@ class FClassSimulator
   setupSpottingScopeControls()
   {
     // Initialize scope key states
-    this.spottingScopeKeys = {
-      w: false,
-      a: false,
-      s: false,
-      d: false,
-      e: false,
-      q: false
-    };
+    this.spottingScopeKeys = { w: false, a: false, s: false, d: false, e: false, q: false };
 
-    // Add keyboard event listeners for scope controls
-    this.spottingScopeKeyDownHandler = (event) =>
+    // Unified key handler for spotting scope
+    this.spottingScopeKeyHandler = (event) =>
     {
-      // Only handle scope keys if no modifier keys are pressed
-      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey)
-      {
-        return; // Let browser handle shortcuts
-      }
-
+      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
+      const isKeyDown = (event.type === 'keydown');
       const key = event.key.toLowerCase();
-      if (key === 'w')
+      if (key === 'w' || key === 'a' || key === 's' || key === 'd' || key === 'e' || key === 'q')
       {
-        this.spottingScopeKeys.w = true;
-        event.preventDefault(); // Prevent page scrolling
+        this.spottingScopeKeys[key] = isKeyDown;
+        event.preventDefault();
       }
-      else if (key === 'a')
-      {
-        this.spottingScopeKeys.a = true;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (key === 's')
-      {
-        this.spottingScopeKeys.s = true;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (key === 'd')
-      {
-        this.spottingScopeKeys.d = true;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (key === 'e')
-      {
-        this.spottingScopeKeys.e = true;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (key === 'q')
-      {
-        this.spottingScopeKeys.q = true;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      // All other keys pass through to browser normally
     };
 
-    this.spottingScopeKeyUpHandler = (event) =>
-    {
-      // Only handle scope keys if no modifier keys are pressed
-      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey)
-      {
-        return; // Let browser handle shortcuts
-      }
-
-      const key = event.key.toLowerCase();
-      if (key === 'w')
-      {
-        this.spottingScopeKeys.w = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (key === 'a')
-      {
-        this.spottingScopeKeys.a = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (key === 's')
-      {
-        this.spottingScopeKeys.s = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (key === 'd')
-      {
-        this.spottingScopeKeys.d = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (key === 'e')
-      {
-        this.spottingScopeKeys.e = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (key === 'q')
-      {
-        this.spottingScopeKeys.q = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      // All other keys pass through to browser normally
-    };
-
-    // Add event listeners
-    document.addEventListener('keydown', this.spottingScopeKeyDownHandler);
-    document.addEventListener('keyup', this.spottingScopeKeyUpHandler);
+    document.addEventListener('keydown', this.spottingScopeKeyHandler);
+    document.addEventListener('keyup', this.spottingScopeKeyHandler);
   }
 
   setupRifleScopeControls()
   {
     // Initialize rifle scope key states
-    this.rifleScopeKeys = {
-      up: false,
-      down: false,
-      left: false,
-      right: false
-    };
+    this.rifleScopeKeys = { up: false, down: false, left: false, right: false };
 
-    // Add keyboard event listeners for rifle scope controls (arrow keys)
-    this.rifleScopeKeyDownHandler = (event) =>
+    // Unified key handler for rifle scope
+    this.rifleScopeKeyHandler = (event) =>
     {
-      // Only handle scope 2 keys if no modifier keys are pressed
-      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey)
-      {
-        return; // Let browser handle shortcuts
-      }
-
-      if (event.key === 'ArrowUp')
-      {
-        this.rifleScopeKeys.up = true;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (event.key === 'ArrowDown')
-      {
-        this.rifleScopeKeys.down = true;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (event.key === 'ArrowLeft')
-      {
-        this.rifleScopeKeys.left = true;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (event.key === 'ArrowRight')
-      {
-        this.rifleScopeKeys.right = true;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (event.key === '+' || event.key === '=')
-      {
-        // Zoom in (decrease FOV multiplier)
-        this.rifleScopeZoom = Math.max(FClassSimulator.RIFLE_SCOPE_ZOOM_MIN, this.rifleScopeZoom - FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
-        this.updateRifleScopeZoom();
-        event.preventDefault();
-      }
-      else if (event.key === '-' || event.key === '_')
-      {
-        // Zoom out (increase FOV multiplier)
-        this.rifleScopeZoom = Math.min(FClassSimulator.RIFLE_SCOPE_ZOOM_MAX, this.rifleScopeZoom + FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
-        this.updateRifleScopeZoom();
-        event.preventDefault();
-      }
-      // All other keys pass through to browser normally
+      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
+      const isKeyDown = (event.type === 'keydown');
+      if (event.key === 'ArrowUp') { this.rifleScopeKeys.up = isKeyDown; event.preventDefault(); }
+      else if (event.key === 'ArrowDown') { this.rifleScopeKeys.down = isKeyDown; event.preventDefault(); }
+      else if (event.key === 'ArrowLeft') { this.rifleScopeKeys.left = isKeyDown; event.preventDefault(); }
+      else if (event.key === 'ArrowRight') { this.rifleScopeKeys.right = isKeyDown; event.preventDefault(); }
+      else if (isKeyDown && (event.key === '+' || event.key === '=')) { this.rifleScopeZoom = Math.max(FClassSimulator.RIFLE_SCOPE_ZOOM_MIN, this.rifleScopeZoom - FClassSimulator.RIFLE_SCOPE_ZOOM_STEP); this.updateRifleScopeZoom(); event.preventDefault(); }
+      else if (isKeyDown && (event.key === '-' || event.key === '_')) { this.rifleScopeZoom = Math.min(FClassSimulator.RIFLE_SCOPE_ZOOM_MAX, this.rifleScopeZoom + FClassSimulator.RIFLE_SCOPE_ZOOM_STEP); this.updateRifleScopeZoom(); event.preventDefault(); }
     };
 
-    this.rifleScopeKeyUpHandler = (event) =>
-    {
-      // Only handle rifle scope keys if no modifier keys are pressed
-      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey)
-      {
-        return; // Let browser handle shortcuts
-      }
-
-      if (event.key === 'ArrowUp')
-      {
-        this.rifleScopeKeys.up = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (event.key === 'ArrowDown')
-      {
-        this.rifleScopeKeys.down = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (event.key === 'ArrowLeft')
-      {
-        this.rifleScopeKeys.left = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      else if (event.key === 'ArrowRight')
-      {
-        this.rifleScopeKeys.right = false;
-        event.preventDefault(); // Prevent page scrolling
-      }
-      // All other keys pass through to browser normally
-    };
-
-    // Add event listeners
-    document.addEventListener('keydown', this.rifleScopeKeyDownHandler);
-    document.addEventListener('keyup', this.rifleScopeKeyUpHandler);
+    document.addEventListener('keydown', this.rifleScopeKeyHandler);
+    document.addEventListener('keyup', this.rifleScopeKeyHandler);
   }
 
   // ===== RANGE SETUP =====
@@ -1234,6 +1071,7 @@ class FClassSimulator
     const brownGround = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
     brownGround.position.set(rangeLength / 2, 0, -0.1); // Center it downrange, slightly lower
     brownGround.receiveShadow = true; // Enable shadow receiving on ground
+    brownGround.matrixAutoUpdate = false; brownGround.updateMatrix();
     this.scene.add(brownGround);
 
     // Add a range plane - just the shooting lanes with grass texture
@@ -1256,10 +1094,13 @@ class FClassSimulator
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.position.set(rangeLength / 2, 0, 0); // Center it downrange
     ground.receiveShadow = true; // Enable shadow receiving on grass
+    ground.matrixAutoUpdate = false; ground.updateMatrix();
     this.scene.add(ground);
 
     // Add pits at the end of the range
-    const pitsGeometry = new THREE.BoxGeometry(FClassSimulator.PITS_DEPTH, FClassSimulator.RANGE_LANE_WIDTH, FClassSimulator.PITS_HEIGHT);
+    if (!this._geoBoxCache) this._geoBoxCache = {};
+    const pitsBoxKey = `${FClassSimulator.PITS_DEPTH}|${FClassSimulator.RANGE_LANE_WIDTH}|${FClassSimulator.PITS_HEIGHT}`;
+    const pitsGeometry = this._geoBoxCache[pitsBoxKey] || (this._geoBoxCache[pitsBoxKey] = new THREE.BoxGeometry(FClassSimulator.PITS_DEPTH, FClassSimulator.RANGE_LANE_WIDTH, FClassSimulator.PITS_HEIGHT));
     const pitsMaterial = new THREE.MeshStandardMaterial(
     {
       color: 0x8b7355
@@ -1272,7 +1113,7 @@ class FClassSimulator
 
     // Position pits at rangeLength - PITS_OFFSET to obscure targets when lowered
     pits.position.set(rangeLength - FClassSimulator.PITS_OFFSET + FClassSimulator.PITS_DEPTH / 2, 0, FClassSimulator.PITS_HEIGHT / 2);
-    this.scene.add(pits);
+    pits.matrixAutoUpdate = false; this.scene.add(pits); pits.updateMatrix();
 
     // Add target frames above the pits
     this.setupTargets(rangeLength);
@@ -1299,7 +1140,8 @@ class FClassSimulator
 
     for (let i = 0; i < maxTargets; i++)
     {
-      const targetGeometry = new THREE.BoxGeometry(0.1, targetSize, targetSize); // Thin frame facing up
+      const targetBoxKey = `0.1|${targetSize}|${targetSize}`;
+      const targetGeometry = this._geoBoxCache[targetBoxKey] || (this._geoBoxCache[targetBoxKey] = new THREE.BoxGeometry(0.1, targetSize, targetSize)); // Thin frame facing up
       const targetMaterial = new THREE.MeshStandardMaterial(
       {
         map: targetTexture
@@ -1313,7 +1155,7 @@ class FClassSimulator
       // Position target at exact distance for accurate ballistic simulation - left to right (positive Y to negative Y)
       const yPos = startY - i * totalTargetWidth;
       target.position.set(rangeLength, yPos, targetHeight);
-      this.scene.add(target);
+      target.matrixAutoUpdate = false; this.scene.add(target); target.updateMatrix();
 
       // Store target frame for animation
       this.targetFrames.push(
@@ -1329,7 +1171,7 @@ class FClassSimulator
 
       // Add white target number box 0.2 yards above the target with number texture
       // Target 1 is at i=0 (leftmost position)
-      const numberGeometry = new THREE.BoxGeometry(0.1, targetSize, targetSize);
+      const numberGeometry = targetGeometry; // reuse same thin box geometry
       const numberTexture = this.createNumberTexture(i + 1);
       const numberMaterial = new THREE.MeshStandardMaterial(
       {
@@ -1343,7 +1185,7 @@ class FClassSimulator
       numberBox.receiveShadow = true;
 
       numberBox.position.set(rangeLength, yPos, targetHeight + targetSize + 0.2); // 0.2 yards above target
-      this.scene.add(numberBox);
+      numberBox.matrixAutoUpdate = false; this.scene.add(numberBox); numberBox.updateMatrix();
 
       // Store number box reference for animation
       this.targetFrames[i].numberBox = numberBox;
@@ -1501,32 +1343,23 @@ class FClassSimulator
   // ===== RENDERING =====
   render()
   {
-    // Calculate game time and FPS
-    const currentTime = performance.now();
-    this.time = (currentTime - this.gameStartTime) / 1000; // Game time in seconds
+    // Update cached time values once per frame
+    this.currentDeltaTime = Math.min(0.05, Math.max(0.0005, this.clock.getDelta())); // clamp 0.5ms-50ms
+    this.currentAbsTime = this.clock.getElapsedTime();
     this.frameCount++;
-
-    if (currentTime - this.lastTime >= 1000)
-    {
-      this.fps = this.frameCount;
-      this.frameCount = 0;
-      this.lastTime = currentTime;
-      // FPS logging removed for cleaner output
-    }
 
     // Update bullet animation (if any)
     this.updateBulletAnimation();
 
     // Update and render flags
-    this.updateFlags(this.time);
+    this.updateFlags();
 
     // Update target frame animations
-    this.updateTargetAnimations(this.time);
+    this.updateTargetAnimations();
 
     // Update scope camera orientations
-    const deltaTime = 1 / FClassSimulator.ASSUMED_FPS; // Assume 60 FPS for consistent updates
-    this.updateSpottingScopeCamera(deltaTime);
-    this.updateRifleScopeCamera(deltaTime);
+    this.updateSpottingScopeCamera();
+    this.updateRifleScopeCamera();
 
 
     // 1) Render main scene first
@@ -1534,13 +1367,10 @@ class FClassSimulator
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
 
-    // 2) Render scene to scope RT
+    // 2) Render scene to scope RTs
     this.renderer.setRenderTarget(this.spottingScopeRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.spottingScopeCamera);
-    this.renderer.setRenderTarget(null);
-
-    // 2b) Render scene to scope 2 RT
     this.renderer.setRenderTarget(this.rifleScopeRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.rifleScopeCamera);
@@ -1561,8 +1391,8 @@ class FClassSimulator
   {
     if (this.isRunning) return;
 
+    this.clock.start();
     this.gameStartTime = performance.now();
-    this.time = 0;
 
     // Setup ballistic system for shot firing
     try
@@ -1602,6 +1432,7 @@ class FClassSimulator
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
+    if (this.clock) this.clock.stop();
 
     // Hide HUD
     if (this.hudElements.container)
@@ -1624,7 +1455,8 @@ class FClassSimulator
 
     for (let yds = FClassSimulator.POLE_INTERVAL; yds < maxDistance; yds += FClassSimulator.POLE_INTERVAL)
     {
-      const poleGeometry = new THREE.BoxGeometry(FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_HEIGHT);
+      const poleBoxKey = `${FClassSimulator.POLE_THICKNESS}|${FClassSimulator.POLE_THICKNESS}|${FClassSimulator.POLE_HEIGHT}`;
+      const poleGeometry = this._geoBoxCache[poleBoxKey] || (this._geoBoxCache[poleBoxKey] = new THREE.BoxGeometry(FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_HEIGHT));
       const poleMaterial = new THREE.MeshStandardMaterial(
       {
         color: 0x808080
@@ -1679,12 +1511,10 @@ class FClassSimulator
 
 
 
-  updateFlags(gameTime)
+  updateFlags()
   {
-    this.time = gameTime;
-
     // Smooth interpolation speed (radians per second for direction, degrees per second for angle)
-    const deltaTime = 1 / FClassSimulator.ASSUMED_FPS; // Assume 60 FPS
+    const deltaTime = this.getDeltaTime();
     const angleSpeed = FClassSimulator.FLAG_ANGLE_INTERPOLATION_SPEED; // degrees per second
     const directionSpeed = FClassSimulator.FLAG_DIRECTION_INTERPOLATION_SPEED; // radians per second
 
@@ -1698,7 +1528,7 @@ class FClassSimulator
       const x_m = btk.Conversions.yardsToMeters(pos.x);
       const y_m = btk.Conversions.yardsToMeters(pos.y);
       const z_m = btk.Conversions.yardsToMeters(pos.z);
-      const t_s = this.time;
+      const t_s = this.getTime();
 
       // Get wind vector at this position and time
       const windVector = this.windGenerator.sample(x_m, t_s);
@@ -1783,9 +1613,9 @@ class FClassSimulator
     flag.flagGeometry.computeVertexNormals();
   }
 
-  updateTargetAnimations(gameTime)
+  updateTargetAnimations()
   {
-    const deltaTime = 1 / FClassSimulator.ASSUMED_FPS; // Assume 60 FPS for consistent animation
+    const deltaTime = this.getDeltaTime();
 
     for (let i = 0; i < this.targetFrames.length; i++)
     {
@@ -1880,8 +1710,9 @@ class FClassSimulator
     target.animating = true;
   }
 
-  updateSpottingScopeCamera(deltaTime)
+  updateSpottingScopeCamera()
   {
+    const deltaTime = this.getDeltaTime();
     // Calculate pan speed that slows down linearly with magnification
     // At 2x mag: full speed, at 100x mag: 1/50th speed
     const speedFactor = 2.0 / this.spottingScopeMagnification; // 2x = 1.0, 100x = 0.02
@@ -1947,7 +1778,7 @@ class FClassSimulator
    * Pan movement is 0.1 inches linear at target distance
    * Pitch/yaw are clamped to target frame boundaries
    */
-  updateRifleScopeCamera(deltaTime)
+  updateRifleScopeCamera()
   {
     // Check if user target exists
     if (!this.userTarget)
@@ -2463,7 +2294,7 @@ class FClassSimulator
 
       // Simulate with wind generator
       const rangeMeters = btk.Conversions.yardsToMeters(range);
-      const trajectory = this.ballisticSimulator.simulateWithWind(rangeMeters, dt, 3.0, this.windGenerator, this.time);
+      const trajectory = this.ballisticSimulator.simulateWithWind(rangeMeters, dt, 3.0, this.windGenerator, this.getTime());
       // Store for animation
       this.lastTrajectory = trajectory;
       const pointAtTarget = trajectory.atDistance(rangeMeters);
@@ -2797,50 +2628,62 @@ class FClassSimulator
     if (this.spottingScopeRenderTarget)
     {
       this.spottingScopeRenderTarget.dispose();
+      this.spottingScopeRenderTarget = null;
     }
     if (this.rifleScopeRenderTarget)
     {
       this.rifleScopeRenderTarget.dispose();
+      this.rifleScopeRenderTarget = null;
     }
     if (this.overlayTexture)
     {
       this.overlayTexture.dispose();
+      this.overlayTexture = null;
     }
     if (this.overlayMesh)
     {
       this.overlayMesh.geometry.dispose();
       this.overlayMesh.material.dispose();
+      if (this.overlayScene) this.overlayScene.remove(this.overlayMesh);
+      this.overlayMesh = null;
     }
     if (this.spottingScopeViewMesh)
     {
       this.spottingScopeViewMesh.geometry.dispose();
       this.spottingScopeViewMesh.material.dispose();
+      if (this.overlayScene) this.overlayScene.remove(this.spottingScopeViewMesh);
+      this.spottingScopeViewMesh = null;
     }
     if (this.rifleScopeViewMesh)
     {
       this.rifleScopeViewMesh.geometry.dispose();
       this.rifleScopeViewMesh.material.dispose();
+      if (this.overlayScene) this.overlayScene.remove(this.rifleScopeViewMesh);
+      this.rifleScopeViewMesh = null;
     }
 
     // Remove scope keyboard event listeners
-    if (this.spottingScopeKeyDownHandler)
+    if (this.spottingScopeKeyHandler)
     {
-      document.removeEventListener('keydown', this.spottingScopeKeyDownHandler);
+      document.removeEventListener('keydown', this.spottingScopeKeyHandler);
     }
-    if (this.spottingScopeKeyUpHandler)
+    if (this.spottingScopeKeyHandler)
     {
-      document.removeEventListener('keyup', this.spottingScopeKeyUpHandler);
+      document.removeEventListener('keyup', this.spottingScopeKeyHandler);
     }
-    if (this.rifleScopeKeyDownHandler)
+    if (this.rifleScopeKeyHandler)
     {
-      document.removeEventListener('keydown', this.rifleScopeKeyDownHandler);
+      document.removeEventListener('keydown', this.rifleScopeKeyHandler);
     }
-    if (this.rifleScopeKeyUpHandler)
+    if (this.rifleScopeKeyHandler)
     {
-      document.removeEventListener('keyup', this.rifleScopeKeyUpHandler);
+      document.removeEventListener('keyup', this.rifleScopeKeyHandler);
     }
 
     this.renderer.dispose();
+    this.scene = null;
+    this.overlayScene = null;
+    this.renderer = null;
   }
 }
 
