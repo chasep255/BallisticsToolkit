@@ -664,7 +664,7 @@ class FClassSimulator
   static FLAG_BASE_WIDTH = 60 / 36; // 60 inches = 1.67 yards (larger flags)
   static FLAG_TIP_WIDTH = 24 / 36; // 24 inches = 0.67 yards (larger flags)
   static FLAG_LENGTH = 16 / 3; // 16 feet = 5.33 yards (longer flags)
-  static FLAG_THICKNESS = 0.05; 
+  static FLAG_THICKNESS = 0.05;
   static FLAG_MIN_ANGLE = 1; // degrees from vertical
   static FLAG_MAX_ANGLE = 90; // degrees from vertical
   static FLAG_DEGREES_PER_MPH = (90 - 1) / 20; // (max - min) / 20 mph = 4 degrees per mph
@@ -799,6 +799,9 @@ class FClassSimulator
     this.targetAnimationTime = 0;
     this.targetAnimationSpeed = 2.0;
 
+    // Target animation state tracking
+    this.targetAnimationStates = []; // Array of {isUp: bool, timeInState: number, maxDownTime: number}
+
     // ===== BALLISTICS & SHOOTING =====
     this.ballisticSimulator = null;
     this.match = null;
@@ -831,6 +834,11 @@ class FClassSimulator
     this.setupCamera();
     this.setupLighting();
     this.setupRange();
+
+    // ===== SCENERY =====
+    this.createMountains();
+    this.createClouds();
+    this.createForestBackdrop();
 
     // ===== COMPOSITION SETUP =====
     this.createMainViewQuad();
@@ -1009,7 +1017,7 @@ class FClassSimulator
 
     // Create spotting scope camera (use current magnification)
     const scopeFOV = FClassSimulator.CAMERA_FOV / 4; // initial 4x, matches this.spottingScopeMagnification
-    this.spottingScopeCamera = new THREE.PerspectiveCamera(scopeFOV, 1.0, 0.5, this.distance * 1.5);
+    this.spottingScopeCamera = new THREE.PerspectiveCamera(scopeFOV, 1.0, 0.5, 2500);
     this.spottingScopeCamera.position.set(0, FClassSimulator.CAMERA_EYE_HEIGHT, 1); // At shooter, slightly behind
     this.spottingScopeCamera.up.set(0, 1, 0); // Y is up
     this.spottingScopeCamera.lookAt(0, FClassSimulator.CAMERA_EYE_HEIGHT, -this.distance); // Look downrange
@@ -1054,7 +1062,7 @@ class FClassSimulator
     const fovDegrees = fovRadians * 180 / Math.PI;
 
     // Create rifle scope camera
-    this.rifleScopeCamera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.5, this.distance * 1.5);
+    this.rifleScopeCamera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.5, 2500);
     this.rifleScopeCamera.position.set(0, FClassSimulator.CAMERA_EYE_HEIGHT, 0); // At muzzle
     this.rifleScopeCamera.up.set(0, 1, 0); // Y is up
 
@@ -1499,8 +1507,8 @@ class FClassSimulator
     // Camera: Standard Three.js coords (X=right, Y=up, Z=towards camera, -Z=downrange)
     const aspect = this.canvasWidth / this.canvasHeight;
     // Use logarithmic depth buffer for better precision at long range
-    // Near plane at 0.5 yards, far plane well beyond target
-    this.camera = new THREE.PerspectiveCamera(FClassSimulator.CAMERA_FOV, aspect, 0.5, this.distance * 1.5);
+    // Near plane at 0.5 yards, far plane extended to 2500 yards for clouds/scenery
+    this.camera = new THREE.PerspectiveCamera(FClassSimulator.CAMERA_FOV, aspect, 0.5, 2500);
     // Camera positioned 1 yard behind shooter, at target center height
     const targetCenterHeight = FClassSimulator.TARGET_CENTER_HEIGHT;
     this.camera.position.set(0, targetCenterHeight, 1); // At shooter position (Z=1, slightly behind muzzle)
@@ -1633,9 +1641,9 @@ class FClassSimulator
   setupRange()
   {
     const rangeLength = this.distance; // yards
-    // Add brown ground that's wider than the range
+    const groundLength = rangeLength + 500;
     // PlaneGeometry(width, height) - after rotation: width=X, height=Z
-    const brownGroundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_TOTAL_WIDTH, rangeLength);
+    const brownGroundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_TOTAL_WIDTH * 4, groundLength);
     this.registerResource('geometries', brownGroundGeometry);
     const brownGroundMaterial = new THREE.MeshLambertMaterial(
     {
@@ -1645,7 +1653,7 @@ class FClassSimulator
     this.registerResource('materials', brownGroundMaterial);
     const brownGround = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
     brownGround.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
-    brownGround.position.set(0, -0.1, -rangeLength / 2); // Center downrange (negative Z), slightly below ground
+    brownGround.position.set(0, -0.1, -groundLength / 2); // Center downrange (negative Z), slightly below ground
     brownGround.receiveShadow = true; // Enable shadow receiving on ground
     this.scene.add(brownGround);
     this.registerResource('meshes', brownGround);
@@ -1798,6 +1806,20 @@ class FClassSimulator
     // Store reference to user's target
     this.userTarget = this.targetFrames[centerTargetIndex];
 
+    // Initialize animation states for all targets
+    this.targetAnimationStates = [];
+    for (let i = 0; i < this.targetFrames.length; i++)
+    {
+      this.targetAnimationStates.push(
+      {
+        isUp: true, // Start with all targets up
+        timeInState: 0, // Time in current state (seconds)
+        nextDropTime: Math.random() * 120 + 30 // Random time until next drop (30-150 seconds, avg ~90s)
+      });
+    }
+
+    console.log(`Initialized ${this.targetAnimationStates.length} target animation states`);
+
   }
 
   // ===== TARGET SYSTEM =====
@@ -1923,6 +1945,308 @@ class FClassSimulator
     return texture;
   }
 
+  // ===== SCENERY =====
+
+  createMountains()
+  {
+    // Create mountain peaks at a fixed distance (always visible with extended camera)
+    const mountainCount = 9;
+    const fixedDistance = 2000; // Fixed at 2000 yards from camera (within 2500 yard far plane)
+    const mountainData = [
+    {
+      x: -180,
+      z: -fixedDistance + 200,
+      height: 55,
+      radius: 110
+    },
+    {
+      x: -130,
+      z: -fixedDistance,
+      height: 70,
+      radius: 125
+    },
+    {
+      x: -70,
+      z: -fixedDistance + 250,
+      height: 48,
+      radius: 95
+    },
+    {
+      x: -20,
+      z: -fixedDistance + 100,
+      height: 65,
+      radius: 115
+    },
+    {
+      x: 30,
+      z: -fixedDistance - 50,
+      height: 75,
+      radius: 130
+    },
+    {
+      x: 80,
+      z: -fixedDistance + 300,
+      height: 50,
+      radius: 100
+    },
+    {
+      x: 130,
+      z: -fixedDistance + 120,
+      height: 68,
+      radius: 120
+    },
+    {
+      x: 180,
+      z: -fixedDistance + 200,
+      height: 60,
+      radius: 108
+    },
+    {
+      x: 230,
+      z: -fixedDistance + 80,
+      height: 72,
+      radius: 118
+    }];
+
+    // Create mountain texture (brown base with white snow cap)
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Vertical gradient: brown at bottom, white at top
+    const gradient = ctx.createLinearGradient(0, 256, 0, 0);
+    gradient.addColorStop(0, '#6b5d4f'); // Brown base
+    gradient.addColorStop(0.6, '#8b7d6b'); // Lighter brown
+    gradient.addColorStop(0.8, '#c0c0c0'); // Gray
+    gradient.addColorStop(1, '#ffffff'); // White snow cap
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 256);
+
+    const mountainTexture = new THREE.CanvasTexture(canvas);
+    this.registerResource('textures', mountainTexture);
+
+    // Create mountains
+    for (const data of mountainData)
+    {
+      const geometry = new THREE.ConeGeometry(data.radius, data.height, 8);
+      this.registerResource('geometries', geometry);
+
+      const material = new THREE.MeshLambertMaterial(
+      {
+        map: mountainTexture,
+        side: THREE.FrontSide
+      });
+      this.registerResource('materials', material);
+
+      const mountain = new THREE.Mesh(geometry, material);
+      // Position mountain so base is at or below ground level (Y=0)
+      mountain.position.set(data.x, data.height / 2 - 5, data.z); // Lower by 5 yards to hide sky gap
+      mountain.receiveShadow = true;
+
+      this.scene.add(mountain);
+      this.registerResource('meshes', mountain);
+    }
+  }
+
+  createClouds()
+  {
+    // Create clouds at various positions with varied shapes
+    this.clouds = [];
+
+    const cloudCount = 40; // More clouds for better coverage
+
+    for (let i = 0; i < cloudCount; i++)
+    {
+      // Create fluffy cloud texture with varied shapes
+      const canvas = document.createElement('canvas');
+      canvas.width = 512; // Higher resolution for smoother edges
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      // Draw fluffy cloud shape with multiple overlapping circles
+      ctx.clearRect(0, 0, 512, 256);
+
+      // Randomize cloud shape by varying circle positions and sizes
+      const numCircles = 5 + Math.floor(Math.random() * 4); // 5-8 circles per cloud
+      const cloudCircles = [];
+
+      // Create overlapping circles across the canvas width
+      for (let j = 0; j < numCircles; j++)
+      {
+        const t = j / (numCircles - 1); // 0 to 1
+        cloudCircles.push(
+        {
+          x: 100 + t * 312 + (Math.random() - 0.5) * 60, // Spread across canvas
+          y: 128 + (Math.random() - 0.5) * 80, // Vertical variation
+          r: 40 + Math.random() * 40 // Larger, more varied circles
+        });
+      }
+
+      // Draw with soft gradients to eliminate hard edges
+      cloudCircles.forEach(circle =>
+      {
+        const gradient = ctx.createRadialGradient(circle.x, circle.y, 0, circle.x, circle.y, circle.r);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+        gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.7)');
+        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.3)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)'); // Fade to transparent
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      const cloudTexture = new THREE.CanvasTexture(canvas);
+      this.registerResource('textures', cloudTexture);
+
+      const cloudMaterial = new THREE.SpriteMaterial(
+      {
+        map: cloudTexture,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false // Prevent z-fighting between clouds
+      });
+      this.registerResource('materials', cloudMaterial);
+
+      const cloud = new THREE.Sprite(cloudMaterial);
+
+      // Position clouds in sky - fixed distance range for consistent coverage at all ranges
+      // Camera far plane is at 2500 yards, so we have plenty of room
+      const x = (Math.random() - 0.5) * 600; // -300 to 300 (wide horizontal spread)
+      const y = 120 + Math.random() * 180; // 120 to 300 yards high
+      const z = -(500 + Math.random() * 1500); // 500 to 2000 yards downrange (always visible)
+
+      cloud.position.set(x, y, z);
+
+      // Scale clouds - larger and more varied
+      const scale = 60 + Math.random() * 60; // 60-120 yards wide
+      cloud.scale.set(scale, scale / 2, 1);
+
+      // Store drift velocity
+      const driftSpeed = 0.1 + Math.random() * 0.2; // 0.1-0.3 yards/second
+
+      this.clouds.push(
+      {
+        sprite: cloud,
+        driftSpeed: driftSpeed,
+        startX: x
+      });
+
+      this.scene.add(cloud);
+      this.registerResource('meshes', cloud);
+    }
+  }
+
+  updateClouds()
+  {
+    const deltaTime = this.getDeltaTime();
+
+    for (const cloud of this.clouds)
+    {
+      // Drift clouds to the right
+      cloud.sprite.position.x += cloud.driftSpeed * deltaTime;
+
+      // Wrap around when cloud goes too far right
+      if (cloud.sprite.position.x > 300)
+      {
+        cloud.sprite.position.x = -300;
+      }
+    }
+  }
+
+  createForestBackdrop()
+  {
+    // Create 240 trees: very dense forest along both sides and behind targets
+    const treeCount = 240;
+
+    // Cache tree geometries
+    const trunkGeometries = [];
+    const foliageGeometries = [];
+
+    for (let i = 0; i < 3; i++)
+    {
+      const trunkRadius = 0.2 + i * 0.1;
+      const trunkHeight = 3 + i * 0.5;
+      const trunkGeo = new THREE.CylinderGeometry(trunkRadius, trunkRadius * 1.2, trunkHeight, 8);
+      this.registerResource('geometries', trunkGeo);
+      trunkGeometries.push(trunkGeo);
+
+      const foliageRadius = 2 + i * 0.5;
+      const foliageHeight = 5 + i * 1;
+      const foliageGeo = new THREE.ConeGeometry(foliageRadius, foliageHeight, 8);
+      this.registerResource('geometries', foliageGeo);
+      foliageGeometries.push(foliageGeo);
+    }
+
+    // Create materials
+    const trunkMaterial = new THREE.MeshLambertMaterial(
+    {
+      color: 0x4a3728
+    }); // Brown
+    this.registerResource('materials', trunkMaterial);
+
+    const foliageMaterial = new THREE.MeshLambertMaterial(
+    {
+      color: 0x2d5016
+    }); // Dark green
+    this.registerResource('materials', foliageMaterial);
+
+    for (let i = 0; i < treeCount; i++)
+    {
+      let x, z;
+
+      // 160 trees: very dense forest along both sides of the range
+      // 80 trees: behind the targets
+      if (i < 160)
+      {
+        // Very dense trees along both sides
+        const side = (i % 2 === 0) ? -1 : 1;
+        x = side * (30 + Math.random() * 80); // 30-110 yards from center (very dense)
+        z = -50 - Math.random() * (this.distance + 200); // From -50 to beyond target
+      }
+      else
+      {
+        // Behind targets - very dense backdrop
+        x = (Math.random() - 0.5) * 80; // -40 to 40 yards (wider behind target area)
+        z = -(this.distance + 10 + Math.random() * 120); // 10-130 yards behind targets
+      }
+
+      // Vary tree size
+      const sizeVariant = Math.floor(Math.random() * 3);
+      const trunkGeo = trunkGeometries[sizeVariant];
+      const foliageGeo = foliageGeometries[sizeVariant];
+
+      const height = 8 + Math.random() * 7; // 8-15 yards total
+      const trunkHeight = height * 0.35;
+      const foliageHeight = height * 0.65;
+
+      // Get actual geometry parameters for precise positioning
+      const actualTrunkHeight = 3 + sizeVariant * 0.5;
+      const actualFoliageHeight = 5 + sizeVariant * 1;
+
+      // Create trunk - positioned so bottom is at ground (Y=0)
+      const trunk = new THREE.Mesh(trunkGeo, trunkMaterial);
+      trunk.position.set(x, actualTrunkHeight / 2, z); // Center at half height so bottom is at Y=0
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+      this.scene.add(trunk);
+      this.registerResource('meshes', trunk);
+
+      // Create foliage - positioned so base (widest part of cone) overlaps with top of trunk
+      const foliage = new THREE.Mesh(foliageGeo, foliageMaterial);
+      // Cone geometry: center is at middle, base (widest) is at Y - height/2
+      // Position so foliage base is slightly below trunk top for solid connection
+      foliage.position.set(x, actualTrunkHeight + actualFoliageHeight / 2 - actualFoliageHeight * 0.25, z); // Overlap 25% for solid connection
+      foliage.castShadow = true;
+      foliage.receiveShadow = true;
+      this.scene.add(foliage);
+      this.registerResource('meshes', foliage);
+    }
+  }
+
   // ===== GAME LOOP & LIFECYCLE =====
   createWindGenerator()
   {
@@ -1944,6 +2268,9 @@ class FClassSimulator
 
     // Update and render flags
     this.updateFlags();
+
+    // Update clouds
+    this.updateClouds();
 
     // Update target frame animations
     this.updateTargetAnimations();
@@ -2212,20 +2539,56 @@ class FClassSimulator
     for (let i = 0; i < this.targetFrames.length; i++)
     {
       const targetFrame = this.targetFrames[i];
+      const animationState = this.targetAnimationStates[i];
       const targetSize = 2; // yards
 
-      // If animating, move toward goal
+      // Skip user's target - it stays up
+      if (targetFrame === this.userTarget)
+      {
+        continue;
+      }
+
+      // Update time in current state
+      animationState.timeInState += deltaTime;
+
+      // Handle state transitions
+      if (animationState.isUp)
+      {
+        // Target is up - check if it's time to drop
+        if (animationState.timeInState >= animationState.nextDropTime)
+        {
+          animationState.isUp = false;
+          animationState.timeInState = 0;
+          console.log(`Target ${i + 1} dropping down`);
+        }
+      }
+      else
+      {
+        // Target is down - stay down for 5 seconds then go back up
+        if (animationState.timeInState >= 5.0)
+        {
+          animationState.isUp = true;
+          animationState.timeInState = 0;
+          // Set next random drop time (30-150 seconds, avg ~90s = ~1 minute)
+          animationState.nextDropTime = Math.random() * 120 + 30;
+          console.log(`Target ${i + 1} going back up, next drop in ${animationState.nextDropTime.toFixed(1)}s`);
+        }
+      }
+
+      // Animate to target position
+      const targetHeight = animationState.isUp ? 0 : FClassSimulator.TARGET_MIN_HEIGHT;
+
       if (targetFrame.animating)
       {
-        const direction = Math.sign(targetFrame.targetHeightGoal - targetFrame.currentHeight);
+        const direction = Math.sign(targetHeight - targetFrame.currentHeight);
         const moveDistance = FClassSimulator.TARGET_ANIMATION_SPEED * deltaTime * direction;
         const newHeight = targetFrame.currentHeight + moveDistance;
 
         // Check if we've reached or passed the goal
-        if ((direction > 0 && newHeight >= targetFrame.targetHeightGoal) ||
-          (direction < 0 && newHeight <= targetFrame.targetHeightGoal))
+        if ((direction > 0 && newHeight >= targetHeight) ||
+          (direction < 0 && newHeight <= targetHeight))
         {
-          targetFrame.currentHeight = targetFrame.targetHeightGoal;
+          targetFrame.currentHeight = targetHeight;
           targetFrame.animating = false;
         }
         else
@@ -2233,38 +2596,23 @@ class FClassSimulator
           targetFrame.currentHeight = newHeight;
         }
       }
+      else if (Math.abs(targetFrame.currentHeight - targetHeight) > 0.01)
+      {
+        // Start animating if not at target position
+        console.log(`Target ${i + 1} starting animation from ${targetFrame.currentHeight.toFixed(2)} to ${targetHeight.toFixed(2)}`);
+        targetFrame.targetHeightGoal = targetHeight;
+        targetFrame.animating = true;
+      }
 
       // Update target position (Three.js coords: Y is height)
       targetFrame.mesh.position.y = targetFrame.baseHeight + targetFrame.currentHeight;
+      targetFrame.mesh.updateMatrix(); // Required because matrixAutoUpdate = false
 
       // Update number box position to move with target (Three.js coords: Y is height)
       if (targetFrame.numberBox)
       {
         targetFrame.numberBox.position.y = targetFrame.baseHeight + targetSize + 0.2 + targetFrame.currentHeight;
-      }
-    }
-
-    // Random demo behavior - every ~3-5 seconds, pick a random target
-    if (Math.random() < FClassSimulator.RANDOM_ANIMATION_CHANCE)
-    { // ~1% chance per frame at 60fps = ~every 1.7 seconds
-      const randomTarget = Math.floor(Math.random() * this.targetFrames.length) + 1;
-      const target = this.targetFrames[randomTarget - 1];
-
-      // Don't animate the user's target
-      if (target === this.userTarget)
-      {
-        return;
-      }
-
-      const randomAction = Math.random();
-
-      if (randomAction < 0.5)
-      {
-        this.raiseTarget(randomTarget);
-      }
-      else
-      {
-        this.lowerTarget(randomTarget);
+        targetFrame.numberBox.updateMatrix(); // Required because matrixAutoUpdate = false
       }
     }
   }
