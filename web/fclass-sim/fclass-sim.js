@@ -341,28 +341,28 @@ class FClassSimulator
     // Geometry cache for reuse
     this._geoBoxCache = {};
 
-    // ===== OVERLAY SYSTEM =====
-    this.overlayCanvas = document.createElement('canvas');
-    this.overlayCanvas.width = this.canvasWidth;
-    this.overlayCanvas.height = this.canvasHeight;
-    this.overlayCtx = this.overlayCanvas.getContext('2d');
-    this.overlayTexture = new THREE.CanvasTexture(this.overlayCanvas);
-
-    this.overlayScene = new THREE.Scene();
-    this.overlayCamera = new THREE.OrthographicCamera(
-      -this.canvasWidth / 2, this.canvasWidth / 2,
-      this.canvasHeight / 2, -this.canvasHeight / 2, 0, 10
+    // ===== RENDER TARGETS =====
+    // Main scene render target
+    this.mainSceneRenderTarget = new THREE.WebGLRenderTarget(
+      this.canvasWidth,
+      this.canvasHeight,
+      {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        samples: 4
+      }
     );
-    this.overlayCamera.position.z = 1;
 
-    const overlayGeom = new THREE.PlaneGeometry(this.canvasWidth, this.canvasHeight);
-    const overlayMat = new THREE.MeshBasicMaterial({
-      map: this.overlayTexture, transparent: true, depthTest: false, depthWrite: false, toneMapped: false
-    });
-    this.overlayMesh = new THREE.Mesh(overlayGeom, overlayMat);
-    this.overlayMesh.frustumCulled = false;
-    this.overlayMesh.renderOrder = 10;
-    this.overlayScene.add(this.overlayMesh);
+    // ===== COMPOSITION SYSTEM =====
+    // 2D orthographic scene for compositing all views
+    this.compositionScene = new THREE.Scene();
+    this.compositionCamera = new THREE.OrthographicCamera(
+      -this.canvasWidth / 2, this.canvasWidth / 2,
+      this.canvasHeight / 2, -this.canvasHeight / 2,
+      0, 10
+    );
+    this.compositionCamera.position.z = 5; // Position camera at z=5 to see layers 0-3
 
     // ===== WIND & ENVIRONMENT =====
     this.windGenerator = null;
@@ -407,11 +407,14 @@ class FClassSimulator
     this.setupLighting();
     this.setupRange();
 
-    // ===== SCOPES =====
+    // ===== COMPOSITION SETUP =====
+    this.createMainViewQuad();
     this.createSpottingScopeOverlay();
     this.createScopeViewMesh();
+    this.createSpottingScopeCrosshair();
     this.createRifleScopeOverlay();
     this.createRifleScopeViewMesh();
+    this.createRifleScopeCrosshair();
 
     // ===== INPUT =====
     this.setupSpottingScopeControls();
@@ -535,6 +538,26 @@ class FClassSimulator
     return maskTexture;
   }
 
+  // ===== COMPOSITION SYSTEM =====
+
+  createMainViewQuad()
+  {
+    // Create full-screen quad showing the main scene
+    const geometry = new THREE.PlaneGeometry(this.canvasWidth, this.canvasHeight);
+    const material = new THREE.MeshBasicMaterial({
+      map: this.mainSceneRenderTarget.texture,
+      toneMapped: false,
+      depthTest: false,
+      depthWrite: false
+    });
+    this.mainViewQuad = new THREE.Mesh(geometry, material);
+    this.mainViewQuad.position.set(0, 0, 0);
+    this.mainViewQuad.frustumCulled = false;
+    this.compositionScene.add(this.mainViewQuad);
+  }
+
+  // ===== SCOPE SYSTEM =====
+
   createSpottingScopeOverlay()
   {
     // Add 10px padding on each side to prevent overlap
@@ -556,12 +579,6 @@ class FClassSimulator
     this.spottingScopeX = 10; // 10px padding from left edge
     // Position at bottom of screen with padding
     this.spottingScopeY = this.canvasHeight - scopeSize - 10; // 10px padding from bottom
-
-    // Create a temporary canvas for reading render target pixels
-    this.spottingScopeTempCanvas = document.createElement('canvas');
-    this.spottingScopeTempCanvas.width = renderSize;
-    this.spottingScopeTempCanvas.height = renderSize;
-    this.spottingScopeTempCtx = this.spottingScopeTempCanvas.getContext('2d');
 
     // Create spotting scope camera
     const scopeFOV = FClassSimulator.CAMERA_FOV / FClassSimulator.SCOPE_MAGNIFICATION; // 30° / 4 = 7.5°
@@ -637,13 +654,13 @@ class FClassSimulator
     const x = this.spottingScopeX;
     const y = this.spottingScopeY;
 
-    // Convert screen coordinates to overlay camera coordinates
-    // Overlay camera: left=-canvasW/2, right=canvasW/2, top=canvasH/2, bottom=-canvasH/2
+    // Convert screen coordinates to composition camera coordinates
+    // Composition camera: left=-canvasW/2, right=canvasW/2, top=canvasH/2, bottom=-canvasH/2
     const canvasW = this.canvasWidth;
     const canvasH = this.canvasHeight;
     // Three.js meshes are positioned by center, so offset by half size
-    const overlayX = x + size / 2 - canvasW / 2;
-    const overlayY = canvasH / 2 - (y + size / 2); // Flip Y coordinate and offset by half size
+    const compX = x + size / 2 - canvasW / 2;
+    const compY = canvasH / 2 - (y + size / 2); // Flip Y coordinate and offset by half size
 
     // Create circular mask texture
     const maskTexture = this.createCircularMaskTexture(size);
@@ -661,12 +678,12 @@ class FClassSimulator
     });
 
     this.spottingScopeViewMesh = new THREE.Mesh(scopeGeom, scopeMat);
-    this.spottingScopeViewMesh.position.set(overlayX, overlayY, 0.001); // Convert to overlay coordinates
-    this.spottingScopeViewMesh.renderOrder = 1; // Render before the canvas overlay
+    this.spottingScopeViewMesh.position.set(compX, compY, 1); // Layer 1 for scope views
+    this.spottingScopeViewMesh.renderOrder = 1; // Render after main view but before crosshairs
     this.spottingScopeViewMesh.frustumCulled = false;
 
-    this.overlayScene.add(this.spottingScopeViewMesh);
-    console.log('Scope view mesh created at position:', overlayX, overlayY, 'size:', size);
+    this.compositionScene.add(this.spottingScopeViewMesh);
+    console.log('Spotting scope view mesh created at position:', compX, compY, 'size:', size);
   }
 
   createRifleScopeViewMesh()
@@ -675,11 +692,11 @@ class FClassSimulator
     const rifleScopeX = this.rifleScopeX;
     const rifleScopeY = this.rifleScopeY;
 
-    // Convert screen coordinates to overlay camera coordinates for rifle scope
+    // Convert screen coordinates to composition camera coordinates for rifle scope
     const canvasW = this.canvasWidth;
     const canvasH = this.canvasHeight;
-    const rifleScopeOverlayX = rifleScopeX + rifleScopeSize / 2 - canvasW / 2;
-    const rifleScopeOverlayY = canvasH / 2 - (rifleScopeY + rifleScopeSize / 2);
+    const rifleScopeCompX = rifleScopeX + rifleScopeSize / 2 - canvasW / 2;
+    const rifleScopeCompY = canvasH / 2 - (rifleScopeY + rifleScopeSize / 2);
 
     // Create circular mask texture for rifle scope
     const rifleScopeMaskTexture = this.createCircularMaskTexture(rifleScopeSize);
@@ -697,87 +714,147 @@ class FClassSimulator
     });
 
     this.rifleScopeViewMesh = new THREE.Mesh(rifleScopeGeom, rifleScopeMat);
-    this.rifleScopeViewMesh.position.set(rifleScopeOverlayX, rifleScopeOverlayY, 0.001);
-    this.rifleScopeViewMesh.renderOrder = 1; // Render before the canvas overlay
+    this.rifleScopeViewMesh.position.set(rifleScopeCompX, rifleScopeCompY, 1); // Layer 1 for scope views
+    this.rifleScopeViewMesh.renderOrder = 1; // Render after main view but before crosshairs
     this.rifleScopeViewMesh.frustumCulled = false;
 
-    this.overlayScene.add(this.rifleScopeViewMesh);
-    console.log('Rifle scope view mesh created at position:', rifleScopeOverlayX, rifleScopeOverlayY, 'size:', rifleScopeSize);
-    console.log('Rifle scope view mesh added to overlay scene. Total children:', this.overlayScene.children.length);
+    this.compositionScene.add(this.rifleScopeViewMesh);
+    console.log('Rifle scope view mesh created at position:', rifleScopeCompX, rifleScopeCompY, 'size:', rifleScopeSize);
   }
 
-  drawScopeToCanvas()
+  createSpottingScopeCrosshair()
   {
-    const ctx = this.overlayCtx;
+    // Create simple crosshair texture for spotting scope
+    const size = 1024; // High resolution to avoid blurriness
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
 
-    // Draw first scope border (bottom-left)
-    const size = this.spottingScopeSize;
-    const x = this.spottingScopeX;
-    const y = this.spottingScopeY;
-    const cx = x + size / 2;
-    const cy = y + size / 2;
-    const r = size / 2 - 5;
+    // Clear to transparent
+    ctx.clearRect(0, 0, size, size);
 
-    // Just draw the circular border - scope content will be handled by Three.js mesh
+    // Draw black circular border
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2 - 8; // Closer to edge (just inside for the stroke)
     ctx.strokeStyle = 'black';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 8; // Thinner border
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Draw rifle scope border and crosshair (bottom-right)
-    const rifleScopeSize = this.rifleScopeSize;
-    const rifleScopeX = this.rifleScopeX;
-    const rifleScopeY = this.rifleScopeY;
-    const cx2 = rifleScopeX + rifleScopeSize / 2;
-    const cy2 = rifleScopeY + rifleScopeSize / 2;
-    const r2 = rifleScopeSize / 2 - 5;
+    const texture = new THREE.CanvasTexture(canvas);
+    const scopeSize = this.spottingScopeSize;
+    const x = this.spottingScopeX;
+    const y = this.spottingScopeY;
+    const canvasW = this.canvasWidth;
+    const canvasH = this.canvasHeight;
+    const compX = x + scopeSize / 2 - canvasW / 2;
+    const compY = canvasH / 2 - (y + scopeSize / 2);
 
-    // Draw circular border for rifle scope
+    // Use a plane mesh instead of sprite for proper layering
+    const geometry = new THREE.PlaneGeometry(scopeSize, scopeSize);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+
+    this.spottingScopeCrosshairSprite = new THREE.Mesh(geometry, material);
+    this.spottingScopeCrosshairSprite.position.set(compX, compY, 2);
+    this.spottingScopeCrosshairSprite.renderOrder = 2; // Render after scope views
+    this.spottingScopeCrosshairSprite.frustumCulled = false;
+    this.compositionScene.add(this.spottingScopeCrosshairSprite);
+    console.log('Spotting scope crosshair created at:', compX, compY, 'size:', scopeSize);
+    console.log('Composition scene children:', this.compositionScene.children.length);
+  }
+
+  createRifleScopeCrosshair()
+  {
+    // Create precision reticle texture for rifle scope
+    const size = 1024; // High resolution to match spotting scope
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Clear to transparent
+    ctx.clearRect(0, 0, size, size);
+
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2 - 8; // Closer to edge (just inside for the stroke)
+
+    // Draw black circular border
     ctx.strokeStyle = 'black';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 8; // Thinner border to match spotting scope
     ctx.beginPath();
-    ctx.arc(cx2, cy2, r2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Draw rifle scope crosshair
+    // Draw crosshair
     ctx.strokeStyle = '#808080'; // Medium grey
-    ctx.fillStyle = '#808080'; // Medium grey
-    ctx.lineWidth = 2;
+    ctx.fillStyle = '#808080';
+    ctx.lineWidth = 2; // Thinner crosshair lines
 
-    // Center dot
+    // Center dot (smaller)
     ctx.beginPath();
-    ctx.arc(cx2, cy2, 3, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
     ctx.fill();
 
-    // Horizontal crosshair lines (left and right of center)
-    const crosshairLen = r2 * 0.4; // 40% of radius
-    const gap = 8; // Gap around center dot
+    // Crosshair lines
+    const crosshairLen = r * 0.4;
+    const gap = 12; // Smaller gap around center dot
 
-    // Left horizontal line
+    // Horizontal lines
     ctx.beginPath();
-    ctx.moveTo(cx2 - crosshairLen, cy2);
-    ctx.lineTo(cx2 - gap, cy2);
+    ctx.moveTo(cx - crosshairLen, cy);
+    ctx.lineTo(cx - gap, cy);
     ctx.stroke();
 
-    // Right horizontal line
     ctx.beginPath();
-    ctx.moveTo(cx2 + gap, cy2);
-    ctx.lineTo(cx2 + crosshairLen, cy2);
+    ctx.moveTo(cx + gap, cy);
+    ctx.lineTo(cx + crosshairLen, cy);
     ctx.stroke();
 
-    // Vertical crosshair lines (above and below center)
-    // Top vertical line
+    // Vertical lines
     ctx.beginPath();
-    ctx.moveTo(cx2, cy2 - crosshairLen);
-    ctx.lineTo(cx2, cy2 - gap);
+    ctx.moveTo(cx, cy - crosshairLen);
+    ctx.lineTo(cx, cy - gap);
     ctx.stroke();
 
-    // Bottom vertical line
     ctx.beginPath();
-    ctx.moveTo(cx2, cy2 + gap);
-    ctx.lineTo(cx2, cy2 + crosshairLen);
+    ctx.moveTo(cx, cy + gap);
+    ctx.lineTo(cx, cy + crosshairLen);
     ctx.stroke();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const scopeSize = this.rifleScopeSize;
+    const x = this.rifleScopeX;
+    const y = this.rifleScopeY;
+    const canvasW = this.canvasWidth;
+    const canvasH = this.canvasHeight;
+    const compX = x + scopeSize / 2 - canvasW / 2;
+    const compY = canvasH / 2 - (y + scopeSize / 2);
+
+    // Use a plane mesh instead of sprite for proper layering
+    const geometry = new THREE.PlaneGeometry(scopeSize, scopeSize);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+
+    this.rifleScopeCrosshairSprite = new THREE.Mesh(geometry, material);
+    this.rifleScopeCrosshairSprite.position.set(compX, compY, 2);
+    this.rifleScopeCrosshairSprite.renderOrder = 2; // Render after scope views
+    this.rifleScopeCrosshairSprite.frustumCulled = false;
+    this.compositionScene.add(this.rifleScopeCrosshairSprite);
   }
 
   // ===== FLAG SYSTEM =====
@@ -1360,30 +1437,26 @@ class FClassSimulator
     this.updateSpottingScopeCamera();
     this.updateRifleScopeCamera();
 
-
-    // 1) Render main scene first
-    this.renderer.setRenderTarget(null);
+    // 4-pass rendering architecture:
+    // 1) Render main scene to texture
+    this.renderer.setRenderTarget(this.mainSceneRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
 
-    // 2) Render scene to scope RTs
+    // 2) Render spotting scope to texture
     this.renderer.setRenderTarget(this.spottingScopeRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.spottingScopeCamera);
+
+    // 3) Render rifle scope to texture
     this.renderer.setRenderTarget(this.rifleScopeRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.rifleScopeCamera);
+
+    // 4) Composite everything to screen
     this.renderer.setRenderTarget(null);
-
-    // 3) Composite overlay canvas (after scope RT is ready)
-    this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-    this.drawScopeToCanvas(); // Just draws the border
-    // Future: this.drawWindIndicator(), this.drawScoreDisplay(), etc.
-    this.overlayTexture.needsUpdate = true;
-
-    // 4) Render overlay on top (clear depth only, not color)
-    this.renderer.clearDepth();
-    this.renderer.render(this.overlayScene, this.overlayCamera);
+    this.renderer.clear();
+    this.renderer.render(this.compositionScene, this.compositionCamera);
   }
 
   async start()
@@ -2670,7 +2743,12 @@ class FClassSimulator
     }
     this._geoBoxCache = {};
 
-    // Clean up scope resources
+    // Clean up render targets
+    if (this.mainSceneRenderTarget)
+    {
+      this.mainSceneRenderTarget.dispose();
+      this.mainSceneRenderTarget = null;
+    }
     if (this.spottingScopeRenderTarget)
     {
       this.spottingScopeRenderTarget.dispose();
@@ -2681,38 +2759,59 @@ class FClassSimulator
       this.rifleScopeRenderTarget.dispose();
       this.rifleScopeRenderTarget = null;
     }
-    if (this.overlayTexture)
+
+    // Clean up composition scene resources
+    if (this.mainViewQuad)
     {
-      this.overlayTexture.dispose();
-      this.overlayTexture = null;
-    }
-    if (this.overlayMesh)
-    {
-      this.overlayMesh.geometry.dispose();
-      this.overlayMesh.material.dispose();
-      if (this.overlayScene) this.overlayScene.remove(this.overlayMesh);
-      this.overlayMesh = null;
+      this.mainViewQuad.geometry.dispose();
+      this.mainViewQuad.material.dispose();
+      if (this.compositionScene) this.compositionScene.remove(this.mainViewQuad);
+      this.mainViewQuad = null;
     }
     if (this.spottingScopeViewMesh)
     {
       this.spottingScopeViewMesh.geometry.dispose();
       this.spottingScopeViewMesh.material.dispose();
-      if (this.overlayScene) this.overlayScene.remove(this.spottingScopeViewMesh);
+      if (this.spottingScopeViewMesh.material.alphaMap)
+      {
+        this.spottingScopeViewMesh.material.alphaMap.dispose();
+      }
+      if (this.compositionScene) this.compositionScene.remove(this.spottingScopeViewMesh);
       this.spottingScopeViewMesh = null;
     }
     if (this.rifleScopeViewMesh)
     {
       this.rifleScopeViewMesh.geometry.dispose();
       this.rifleScopeViewMesh.material.dispose();
-      if (this.overlayScene) this.overlayScene.remove(this.rifleScopeViewMesh);
+      if (this.rifleScopeViewMesh.material.alphaMap)
+      {
+        this.rifleScopeViewMesh.material.alphaMap.dispose();
+      }
+      if (this.compositionScene) this.compositionScene.remove(this.rifleScopeViewMesh);
       this.rifleScopeViewMesh = null;
+    }
+    if (this.spottingScopeCrosshairSprite)
+    {
+      this.spottingScopeCrosshairSprite.geometry.dispose();
+      this.spottingScopeCrosshairSprite.material.map.dispose();
+      this.spottingScopeCrosshairSprite.material.dispose();
+      if (this.compositionScene) this.compositionScene.remove(this.spottingScopeCrosshairSprite);
+      this.spottingScopeCrosshairSprite = null;
+    }
+    if (this.rifleScopeCrosshairSprite)
+    {
+      this.rifleScopeCrosshairSprite.geometry.dispose();
+      this.rifleScopeCrosshairSprite.material.map.dispose();
+      this.rifleScopeCrosshairSprite.material.dispose();
+      if (this.compositionScene) this.compositionScene.remove(this.rifleScopeCrosshairSprite);
+      this.rifleScopeCrosshairSprite = null;
     }
 
     // Clean up cameras
     this.camera = null;
     this.spottingScopeCamera = null;
     this.rifleScopeCamera = null;
-    this.overlayCamera = null;
+    this.compositionCamera = null;
 
     // Clean up audio
     if (this.audioContext)
@@ -2776,7 +2875,7 @@ class FClassSimulator
     // Dispose renderer and scenes
     this.renderer.dispose();
     this.scene = null;
-    this.overlayScene = null;
+    this.compositionScene = null;
     this.renderer = null;
     this.clock = null;
   }
