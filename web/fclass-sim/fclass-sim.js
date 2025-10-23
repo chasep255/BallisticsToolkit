@@ -18,7 +18,7 @@ let webglGame = null;
 // ===== BTK WRAPPERS (TRANSPARENT COORDINATE/UNIT CONVERSION) =====
 
 /**
- * Wraps BTK Vector3 - appears as standard Three.js coords in yards
+ * Wraps BTK Vector3 for POSITIONS - appears as standard Three.js coords in yards
  * BTK: X=downrange(m), Y=crossrange-right(m), Z=up(m)
  * Three.js: X=right(yd), Y=up(yd), Z=towards-camera(yd) [negative Z = downrange]
  */
@@ -33,7 +33,7 @@ class BtkVector3Wrapper {
       const btkX_m = btk.Conversions.yardsToMeters(-z);  // Three Z → BTK X (downrange)
       const btkY_m = btk.Conversions.yardsToMeters(x_yd); // Three X → BTK Y (crossrange)
       const btkZ_m = btk.Conversions.yardsToMeters(y);   // Three Y → BTK Z (up)
-      this._btk = new btk.Vector3(btkX_m, btkY_m, btkZ_m);
+      this._btk = new btk.Vector3D(btkX_m, btkY_m, btkZ_m);
     }
   }
   
@@ -42,8 +42,59 @@ class BtkVector3Wrapper {
   get y() { return btk.Conversions.metersToYards(this._btk.z); }  // BTK Z → Three Y
   get z() { return btk.Conversions.metersToYards(-this._btk.x); } // BTK -X → Three Z
   
+  set x(x_yd) { this._btk.y = btk.Conversions.yardsToMeters(x_yd); }
+  set y(y_yd) { this._btk.z = btk.Conversions.yardsToMeters(y_yd); }
+  set z(z_yd) { this._btk.x = btk.Conversions.yardsToMeters(-z_yd); }
+  
   toThreeVector3() {
     return new THREE.Vector3(this.x, this.y, this.z);
+  }
+  
+  // Set from Three.js Vector3
+  setFromThreeVector3(vec3) {
+    this.x = vec3.x;
+    this.y = vec3.y;
+    this.z = vec3.z;
+    return this;
+  }
+  
+  get raw() { return this._btk; } // For passing to BTK functions
+  delete() { if (this._btk?.delete) this._btk.delete(); }
+}
+
+/**
+ * Wraps BTK Vector3 for VELOCITIES - appears as standard Three.js coords in fps
+ * BTK: X=downrange(m/s), Y=crossrange-right(m/s), Z=up(m/s)
+ * Three.js: X=right(fps), Y=up(fps), Z=towards-camera(fps) [negative Z = downrange]
+ */
+class BtkVelocityWrapper {
+  constructor(btkVec3OrX, y, z) {
+    if (typeof btkVec3OrX === 'object') {
+      // Wrapping existing BTK vector
+      this._btk = btkVec3OrX;
+    } else {
+      // Creating from Three.js coords (fps) - convert to BTK (m/s)
+      const x_fps = btkVec3OrX;
+      const btkX_mps = btk.Conversions.fpsToMps(-z);  // Three Z → BTK X (downrange)
+      const btkY_mps = btk.Conversions.fpsToMps(x_fps); // Three X → BTK Y (crossrange)
+      const btkZ_mps = btk.Conversions.fpsToMps(y);   // Three Y → BTK Z (up)
+      this._btk = new btk.Vector3D(btkX_mps, btkY_mps, btkZ_mps);
+    }
+  }
+  
+  // Expose as Three.js coordinates in fps (transparent conversion)
+  get x() { return btk.Conversions.mpsToFps(this._btk.y); }  // BTK Y → Three X
+  get y() { return btk.Conversions.mpsToFps(this._btk.z); }  // BTK Z → Three Y
+  get z() { return btk.Conversions.mpsToFps(-this._btk.x); } // BTK -X → Three Z
+  
+  magnitude() {
+    // Returns speed in fps (transparent conversion from m/s)
+    return btk.Conversions.mpsToFps(this._btk.magnitude());
+  }
+
+  normalized() {
+    // Returns unit vector (still in Three.js coords)
+    return new BtkVelocityWrapper(this._btk.normalized());
   }
   
   get raw() { return this._btk; } // For passing to BTK functions
@@ -54,16 +105,42 @@ class BtkVector3Wrapper {
  * Wraps BTK Bullet - all coordinates in Three.js space, yards
  */
 class BtkBulletWrapper {
-  constructor(btkBullet) {
-    this._btk = btkBullet;
+  constructor(btkBulletOrMass, posOrDiameter, velOrLength, spinRateOrBc, dragFunction) {
+    if (typeof btkBulletOrMass === 'object' && arguments.length === 1) {
+      // Wrapping existing BTK bullet
+      this._btk = btkBulletOrMass;
+    } else if (typeof btkBulletOrMass === 'object' && arguments.length === 4) {
+      // Creating bullet from (baseBullet, pos, vel, spinRate)
+      // pos and vel MUST be wrappers (BtkVector3Wrapper or BtkVelocityWrapper)
+      const baseBullet = btkBulletOrMass;
+      const pos = posOrDiameter; // BtkVector3Wrapper
+      const vel = velOrLength;   // BtkVelocityWrapper
+      const spinRate = spinRateOrBc;
+      this._btk = new btk.Bullet(baseBullet, pos.raw, vel.raw, spinRate);
+    } else {
+      // Creating new bullet from standard units (grains, inches)
+      const massGrains = btkBulletOrMass;
+      const diameterInches = posOrDiameter;
+      const lengthInches = velOrLength;
+      const bc = spinRateOrBc;
+      this._btk = new btk.Bullet(
+        btk.Conversions.grainsToKg(massGrains),
+        btk.Conversions.inchesToMeters(diameterInches),
+        btk.Conversions.inchesToMeters(lengthInches),
+        bc,
+        dragFunction === 'G1' ? btk.DragFunction.G1 : btk.DragFunction.G7
+      );
+    }
   }
   
   getPosition() { return new BtkVector3Wrapper(this._btk.getPosition()); }
-  getVelocity() { return new BtkVector3Wrapper(this._btk.getVelocity()); }
+  getVelocity() { return new BtkVelocityWrapper(this._btk.getVelocity()); }
   getMach() { return this._btk.getMach(); }
   getTime() { return this._btk.getTime(); }
+  getSpinRate() { return this._btk.getSpinRate(); }
   
   get raw() { return this._btk; }
+  delete() { if (this._btk?.delete) this._btk.delete(); }
 }
 
 /**
@@ -119,7 +196,13 @@ class BtkWindGeneratorWrapper {
     // Wind only depends on downrange distance currently
     const downrange_m = btk.Conversions.yardsToMeters(-z_yd);
     const wind = this._btk.sample(downrange_m, time);
-    return new BtkVector3Wrapper(wind);
+    
+    
+    // Wind is a velocity vector, use BtkVelocityWrapper for correct coordinate transform
+    const wrapped = new BtkVelocityWrapper(wind);
+    
+    
+    return wrapped;
   }
   
   get raw() { return this._btk; }
@@ -154,10 +237,103 @@ class BtkSimulatorWrapper {
   }
 }
 
+/**
+ * Wraps BTK BallisticsSimulator (stateful simulator) - all inputs/outputs in Three.js coords, yards
+ */
+class BtkBallisticsSimulatorWrapper {
+  constructor() {
+    this._btk = new btk.BallisticsSimulator();
+  }
+  
+  setInitialBullet(bullet) {
+    this._btk.setInitialBullet(bullet.raw || bullet);
+  }
+  
+  setAtmosphere(atmosphere) {
+    this._btk.setAtmosphere(atmosphere.raw || atmosphere);
+  }
+  
+  setWind(wind) {
+    if (wind instanceof BtkVector3Wrapper) {
+      this._btk.setWind(wind.raw);
+    } else {
+      this._btk.setWind(wind);
+    }
+  }
+  
+  resetToInitial() {
+    this._btk.resetToInitial();
+  }
+  
+  simulate(rangeYards, timeStep, maxTime) {
+    const range_m = btk.Conversions.yardsToMeters(rangeYards);
+    const rawTraj = this._btk.simulate(range_m, timeStep, maxTime);
+    return new BtkTrajectoryWrapper(rawTraj);
+  }
+  
+  simulateWithWind(rangeYards, timeStep, maxTime, windGenerator, time) {
+    const range_m = btk.Conversions.yardsToMeters(rangeYards);
+    const rawTraj = this._btk.simulateWithWind(range_m, timeStep, maxTime, windGenerator.raw || windGenerator, time);
+    return new BtkTrajectoryWrapper(rawTraj);
+  }
+  
+  get raw() { return this._btk; }
+  delete() { this._btk.delete(); }
+}
+
+/**
+ * Wraps BTK Atmosphere - all parameters in standard units (°F, feet, %)
+ */
+class BtkAtmosphereWrapper {
+  constructor(tempF, altitudeFeet, humidity, pressure = 0.0) {
+    this._btk = new btk.Atmosphere(
+      btk.Conversions.fahrenheitToKelvin(tempF),
+      btk.Conversions.feetToMeters(altitudeFeet),
+      humidity,
+      pressure
+    );
+  }
+  
+  get raw() { return this._btk; }
+}
+
+/**
+ * Wraps BTK Match - handles scoring with transparent unit conversion
+ */
+class BtkMatchWrapper {
+  constructor() {
+    this._btk = new btk.Match();
+  }
+  
+  getTotalScore() { return this._btk.getTotalScore(); }
+  getXCount() { return this._btk.getXCount(); }
+  getHitCount() { return this._btk.getHitCount(); }
+  
+  // Add hit to match
+  addHit(relativeX, relativeY, mvFps, impactVelocityFps, bulletDiameterMeters) {
+    // Convert from yards to meters for BTK
+    const relativeX_m = btk.Conversions.yardsToMeters(relativeX);
+    const relativeY_m = btk.Conversions.yardsToMeters(relativeY);
+    return this._btk.addHit(relativeX_m, relativeY_m, mvFps, impactVelocityFps, bulletDiameterMeters);
+  }
+  
+  // Return group size in inches
+  getGroupSizeInches() {
+    return btk.Conversions.metersToInches(this._btk.getGroupSize());
+  }
+  
+  // Clear all hits from the match
+  clear() {
+    this._btk.clear();
+  }
+  
+  get raw() { return this._btk; }
+  delete() { this._btk.delete(); }
+}
+
 // Initialize the game
 async function init()
 {
-  console.log('F-Class Simulator initialized');
 }
 
 // Lock canvas size once on page load
@@ -186,7 +362,6 @@ function lockCanvasSize()
   // Read canvas size from CSS (will be square due to aspect-ratio: 1)
   const canvasWidth = canvas.clientWidth;
   const canvasHeight = canvas.clientHeight;
-  console.log(`Canvas dimensions locked at: ${canvasWidth}x${canvasHeight}`);
 
   // Lock canvas size permanently - no resizing allowed
   canvas.width = canvasWidth;
@@ -258,7 +433,6 @@ function startGame()
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('restartBtn').style.display = 'inline-block';
 
-    console.log('Game started with params:', params);
   }
   catch (error)
   {
@@ -272,19 +446,18 @@ function restartGame()
   {
     // Get current parameters
     const params = getGameParams();
-
+    
     // Clean up previous game if exists
     if (webglGame)
     {
       webglGame.destroy();
     }
-
+    
     // Create new Three.js game instance with updated parameters
     const canvas = document.getElementById('gameCanvas');
     webglGame = new FClassSimulator(canvas, params);
     webglGame.start();
-
-    console.log('Game restarted with params:', params);
+    
   }
   catch (error)
   {
@@ -295,18 +468,18 @@ function restartGame()
 function getGameParams()
 {
   const fclassMode = document.getElementById('fclassMode').value;
-
+  
   // Parse F-Class mode to get distance (format: "fclass-300", "fclass-500", etc.)
   const distance = fclassMode.split('-')[1];
   const distanceYards = parseInt(distance);
-
+  
   // Map F-Class distances to correct targets
   const targetType = FCLASS_DISTANCE_TO_TARGET[distanceYards];
   if (!targetType)
   {
     throw new Error(`Invalid F-Class distance: ${distanceYards} yards. Valid distances are: 300, 500, 600, 800, 900, 1000`);
   }
-
+  
   return {
     distance: distanceYards,
     target: targetType,
@@ -349,7 +522,6 @@ function populateWindPresetDropdown()
       windSelect.value = presetNames[0];
     }
 
-    console.log('Loaded wind presets:', presetNames);
   }
   catch (error)
   {
@@ -380,7 +552,7 @@ class FClassSimulator
   static TARGET_MIN_HEIGHT = -(FClassSimulator.TARGET_SIZE + FClassSimulator.TARGET_GAP_ABOVE_PITS); // Fully lowered (target size + gap)
   static TARGET_CENTER_HEIGHT = FClassSimulator.PITS_HEIGHT + FClassSimulator.TARGET_GAP_ABOVE_PITS + FClassSimulator.TARGET_SIZE / 2; // Target center height when raised
   static TARGET_ANIMATION_SPEED = 0.75; // yards per second
-
+  
   // === WIND VISUALIZATION ===
   // Wind flags (manual conversions since BTK not available at class definition time)
   static FLAG_BASE_WIDTH = 48 / 36; // 48 inches = 1.33 yards (btk.Conversions.inchesToYards(48))
@@ -427,7 +599,7 @@ class FClassSimulator
   static SPOTTING_SCOPE_MIN_MAGNIFICATION = 2; // minimum zoom
   static SPOTTING_SCOPE_MAX_MAGNIFICATION = 100; // maximum zoom
   static SPOTTING_SCOPE_MAGNIFICATION_STEP = 0.5; // zoom step size
-
+  
   // Rifle scope constants (arrow keys pan, fixed zoom for targeting)
   static RIFLE_SCOPE_DIAMETER_FRACTION = 0.5; // Same size as spotting scope
   static RIFLE_SCOPE_MARGIN = 20; // pixels from edge
@@ -507,7 +679,7 @@ class FClassSimulator
     this.windGenerator = null;
     this.flagMeshes = [];
     this.flagPositions = [];
-
+    
     // ===== TARGETS =====
     this.targetFrames = [];
     this.targetAnimationTime = 0;
@@ -540,7 +712,7 @@ class FClassSimulator
       mv: document.getElementById('hudMV'),
       impactV: document.getElementById('hudImpactV')
     };
-
+    
     // ===== SCENE SETUP =====
     this.setupCamera();
     this.setupLighting();
@@ -564,8 +736,7 @@ class FClassSimulator
     this.createWindGenerator();
     this.createWindFlags();
     this.initializeAudio();
-
-    console.log('F-Class Simulator initialized');
+    
   }
 
   // ===== TIME ACCESSORS =====
@@ -594,7 +765,6 @@ class FClassSimulator
       // Load shot sound
       await this.loadShotSound();
 
-      console.log('Audio system initialized');
     }
     catch (error)
     {
@@ -618,7 +788,6 @@ class FClassSimulator
       const arrayBuffer = await response.arrayBuffer();
       this.shotSound = await this.audioContext.decodeAudioData(arrayBuffer);
 
-      console.log('Shot sound loaded successfully');
     }
     catch (error)
     {
@@ -644,7 +813,6 @@ class FClassSimulator
       source.connect(this.audioContext.destination);
       source.start();
 
-      console.log('Shot sound played');
     }
     catch (error)
     {
@@ -705,7 +873,7 @@ class FClassSimulator
     const maxScopeSize = Math.min(availableWidth, availableHeight);
     const scopeSize = Math.floor(maxScopeSize * FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION);
     const renderSize = scopeSize * 2;
-
+    
     this.spottingScopeRenderTarget = new THREE.WebGLRenderTarget(renderSize, renderSize,
     {
       minFilter: THREE.LinearFilter,
@@ -713,7 +881,7 @@ class FClassSimulator
       format: THREE.RGBAFormat,
       samples: 4
     });
-
+    
     this.spottingScopeSize = scopeSize;
     this.spottingScopeX = 10; // 10px padding from left edge
     // Position at bottom of screen with padding
@@ -746,7 +914,7 @@ class FClassSimulator
     const maxScopeSize = Math.min(availableWidth, availableHeight);
     const rifleScopeSize = Math.floor(maxScopeSize * FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION);
     const rifleScopeRenderSize = rifleScopeSize * 2;
-
+    
     this.rifleScopeRenderTarget = new THREE.WebGLRenderTarget(rifleScopeRenderSize, rifleScopeRenderSize,
     {
       minFilter: THREE.LinearFilter,
@@ -754,16 +922,16 @@ class FClassSimulator
       format: THREE.RGBAFormat,
       samples: 4
     });
-
+    
     this.rifleScopeSize = rifleScopeSize;
     this.rifleScopeX = this.canvasWidth - rifleScopeSize - 10; // 10px padding from right edge
     this.rifleScopeY = this.canvasHeight - rifleScopeSize - 10; // 10px padding from bottom
-
+    
     // Calculate FOV for 1.5x target width
     const targetFrameWidth = FClassSimulator.TARGET_SIZE; // yards
     const fovRadians = Math.atan((FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER * targetFrameWidth) / this.distance);
     const fovDegrees = fovRadians * 180 / Math.PI;
-
+    
     // Create rifle scope camera
     this.rifleScopeCamera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.5, this.distance * 1.5);
     this.rifleScopeCamera.position.set(0, FClassSimulator.CAMERA_EYE_HEIGHT, 0); // At muzzle
@@ -774,7 +942,7 @@ class FClassSimulator
     const targetCenterY = FClassSimulator.TARGET_CENTER_HEIGHT; // Target height
     const targetCenterZ = -this.distance; // Downrange
     this.rifleScopeCamera.lookAt(targetCenterX, targetCenterY, targetCenterZ);
-
+    
     // Initialize rifle scope control state
     this.rifleScopePitch = 0;
     this.rifleScopeYaw = 0;
@@ -801,10 +969,10 @@ class FClassSimulator
     // Three.js meshes are positioned by center, so offset by half size
     const compX = x + size / 2 - canvasW / 2;
     const compY = canvasH / 2 - (y + size / 2); // Flip Y coordinate and offset by half size
-
+    
     // Create circular mask texture
     const maskTexture = this.createCircularMaskTexture(size);
-
+    
     // Create scope view mesh
     const scopeGeom = new THREE.PlaneGeometry(size, size);
     const scopeMat = new THREE.MeshBasicMaterial(
@@ -816,14 +984,13 @@ class FClassSimulator
       depthWrite: false,
       toneMapped: false
     });
-
+    
     this.spottingScopeViewMesh = new THREE.Mesh(scopeGeom, scopeMat);
     this.spottingScopeViewMesh.position.set(compX, compY, 1); // Layer 1 for scope views
     this.spottingScopeViewMesh.renderOrder = 1; // Render after main view but before crosshairs
     this.spottingScopeViewMesh.frustumCulled = false;
 
     this.compositionScene.add(this.spottingScopeViewMesh);
-    console.log('Spotting scope view mesh created at position:', compX, compY, 'size:', size);
   }
 
   createRifleScopeViewMesh()
@@ -831,16 +998,16 @@ class FClassSimulator
     const rifleScopeSize = this.rifleScopeSize;
     const rifleScopeX = this.rifleScopeX;
     const rifleScopeY = this.rifleScopeY;
-
+    
     // Convert screen coordinates to composition camera coordinates for rifle scope
     const canvasW = this.canvasWidth;
     const canvasH = this.canvasHeight;
     const rifleScopeCompX = rifleScopeX + rifleScopeSize / 2 - canvasW / 2;
     const rifleScopeCompY = canvasH / 2 - (rifleScopeY + rifleScopeSize / 2);
-
+    
     // Create circular mask texture for rifle scope
     const rifleScopeMaskTexture = this.createCircularMaskTexture(rifleScopeSize);
-
+    
     // Create rifle scope view mesh
     const rifleScopeGeom = new THREE.PlaneGeometry(rifleScopeSize, rifleScopeSize);
     const rifleScopeMat = new THREE.MeshBasicMaterial(
@@ -852,14 +1019,13 @@ class FClassSimulator
       depthWrite: false,
       toneMapped: false
     });
-
+    
     this.rifleScopeViewMesh = new THREE.Mesh(rifleScopeGeom, rifleScopeMat);
     this.rifleScopeViewMesh.position.set(rifleScopeCompX, rifleScopeCompY, 1); // Layer 1 for scope views
     this.rifleScopeViewMesh.renderOrder = 1; // Render after main view but before crosshairs
     this.rifleScopeViewMesh.frustumCulled = false;
-
+    
     this.compositionScene.add(this.rifleScopeViewMesh);
-    console.log('Rifle scope view mesh created at position:', rifleScopeCompX, rifleScopeCompY, 'size:', rifleScopeSize);
   }
 
   createSpottingScopeCrosshair()
@@ -883,7 +1049,7 @@ class FClassSimulator
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.stroke();
-
+    
     const texture = new THREE.CanvasTexture(canvas);
     const scopeSize = this.spottingScopeSize;
     const x = this.spottingScopeX;
@@ -908,8 +1074,6 @@ class FClassSimulator
     this.spottingScopeCrosshairSprite.renderOrder = 2; // Render after scope views
     this.spottingScopeCrosshairSprite.frustumCulled = false;
     this.compositionScene.add(this.spottingScopeCrosshairSprite);
-    console.log('Spotting scope crosshair created at:', compX, compY, 'size:', scopeSize);
-    console.log('Composition scene children:', this.compositionScene.children.length);
   }
 
   createRifleScopeCrosshair()
@@ -934,17 +1098,17 @@ class FClassSimulator
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.stroke();
-
+    
     // Draw crosshair
     ctx.strokeStyle = '#808080'; // Medium grey
     ctx.fillStyle = '#808080';
     ctx.lineWidth = 2; // Thinner crosshair lines
-
+    
     // Center dot (smaller)
     ctx.beginPath();
     ctx.arc(cx, cy, 4, 0, Math.PI * 2);
     ctx.fill();
-
+    
     // Crosshair lines
     const crosshairLen = r * 0.4;
     const gap = 12; // Smaller gap around center dot
@@ -954,18 +1118,18 @@ class FClassSimulator
     ctx.moveTo(cx - crosshairLen, cy);
     ctx.lineTo(cx - gap, cy);
     ctx.stroke();
-
+    
     ctx.beginPath();
     ctx.moveTo(cx + gap, cy);
     ctx.lineTo(cx + crosshairLen, cy);
     ctx.stroke();
-
+    
     // Vertical lines
     ctx.beginPath();
     ctx.moveTo(cx, cy - crosshairLen);
     ctx.lineTo(cx, cy - gap);
     ctx.stroke();
-
+    
     ctx.beginPath();
     ctx.moveTo(cx, cy + gap);
     ctx.lineTo(cx, cy + crosshairLen);
@@ -1006,15 +1170,15 @@ class FClassSimulator
     canvas.width = 256;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
-
+    
     // Top half red
     ctx.fillStyle = '#ff0000';
     ctx.fillRect(0, 0, 256, 128);
-
+    
     // Bottom half yellow
     ctx.fillStyle = '#ffff00';
     ctx.fillRect(0, 128, 256, 128);
-
+    
     const texture = new THREE.CanvasTexture(canvas);
     return texture;
   }
@@ -1041,10 +1205,11 @@ class FClassSimulator
     // In Three.js coords: X=right, Y=up, Z=towards camera (negative Z = downrange)
     // Flag extends from pole: 0° = hanging down, 90° = horizontal
     // Wind angle determines how much the flag lifts (0° = hanging down, 90° = straight out)
+    // direction parameter is the wind direction angle (0° = right, 90° = up, 180° = left, 270° = down)
     
-    const segmentX = sinPitch * length * t; // Horizontal extension (positive X from left side)
+    const segmentX = Math.cos(direction) * sinPitch * length * t; // Horizontal extension in wind direction
     const segmentY = -cosPitch * length * t; // Vertical droop (negative Y = down)
-    const segmentZ = 0; // No depth extension
+    const segmentZ = Math.sin(direction) * sinPitch * length * t; // Depth extension in wind direction
 
     // Flapping animation - flag waves in the wind
     const wavePosition = t * FClassSimulator.FLAG_WAVE_LENGTH;
@@ -1074,17 +1239,17 @@ class FClassSimulator
     // Uses helper method for initial positions (no wind, no flapping)
     const geometry = new THREE.BufferGeometry();
     const numSegments = 5;
-
+    
     // Create vertices for thick flag using multiple layers
     const vertices = [];
     const uvs = [];
     const indices = [];
-
+    
     // Create front and back faces for each segment using helper
     for (let i = 0; i < numSegments; i++)
     {
       const t = i / (numSegments - 1); // 0 to 1
-
+      
       // Get initial positions (no wind, no flapping)
       const positions = this.calculateFlagSegmentPosition(i, 0, 0, 0);
 
@@ -1093,47 +1258,47 @@ class FClassSimulator
       vertices.push(...positions.bottomFront);
       vertices.push(...positions.topBack);
       vertices.push(...positions.bottomBack);
-
+      
       // UV coordinates (red top, yellow bottom) for both faces
       uvs.push(t, 0); // Top front
       uvs.push(t, 1); // Bottom front
       uvs.push(t, 0); // Top back
       uvs.push(t, 1); // Bottom back
     }
-
+    
     // Create indices for front and back faces
     for (let i = 0; i < numSegments - 1; i++)
     {
       const idx = i * 4; // 4 vertices per segment (2 front + 2 back)
-
+      
       // Front face triangles
       indices.push(idx, idx + 1, idx + 4); // First triangle
       indices.push(idx + 1, idx + 5, idx + 4); // Second triangle
-
+      
       // Back face triangles (reverse winding)
       indices.push(idx + 2, idx + 6, idx + 3); // First triangle
       indices.push(idx + 3, idx + 6, idx + 7); // Second triangle
     }
-
+    
     // Add side faces to connect front and back
     for (let i = 0; i < numSegments - 1; i++)
     {
       const idx = i * 4;
-
+      
       // Top edge side face
       indices.push(idx, idx + 4, idx + 2); // First triangle
       indices.push(idx + 2, idx + 4, idx + 6); // Second triangle
-
+      
       // Bottom edge side face
       indices.push(idx + 1, idx + 3, idx + 5); // First triangle
       indices.push(idx + 3, idx + 7, idx + 5); // Second triangle
     }
-
+    
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
-
+    
     return geometry;
   }
 
@@ -1146,16 +1311,16 @@ class FClassSimulator
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
-
+    
     // Create dense grass pattern
     const imageData = ctx.createImageData(512, 512);
     const data = imageData.data;
-
+    
     for (let i = 0; i < data.length; i += 4)
     {
       const x = (i / 4) % 512;
       const y = Math.floor((i / 4) / 512);
-
+      
       // Generate multiple layers of noise for density
       let noise = 0;
       noise += Math.random() * 0.3;
@@ -1163,19 +1328,19 @@ class FClassSimulator
       noise += Math.random() * 0.1;
       noise += Math.random() * 0.05;
       noise = Math.min(1, noise);
-
+      
       // Add some grass blade patterns
       const grassPattern = Math.sin(x * 0.1) * Math.cos(y * 0.1) * 0.1;
       noise += grassPattern;
-
+      
       data[i] = noise * 255; // R
       data[i + 1] = noise * 255; // G  
       data[i + 2] = noise * 255; // B
       data[i + 3] = 255; // A
     }
-
+    
     ctx.putImageData(imageData, 0, 0);
-
+    
     // Create Three.js texture with proper wrapping
     const texture = new THREE.CanvasTexture(canvas);
     const maxAniso = this.renderer.capabilities.getMaxAnisotropy?.() || 1;
@@ -1206,13 +1371,13 @@ class FClassSimulator
     // Brighter ambient light for overall scene illumination
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     this.scene.add(ambientLight);
-
+    
     // Strong directional light (sun) for bright scene with vivid shadows
     const directionalLight = new THREE.DirectionalLight(0xfffaf0, 2.5); // Bright warm sunlight
     // Position sun behind and to the left of shooter (Three.js coords: X=right, Y=up, Z=towards camera)
     directionalLight.position.set(-200, 400, 500); // Left, high, behind shooter
     directionalLight.castShadow = true;
-
+    
     // Configure shadow properties for better quality
     directionalLight.shadow.mapSize.width = 4096; // Higher resolution shadows
     directionalLight.shadow.mapSize.height = 4096;
@@ -1225,9 +1390,9 @@ class FClassSimulator
     directionalLight.shadow.camera.bottom = -10;  // Bottom (slightly below ground)
     directionalLight.shadow.bias = -0.0005; // Reduce shadow acne
     directionalLight.shadow.normalBias = 0.02; // Additional bias for smooth surfaces
-
+    
     this.scene.add(directionalLight);
-
+    
     // Optional: Add a subtle fill light from the front to soften shadows
     const fillLight = new THREE.DirectionalLight(0xadd8e6, 0.3); // Soft blue fill
     fillLight.position.set(0, 100, -500); // From downrange (negative Z)
@@ -1260,7 +1425,7 @@ class FClassSimulator
   {
     // Initialize rifle scope key states
     this.rifleScopeKeys = { up: false, down: false, left: false, right: false };
-
+    
     // Unified key handler for rifle scope
     this.rifleScopeKeyHandler = (event) =>
     {
@@ -1296,11 +1461,11 @@ class FClassSimulator
     brownGround.receiveShadow = true; // Enable shadow receiving on ground
     brownGround.matrixAutoUpdate = false; brownGround.updateMatrix();
     this.scene.add(brownGround);
-
+    
     // Add a range plane - just the shooting lanes with grass texture
     // PlaneGeometry(width, height) - after rotation: width=X, height=Z
     const groundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_LANE_WIDTH, rangeLength);
-
+    
     // Create grass material with dense texture variation
     const groundMaterial = new THREE.MeshStandardMaterial(
     {
@@ -1310,7 +1475,7 @@ class FClassSimulator
       metalness: 0.0,
       bumpScale: 0.8 // Subtle texture for grass blades
     });
-
+    
     // Add some noise for texture
     const noiseTexture = this.createNoiseTexture();
     groundMaterial.bumpMap = noiseTexture;
@@ -1321,7 +1486,7 @@ class FClassSimulator
     ground.receiveShadow = true; // Enable shadow receiving on grass
     ground.matrixAutoUpdate = false; ground.updateMatrix();
     this.scene.add(ground);
-
+    
     // Add pits at the end of the range
     // BoxGeometry(width, height, depth) = (X, Y, Z) in Three.js coords
     if (!this._geoBoxCache) this._geoBoxCache = {};
@@ -1332,18 +1497,18 @@ class FClassSimulator
       color: 0x8b7355
     }); // Grey-brown
     const pits = new THREE.Mesh(pitsGeometry, pitsMaterial);
-
+    
     // Enable shadows on pits
     pits.castShadow = true;
     pits.receiveShadow = true;
-
+    
     // Position pits at rangeLength - PITS_OFFSET to obscure targets when lowered (Three.js coords)
     pits.position.set(0, FClassSimulator.PITS_HEIGHT / 2, -(rangeLength - FClassSimulator.PITS_OFFSET + FClassSimulator.PITS_DEPTH / 2));
     pits.matrixAutoUpdate = false; this.scene.add(pits); pits.updateMatrix();
-
+    
     // Add target frames above the pits
     this.setupTargets(rangeLength);
-
+    
   }
 
   setupTargets(rangeLength)
@@ -1351,19 +1516,19 @@ class FClassSimulator
     const targetSize = FClassSimulator.TARGET_SIZE; // yards
     const targetSpacing = 1; // yards between targets
     const totalTargetWidth = targetSize + targetSpacing;
-
+    
     // Calculate how many targets fit in the range width
     const rangeWidth = FClassSimulator.RANGE_LANE_WIDTH;
     const maxTargets = Math.floor(rangeWidth / totalTargetWidth);
-
+    
     // Position targets above the pits - centered on the range width
     const targetHeight = FClassSimulator.TARGET_CENTER_HEIGHT;
     const totalTargetsWidth = maxTargets * targetSize + (maxTargets - 1) * targetSpacing; // Total width including spacing
     const startY = totalTargetsWidth / 2 - targetSize / 2; // Start from left (positive Y), centered
-
+    
     // Create target texture once for all targets
     const targetTexture = this.createTargetTexture();
-
+    
     for (let i = 0; i < maxTargets; i++)
     {
       // BoxGeometry(width, height, depth) for target facing shooter (thin in Z)
@@ -1374,16 +1539,16 @@ class FClassSimulator
         map: targetTexture
       });
       const target = new THREE.Mesh(targetGeometry, targetMaterial);
-
+      
       // Enable shadows on target
       target.castShadow = true;
       target.receiveShadow = true;
-
+      
       // Position target at exact distance downrange (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
       const xPos = startY - i * totalTargetWidth; // Horizontal position (left to right)
       target.position.set(xPos, targetHeight, -rangeLength); // Downrange (negative Z)
       target.matrixAutoUpdate = false; this.scene.add(target); target.updateMatrix();
-
+      
       // Store target frame for animation
       this.targetFrames.push(
       {
@@ -1395,7 +1560,7 @@ class FClassSimulator
         targetHeightGoal: 0, // Where we're animating to
         animating: false
       });
-
+      
       // Add white target number box 0.2 yards above the target with number texture
       // Target 1 is at i=0 (leftmost position)
       const numberGeometry = targetGeometry; // reuse same thin box geometry
@@ -1406,35 +1571,34 @@ class FClassSimulator
         transparent: true
       });
       const numberBox = new THREE.Mesh(numberGeometry, numberMaterial);
-
+      
       // Enable shadows on number box
       numberBox.castShadow = true;
       numberBox.receiveShadow = true;
-
+      
       numberBox.position.set(xPos, targetHeight + targetSize + 0.2, -rangeLength); // 0.2 yards above target
       numberBox.matrixAutoUpdate = false; this.scene.add(numberBox); numberBox.updateMatrix();
-
+      
       // Store number box reference for animation
       this.targetFrames[i].numberBox = numberBox;
     }
-
-    // After the loop, find the center target (closest to Y=0)
+    
+    // After the loop, find the center target (closest to X=0)
     let centerTargetIndex = 0;
     let minDistance = Infinity;
     for (let i = 0; i < this.targetFrames.length; i++)
     {
-      const yPos = Math.abs(this.targetFrames[i].mesh.position.y);
-      if (yPos < minDistance)
+      const xPos = Math.abs(this.targetFrames[i].mesh.position.x);
+      if (xPos < minDistance)
       {
-        minDistance = yPos;
+        minDistance = xPos;
         centerTargetIndex = i;
       }
     }
-
+    
     // Store reference to user's target
     this.userTarget = this.targetFrames[centerTargetIndex];
-    console.log(`User's target is #${this.userTarget.targetNumber} at Y=${this.userTarget.mesh.position.y.toFixed(2)}`);
-
+    
   }
 
   // ===== TARGET SYSTEM =====
@@ -1443,23 +1607,23 @@ class FClassSimulator
   {
     // Get the actual target from BTK for accurate dimensions
     const target = btk.NRATargets.getTarget(String(this.target));
-
+    
     // Create canvas - use 1024x1024 for high resolution
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = 1024;
     canvas.height = 1024;
-
+    
     const centerX = 512;
     const centerY = 512;
-
+    
     // Scale: 2 yards = 1024 pixels, so 1 yard = 512 pixels
     const pixelsPerYard = 512;
-
+    
     // Fill entire canvas with white background (outside target area)
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, 1024, 1024);
-
+    
     // Draw concentric circles from outer to inner (white outer, black center)
     const ringSpecs = [
     {
@@ -1492,24 +1656,24 @@ class FClassSimulator
       const ringDiameterMeters = target.getRingInnerDiameter(spec.ring);
       const ringDiameterYards = btk.Conversions.metersToYards(ringDiameterMeters);
       const radiusPixels = (ringDiameterYards / 2) * pixelsPerYard;
-
+      
       // Draw filled circle
       context.beginPath();
       context.arc(centerX, centerY, radiusPixels, 0, 2 * Math.PI);
       context.fillStyle = spec.fill;
       context.fill();
-
+      
       // Draw boundary line
       context.strokeStyle = spec.fill === 'black' ? 'white' : 'black';
       context.lineWidth = 2;
       context.stroke();
     }
-
+    
     // Draw X-ring
     const xRingDiameterMeters = target.getXRingDiameter();
     const xRingDiameterYards = btk.Conversions.metersToYards(xRingDiameterMeters);
     const xRingRadius = (xRingDiameterYards / 2) * pixelsPerYard;
-
+    
     context.beginPath();
     context.arc(centerX, centerY, xRingRadius, 0, 2 * Math.PI);
     context.fillStyle = 'black';
@@ -1517,7 +1681,7 @@ class FClassSimulator
     context.strokeStyle = 'white';
     context.lineWidth = 2;
     context.stroke();
-
+    
     // Draw white X in center
     const xSize = xRingRadius * 0.5;
     context.strokeStyle = 'white';
@@ -1528,7 +1692,7 @@ class FClassSimulator
     context.moveTo(centerX - xSize, centerY + xSize);
     context.lineTo(centerX + xSize, centerY - xSize);
     context.stroke();
-
+    
     return new THREE.CanvasTexture(canvas);
   }
 
@@ -1539,23 +1703,23 @@ class FClassSimulator
     const context = canvas.getContext('2d');
     canvas.width = 256;
     canvas.height = 256;
-
+    
     // Clear canvas with white background
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, 256, 256);
-
+    
     // Rotate canvas 90 degrees to fix orientation
     context.translate(128, 128);
     context.rotate(Math.PI / 2);
     context.translate(-128, -128);
-
+    
     // Draw number on canvas
     context.fillStyle = '#000000'; // Black text
     context.font = 'bold 200px Arial';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillText(number.toString(), 128, 128);
-
+    
     // Create and return texture from canvas
     return new THREE.CanvasTexture(canvas);
   }
@@ -1581,10 +1745,10 @@ class FClassSimulator
 
     // Update and render flags
     this.updateFlags();
-
+    
     // Update target frame animations
     this.updateTargetAnimations();
-
+    
     // Update scope camera orientations
     this.updateSpottingScopeCamera();
     this.updateRifleScopeCamera();
@@ -1617,7 +1781,7 @@ class FClassSimulator
 
     this.clock.start();
     this.gameStartTime = performance.now();
-
+    
     // Setup ballistic system for shot firing
     try
     {
@@ -1628,14 +1792,14 @@ class FClassSimulator
       console.error('Failed to setup ballistic system:', error);
       throw error;
     }
-
+    
     // Show HUD
     if (this.hudElements.container)
     {
       this.hudElements.container.style.display = 'block';
     }
     this.updateHUD();
-
+    
     this.isRunning = true;
     const gameLoop = () =>
     {
@@ -1657,7 +1821,7 @@ class FClassSimulator
       this.animationId = null;
     }
     if (this.clock) this.clock.stop();
-
+    
     // Hide HUD
     if (this.hudElements.container)
     {
@@ -1667,16 +1831,16 @@ class FClassSimulator
 
   createWindFlags()
   {
-
+    
     // Create flag texture once
     const flagTexture = this.createFlagTexture();
-
+    
     // Create flag poles every 100 yards from 100 to target distance at the border of the 50-yard lane
     const maxDistance = this.distance; // yards
     const laneBorder = -FClassSimulator.RANGE_LANE_WIDTH / 2; // yards from center (left border of 50-yard lane)
-
+    
     this.flagMeshes = [];
-
+    
     for (let yds = FClassSimulator.POLE_INTERVAL; yds < maxDistance; yds += FClassSimulator.POLE_INTERVAL)
     {
       // BoxGeometry(width, height, depth) for vertical pole (thin in X and Z, tall in Y)
@@ -1687,33 +1851,33 @@ class FClassSimulator
         color: 0x808080
       }); // Grey
       const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-
+      
       // Enable shadow casting and receiving
       pole.castShadow = true;
       pole.receiveShadow = true;
-
+      
       // Position pole (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
       pole.position.set(laneBorder, FClassSimulator.POLE_HEIGHT / 2, -yds);
       this.scene.add(pole);
-
-      // Create flag geometry and mesh
-      const flagGeometry = this.createFlagGeometry();
+      
+    // Create flag geometry and mesh
+    const flagGeometry = this.createFlagGeometry();
       const flagMaterial = new THREE.MeshStandardMaterial(
       {
-        map: flagTexture,
-        side: THREE.DoubleSide
-      });
-      const flagMesh = new THREE.Mesh(flagGeometry, flagMaterial);
-
-      // Enable shadow casting and receiving
-      flagMesh.castShadow = true;
-      flagMesh.receiveShadow = true;
-
+      map: flagTexture,
+      side: THREE.DoubleSide
+    });
+    const flagMesh = new THREE.Mesh(flagGeometry, flagMaterial);
+    
+    // Enable shadow casting and receiving
+    flagMesh.castShadow = true;
+    flagMesh.receiveShadow = true;
+      
       // Position flag at top of pole (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
       const flagY = FClassSimulator.POLE_HEIGHT - FClassSimulator.FLAG_BASE_WIDTH / 2;
       flagMesh.position.set(laneBorder, flagY, -yds);
       this.scene.add(flagMesh);
-
+      
       // Store flag data for animation
       this.flagMeshes.push(
       {
@@ -1732,7 +1896,7 @@ class FClassSimulator
         flapPhase: Math.random() * Math.PI * 2 // Random starting phase for variety
       });
     }
-
+    
   }
 
 
@@ -1749,7 +1913,7 @@ class FClassSimulator
     {
       const flag = this.flagMeshes[i];
       const pos = flag.position;
-
+      
       // Get wind at flag position (wrapper handles coordinate/unit conversion)
       const t_s = this.getTime();
       const windVector = this.windGenerator.getWindAt(pos.x, pos.y, pos.z, t_s);
@@ -1762,22 +1926,27 @@ class FClassSimulator
       // Calculate wind magnitude (primarily horizontal and downrange components)
       const windSpeedMps = Math.sqrt(windX_mps * windX_mps + windZ_mps * windZ_mps);
       const windSpeedMph = btk.Conversions.mpsToMph(windSpeedMps);
-
+      
       // Calculate target angle based on wind speed
       const targetAngleDeg = Math.min(
         FClassSimulator.FLAG_MIN_ANGLE + windSpeedMph * FClassSimulator.FLAG_DEGREES_PER_MPH,
         FClassSimulator.FLAG_MAX_ANGLE
       );
-
-      // Calculate wind direction (yaw) - flag points opposite to wind direction
-      // Wind blows in direction (windX, windZ), flag points where wind comes FROM
-      const targetDirection = Math.atan2(-windX_mps, windZ_mps); // Opposite of wind direction
-
+      
+      // Calculate wind direction (yaw) - flag points in direction wind is blowing TO
+      // In Three.js coords: X=right, Z=towards-camera (negative Z = downrange)
+      // atan2(Y, X) gives angle from positive X axis (right = 0°)
+      const targetDirection = Math.atan2(windZ_mps, windX_mps); // Flag points where wind blows TO
+      
+      // Debug: log wind components and angle for first flag
+      if (i === 0 && Math.abs(t_s - Math.floor(t_s)) < 0.1) {
+      }
+      
       // Smooth interpolate current angle toward target
       const angleDiff = targetAngleDeg - flag.currentAngle;
       const angleStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), angleSpeed * deltaTime);
       flag.currentAngle += angleStep;
-
+      
       // Smooth interpolate current direction toward target
       let dirDiff = targetDirection - flag.currentDirection;
       // Normalize to [-PI, PI]
@@ -1785,11 +1954,11 @@ class FClassSimulator
       while (dirDiff < -Math.PI) dirDiff += 2 * Math.PI;
       const dirStep = Math.sign(dirDiff) * Math.min(Math.abs(dirDiff), directionSpeed * deltaTime);
       flag.currentDirection += dirStep;
-
+      
       // Update flap phase based on wind speed
       const flapFrequency = FClassSimulator.FLAG_FLAP_FREQUENCY_BASE + windSpeedMph * FClassSimulator.FLAG_FLAP_FREQUENCY_SCALE;
       flag.flapPhase += flapFrequency * 2 * Math.PI * deltaTime;
-
+      
       // Update flag geometry with flapping
       this.updateFlagVertices(flag, flag.currentAngle, flag.currentDirection, windSpeedMph);
     }
@@ -1801,19 +1970,19 @@ class FClassSimulator
     // Update all segments with flapping animation for thick flag
     // Uses helper method for position calculations
     const numSegments = 5;
-
+    
     // Get the position attribute from the geometry
     const positions = flag.flagGeometry.attributes.position.array;
-
+    
     // Update each segment (4 vertices per segment: 2 front + 2 back)
     for (let i = 0; i < numSegments; i++)
     {
       // Get positions using helper method with actual wind parameters
       const segmentPositions = this.calculateFlagSegmentPosition(i, angleDeg, direction, flag.flapPhase);
-
+      
       // Update all 4 vertices for this segment (front and back faces)
       const idx = i * 4; // 4 vertices per segment
-
+      
       // Front face vertices (positive X)
       positions[idx * 3 + 0] = segmentPositions.topFront[0]; // Top front X
       positions[idx * 3 + 1] = segmentPositions.topFront[1]; // Top front Y
@@ -1822,7 +1991,7 @@ class FClassSimulator
       positions[(idx + 1) * 3 + 0] = segmentPositions.bottomFront[0]; // Bottom front X
       positions[(idx + 1) * 3 + 1] = segmentPositions.bottomFront[1]; // Bottom front Y
       positions[(idx + 1) * 3 + 2] = segmentPositions.bottomFront[2]; // Bottom front Z
-
+      
       // Back face vertices (negative X)
       positions[(idx + 2) * 3 + 0] = segmentPositions.topBack[0]; // Top back X
       positions[(idx + 2) * 3 + 1] = segmentPositions.topBack[1]; // Top back Y
@@ -1832,7 +2001,7 @@ class FClassSimulator
       positions[(idx + 3) * 3 + 1] = segmentPositions.bottomBack[1]; // Bottom back Y
       positions[(idx + 3) * 3 + 2] = segmentPositions.bottomBack[2]; // Bottom back Z
     }
-
+    
     // Mark the geometry as needing an update
     flag.flagGeometry.attributes.position.needsUpdate = true;
     flag.flagGeometry.computeVertexNormals();
@@ -1841,19 +2010,19 @@ class FClassSimulator
   updateTargetAnimations()
   {
     const deltaTime = this.getDeltaTime();
-
+    
     for (let i = 0; i < this.targetFrames.length; i++)
     {
       const targetFrame = this.targetFrames[i];
       const targetSize = 2; // yards
-
+      
       // If animating, move toward goal
       if (targetFrame.animating)
       {
         const direction = Math.sign(targetFrame.targetHeightGoal - targetFrame.currentHeight);
         const moveDistance = FClassSimulator.TARGET_ANIMATION_SPEED * deltaTime * direction;
         const newHeight = targetFrame.currentHeight + moveDistance;
-
+        
         // Check if we've reached or passed the goal
         if ((direction > 0 && newHeight >= targetFrame.targetHeightGoal) ||
           (direction < 0 && newHeight <= targetFrame.targetHeightGoal))
@@ -1866,7 +2035,7 @@ class FClassSimulator
           targetFrame.currentHeight = newHeight;
         }
       }
-
+      
       // Update target position (Three.js coords: Y is height)
       targetFrame.mesh.position.y = targetFrame.baseHeight + targetFrame.currentHeight;
 
@@ -1876,21 +2045,21 @@ class FClassSimulator
         targetFrame.numberBox.position.y = targetFrame.baseHeight + targetSize + 0.2 + targetFrame.currentHeight;
       }
     }
-
+    
     // Random demo behavior - every ~3-5 seconds, pick a random target
     if (Math.random() < FClassSimulator.RANDOM_ANIMATION_CHANCE)
     { // ~1% chance per frame at 60fps = ~every 1.7 seconds
       const randomTarget = Math.floor(Math.random() * this.targetFrames.length) + 1;
       const target = this.targetFrames[randomTarget - 1];
-
+      
       // Don't animate the user's target
       if (target === this.userTarget)
       {
         return;
       }
-
+      
       const randomAction = Math.random();
-
+      
       if (randomAction < 0.5)
       {
         this.raiseTarget(randomTarget);
@@ -1915,7 +2084,7 @@ class FClassSimulator
       console.warn(`Invalid target number: ${targetNumber}. Valid range: 1-${this.targetFrames.length}`);
       return;
     }
-
+    
     const target = this.targetFrames[targetNumber - 1];
     target.targetHeightGoal = FClassSimulator.TARGET_MAX_HEIGHT;
     target.animating = true;
@@ -1942,19 +2111,19 @@ class FClassSimulator
     // At 2x mag: full speed, at 100x mag: 1/50th speed
     const speedFactor = 2.0 / this.spottingScopeMagnification; // 2x = 1.0, 100x = 0.02
     const panSpeed = FClassSimulator.SPOTTING_SCOPE_PAN_SPEED * deltaTime * speedFactor;
-
+    
     // W/S: adjust pitch (tilt up/down)
     // W = tilt up (positive pitch)
     // S = tilt down (negative pitch)
     if (this.spottingScopeKeys.w) this.spottingScopePitch += panSpeed;
     if (this.spottingScopeKeys.s) this.spottingScopePitch -= panSpeed;
-
+    
     // A/D: pan left/right (move crossrange position)
     // A = pan left (negative X in Three.js coords)
     // D = pan right (positive X in Three.js coords)
     if (this.spottingScopeKeys.a) this.spottingScopeYaw -= panSpeed;
     if (this.spottingScopeKeys.d) this.spottingScopeYaw += panSpeed;
-
+    
     // E/Q: adjust magnification (exponential scaling)
     // E = increase magnification
     // Q = decrease magnification
@@ -1972,16 +2141,16 @@ class FClassSimulator
         this.spottingScopeMagnification / Math.pow(1.1, deltaTime * 10) // 10% decrease per second
       );
     }
-
+    
     // Clamp pitch and yaw to reasonable limits
     this.spottingScopePitch = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, this.spottingScopePitch));
     this.spottingScopeYaw = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, this.spottingScopeYaw));
-
+    
     // Update scope camera FOV based on current magnification
     const scopeFOV = FClassSimulator.CAMERA_FOV / this.spottingScopeMagnification;
     this.spottingScopeCamera.fov = scopeFOV;
     this.spottingScopeCamera.updateProjectionMatrix();
-
+    
     // Apply rotation to scope camera
     // Start from main camera position and orientation
     const targetCenterHeight = FClassSimulator.PITS_HEIGHT + FClassSimulator.TARGET_GAP_ABOVE_PITS + 1;
@@ -2011,11 +2180,11 @@ class FClassSimulator
       console.warn('User target not found, skipping rifle scope update');
       return;
     }
-
+    
     // Calculate angular movement in radians from MOA
     const moaIncrement = FClassSimulator.RIFLE_SCOPE_PAN_SPEED; // 0.1 MOA per key press
     const angularIncrement = moaIncrement * (Math.PI / 180) / 60; // Convert MOA to radians
-
+    
     // Arrow keys: adjust pitch and yaw (per key press, not per frame)
     // Up arrow: increase pitch (tilt up)
     // Down arrow: decrease pitch (tilt down)
@@ -2029,7 +2198,7 @@ class FClassSimulator
       this.rifleScopePitch -= angularIncrement;
       this.rifleScopeKeys.down = false; // Reset key state after one press
     }
-
+    
     // Left arrow: decrease yaw (pan left)
     // Right arrow: increase yaw (pan right)
     if (this.rifleScopeKeys.left)
@@ -2042,11 +2211,11 @@ class FClassSimulator
       this.rifleScopeYaw += angularIncrement;
       this.rifleScopeKeys.right = false; // Reset key state after one press
     }
-
+    
     // Clamp pitch and yaw to target frame limits
     this.rifleScopePitch = Math.max(-this.rifleScopeMaxPitch, Math.min(this.rifleScopeMaxPitch, this.rifleScopePitch));
     this.rifleScopeYaw = Math.max(-this.rifleScopeMaxYaw, Math.min(this.rifleScopeMaxYaw, this.rifleScopeYaw));
-
+    
     // Apply rotation to rifle scope camera
     // Use user's target as the center reference point
     this.rifleScopeCamera.position.copy(this.camera.position);
@@ -2073,7 +2242,6 @@ class FClassSimulator
     this.rifleScopeCamera.fov = fovDegrees;
     this.rifleScopeCamera.updateProjectionMatrix();
 
-    console.log(`Rifle scope zoom: ${this.rifleScopeZoom.toFixed(2)}x (FOV: ${fovDegrees.toFixed(1)}°)`);
   }
 
 
@@ -2093,52 +2261,39 @@ class FClassSimulator
       const diameterInches = parseFloat(document.getElementById('diameter').value);
       const mvSdFps = parseFloat(document.getElementById('mvSd').value);
       const rifleAccuracyMoa = parseFloat(document.getElementById('rifleAccuracy').value);
-
+      
       this.nominalMV = mvFps; // Store in fps
       this.bulletDiameter = diameterInches; // Store in inches
       this.mvSd = mvSdFps; // Store in fps
       this.rifleAccuracyMoa = rifleAccuracyMoa; // Store in MOA
-
+      
       // Get game parameters
       const gameParams = getGameParams();
-      console.log('Getting target:', gameParams.target, typeof gameParams.target);
       this.btkTarget = btk.NRATargets.getTarget(String(gameParams.target));
       const range = btk.Conversions.yardsToMeters(gameParams.distance);
-
-      // Create bullet
-      this.bullet = new btk.Bullet(
-        btk.Conversions.grainsToKg(0),
-        btk.Conversions.inchesToMeters(this.bulletDiameter), // Convert at call
-        btk.Conversions.inchesToMeters(0),
-        bc,
-        dragFunction === 'G1' ? btk.DragFunction.G1 : btk.DragFunction.G7
-      );
-
-      // Create atmosphere (default conditions)
-      const atmosphere = new btk.Atmosphere(
-        btk.Conversions.fahrenheitToKelvin(59),
-        btk.Conversions.feetToMeters(0),
-        0.5,
-        0.0
-      );
-
-      // Create ballistic simulator
-      this.ballisticSimulator = new btk.BallisticsSimulator();
+      
+      // Create bullet (wrapper handles unit conversions)
+      this.bullet = new BtkBulletWrapper(0, this.bulletDiameter, 0, bc, dragFunction);
+      
+      // Create atmosphere (wrapper handles unit conversions)
+      const atmosphere = new BtkAtmosphereWrapper(59, 0, 0.5, 0.0);
+      
+      // Create ballistic simulator (wrapped for transparent coordinate conversion)
+      this.ballisticSimulator = new BtkBallisticsSimulatorWrapper();
       this.ballisticSimulator.setInitialBullet(this.bullet);
       this.ballisticSimulator.setAtmosphere(atmosphere);
-      this.ballisticSimulator.setWind(new btk.Vector3D(0, 0, 0));
-
+      this.ballisticSimulator.setWind(new BtkVector3Wrapper(0, 0, 0));
+      
       // Calculate target center coordinates for the selected target
       this.targetCenterCoords = this.calculateTargetCenterCoords();
-
+      
       // Custom zeroing routine to hit target center (accounting for Y offset)
-      const mvMps = btk.Conversions.fpsToMps(this.nominalMV); // Convert to m/s
-      this.zeroedBullet = this.computeZeroToTarget(mvMps, range);
-
-      // Create match object for recording shots
-      this.match = new btk.Match();
-
-      console.log('Ballistic system zeroed on target at', gameParams.distance, 'yards');
+      const rangeYards = btk.Conversions.metersToYards(range);
+      this.zeroedBullet = this.computeZeroToTarget(this.nominalMV, rangeYards);
+      
+      // Create match object for recording shots (wrapped)
+      this.match = new BtkMatchWrapper();
+      
     }
     catch (error)
     {
@@ -2151,123 +2306,113 @@ class FClassSimulator
    * Calculate the center coordinates of the selected target
    */
   calculateTargetCenterCoords()
-  {
-    // Get the target position from the 3D scene (already in Three.js coords)
-    if (!this.userTarget || !this.userTarget.mesh)
-    {
-      console.error('User target not found');
-      return {
-        x: 0, // Center horizontally
-        y: FClassSimulator.TARGET_CENTER_HEIGHT,
-        z: -this.distance // Downrange (negative Z)
-      };
-    }
-
-    // Get the actual position from the 3D mesh (Three.js coords: X=right, Y=up, Z=towards camera)
+  { // Get the actual position from the 3D mesh (Three.js coords: X=right, Y=up, Z=towards camera)
     const mesh = this.userTarget.mesh;
     const position = mesh.position;
-
-    console.log(`Target position (Three.js): (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}) yards`);
-
     // Return position as-is (already in Three.js coordinates)
     return {
       x: position.x, // Horizontal position
-      y: position.y, // Vertical position
+      y: position.y, // Vertical position (center of target)
       z: position.z  // Downrange position (negative)
     };
   }
 
   /**
    * Custom zeroing routine to hit target center accounting for Y offset
+   * @param {number} mv - Muzzle velocity (fps)
+   * @param {number} range - Range (yards)
    */
-  computeZeroToTarget(mv, range_m)
+  computeZeroToTarget(mv, range)
   {
-    // Convert Three.js target coords (yards) to BTK coords (meters)
-    // Three.js: X=right, Y=up, Z=towards-camera (negative=downrange)
-    // BTK: X=downrange, Y=crossrange-right, Z=up
-    const targetX = btk.Conversions.yardsToMeters(-this.targetCenterCoords.z); // Three -Z → BTK X (downrange)
-    const targetY = btk.Conversions.yardsToMeters(this.targetCenterCoords.x);  // Three X → BTK Y (crossrange)
-    const targetZ = btk.Conversions.yardsToMeters(this.targetCenterCoords.y);  // Three Y → BTK Z (up)
+    // Target coordinates in yards (Three.js units)
+    const targetX = this.targetCenterCoords.x;  // Three X (crossrange)
+    const targetY = this.targetCenterCoords.y;  // Three Y (up)
+    const targetZ = this.targetCenterCoords.z;  // Three Z (downrange, negative)
 
-    console.log(`Zeroing to target at BTK (${targetX.toFixed(2)}, ${targetY.toFixed(2)}, ${targetZ.toFixed(2)}) meters`);
-
+    
     // Initial angles - start with reasonable elevation and windage
-    let elevation = 0.1; // Start with 0.1 radian elevation (about 6 degrees)
+    let elevation = 0.01; // Start with 0.01 radian elevation (about 0.57 degrees)
     let windage = 0.0; // Start with no windage
-
+    
     const dt = 0.001;
     const maxIterations = 1000;
-    const tolerance = 0.001; // 1mm tolerance
-
+    const tolerance = 0.01; // 0.01 yards (~0.36 inches) tolerance
+    
     for (let iter = 0; iter < maxIterations; iter++)
     {
-      // Create velocity vector from angles
-      const vx = mv * Math.cos(elevation) * Math.cos(windage);
-      const vy = mv * Math.cos(elevation) * Math.sin(windage);
-      const vz = mv * Math.sin(elevation);
-
-      const vel = new btk.Vector3D(vx, vy, vz);
-      const pos = new btk.Vector3D(0, 0, 0); // Start at muzzle
-      const bullet = new btk.Bullet(this.bullet, pos, vel, 0.0);
-
-      // Simulate trajectory
-      this.ballisticSimulator.setInitialBullet(bullet);
+      // Create velocity vector from angles in Three.js coordinates (fps)
+      // Three.js: X=right, Y=up, Z=towards camera (negative Z = downrange)
+      // Elevation: angle above horizontal (pitch)
+      // Windage: angle left/right from center (yaw)
+      const velX = mv * Math.sin(windage) * Math.cos(elevation); // Crossrange (right)
+      const velY = mv * Math.sin(elevation); // Vertical (up)
+      const velZ = -mv * Math.cos(windage) * Math.cos(elevation); // Downrange (negative Z)
+      
+      if (iter === 0) {
+      }
+      
+      // Create velocity and position using wrappers
+      const vel = new BtkVelocityWrapper(velX, velY, velZ);
+      const pos = new BtkVector3Wrapper(0, 0, 0); // Start at muzzle
+      
+      if (iter === 0) {
+      }
+      
+      // Create bullet using wrapper (accepts wrapped pos and vel)
+      const bullet = new BtkBulletWrapper(this.bullet.raw, pos, vel, 0.0);
+      
+      // Simulate trajectory using wrapper
+      this.ballisticSimulator.setInitialBullet(bullet.raw);
       this.ballisticSimulator.resetToInitial();
-      this.ballisticSimulator.setWind(new btk.Vector3D(0, 0, 0)); // No wind for zeroing
-
-      const trajectory = this.ballisticSimulator.simulate(range_m * 1.1, dt, 5.0);
-      const pointAtRange = trajectory.atDistance(range_m);
-
+      this.ballisticSimulator.setWind(new BtkVector3Wrapper(0, 0, 0)); // No wind for zeroing
+      
+      const trajectory = this.ballisticSimulator.simulate(range * 1.1, dt, 5.0);
+      const pointAtRange = trajectory.atDistance(range);
+      
       if (!pointAtRange)
       {
-        console.log('Trajectory failed at iteration', iter);
         break;
       }
-
+      
       const bulletPos = pointAtRange.getState().getPosition();
+      // Both bulletPos and target coordinates are in yards (Three.js units)
       const errorX = bulletPos.x - targetX;
       const errorY = bulletPos.y - targetY;
       const errorZ = bulletPos.z - targetZ;
-      const totalError = Math.sqrt(errorX * errorX + errorY * errorY + errorZ * errorZ);
-
+      // Only consider X and Y errors for convergence (Z is interpolation error)
+      const totalError = Math.sqrt(errorX * errorX + errorY * errorY);
+      
       if (iter % 10 === 0)
       {
-        console.log(`Iter ${iter}: Error=(${errorX.toFixed(3)}, ${errorY.toFixed(3)}, ${errorZ.toFixed(3)}) total=${totalError.toFixed(3)}m`);
-        console.log(`  Angles: elevation=${(elevation * 180/Math.PI).toFixed(2)}°, windage=${(windage * 180/Math.PI).toFixed(2)}°`);
       }
-
+      
       if (totalError < tolerance)
       {
-        console.log(`Zeroing converged after ${iter} iterations`);
-        console.log(`Final bullet position: (${bulletPos.x.toFixed(2)}, ${bulletPos.y.toFixed(2)}, ${bulletPos.z.toFixed(2)}) meters`);
-        console.log(`Target position: (${targetX.toFixed(2)}, ${targetY.toFixed(2)}, ${targetZ.toFixed(2)}) meters`);
         break;
       }
-
-      // Adjust angles based on errors - more aggressive correction
+      
+      // Adjust angles based on errors
       const correctionFactor = 0.5;
-      elevation -= errorZ * correctionFactor / range_m; // Adjust elevation for height error
-      windage -= errorY * correctionFactor / range_m; // Adjust windage for crossrange error
-
+      elevation -= errorY * correctionFactor / range; // Adjust elevation for vertical error (Y)
+      windage -= errorX * correctionFactor / range; // Adjust windage for crossrange error (X)
+      
       // Keep angles reasonable
       elevation = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, elevation));
       windage = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, windage));
     }
-
-    // Create final velocity from converged angles
-    const finalVx = mv * Math.cos(elevation) * Math.cos(windage);
-    const finalVy = mv * Math.cos(elevation) * Math.sin(windage);
-    const finalVz = mv * Math.sin(elevation);
-
-    const finalVel = new btk.Vector3D(finalVx, finalVy, finalVz);
-    const finalPos = new btk.Vector3D(0, 0, 0);
-    const zeroedBullet = new btk.Bullet(this.bullet, finalPos, finalVel, 0.0);
-
-    console.log(`Final zeroed velocity: (${finalVx.toFixed(2)}, ${finalVy.toFixed(2)}, ${finalVz.toFixed(2)}) m/s`);
-    console.log(`Final angles: elevation=${(elevation * 180/Math.PI).toFixed(2)}°, windage=${(windage * 180/Math.PI).toFixed(2)}°`);
-    console.log(`Velocity magnitude: ${finalVel.magnitude().toFixed(2)} m/s`);
-
-    return zeroedBullet;
+    
+    // Create final velocity from converged angles in Three.js coordinates
+    const finalVelX = mv * Math.sin(windage) * Math.cos(elevation); // Crossrange (right)
+    const finalVelY = mv * Math.sin(elevation); // Vertical (up)
+    const finalVelZ = -mv * Math.cos(windage) * Math.cos(elevation); // Downrange (negative Z)
+    
+    // Create final bullet using wrappers
+    const finalVel = new BtkVelocityWrapper(finalVelX, finalVelY, finalVelZ);
+    const finalPos = new BtkVector3Wrapper(0, 0, 0);
+    const zeroedBullet = new BtkBulletWrapper(this.bullet.raw, finalPos, finalVel, 0.0);
+    
+    
+    return zeroedBullet; // Return the wrapped bullet
   }
 
   // ===== UI & DISPLAY =====
@@ -2285,10 +2430,10 @@ class FClassSimulator
       this.lastShotMarker.material.dispose();
       this.lastShotMarker = null;
     }
-
-
+    
+    
     // Parameters are already in yards (no conversion needed)
-
+    
     // Create 1" red sphere marker (1 inch = 0.02778 yards, so 0.5" radius)
     const markerGeometry = new THREE.SphereGeometry(0.5 * 0.02778, 8, 8); // 1" diameter = 0.5" radius in yards
     const markerMaterial = new THREE.MeshBasicMaterial(
@@ -2296,19 +2441,17 @@ class FClassSimulator
       color: new THREE.Color(1, 0, 0), // Explicit red RGB
       toneMapped: false // Don't apply tone mapping/lighting
     });
-
+    
     this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-
+    
     // Position at target center with relative offset (Three.js coords)
     this.lastShotMarker.position.set(
       this.targetCenterCoords.x + relativeX, // Target center X + horizontal offset
       this.targetCenterCoords.y + relativeY, // Target center Y + vertical offset
       this.targetCenterCoords.z + 0.1 // Slightly in front of target (towards shooter)
     );
-
-    console.log(`Shot marker at: (${this.lastShotMarker.position.x.toFixed(2)}, ${this.lastShotMarker.position.y.toFixed(2)}, ${this.lastShotMarker.position.z.toFixed(2)}) yards`);
-    console.log(`Relative impact: (${relativeX.toFixed(2)}, ${relativeY.toFixed(2)}) yards`);
-
+    
+    
     this.scene.add(this.lastShotMarker);
   }
 
@@ -2318,11 +2461,11 @@ class FClassSimulator
   updateHUD()
   {
     if (!this.hudElements.container) return;
-
+    
     const shotCount = this.match ? this.match.getHitCount() : 0;
     const totalScore = this.match ? this.match.getTotalScore() : 0;
     const xCount = this.match ? this.match.getXCount() : 0;
-
+    
     // Update shot count and score (F-Class match is 60 shots)
     if (shotCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
     {
@@ -2342,7 +2485,7 @@ class FClassSimulator
     const droppedPoints = maxPossibleScore - totalScore;
     const droppedX = maxPossibleX - xCount;
     this.hudElements.dropped.textContent = `${droppedPoints}-${droppedX}x`;
-
+    
     // Update last shot data
     if (this.lastShotData)
     {
@@ -2384,7 +2527,7 @@ class FClassSimulator
 
     const totalScore = this.match.getTotalScore();
     const xCount = this.match.getXCount();
-    const groupSize = btk.Conversions.metersToInches(this.match.getGroupSize()).toFixed(2);
+    const groupSize = this.match.getGroupSizeInches().toFixed(2);
     const shotCount = this.match.getHitCount();
     const maxPossibleScore = shotCount * 10;
     const maxPossibleX = shotCount;
@@ -2431,12 +2574,11 @@ class FClassSimulator
       console.error('Ballistic simulator not initialized');
       return;
     }
-
+    
     // Check if match is complete (60 shots for F-Class)
     const currentShots = this.match ? this.match.getHitCount() : 0;
     if (currentShots >= FClassSimulator.FCLASS_MATCH_SHOTS)
     {
-      console.log(`Match complete! ${FClassSimulator.FCLASS_MATCH_SHOTS} shots fired. Please restart to start a new match.`);
       return;
     }
 
@@ -2447,76 +2589,77 @@ class FClassSimulator
     {
       const range = this.distance;
       const dt = 0.001;
-
-      // Apply MV variation in fps, then convert to m/s for BTK
+      
+    // Apply MV variation in fps
       const mvVariationFps = (Math.random() - 0.5) * 2.0 * this.mvSd; // fps
       const actualMVFps = this.nominalMV + mvVariationFps; // fps
-      const actualMV = btk.Conversions.fpsToMps(actualMVFps); // m/s for BTK
-
-      // Rifle accuracy as uniform distribution within a circle (diameter)
-      // Generate random point within unit circle using rejection sampling
-      let accuracyX, accuracyY;
-      do {
-        accuracyX = (Math.random() - 0.5) * 2.0; // -1 to 1
-        accuracyY = (Math.random() - 0.5) * 2.0; // -1 to 1
-      } while (accuracyX * accuracyX + accuracyY * accuracyY > 1.0);
-
-      // Rifle accuracy in MOA, convert to radians for angular error
-      const accuracyMoa = this.rifleAccuracyMoa;
-      const accuracyRad = btk.Conversions.moaToRadians(accuracyMoa);
+    
+    // Rifle accuracy as uniform distribution within a circle (diameter)
+    // Generate random point within unit circle using rejection sampling
+    let accuracyX, accuracyY;
+    do {
+      accuracyX = (Math.random() - 0.5) * 2.0; // -1 to 1
+      accuracyY = (Math.random() - 0.5) * 2.0; // -1 to 1
+    } while (accuracyX * accuracyX + accuracyY * accuracyY > 1.0);
+    
+    // Rifle accuracy in MOA, convert to radians for angular error
+    const accuracyMoa = this.rifleAccuracyMoa;
+    const accuracyRad = btk.Conversions.moaToRadians(accuracyMoa);
       const accuracyRadius = accuracyRad / 2.0; // Convert diameter to radius
       const accuracyErrorH = accuracyX * accuracyRadius; // radians
       const accuracyErrorV = accuracyY * accuracyRadius; // radians
-
-      // Apply scope aim and accuracy errors to the zeroed velocity
-      const zeroVel = this.zeroedBullet.getVelocity();
-      const zeroVelMag = zeroVel.magnitude();
-      const zeroVelNorm = zeroVel.normalized();
-
-      // Apply scope aim as small angular adjustments to the zeroed direction
-      const yawAdjustment = this.rifleScopeYaw + accuracyErrorH;
-      const pitchAdjustment = -(this.rifleScopePitch + accuracyErrorV); // Invert pitch for correct behavior
-
-      // Create new velocity by rotating the zeroed velocity
-      const cosYaw = Math.cos(yawAdjustment);
-      const sinYaw = Math.sin(yawAdjustment);
-      const cosPitch = Math.cos(pitchAdjustment);
-      const sinPitch = Math.sin(pitchAdjustment);
-
-      // Rotate zeroed velocity by scope adjustments
-      const rotatedVel = new btk.Vector3D(
-        zeroVelNorm.x * cosPitch * cosYaw - zeroVelNorm.y * sinYaw + zeroVelNorm.z * sinPitch * cosYaw,
-        zeroVelNorm.x * cosPitch * sinYaw + zeroVelNorm.y * cosYaw + zeroVelNorm.z * sinPitch * sinYaw,
-        -zeroVelNorm.x * sinPitch + zeroVelNorm.z * cosPitch
-      );
-
-      // Scale by actual MV
-      const variedVel = new btk.Vector3D(
-        rotatedVel.x * actualMV,
-        rotatedVel.y * actualMV,
-        rotatedVel.z * actualMV
-      );
-
-      // Create bullet with varied initial state - start from muzzle (z=0)
-      const bulletStartPos = new btk.Vector3D(0, 0, 0);
-
-      const variedBullet = new btk.Bullet(
-        this.zeroedBullet,
-        bulletStartPos,
-        variedVel,
-        this.zeroedBullet.getSpinRate()
-      );
-
+    
+    // Apply scope aim and accuracy errors to the zeroed velocity
+    const zeroVel = this.zeroedBullet.getVelocity();
+    const zeroVelMag = zeroVel.magnitude();
+    // Compute true unit direction in fps space (avoid wrapper normalized cross-unit issues)
+    const zx = zeroVel.x, zy = zeroVel.y, zz = zeroVel.z;
+    const ux0 = zx / zeroVelMag;
+    const uy0 = zy / zeroVelMag;
+    const uz0 = zz / zeroVelMag;
+    
+    // Apply scope aim as small angular adjustments to the zeroed direction
+    const yawAdjustment = this.rifleScopeYaw + accuracyErrorH;
+    const pitchAdjustment = -(this.rifleScopePitch + accuracyErrorV); // Invert pitch for correct behavior
+    
+    // Create new velocity by rotating the zeroed direction
+    const cosYaw = Math.cos(yawAdjustment);
+    const sinYaw = Math.sin(yawAdjustment);
+    const cosPitch = Math.cos(pitchAdjustment);
+    const sinPitch = Math.sin(pitchAdjustment);
+    
+    // Rotate unit direction (fps space): yaw around Y, then pitch around X
+    const rx = ux0 * cosYaw - uz0 * sinYaw;
+    const rz = ux0 * sinYaw + uz0 * cosYaw;
+    const ry = uy0;
+    const ux = rx;
+    const uy = ry * cosPitch + rz * sinPitch;
+    const uz = -ry * sinPitch + rz * cosPitch;
+    
+    // Scale by actual MV (fps)
+    const variedVel = new BtkVelocityWrapper(
+      ux * actualMVFps,
+      uy * actualMVFps,
+      uz * actualMVFps
+    );
+    
+    // Create bullet with varied initial state - start from muzzle (z=0)
+    const bulletStartPos = new BtkVector3Wrapper(0, 0, 0);
+    
+    const variedBullet = new BtkBulletWrapper(
+      this.zeroedBullet.raw,
+      bulletStartPos,
+      variedVel,
+      this.zeroedBullet.getSpinRate()
+    );
+      
       // Reset simulator with varied bullet
       this.ballisticSimulator.setInitialBullet(variedBullet);
       this.ballisticSimulator.resetToInitial();
-
-      // Simulate with wind generator
-      const rangeMeters = btk.Conversions.yardsToMeters(range);
-      const rawTrajectory = this.ballisticSimulator.simulateWithWind(rangeMeters, dt, 3.0, this.windGenerator.raw, this.getTime());
-      // Store wrapped trajectory for animation (handles coordinate conversion)
-      this.lastTrajectory = new BtkTrajectoryWrapper(rawTrajectory);
-      const pointAtTarget = this.lastTrajectory.atDistance(range); // Now in yards!
+      
+      // Simulate with wind generator (wrapper handles unit conversion)
+      this.lastTrajectory = this.ballisticSimulator.simulateWithWind(range, dt, 5.0, this.windGenerator, this.getTime());
+      const pointAtTarget = this.lastTrajectory.atDistance(range); // distance in yards
 
       if (!pointAtTarget)
       {
@@ -2527,8 +2670,8 @@ class FClassSimulator
       // Get bullet position and velocity at target (now in Three.js coords, yards)
       const bulletState = pointAtTarget.getState();
       const bulletPos = bulletState.getPosition(); // Three.js coords in yards
-      const bulletVel = bulletState.getVelocity(); // Three.js coords in yards
-      const impactVelocity = Math.sqrt(bulletVel.x**2 + bulletVel.y**2 + bulletVel.z**2) * 0.9144; // Convert yards/s to m/s
+      const bulletVel = bulletState.getVelocity(); // Three.js coords in fps
+      const impactVelocityFps = Math.sqrt(bulletVel.x**2 + bulletVel.y**2 + bulletVel.z**2); // fps
 
       // Target coordinates are also in Three.js coords, yards
       const targetX = this.targetCenterCoords.x;
@@ -2541,15 +2684,14 @@ class FClassSimulator
 
       // Store all shot data for processing after animation completes
       this.pendingShotData = {
-        relativeX: relativeX * 0.9144, // Convert yards to meters for scoring
-        relativeY: relativeY * 0.9144, // Convert yards to meters for scoring
+        relativeX: relativeX, // yards (will be converted by match.addHit)
+        relativeY: relativeY, // yards (will be converted by match.addHit)
         mvFps: actualMVFps,
-        impactVelocityFps: btk.Conversions.mpsToFps(impactVelocity),
+        impactVelocityFps: impactVelocityFps,
         bulletDiameterMeters: btk.Conversions.inchesToMeters(this.bulletDiameter)
       };
 
       // Log that animation is starting
-      console.log(`Bullet fired - animation starting...`);
     }
     catch (error)
     {
@@ -2568,7 +2710,7 @@ class FClassSimulator
   displayShotImpact(relativeX, relativeY, score, isX)
   {
     if (!this.userTarget) return;
-
+    
     // Create shot impact marker
     const shotGeometry = new THREE.SphereGeometry(this.bulletDiameter / 2, 8, 8);
     const shotMaterial = new THREE.MeshBasicMaterial(
@@ -2576,16 +2718,16 @@ class FClassSimulator
       color: isX ? FClassSimulator.COLOR_X_RING : (score >= FClassSimulator.SCORE_THRESHOLD_RED ? FClassSimulator.COLOR_HIGH_SCORE : FClassSimulator.COLOR_LOW_SCORE)
     });
     const shotMesh = new THREE.Mesh(shotGeometry, shotMaterial);
-
+    
     // Position on user target
     shotMesh.position.set(
       this.userTarget.mesh.position.x,
       this.userTarget.mesh.position.y + relativeX,
       this.userTarget.mesh.position.z + relativeY
     );
-
+    
     this.scene.add(shotMesh);
-
+    
     if (!this.shotMarkers) this.shotMarkers = [];
     this.shotMarkers.push(shotMesh);
   }
@@ -2605,7 +2747,7 @@ class FClassSimulator
       });
       this.shotMarkers = [];
     }
-
+    
     // Clear match data
     if (this.match)
     {
@@ -2631,8 +2773,8 @@ class FClassSimulator
 
         if (this.isRunning && this.ballisticSimulator)
         {
-          event.preventDefault();
-          this.fireShot();
+        event.preventDefault();
+        this.fireShot();
           // Start bullet animation for this shot if trajectory is available
           this.startBulletAnimation();
         }
@@ -2790,8 +2932,6 @@ class FClassSimulator
         }
 
         // Log the final results
-        console.log(`Shot ${this.match.getHitCount()}: Score=${hit.getScore()}${hit.isX() ? 'x' : ''}, Impact=(${btk.Conversions.metersToInches(data.relativeX).toFixed(2)}", ${btk.Conversions.metersToInches(data.relativeY).toFixed(2)}")`);
-        console.log(`Match: ${this.match.getTotalScore()}-${this.match.getXCount()}x, Group=${btk.Conversions.metersToInches(this.match.getGroupSize()).toFixed(2)}"`);
 
         this.pendingShotData = null;
       }
@@ -2805,7 +2945,7 @@ class FClassSimulator
   destroy()
   {
     this.stop();
-
+    
     // Clean up flags
     for (let flagMesh of this.flagMeshes)
     {
@@ -2847,10 +2987,10 @@ class FClassSimulator
       }
     }
     this.targetFrames = [];
-
+    
     // Clean up shot markers
     this.clearShotMarkers();
-
+    
     // Clean up bullet resources
     if (this.bulletMesh)
     {
