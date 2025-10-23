@@ -278,7 +278,6 @@ class FClassSimulator
   static FCLASS_MATCH_SHOTS = 60;
 
   // === ANIMATION & TIMING ===
-  static ASSUMED_FPS = 60;
   static FLAG_ANGLE_INTERPOLATION_SPEED = 30; // degrees per second
   static FLAG_DIRECTION_INTERPOLATION_SPEED = 1.0; // radians per second
 
@@ -2593,28 +2592,68 @@ class FClassSimulator
   {
     this.stop();
 
-    // Clean up Three.js resources
+    // Clean up flags
     for (let flagMesh of this.flagMeshes)
     {
       flagMesh.pole.geometry.dispose();
       flagMesh.pole.material.dispose();
       flagMesh.flagMesh.geometry.dispose();
       flagMesh.flagMesh.material.dispose();
+      if (flagMesh.flagMesh.material.map)
+      {
+        flagMesh.flagMesh.material.map.dispose();
+      }
       this.scene.remove(flagMesh.pole);
       this.scene.remove(flagMesh.flagMesh);
     }
+    this.flagMeshes = [];
 
+    // Clean up targets
+    for (let targetFrame of this.targetFrames)
+    {
+      if (targetFrame.mesh)
+      {
+        this.scene.remove(targetFrame.mesh);
+        targetFrame.mesh.geometry.dispose();
+        targetFrame.mesh.material.dispose();
+        if (targetFrame.mesh.material.map)
+        {
+          targetFrame.mesh.material.map.dispose();
+        }
+      }
+      if (targetFrame.numberBox)
+      {
+        this.scene.remove(targetFrame.numberBox);
+        targetFrame.numberBox.geometry.dispose();
+        targetFrame.numberBox.material.dispose();
+        if (targetFrame.numberBox.material.map)
+        {
+          targetFrame.numberBox.material.map.dispose();
+        }
+      }
+    }
+    this.targetFrames = [];
 
     // Clean up shot markers
     this.clearShotMarkers();
 
-    // Clean up bullet mesh and glow
+    // Clean up bullet resources
     if (this.bulletMesh)
     {
       this.scene.remove(this.bulletMesh);
       this.bulletMesh.geometry.dispose();
       this.bulletMesh.material.dispose();
       this.bulletMesh = null;
+    }
+    if (this.bulletGeometry)
+    {
+      this.bulletGeometry.dispose();
+      this.bulletGeometry = null;
+    }
+    if (this.bulletMaterial)
+    {
+      this.bulletMaterial.dispose();
+      this.bulletMaterial = null;
     }
     if (this.bulletGlowSprite)
     {
@@ -2623,6 +2662,13 @@ class FClassSimulator
       this.bulletGlowSprite.material.dispose();
       this.bulletGlowSprite = null;
     }
+
+    // Clean up geometry cache
+    for (let key in this._geoBoxCache)
+    {
+      this._geoBoxCache[key].dispose();
+    }
+    this._geoBoxCache = {};
 
     // Clean up scope resources
     if (this.spottingScopeRenderTarget)
@@ -2662,28 +2708,77 @@ class FClassSimulator
       this.rifleScopeViewMesh = null;
     }
 
-    // Remove scope keyboard event listeners
+    // Clean up cameras
+    this.camera = null;
+    this.spottingScopeCamera = null;
+    this.rifleScopeCamera = null;
+    this.overlayCamera = null;
+
+    // Clean up audio
+    if (this.audioContext)
+    {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    this.shotSound = null;
+
+    // Clean up WASM objects
+    if (this.windGenerator)
+    {
+      this.windGenerator.delete();
+      this.windGenerator = null;
+    }
+    if (this.ballisticSimulator)
+    {
+      this.ballisticSimulator.delete();
+      this.ballisticSimulator = null;
+    }
+    if (this.match)
+    {
+      this.match.delete();
+      this.match = null;
+    }
+    if (this.btkTarget)
+    {
+      this.btkTarget.delete();
+      this.btkTarget = null;
+    }
+    if (this.bullet)
+    {
+      this.bullet.delete();
+      this.bullet = null;
+    }
+    if (this.zeroedBullet)
+    {
+      this.zeroedBullet.delete();
+      this.zeroedBullet = null;
+    }
+
+    // Remove event listeners
     if (this.spottingScopeKeyHandler)
     {
       document.removeEventListener('keydown', this.spottingScopeKeyHandler);
-    }
-    if (this.spottingScopeKeyHandler)
-    {
       document.removeEventListener('keyup', this.spottingScopeKeyHandler);
+      this.spottingScopeKeyHandler = null;
     }
     if (this.rifleScopeKeyHandler)
     {
       document.removeEventListener('keydown', this.rifleScopeKeyHandler);
-    }
-    if (this.rifleScopeKeyHandler)
-    {
       document.removeEventListener('keyup', this.rifleScopeKeyHandler);
+      this.rifleScopeKeyHandler = null;
+    }
+    if (this.shotFiringHandler)
+    {
+      document.removeEventListener('keydown', this.shotFiringHandler);
+      this.shotFiringHandler = null;
     }
 
+    // Dispose renderer and scenes
     this.renderer.dispose();
     this.scene = null;
     this.overlayScene = null;
     this.renderer = null;
+    this.clock = null;
   }
 }
 
