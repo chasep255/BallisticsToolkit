@@ -15,6 +15,145 @@ const FCLASS_DISTANCE_TO_TARGET = {
 // WebGL game instance
 let webglGame = null;
 
+// ===== BTK WRAPPERS (TRANSPARENT COORDINATE/UNIT CONVERSION) =====
+
+/**
+ * Wraps BTK Vector3 - appears as standard Three.js coords in yards
+ * BTK: X=downrange(m), Y=crossrange-right(m), Z=up(m)
+ * Three.js: X=right(yd), Y=up(yd), Z=towards-camera(yd) [negative Z = downrange]
+ */
+class BtkVector3Wrapper {
+  constructor(btkVec3OrX, y, z) {
+    if (typeof btkVec3OrX === 'object') {
+      // Wrapping existing BTK vector
+      this._btk = btkVec3OrX;
+    } else {
+      // Creating from Three.js coords (yards) - convert to BTK (meters)
+      const x_yd = btkVec3OrX;
+      const btkX_m = btk.Conversions.yardsToMeters(-z);  // Three Z → BTK X (downrange)
+      const btkY_m = btk.Conversions.yardsToMeters(x_yd); // Three X → BTK Y (crossrange)
+      const btkZ_m = btk.Conversions.yardsToMeters(y);   // Three Y → BTK Z (up)
+      this._btk = new btk.Vector3(btkX_m, btkY_m, btkZ_m);
+    }
+  }
+  
+  // Expose as Three.js coordinates in yards (transparent conversion)
+  get x() { return btk.Conversions.metersToYards(this._btk.y); }  // BTK Y → Three X
+  get y() { return btk.Conversions.metersToYards(this._btk.z); }  // BTK Z → Three Y
+  get z() { return btk.Conversions.metersToYards(-this._btk.x); } // BTK -X → Three Z
+  
+  toThreeVector3() {
+    return new THREE.Vector3(this.x, this.y, this.z);
+  }
+  
+  get raw() { return this._btk; } // For passing to BTK functions
+  delete() { if (this._btk?.delete) this._btk.delete(); }
+}
+
+/**
+ * Wraps BTK Bullet - all coordinates in Three.js space, yards
+ */
+class BtkBulletWrapper {
+  constructor(btkBullet) {
+    this._btk = btkBullet;
+  }
+  
+  getPosition() { return new BtkVector3Wrapper(this._btk.getPosition()); }
+  getVelocity() { return new BtkVector3Wrapper(this._btk.getVelocity()); }
+  getMach() { return this._btk.getMach(); }
+  getTime() { return this._btk.getTime(); }
+  
+  get raw() { return this._btk; }
+}
+
+/**
+ * Wraps BTK TrajectoryPoint
+ */
+class BtkTrajectoryPointWrapper {
+  constructor(btkPoint) {
+    this._btk = btkPoint;
+  }
+  
+  getState() { return new BtkBulletWrapper(this._btk.getState()); }
+  getTime() { return this._btk.getTime(); }
+  get raw() { return this._btk; }
+}
+
+/**
+ * Wraps BTK Trajectory - distances in yards, returns Three.js coords
+ */
+class BtkTrajectoryWrapper {
+  constructor(btkTrajectory) {
+    this._btk = btkTrajectory;
+  }
+  
+  atTime(t) {
+    const point = this._btk.atTime(t);
+    return point ? new BtkTrajectoryPointWrapper(point) : undefined;
+  }
+  
+  atDistance(distanceYards) {
+    const d_m = btk.Conversions.yardsToMeters(distanceYards);
+    const point = this._btk.atDistance(d_m);
+    return point ? new BtkTrajectoryPointWrapper(point) : undefined;
+  }
+  
+  getTotalTime() { return this._btk.getTotalTime(); }
+  
+  get raw() { return this._btk; }
+  delete() { this._btk.delete(); }
+}
+
+/**
+ * Wraps BTK WindGenerator - positions in yards, returns Three.js coords
+ * Note: Wind is currently only a function of downrange distance (z coordinate),
+ * but we keep the 3-coordinate interface for future flexibility
+ */
+class BtkWindGeneratorWrapper {
+  constructor(btkWindGen) {
+    this._btk = btkWindGen;
+  }
+  
+  getWindAt(x_yd, y_yd, z_yd, time) {
+    // Convert Three.js Z (towards camera, negative = downrange) to BTK X (downrange)
+    // Wind only depends on downrange distance currently
+    const downrange_m = btk.Conversions.yardsToMeters(-z_yd);
+    const wind = this._btk.sample(downrange_m, time);
+    return new BtkVector3Wrapper(wind);
+  }
+  
+  get raw() { return this._btk; }
+  delete() { this._btk.delete(); }
+}
+
+/**
+ * Wraps BTK Simulator - all inputs/outputs in Three.js coords, yards
+ */
+class BtkSimulatorWrapper {
+  static simulate(bullet, atmosphere, wind, maxTime, timeStep) {
+    const traj = btk.ballistics.Simulator.simulate(
+      bullet.raw, 
+      atmosphere.raw, 
+      wind?.raw, 
+      maxTime, 
+      timeStep
+    );
+    return new BtkTrajectoryWrapper(traj);
+  }
+  
+  static computeZero(bullet, atmosphere, wind, rangeYards, scopeHeightYards) {
+    const range_m = btk.Conversions.yardsToMeters(rangeYards);
+    const height_m = btk.Conversions.yardsToMeters(scopeHeightYards);
+    return btk.ballistics.Simulator.computeZero(
+      bullet.raw,
+      atmosphere.raw,
+      wind?.raw,
+      range_m,
+      height_m
+    );
+  }
+}
+
 // Initialize the game
 async function init()
 {
@@ -583,9 +722,9 @@ class FClassSimulator
     // Create spotting scope camera
     const scopeFOV = FClassSimulator.CAMERA_FOV / FClassSimulator.SCOPE_MAGNIFICATION; // 30° / 4 = 7.5°
     this.spottingScopeCamera = new THREE.PerspectiveCamera(scopeFOV, 1.0, 0.5, this.distance * 1.5);
-    this.spottingScopeCamera.position.set(-1, 0, FClassSimulator.CAMERA_EYE_HEIGHT);
-    this.spottingScopeCamera.up.set(0, 0, 1);
-    this.spottingScopeCamera.lookAt(this.distance, 0, FClassSimulator.CAMERA_EYE_HEIGHT);
+    this.spottingScopeCamera.position.set(0, FClassSimulator.CAMERA_EYE_HEIGHT, 1); // At shooter, slightly behind
+    this.spottingScopeCamera.up.set(0, 1, 0); // Y is up
+    this.spottingScopeCamera.lookAt(0, FClassSimulator.CAMERA_EYE_HEIGHT, -this.distance); // Look downrange
 
     // Initialize control state
     this.spottingScopeYaw = 0;
@@ -627,12 +766,13 @@ class FClassSimulator
 
     // Create rifle scope camera
     this.rifleScopeCamera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.5, this.distance * 1.5);
-    this.rifleScopeCamera.position.set(0, 0, FClassSimulator.CAMERA_EYE_HEIGHT);
+    this.rifleScopeCamera.position.set(0, FClassSimulator.CAMERA_EYE_HEIGHT, 0); // At muzzle
+    this.rifleScopeCamera.up.set(0, 1, 0); // Y is up
 
-    // Point at user's target center
-    const targetCenterX = this.distance;
-    const targetCenterY = this.userTarget.mesh.position.y;
-    const targetCenterZ = this.userTarget.mesh.position.z;
+    // Point at center target position (will be updated when user target is selected)
+    const targetCenterX = 0; // Center horizontally
+    const targetCenterY = FClassSimulator.TARGET_CENTER_HEIGHT; // Target height
+    const targetCenterZ = -this.distance; // Downrange
     this.rifleScopeCamera.lookAt(targetCenterX, targetCenterY, targetCenterZ);
 
     // Initialize rifle scope control state
@@ -898,27 +1038,32 @@ class FClassSimulator
     const cosPitch = Math.cos(angleRad);
     const sinPitch = Math.sin(angleRad);
 
-    const segmentX = sinPitch * length * t * cosDir;
-    const segmentY = sinPitch * length * t * sinDir;
-    const segmentZ = -cosPitch * length * t;
+    // In Three.js coords: X=right, Y=up, Z=towards camera (negative Z = downrange)
+    // Flag extends from pole: 0° = hanging down, 90° = horizontal
+    // Wind angle determines how much the flag lifts (0° = hanging down, 90° = straight out)
+    
+    const segmentX = sinPitch * length * t; // Horizontal extension (positive X from left side)
+    const segmentY = -cosPitch * length * t; // Vertical droop (negative Y = down)
+    const segmentZ = 0; // No depth extension
 
-    // Flapping animation
+    // Flapping animation - flag waves in the wind
     const wavePosition = t * FClassSimulator.FLAG_WAVE_LENGTH;
     const waveOffset = Math.sin(flapPhase + wavePosition * 2 * Math.PI) * FClassSimulator.FLAG_FLAP_AMPLITUDE;
     const flapAmplitude = waveOffset * t;
 
-    const perpX = -sinDir;
-    const perpY = cosDir;
-    const flapX = perpX * flapAmplitude;
-    const flapY = perpY * flapAmplitude;
-    const flapZ = 0;
+    // Flapping perpendicular to flag surface (in Z direction - towards/away from camera)
+    const flapX = 0; // No horizontal flapping
+    const flapY = 0; // No vertical flapping
+    const flapZ = flapAmplitude; // Depth flapping (flag waves towards/away from camera)
 
     // Return 4 vertices: [topFront, bottomFront, topBack, bottomBack]
+    // Flag is vertical (in XY plane), with top/bottom in Y direction
+    // Front/back faces are offset in Z direction (thickness)
     return {
-      topFront: [segmentX + flapX + thickness / 2, segmentY + flapY, segmentZ + flapZ + halfWidth],
-      bottomFront: [segmentX + flapX + thickness / 2, segmentY + flapY, segmentZ + flapZ - halfWidth],
-      topBack: [segmentX + flapX - thickness / 2, segmentY + flapY, segmentZ + flapZ + halfWidth],
-      bottomBack: [segmentX + flapX - thickness / 2, segmentY + flapY, segmentZ + flapZ - halfWidth]
+      topFront: [segmentX + flapX, segmentY + flapY + halfWidth, segmentZ + flapZ + thickness / 2],
+      bottomFront: [segmentX + flapX, segmentY + flapY - halfWidth, segmentZ + flapZ + thickness / 2],
+      topBack: [segmentX + flapX, segmentY + flapY + halfWidth, segmentZ + flapZ - thickness / 2],
+      bottomBack: [segmentX + flapX, segmentY + flapY - halfWidth, segmentZ + flapZ - thickness / 2]
     };
   }
 
@@ -1044,16 +1189,16 @@ class FClassSimulator
   // ===== SCENE SETUP =====
   setupCamera()
   {
-    // Camera: BTK coords (X=downrange, Y=crossrange, Z=up)
+    // Camera: Standard Three.js coords (X=right, Y=up, Z=towards camera, -Z=downrange)
     const aspect = this.canvasWidth / this.canvasHeight;
     // Use logarithmic depth buffer for better precision at long range
     // Near plane at 0.5 yards, far plane well beyond target
     this.camera = new THREE.PerspectiveCamera(FClassSimulator.CAMERA_FOV, aspect, 0.5, this.distance * 1.5);
-    // Camera positioned 1 yard behind muzzle, at target center height when raised
+    // Camera positioned 1 yard behind shooter, at target center height
     const targetCenterHeight = FClassSimulator.TARGET_CENTER_HEIGHT;
-    this.camera.position.set(-1, 0, targetCenterHeight); // 1 yard behind muzzle, at target center height
-    this.camera.up.set(0, 0, 1); // Z is up
-    this.camera.lookAt(this.distance, 0, targetCenterHeight); // Look at target distance at same height
+    this.camera.position.set(0, targetCenterHeight, 1); // At shooter position (Z=1, slightly behind muzzle)
+    this.camera.up.set(0, 1, 0); // Y is up in Three.js
+    this.camera.lookAt(0, targetCenterHeight, -this.distance); // Look downrange (negative Z)
   }
 
   setupLighting()
@@ -1064,8 +1209,8 @@ class FClassSimulator
 
     // Strong directional light (sun) for bright scene with vivid shadows
     const directionalLight = new THREE.DirectionalLight(0xfffaf0, 2.5); // Bright warm sunlight
-    // Position sun behind and to the left of shooter (7.5 o'clock position)
-    directionalLight.position.set(-500, -200, 400); // Behind shooter, high up
+    // Position sun behind and to the left of shooter (Three.js coords: X=right, Y=up, Z=towards camera)
+    directionalLight.position.set(-200, 400, 500); // Left, high, behind shooter
     directionalLight.castShadow = true;
 
     // Configure shadow properties for better quality
@@ -1073,11 +1218,11 @@ class FClassSimulator
     directionalLight.shadow.mapSize.height = 4096;
     directionalLight.shadow.camera.near = 10;
     directionalLight.shadow.camera.far = 1500;
-    // Wider shadow camera to cover the entire range
-    directionalLight.shadow.camera.left = -100;
-    directionalLight.shadow.camera.right = 1100;
-    directionalLight.shadow.camera.top = 100;
-    directionalLight.shadow.camera.bottom = -100;
+    // Shadow camera bounds (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
+    directionalLight.shadow.camera.left = -100;   // Left side
+    directionalLight.shadow.camera.right = 100;   // Right side
+    directionalLight.shadow.camera.top = 200;     // Top
+    directionalLight.shadow.camera.bottom = -10;  // Bottom (slightly below ground)
     directionalLight.shadow.bias = -0.0005; // Reduce shadow acne
     directionalLight.shadow.normalBias = 0.02; // Additional bias for smooth surfaces
 
@@ -1085,7 +1230,7 @@ class FClassSimulator
 
     // Optional: Add a subtle fill light from the front to soften shadows
     const fillLight = new THREE.DirectionalLight(0xadd8e6, 0.3); // Soft blue fill
-    fillLight.position.set(500, 0, 100); // From downrange
+    fillLight.position.set(0, 100, -500); // From downrange (negative Z)
     this.scene.add(fillLight);
   }
 
@@ -1138,20 +1283,23 @@ class FClassSimulator
   {
     const rangeLength = this.distance; // yards
     // Add brown ground that's wider than the range
-    const brownGroundGeometry = new THREE.PlaneGeometry(rangeLength, FClassSimulator.RANGE_TOTAL_WIDTH);
+    // PlaneGeometry(width, height) - after rotation: width=X, height=Z
+    const brownGroundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_TOTAL_WIDTH, rangeLength);
     const brownGroundMaterial = new THREE.MeshStandardMaterial(
     {
       color: 0x8b4513,
       side: THREE.DoubleSide
     }); // Brown
     const brownGround = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
-    brownGround.position.set(rangeLength / 2, 0, -0.1); // Center it downrange, slightly lower
+    brownGround.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
+    brownGround.position.set(0, -0.1, -rangeLength / 2); // Center downrange (negative Z), slightly below ground
     brownGround.receiveShadow = true; // Enable shadow receiving on ground
     brownGround.matrixAutoUpdate = false; brownGround.updateMatrix();
     this.scene.add(brownGround);
 
     // Add a range plane - just the shooting lanes with grass texture
-    const groundGeometry = new THREE.PlaneGeometry(rangeLength, FClassSimulator.RANGE_LANE_WIDTH);
+    // PlaneGeometry(width, height) - after rotation: width=X, height=Z
+    const groundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_LANE_WIDTH, rangeLength);
 
     // Create grass material with dense texture variation
     const groundMaterial = new THREE.MeshStandardMaterial(
@@ -1168,15 +1316,17 @@ class FClassSimulator
     groundMaterial.bumpMap = noiseTexture;
     groundMaterial.normalMap = noiseTexture;
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.position.set(rangeLength / 2, 0, 0); // Center it downrange
+    ground.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
+    ground.position.set(0, 0, -rangeLength / 2); // Center downrange (negative Z)
     ground.receiveShadow = true; // Enable shadow receiving on grass
     ground.matrixAutoUpdate = false; ground.updateMatrix();
     this.scene.add(ground);
 
     // Add pits at the end of the range
+    // BoxGeometry(width, height, depth) = (X, Y, Z) in Three.js coords
     if (!this._geoBoxCache) this._geoBoxCache = {};
-    const pitsBoxKey = `${FClassSimulator.PITS_DEPTH}|${FClassSimulator.RANGE_LANE_WIDTH}|${FClassSimulator.PITS_HEIGHT}`;
-    const pitsGeometry = this._geoBoxCache[pitsBoxKey] || (this._geoBoxCache[pitsBoxKey] = new THREE.BoxGeometry(FClassSimulator.PITS_DEPTH, FClassSimulator.RANGE_LANE_WIDTH, FClassSimulator.PITS_HEIGHT));
+    const pitsBoxKey = `${FClassSimulator.RANGE_LANE_WIDTH}|${FClassSimulator.PITS_HEIGHT}|${FClassSimulator.PITS_DEPTH}`;
+    const pitsGeometry = this._geoBoxCache[pitsBoxKey] || (this._geoBoxCache[pitsBoxKey] = new THREE.BoxGeometry(FClassSimulator.RANGE_LANE_WIDTH, FClassSimulator.PITS_HEIGHT, FClassSimulator.PITS_DEPTH));
     const pitsMaterial = new THREE.MeshStandardMaterial(
     {
       color: 0x8b7355
@@ -1187,8 +1337,8 @@ class FClassSimulator
     pits.castShadow = true;
     pits.receiveShadow = true;
 
-    // Position pits at rangeLength - PITS_OFFSET to obscure targets when lowered
-    pits.position.set(rangeLength - FClassSimulator.PITS_OFFSET + FClassSimulator.PITS_DEPTH / 2, 0, FClassSimulator.PITS_HEIGHT / 2);
+    // Position pits at rangeLength - PITS_OFFSET to obscure targets when lowered (Three.js coords)
+    pits.position.set(0, FClassSimulator.PITS_HEIGHT / 2, -(rangeLength - FClassSimulator.PITS_OFFSET + FClassSimulator.PITS_DEPTH / 2));
     pits.matrixAutoUpdate = false; this.scene.add(pits); pits.updateMatrix();
 
     // Add target frames above the pits
@@ -1216,8 +1366,9 @@ class FClassSimulator
 
     for (let i = 0; i < maxTargets; i++)
     {
-      const targetBoxKey = `0.1|${targetSize}|${targetSize}`;
-      const targetGeometry = this._geoBoxCache[targetBoxKey] || (this._geoBoxCache[targetBoxKey] = new THREE.BoxGeometry(0.1, targetSize, targetSize)); // Thin frame facing up
+      // BoxGeometry(width, height, depth) for target facing shooter (thin in Z)
+      const targetBoxKey = `${targetSize}|${targetSize}|0.1`;
+      const targetGeometry = this._geoBoxCache[targetBoxKey] || (this._geoBoxCache[targetBoxKey] = new THREE.BoxGeometry(targetSize, targetSize, 0.1));
       const targetMaterial = new THREE.MeshStandardMaterial(
       {
         map: targetTexture
@@ -1228,9 +1379,9 @@ class FClassSimulator
       target.castShadow = true;
       target.receiveShadow = true;
 
-      // Position target at exact distance for accurate ballistic simulation - left to right (positive Y to negative Y)
-      const yPos = startY - i * totalTargetWidth;
-      target.position.set(rangeLength, yPos, targetHeight);
+      // Position target at exact distance downrange (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
+      const xPos = startY - i * totalTargetWidth; // Horizontal position (left to right)
+      target.position.set(xPos, targetHeight, -rangeLength); // Downrange (negative Z)
       target.matrixAutoUpdate = false; this.scene.add(target); target.updateMatrix();
 
       // Store target frame for animation
@@ -1260,7 +1411,7 @@ class FClassSimulator
       numberBox.castShadow = true;
       numberBox.receiveShadow = true;
 
-      numberBox.position.set(rangeLength, yPos, targetHeight + targetSize + 0.2); // 0.2 yards above target
+      numberBox.position.set(xPos, targetHeight + targetSize + 0.2, -rangeLength); // 0.2 yards above target
       numberBox.matrixAutoUpdate = false; this.scene.add(numberBox); numberBox.updateMatrix();
 
       // Store number box reference for animation
@@ -1412,8 +1563,9 @@ class FClassSimulator
   // ===== GAME LOOP & LIFECYCLE =====
   createWindGenerator()
   {
-    // Create wind generator from preset
-    this.windGenerator = btk.WindPresets.getPreset(this.windPreset);
+    // Create wind generator from preset and wrap it
+    const rawWindGen = btk.WindPresets.getPreset(this.windPreset);
+    this.windGenerator = new BtkWindGeneratorWrapper(rawWindGen);
   }
 
   // ===== RENDERING =====
@@ -1521,14 +1673,15 @@ class FClassSimulator
 
     // Create flag poles every 100 yards from 100 to target distance at the border of the 50-yard lane
     const maxDistance = this.distance; // yards
-    const laneBorder = FClassSimulator.RANGE_LANE_WIDTH / 2; // yards from center (border of 50-yard lane)
+    const laneBorder = -FClassSimulator.RANGE_LANE_WIDTH / 2; // yards from center (left border of 50-yard lane)
 
     this.flagMeshes = [];
 
     for (let yds = FClassSimulator.POLE_INTERVAL; yds < maxDistance; yds += FClassSimulator.POLE_INTERVAL)
     {
-      const poleBoxKey = `${FClassSimulator.POLE_THICKNESS}|${FClassSimulator.POLE_THICKNESS}|${FClassSimulator.POLE_HEIGHT}`;
-      const poleGeometry = this._geoBoxCache[poleBoxKey] || (this._geoBoxCache[poleBoxKey] = new THREE.BoxGeometry(FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_HEIGHT));
+      // BoxGeometry(width, height, depth) for vertical pole (thin in X and Z, tall in Y)
+      const poleBoxKey = `${FClassSimulator.POLE_THICKNESS}|${FClassSimulator.POLE_HEIGHT}|${FClassSimulator.POLE_THICKNESS}`;
+      const poleGeometry = this._geoBoxCache[poleBoxKey] || (this._geoBoxCache[poleBoxKey] = new THREE.BoxGeometry(FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_HEIGHT, FClassSimulator.POLE_THICKNESS));
       const poleMaterial = new THREE.MeshStandardMaterial(
       {
         color: 0x808080
@@ -1539,7 +1692,8 @@ class FClassSimulator
       pole.castShadow = true;
       pole.receiveShadow = true;
 
-      pole.position.set(yds, laneBorder, FClassSimulator.POLE_HEIGHT / 2);
+      // Position pole (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
+      pole.position.set(laneBorder, FClassSimulator.POLE_HEIGHT / 2, -yds);
       this.scene.add(pole);
 
       // Create flag geometry and mesh
@@ -1555,9 +1709,9 @@ class FClassSimulator
       flagMesh.castShadow = true;
       flagMesh.receiveShadow = true;
 
-      // Position flag at top of pole (center of base at pole top - half base width)
-      const flagZ = FClassSimulator.POLE_HEIGHT - FClassSimulator.FLAG_BASE_WIDTH / 2;
-      flagMesh.position.set(yds, laneBorder, flagZ);
+      // Position flag at top of pole (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
+      const flagY = FClassSimulator.POLE_HEIGHT - FClassSimulator.FLAG_BASE_WIDTH / 2;
+      flagMesh.position.set(laneBorder, flagY, -yds);
       this.scene.add(flagMesh);
 
       // Store flag data for animation
@@ -1568,9 +1722,9 @@ class FClassSimulator
         flagMesh: flagMesh,
         position:
         {
-          x: yds,
-          y: laneBorder,
-          z: flagZ
+          x: laneBorder,
+          y: flagY,
+          z: -yds
         },
         currentAngle: FClassSimulator.FLAG_MIN_ANGLE,
         targetAngle: FClassSimulator.FLAG_MIN_ANGLE,
@@ -1596,19 +1750,17 @@ class FClassSimulator
       const flag = this.flagMeshes[i];
       const pos = flag.position;
 
-      // Get wind at flag position (convert yards to meters for BTK)
-      const x_m = btk.Conversions.yardsToMeters(pos.x);
-      const y_m = btk.Conversions.yardsToMeters(pos.y);
-      const z_m = btk.Conversions.yardsToMeters(pos.z);
+      // Get wind at flag position (wrapper handles coordinate/unit conversion)
       const t_s = this.getTime();
+      const windVector = this.windGenerator.getWindAt(pos.x, pos.y, pos.z, t_s);
+      
+      // Wind vector is in Three.js coords (yards/s), convert to m/s for speed calculation
+      const windX_mps = windVector.x * 0.9144; // Three X (horizontal) → m/s
+      const windY_mps = windVector.y * 0.9144; // Three Y (vertical) → m/s
+      const windZ_mps = windVector.z * 0.9144; // Three Z (downrange) → m/s
 
-      // Get wind vector at this position and time
-      const windVector = this.windGenerator.sample(x_m, t_s);
-      const windX = windVector.x; // Downrange (m/s)
-      const windY = windVector.y; // Crossrange (m/s)
-
-      // Calculate wind magnitude and direction
-      const windSpeedMps = Math.sqrt(windX * windX + windY * windY);
+      // Calculate wind magnitude (primarily horizontal and downrange components)
+      const windSpeedMps = Math.sqrt(windX_mps * windX_mps + windZ_mps * windZ_mps);
       const windSpeedMph = btk.Conversions.mpsToMph(windSpeedMps);
 
       // Calculate target angle based on wind speed
@@ -1617,8 +1769,9 @@ class FClassSimulator
         FClassSimulator.FLAG_MAX_ANGLE
       );
 
-      // Calculate wind direction (yaw)
-      const targetDirection = Math.atan2(windY, windX);
+      // Calculate wind direction (yaw) - flag points opposite to wind direction
+      // Wind blows in direction (windX, windZ), flag points where wind comes FROM
+      const targetDirection = Math.atan2(-windX_mps, windZ_mps); // Opposite of wind direction
 
       // Smooth interpolate current angle toward target
       const angleDiff = targetAngleDeg - flag.currentAngle;
@@ -1714,13 +1867,13 @@ class FClassSimulator
         }
       }
 
-      // Update target position
-      targetFrame.mesh.position.z = targetFrame.baseHeight + targetFrame.currentHeight;
+      // Update target position (Three.js coords: Y is height)
+      targetFrame.mesh.position.y = targetFrame.baseHeight + targetFrame.currentHeight;
 
-      // Update number box position to move with target
+      // Update number box position to move with target (Three.js coords: Y is height)
       if (targetFrame.numberBox)
       {
-        targetFrame.numberBox.position.z = targetFrame.baseHeight + targetSize + 0.2 + targetFrame.currentHeight;
+        targetFrame.numberBox.position.y = targetFrame.baseHeight + targetSize + 0.2 + targetFrame.currentHeight;
       }
     }
 
@@ -1797,10 +1950,10 @@ class FClassSimulator
     if (this.spottingScopeKeys.s) this.spottingScopePitch -= panSpeed;
 
     // A/D: pan left/right (move crossrange position)
-    // A = pan left (negative Y in BTK coords)
-    // D = pan right (positive Y in BTK coords)
-    if (this.spottingScopeKeys.a) this.spottingScopeYaw += panSpeed;
-    if (this.spottingScopeKeys.d) this.spottingScopeYaw -= panSpeed;
+    // A = pan left (negative X in Three.js coords)
+    // D = pan right (positive X in Three.js coords)
+    if (this.spottingScopeKeys.a) this.spottingScopeYaw -= panSpeed;
+    if (this.spottingScopeKeys.d) this.spottingScopeYaw += panSpeed;
 
     // E/Q: adjust magnification (exponential scaling)
     // E = increase magnification
@@ -1833,14 +1986,14 @@ class FClassSimulator
     // Start from main camera position and orientation
     const targetCenterHeight = FClassSimulator.PITS_HEIGHT + FClassSimulator.TARGET_GAP_ABOVE_PITS + 1;
     this.spottingScopeCamera.position.copy(this.camera.position);
-    this.spottingScopeCamera.up.set(0, 0, 1);
+    this.spottingScopeCamera.up.set(0, 1, 0); // Y is up in Three.js
 
-    // Calculate look-at target with offsets
-    // scopeYaw controls horizontal (Y-axis) offset at distance
-    // scopePitch controls vertical (Z-axis) offset
-    const lookX = this.distance;
-    const lookY = this.distance * Math.tan(this.spottingScopeYaw); // Pan left/right
-    const lookZ = targetCenterHeight + this.distance * Math.tan(this.spottingScopePitch); // Tilt up/down
+    // Calculate look-at target with offsets (Three.js coords: X=right, Y=up, Z=towards camera)
+    // scopeYaw controls horizontal (X-axis) offset at distance
+    // scopePitch controls vertical (Y-axis) offset
+    const lookX = this.distance * Math.tan(this.spottingScopeYaw); // Pan left/right
+    const lookY = targetCenterHeight + this.distance * Math.tan(this.spottingScopePitch); // Tilt up/down
+    const lookZ = -this.distance; // Downrange (negative Z)
 
     this.spottingScopeCamera.lookAt(lookX, lookY, lookZ);
   }
@@ -1877,16 +2030,16 @@ class FClassSimulator
       this.rifleScopeKeys.down = false; // Reset key state after one press
     }
 
-    // Left arrow: increase yaw (pan left)
-    // Right arrow: decrease yaw (pan right)
+    // Left arrow: decrease yaw (pan left)
+    // Right arrow: increase yaw (pan right)
     if (this.rifleScopeKeys.left)
     {
-      this.rifleScopeYaw += angularIncrement;
+      this.rifleScopeYaw -= angularIncrement;
       this.rifleScopeKeys.left = false; // Reset key state after one press
     }
     if (this.rifleScopeKeys.right)
     {
-      this.rifleScopeYaw -= angularIncrement;
+      this.rifleScopeYaw += angularIncrement;
       this.rifleScopeKeys.right = false; // Reset key state after one press
     }
 
@@ -1897,12 +2050,12 @@ class FClassSimulator
     // Apply rotation to rifle scope camera
     // Use user's target as the center reference point
     this.rifleScopeCamera.position.copy(this.camera.position);
-    this.rifleScopeCamera.up.set(0, 0, 1);
+    this.rifleScopeCamera.up.set(0, 1, 0); // Y is up in Three.js
 
-    // Calculate look-at target with offsets relative to user's target
-    const lookX = this.distance;
-    const lookY = this.userTarget.mesh.position.y + this.distance * Math.tan(this.rifleScopeYaw);
-    const lookZ = this.userTarget.mesh.position.z + this.distance * Math.tan(this.rifleScopePitch);
+    // Calculate look-at target with offsets relative to user's target (Three.js coords)
+    const lookX = this.userTarget.mesh.position.x + this.distance * Math.tan(this.rifleScopeYaw); // Horizontal
+    const lookY = this.userTarget.mesh.position.y + this.distance * Math.tan(this.rifleScopePitch); // Vertical
+    const lookZ = this.userTarget.mesh.position.z; // Downrange position (negative)
 
     this.rifleScopeCamera.lookAt(lookX, lookY, lookZ);
   }
@@ -1999,36 +2152,28 @@ class FClassSimulator
    */
   calculateTargetCenterCoords()
   {
-    // Get the target position from the 3D scene
+    // Get the target position from the 3D scene (already in Three.js coords)
     if (!this.userTarget || !this.userTarget.mesh)
     {
       console.error('User target not found');
       return {
-        x: this.distance,
-        y: 0,
-        z: FClassSimulator.TARGET_CENTER_HEIGHT
+        x: 0, // Center horizontally
+        y: FClassSimulator.TARGET_CENTER_HEIGHT,
+        z: -this.distance // Downrange (negative Z)
       };
     }
 
-    // Get the actual position from the 3D mesh
+    // Get the actual position from the 3D mesh (Three.js coords: X=right, Y=up, Z=towards camera)
     const mesh = this.userTarget.mesh;
     const position = mesh.position;
 
-    console.log(`Three.js target position: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
+    console.log(`Target position (Three.js): (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}) yards`);
 
-    // Convert from Three.js coordinates to BTK coordinates
-    // Three.js: X=downrange, Y=crossrange, Z=up (based on actual output)
-    // BTK: X=downrange, Y=crossrange, Z=up
-    const x = position.x; // Three.js X (downrange) -> BTK X (downrange)
-    const y = position.y; // Three.js Y (crossrange) -> BTK Y (crossrange)  
-    const z = position.z; // Three.js Z (up) -> BTK Z (up)
-
-    console.log(`Target center coordinates: (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}) yards`);
-
+    // Return position as-is (already in Three.js coordinates)
     return {
-      x,
-      y,
-      z
+      x: position.x, // Horizontal position
+      y: position.y, // Vertical position
+      z: position.z  // Downrange position (negative)
     };
   }
 
@@ -2037,12 +2182,14 @@ class FClassSimulator
    */
   computeZeroToTarget(mv, range_m)
   {
-    // Use the actual target center coordinates from the 3D scene
-    const targetX = btk.Conversions.yardsToMeters(this.targetCenterCoords.x);
-    const targetY = btk.Conversions.yardsToMeters(this.targetCenterCoords.y);
-    const targetZ = btk.Conversions.yardsToMeters(this.targetCenterCoords.z);
+    // Convert Three.js target coords (yards) to BTK coords (meters)
+    // Three.js: X=right, Y=up, Z=towards-camera (negative=downrange)
+    // BTK: X=downrange, Y=crossrange-right, Z=up
+    const targetX = btk.Conversions.yardsToMeters(-this.targetCenterCoords.z); // Three -Z → BTK X (downrange)
+    const targetY = btk.Conversions.yardsToMeters(this.targetCenterCoords.x);  // Three X → BTK Y (crossrange)
+    const targetZ = btk.Conversions.yardsToMeters(this.targetCenterCoords.y);  // Three Y → BTK Z (up)
 
-    console.log(`Zeroing to target at (${targetX.toFixed(2)}, ${targetY.toFixed(2)}, ${targetZ.toFixed(2)}) meters`);
+    console.log(`Zeroing to target at BTK (${targetX.toFixed(2)}, ${targetY.toFixed(2)}, ${targetZ.toFixed(2)}) meters`);
 
     // Initial angles - start with reasonable elevation and windage
     let elevation = 0.1; // Start with 0.1 radian elevation (about 6 degrees)
@@ -2152,11 +2299,11 @@ class FClassSimulator
 
     this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
 
-    // Position at target center with relative offset
+    // Position at target center with relative offset (Three.js coords)
     this.lastShotMarker.position.set(
-      this.distance - 0.1, // Slightly in front of target (yards)
-      this.targetCenterCoords.y + relativeX, // Target center Y + crossrange offset
-      this.targetCenterCoords.z + relativeY // Target center Z + height offset
+      this.targetCenterCoords.x + relativeX, // Target center X + horizontal offset
+      this.targetCenterCoords.y + relativeY, // Target center Y + vertical offset
+      this.targetCenterCoords.z + 0.1 // Slightly in front of target (towards shooter)
     );
 
     console.log(`Shot marker at: (${this.lastShotMarker.position.x.toFixed(2)}, ${this.lastShotMarker.position.y.toFixed(2)}, ${this.lastShotMarker.position.z.toFixed(2)}) yards`);
@@ -2366,10 +2513,10 @@ class FClassSimulator
 
       // Simulate with wind generator
       const rangeMeters = btk.Conversions.yardsToMeters(range);
-      const trajectory = this.ballisticSimulator.simulateWithWind(rangeMeters, dt, 3.0, this.windGenerator, this.getTime());
-      // Store for animation
-      this.lastTrajectory = trajectory;
-      const pointAtTarget = trajectory.atDistance(rangeMeters);
+      const rawTrajectory = this.ballisticSimulator.simulateWithWind(rangeMeters, dt, 3.0, this.windGenerator.raw, this.getTime());
+      // Store wrapped trajectory for animation (handles coordinate conversion)
+      this.lastTrajectory = new BtkTrajectoryWrapper(rawTrajectory);
+      const pointAtTarget = this.lastTrajectory.atDistance(range); // Now in yards!
 
       if (!pointAtTarget)
       {
@@ -2377,25 +2524,25 @@ class FClassSimulator
         return;
       }
 
-      // Get bullet position and velocity at target
+      // Get bullet position and velocity at target (now in Three.js coords, yards)
       const bulletState = pointAtTarget.getState();
-      const bulletPos = bulletState.getPosition();
-      const bulletVel = bulletState.getVelocity();
-      const impactVelocity = bulletVel.magnitude(); // m/s
+      const bulletPos = bulletState.getPosition(); // Three.js coords in yards
+      const bulletVel = bulletState.getVelocity(); // Three.js coords in yards
+      const impactVelocity = Math.sqrt(bulletVel.x**2 + bulletVel.y**2 + bulletVel.z**2) * 0.9144; // Convert yards/s to m/s
 
-      // Calculate impact relative to target center using actual target coordinates
-      const targetX = btk.Conversions.yardsToMeters(this.targetCenterCoords.x);
-      const targetY = btk.Conversions.yardsToMeters(this.targetCenterCoords.y);
-      const targetZ = btk.Conversions.yardsToMeters(this.targetCenterCoords.z);
+      // Target coordinates are also in Three.js coords, yards
+      const targetX = this.targetCenterCoords.x;
+      const targetY = this.targetCenterCoords.y;
+      const targetZ = this.targetCenterCoords.z;
 
-      // Impact relative to target center
-      const relativeX = bulletPos.y - targetY;
-      const relativeY = bulletPos.z - targetZ;
+      // Impact relative to target center (in target plane: X=horizontal, Y=vertical)
+      const relativeX = bulletPos.x - targetX; // Horizontal offset in yards
+      const relativeY = bulletPos.y - targetY; // Vertical offset in yards
 
       // Store all shot data for processing after animation completes
       this.pendingShotData = {
-        relativeX: relativeX, // meters
-        relativeY: relativeY, // meters
+        relativeX: relativeX * 0.9144, // Convert yards to meters for scoring
+        relativeY: relativeY * 0.9144, // Convert yards to meters for scoring
         mvFps: actualMVFps,
         impactVelocityFps: btk.Conversions.mpsToFps(impactVelocity),
         bulletDiameterMeters: btk.Conversions.inchesToMeters(this.bulletDiameter)
@@ -2576,15 +2723,12 @@ class FClassSimulator
       startTimeMs: performance.now()
     };
 
-    // Initialize position at t=0
+    // Initialize position at t=0 (wrapped trajectory returns Three.js coords in yards)
     const optPoint0 = this.lastTrajectory.atTime(0);
     if (optPoint0 !== undefined)
     {
-      const p0 = optPoint0.getState().getPosition();
-      const x = btk.Conversions.metersToYards(p0.x);
-      const y = btk.Conversions.metersToYards(p0.y);
-      const z = btk.Conversions.metersToYards(p0.z);
-      this.bulletMesh.position.set(x, y, z);
+      const pos = optPoint0.getState().getPosition(); // Already Three.js coords, yards!
+      this.bulletMesh.position.set(pos.x, pos.y, pos.z);
     }
   }
 
@@ -2605,12 +2749,9 @@ class FClassSimulator
     const optPoint = this.lastTrajectory.atTime(t);
     if (optPoint !== undefined)
     {
-      const pos = optPoint.getState().getPosition();
-      const x = btk.Conversions.metersToYards(pos.x);
-      const y = btk.Conversions.metersToYards(pos.y);
-      const z = btk.Conversions.metersToYards(pos.z);
-      this.bulletMesh.position.set(x, y, z);
-      this.bulletGlowSprite.position.set(x, y, z);
+      const pos = optPoint.getState().getPosition(); // Already Three.js coords, yards!
+      this.bulletMesh.position.set(pos.x, pos.y, pos.z);
+      this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
     }
 
     // End animation when time reaches total
