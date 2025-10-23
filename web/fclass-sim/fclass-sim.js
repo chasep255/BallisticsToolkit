@@ -440,7 +440,10 @@ class BtkMatchWrapper
 
 // Initialize the game
 async function init()
-{}
+{
+  // Game initialization is handled by the FClassSimulator constructor
+  // This function is kept for compatibility with the existing initialization flow
+}
 
 // Lock canvas size once on page load
 function lockCanvasSize()
@@ -679,7 +682,7 @@ class FClassSimulator
   static CAMERA_EYE_HEIGHT = 0.1;
 
   // === ANIMATION ===
-  static RANDOM_ANIMATION_CHANCE = 0.01; // ~1% per frame at 60fps
+  // Note: RANDOM_ANIMATION_CHANCE removed - target animations now use state-based system
 
   // === UI & DISPLAY ===
   static MIN_SCREEN_WIDTH = 800;
@@ -744,8 +747,7 @@ class FClassSimulator
     {
       canvas,
       antialias: true,
-      // Be explicit so we don't accidentally flip it on elsewhere:
-      logarithmicDepthBuffer: false
+      logarithmicDepthBuffer: false // Required for proper shadow rendering
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
@@ -1506,8 +1508,8 @@ class FClassSimulator
   {
     // Camera: Standard Three.js coords (X=right, Y=up, Z=towards camera, -Z=downrange)
     const aspect = this.canvasWidth / this.canvasHeight;
-    // Use logarithmic depth buffer for better precision at long range
-    // Near plane at 0.5 yards, far plane extended to 2500 yards for clouds/scenery
+    // Standard depth buffer with extended far plane for clouds/scenery
+    // Near plane at 0.5 yards, far plane at 2500 yards to ensure clouds are visible
     this.camera = new THREE.PerspectiveCamera(FClassSimulator.CAMERA_FOV, aspect, 0.5, 2500);
     // Camera positioned 1 yard behind shooter, at target center height
     const targetCenterHeight = FClassSimulator.TARGET_CENTER_HEIGHT;
@@ -1641,7 +1643,7 @@ class FClassSimulator
   setupRange()
   {
     const rangeLength = this.distance; // yards
-    const groundLength = rangeLength + 500;
+    const groundLength = rangeLength + 500; // Extend 500 yards beyond target for scenery
     // PlaneGeometry(width, height) - after rotation: width=X, height=Z
     const brownGroundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_TOTAL_WIDTH * 4, groundLength);
     this.registerResource('geometries', brownGroundGeometry);
@@ -1818,7 +1820,7 @@ class FClassSimulator
       });
     }
 
-    console.log(`Initialized ${this.targetAnimationStates.length} target animation states`);
+    // Target animation states initialized
 
   }
 
@@ -2115,18 +2117,18 @@ class FClassSimulator
 
       // Position clouds in sky - fixed distance range for consistent coverage at all ranges
       // Camera far plane is at 2500 yards, so we have plenty of room
-      const x = (Math.random() - 0.5) * 600; // -300 to 300 (wide horizontal spread)
+      const x = (Math.random() - 0.5) * 600; // -300 to 300 yards (wide horizontal spread)
       const y = 120 + Math.random() * 180; // 120 to 300 yards high
       const z = -(500 + Math.random() * 1500); // 500 to 2000 yards downrange (always visible)
 
       cloud.position.set(x, y, z);
 
       // Scale clouds - larger and more varied
-      const scale = 60 + Math.random() * 60; // 60-120 yards wide
+      const scale = 60 + Math.random() * 60; // 60-120 yards wide (cloud size)
       cloud.scale.set(scale, scale / 2, 1);
 
-      // Store drift velocity
-      const driftSpeed = 0.1 + Math.random() * 0.2; // 0.1-0.3 yards/second
+      // Store drift velocity for cloud movement
+      const driftSpeed = 0.1 + Math.random() * 0.2; // 0.1-0.3 yards/second (cloud drift)
 
       this.clouds.push(
       {
@@ -2160,7 +2162,7 @@ class FClassSimulator
   createForestBackdrop()
   {
     // Create 240 trees: very dense forest along both sides and behind targets
-    const treeCount = 240;
+    const treeCount = 240; // Total number of trees for dense forest backdrop
 
     // Cache tree geometries
     const trunkGeometries = [];
@@ -2219,9 +2221,9 @@ class FClassSimulator
       const trunkGeo = trunkGeometries[sizeVariant];
       const foliageGeo = foliageGeometries[sizeVariant];
 
-      const height = 8 + Math.random() * 7; // 8-15 yards total
-      const trunkHeight = height * 0.35;
-      const foliageHeight = height * 0.65;
+      const height = 8 + Math.random() * 7; // 8-15 yards total tree height
+      const trunkHeight = height * 0.35; // 35% of total height for trunk
+      const foliageHeight = height * 0.65; // 65% of total height for foliage
 
       // Get actual geometry parameters for precise positioning
       const actualTrunkHeight = 3 + sizeVariant * 0.5;
@@ -2239,7 +2241,8 @@ class FClassSimulator
       const foliage = new THREE.Mesh(foliageGeo, foliageMaterial);
       // Cone geometry: center is at middle, base (widest) is at Y - height/2
       // Position so foliage base is slightly below trunk top for solid connection
-      foliage.position.set(x, actualTrunkHeight + actualFoliageHeight / 2 - actualFoliageHeight * 0.25, z); // Overlap 25% for solid connection
+      // Overlap 25% of foliage height with trunk for solid connection
+      foliage.position.set(x, actualTrunkHeight + actualFoliageHeight / 2 - actualFoliageHeight * 0.25, z);
       foliage.castShadow = true;
       foliage.receiveShadow = true;
       this.scene.add(foliage);
@@ -2559,7 +2562,7 @@ class FClassSimulator
         {
           animationState.isUp = false;
           animationState.timeInState = 0;
-          console.log(`Target ${i + 1} dropping down`);
+          // Target dropping down
         }
       }
       else
@@ -2571,7 +2574,7 @@ class FClassSimulator
           animationState.timeInState = 0;
           // Set next random drop time (30-150 seconds, avg ~90s = ~1 minute)
           animationState.nextDropTime = Math.random() * 120 + 30;
-          console.log(`Target ${i + 1} going back up, next drop in ${animationState.nextDropTime.toFixed(1)}s`);
+          // Target going back up
         }
       }
 
@@ -2599,7 +2602,7 @@ class FClassSimulator
       else if (Math.abs(targetFrame.currentHeight - targetHeight) > 0.01)
       {
         // Start animating if not at target position
-        console.log(`Target ${i + 1} starting animation from ${targetFrame.currentHeight.toFixed(2)} to ${targetHeight.toFixed(2)}`);
+        // Starting target animation
         targetFrame.targetHeightGoal = targetHeight;
         targetFrame.animating = true;
       }
@@ -2699,13 +2702,13 @@ class FClassSimulator
 
     // Apply rotation to scope camera
     // Start from main camera position and orientation
-    const targetCenterHeight = FClassSimulator.PITS_HEIGHT + FClassSimulator.TARGET_GAP_ABOVE_PITS + 1;
     this.spottingScopeCamera.position.copy(this.camera.position);
     this.spottingScopeCamera.up.set(0, 1, 0); // Y is up in Three.js
 
     // Calculate look-at target with offsets (Three.js coords: X=right, Y=up, Z=towards camera)
     // scopeYaw controls horizontal (X-axis) offset at distance
     // scopePitch controls vertical (Y-axis) offset
+    const targetCenterHeight = FClassSimulator.TARGET_CENTER_HEIGHT; // Use actual target center height
     const lookX = this.distance * Math.tan(this.spottingScopeYaw); // Pan left/right
     const lookY = targetCenterHeight + this.distance * Math.tan(this.spottingScopePitch); // Tilt up/down
     const lookZ = -this.distance; // Downrange (negative Z)
@@ -2893,8 +2896,7 @@ class FClassSimulator
       const velY = mv * Math.sin(elevation); // Vertical (up)
       const velZ = -mv * Math.cos(windage) * Math.cos(elevation); // Downrange (negative Z)
 
-      if (iter === 0)
-      {}
+      // First iteration - no special handling needed
 
       // Create velocity and position using wrappers
       const vel = new BtkVelocityWrapper(velX, velY, velZ);
@@ -3625,12 +3627,8 @@ class FClassSimulator
         }
       });
 
-      // Remove shadow target
-      if (this.shadowTarget)
-      {
-        this.scene.remove(this.shadowTarget);
-        this.shadowTarget = null;
-      }
+      // Note: shadowTarget property does not exist in this implementation
+      // Shadow casting is handled by individual objects (flags, poles, etc.)
     }
 
     // Clean up all registered resources automatically
