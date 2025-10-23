@@ -41,11 +41,11 @@ namespace btk
       return points_[index];
     }
 
-    TrajectoryPoint Trajectory::atDistance(float distance) const
+    std::optional<TrajectoryPoint> Trajectory::atDistance(float distance) const
     {
       if(points_.empty())
       {
-        return TrajectoryPoint(std::numeric_limits<float>::quiet_NaN(), Bullet(0.0f, 0.0f, 0.0f, 0.0f));
+        return std::nullopt;
       }
 
       // Check if target distance is beyond the last point

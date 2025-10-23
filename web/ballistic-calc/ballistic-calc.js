@@ -91,6 +91,11 @@ function calculateTrajectory()
   for (let range = 0; range <= maxRange; range += step)
   {
     const point = trajectoryObj.atDistance(range);
+    if (!point)
+    {
+      console.warn(`Failed to get trajectory point at range ${range}m`);
+      continue;
+    }
     const state = point.getState();
     const position = state.getPosition();
 

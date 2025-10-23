@@ -92,10 +92,10 @@ namespace btk::match
     btk::ballistics::Trajectory trajectory = simulator_.simulate(target_range_, timestep_);
 
     // Get impact at target range
-    btk::ballistics::TrajectoryPoint impact_point = trajectory.atDistance(target_range_);
+    std::optional<btk::ballistics::TrajectoryPoint> impact_point = trajectory.atDistance(target_range_);
 
-    // Check if we got a valid impact (not NaN time)
-    if(std::isnan(impact_point.getTime()))
+    // Check if we got a valid impact
+    if(!impact_point)
     {
       // Shouldn't happen, but handle gracefully
       SimulatedShot simulatedShot(btk::math::Conversions::inchesToMeters(999.0f), btk::math::Conversions::inchesToMeters(999.0f), 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps,
@@ -105,9 +105,9 @@ namespace btk::match
     }
 
     // Get impact position and velocity
-    float impact_x = impact_point.getState().getPosition().y;        // Y is crosswind
-    float impact_y = impact_point.getState().getPosition().z;        // Z is vertical
-    float impact_velocity = impact_point.getState().getVelocity().x; // Forward velocity at impact
+    float impact_x = impact_point->getState().getPosition().y;        // Y is crosswind
+    float impact_y = impact_point->getState().getPosition().z;        // Z is vertical
+    float impact_velocity = impact_point->getState().getVelocity().x; // Forward velocity at impact
 
     // Score the shot and add to match
     const Hit& hit = match_.addHit(impact_x, impact_y, target_, bullet_.getDiameter());

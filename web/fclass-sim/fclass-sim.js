@@ -2168,7 +2168,7 @@ class FClassSimulator
       const trajectory = this.ballisticSimulator.simulate(range_m * 1.1, dt, 5.0);
       const pointAtRange = trajectory.atDistance(range_m);
 
-      if (isNaN(pointAtRange.getTime()))
+      if (!pointAtRange)
       {
         console.log('Trajectory failed at iteration', iter);
         break;
@@ -2467,6 +2467,12 @@ class FClassSimulator
       // Store for animation
       this.lastTrajectory = trajectory;
       const pointAtTarget = trajectory.atDistance(rangeMeters);
+
+      if (!pointAtTarget)
+      {
+        console.error('Failed to get trajectory point at target distance');
+        return;
+      }
 
       // Get bullet position and velocity at target
       const bulletState = pointAtTarget.getState();

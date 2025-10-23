@@ -153,16 +153,16 @@ namespace btk::ballistics
       Trajectory trajectory = simulate(target_dist, dt, 5.0f);
 
       // Get state at zero range using interpolation
-      TrajectoryPoint point_at_zero = trajectory.atDistance(zero_range);
+      std::optional<TrajectoryPoint> point_at_zero = trajectory.atDistance(zero_range);
 
-      // Check if the point is valid (not NaN time)
-      if(std::isnan(point_at_zero.getTime()))
+      // Check if the point is valid
+      if(!point_at_zero)
       {
         break;
       }
 
       // Want: bullet height at zero_range equals scope height (line of sight)
-      float height_error = point_at_zero.getState().getPositionZ() - scope_height;
+      float height_error = point_at_zero->getState().getPositionZ() - scope_height;
 
       // Check if we're close enough
       if(std::abs(height_error) < tolerance)

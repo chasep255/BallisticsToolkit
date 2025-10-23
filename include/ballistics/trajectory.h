@@ -89,9 +89,9 @@ namespace btk::ballistics
      * @brief Get the trajectory point at a specific distance
      *
      * @param distance Distance along trajectory in m
-     * @return Trajectory point at the given distance (interpolated), or TrajectoryPoint with NaN time if not found
+     * @return Trajectory point at the given distance (interpolated), or std::nullopt if not found
      */
-    TrajectoryPoint atDistance(float distance) const;
+    std::optional<TrajectoryPoint> atDistance(float distance) const;
 
     /**
      * @brief Get the trajectory point at a specific time
