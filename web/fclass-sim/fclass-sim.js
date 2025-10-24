@@ -1122,7 +1122,7 @@ class FClassSimulator
    */
   setupShotFiringControls()
   {
-    document.addEventListener('keydown', (event) =>
+    this.shotFiringHandler = (event) =>
     {
       if (event.code === 'Space')
       {
@@ -1139,7 +1139,9 @@ class FClassSimulator
           this.fireShot();
         }
       }
-    });
+    };
+    
+    document.addEventListener('keydown', this.shotFiringHandler);
   }
 
   // ===== CLEANUP =====

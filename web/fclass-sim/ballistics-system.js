@@ -87,7 +87,14 @@ export class BallisticsSystem
       this.ballisticSimulator = new BtkBallisticsSimulatorWrapper();
       this.ballisticSimulator.setInitialBullet(this.bullet);
       this.ballisticSimulator.setAtmosphere(atmosphere);
-      this.ballisticSimulator.setWind(new BtkVector3Wrapper(0, 0, 0));
+      
+      // Dispose atmosphere immediately after use
+      atmosphere.dispose();
+      
+      // Set wind to zero for zeroing (dispose immediately after use)
+      const zeroWind = new BtkVector3Wrapper(0, 0, 0);
+      this.ballisticSimulator.setWind(zeroWind);
+      zeroWind.dispose();
       
       // Custom zeroing routine to hit target center (accounting for Y offset)
       this.zeroedBullet = this.computeZeroToTarget(this.nominalMV, this.distance);
@@ -149,6 +156,10 @@ export class BallisticsSystem
       // Create bullet using wrapper (accepts wrapped pos and vel)
       const bullet = new BtkBulletWrapper(this.bullet, pos, vel, 0.0);
       
+      // Dispose temporary wrappers immediately after bullet creation
+      vel.dispose();
+      pos.dispose();
+      
       // Simulate trajectory using wrapper
       this.ballisticSimulator.setInitialBullet(bullet);
       this.ballisticSimulator.resetToInitial();
@@ -159,6 +170,9 @@ export class BallisticsSystem
       
       if (!pointAtTarget)
       {
+        // Clean up before throwing
+        trajectory.dispose();
+        bullet.dispose();
         throw new Error('Failed to get trajectory point at target distance');
       }
       
@@ -174,7 +188,10 @@ export class BallisticsSystem
       // Check convergence
       if (errorMagnitude < tolerance)
       {
-        return bullet;
+        // Clean up and return the zeroed bullet
+        pointAtTarget.dispose();
+        trajectory.dispose();
+        return bullet; // Return the converged bullet (caller owns it)
       }
       
       // Compute angular corrections
@@ -186,6 +203,11 @@ export class BallisticsSystem
       const damping = 0.5;
       windage -= angularErrorX * damping;
       elevation -= angularErrorY * damping;
+      
+      // Clean up this iteration's objects before next iteration
+      pointAtTarget.dispose();
+      trajectory.dispose();
+      bullet.dispose();
     }
     
     throw new Error('Failed to converge on zero solution');
@@ -208,6 +230,8 @@ export class BallisticsSystem
       
       // Load shot sound
       await this.loadShotSound();
+      
+      // Audio source will be created on-demand for each shot
     }
     catch (error)
     {
@@ -238,28 +262,6 @@ export class BallisticsSystem
     }
   }
   
-  /**
-   * Play shot sound when firing
-   */
-  playShotSound()
-  {
-    if (this.audioMuted || !this.shotSound || !this.audioContext)
-    {
-      return;
-    }
-    
-    try
-    {
-      const source = this.audioContext.createBufferSource();
-      source.buffer = this.shotSound;
-      source.connect(this.audioContext.destination);
-      source.start();
-    }
-    catch (error)
-    {
-      console.warn('Could not play shot sound:', error);
-    }
-  }
   
   // ===== SHOT FIRING =====
   
@@ -274,8 +276,21 @@ export class BallisticsSystem
       return null;
     }
     
-    // Play shot sound (audio pre-loaded during setup)
-    this.playShotSound();
+    // Play shot sound immediately
+    if (!this.audioMuted && this.shotSound && this.audioContext)
+    {
+      try
+      {
+        const source = this.audioContext.createBufferSource();
+        source.buffer = this.shotSound;
+        source.connect(this.audioContext.destination);
+        source.start(0);
+      }
+      catch (error)
+      {
+        console.warn('Could not play shot sound:', error);
+      }
+    }
     
     try
     {
@@ -347,9 +362,22 @@ export class BallisticsSystem
         this.zeroedBullet.getSpinRate()
       );
       
+      // Dispose temporary wrappers immediately after bullet creation
+      variedVel.dispose();
+      bulletStartPos.dispose();
+      
       // Reset simulator with varied bullet
       this.ballisticSimulator.setInitialBullet(variedBullet);
       this.ballisticSimulator.resetToInitial();
+      
+      // Dispose varied bullet immediately - simulator has copied the data
+      variedBullet.dispose();
+      
+      // Dispose previous trajectory before creating new one
+      if (this.lastTrajectory)
+      {
+        this.lastTrajectory.dispose();
+      }
       
       // Simulate with wind generator (wrapper handles unit conversion)
       this.lastTrajectory = this.ballisticSimulator.simulateWithWind(range, dt, 5.0, this.windGenerator, this.getTime());
@@ -371,7 +399,6 @@ export class BallisticsSystem
       const targetCenter = this.targetSystem.getUserTargetCenter();
       const targetX = targetCenter.x;
       const targetY = targetCenter.y;
-      const targetZ = targetCenter.z;
       
       // Impact relative to target center (in target plane: X=horizontal, Y=vertical)
       const relativeX = bulletPos.x - targetX; // Horizontal offset in yards
@@ -384,6 +411,8 @@ export class BallisticsSystem
         mvFps: actualMVFps,
         impactVelocityFps: impactVelocityFps
       };
+      
+      pointAtTarget.dispose(); // Dispose TrajectoryPoint to prevent memory leak
       
       return this.pendingShotData;
     }
@@ -454,7 +483,9 @@ export class BallisticsSystem
   startBulletAnimation()
   {
     if (!this.lastTrajectory)
+    {
       return;
+    }
     
     if (!this.bulletMaterial)
     {
@@ -514,7 +545,9 @@ export class BallisticsSystem
     {
       const pos = optPoint0.getState().getPosition(); // Already Three.js coords, yards!
       this.bulletMesh.position.set(pos.x, pos.y, pos.z);
+      optPoint0.dispose(); // Dispose TrajectoryPoint to prevent memory leak
     }
+    
   }
   
   updateBulletAnimation()
@@ -537,6 +570,7 @@ export class BallisticsSystem
       const pos = optPoint.getState().getPosition(); // Already Three.js coords, yards!
       this.bulletMesh.position.set(pos.x, pos.y, pos.z);
       this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
+      optPoint.dispose(); // Dispose TrajectoryPoint to prevent memory leak
     }
     
     // Check if animation is complete
@@ -554,14 +588,19 @@ export class BallisticsSystem
         // Score the hit
         const hit = this.match.addHit(data.relativeX, data.relativeY, this.btkTarget, this.bulletDiameter);
         
+        // Extract data from Hit before disposing
+        const score = hit.getScore();
+        const isX = hit.isX();
+        hit.delete(); // Dispose Hit object to prevent memory leak
+        
         // Call completion callback with shot data
         if (this.onShotComplete)
         {
           this.onShotComplete({
             relativeX: data.relativeX,
             relativeY: data.relativeY,
-            score: hit.getScore(),
-            isX: hit.isX(),
+            score: score,
+            isX: isX,
             mvFps: data.mvFps,
             impactVelocityFps: data.impactVelocityFps,
             hitCount: this.match.getHitCount()
@@ -648,9 +687,6 @@ export class BallisticsSystem
     if (this.zeroedBullet) {
       this.zeroedBullet.dispose();
     }
-    if (this.atmosphere) {
-      this.atmosphere.dispose();
-    }
     if (this.ballisticSimulator) {
       this.ballisticSimulator.dispose();
     }
@@ -665,7 +701,6 @@ export class BallisticsSystem
     this.ballisticSimulator = null;
     this.bullet = null;
     this.zeroedBullet = null;
-    this.atmosphere = null;
     this.btkTarget = null;
     this.match = null;
     this.lastTrajectory = null;
