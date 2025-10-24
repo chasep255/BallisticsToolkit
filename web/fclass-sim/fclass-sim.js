@@ -625,8 +625,12 @@ function populateWindPresetDropdown()
       windSelect.appendChild(option);
     });
 
-    // Set default selection to first preset
-    if (presetNames.length > 0)
+    // Set default selection to "Typical" if available, otherwise first preset
+    if (presetNames.includes('Typical'))
+    {
+      windSelect.value = 'Typical';
+    }
+    else if (presetNames.length > 0)
     {
       windSelect.value = presetNames[0];
     }
@@ -670,7 +674,7 @@ class FClassSimulator
   static FLAG_THICKNESS = 0.05;
   static FLAG_MIN_ANGLE = 1; // degrees from vertical
   static FLAG_MAX_ANGLE = 90; // degrees from vertical
-  static FLAG_DEGREES_PER_MPH = (90 - 1) / 20; // (max - min) / 20 mph = 4 degrees per mph
+  static FLAG_DEGREES_PER_MPH = (90 - 1) / 10; 
   static FLAG_FLAP_FREQUENCY_BASE = 0.5; // Hz at 10 mph (faster flapping)
   static FLAG_FLAP_FREQUENCY_SCALE = 0.25; // Additional Hz per mph (more responsive)
   static FLAG_FLAP_AMPLITUDE = 0.3; // Max ripple amplitude in yards (very visible flapping)
@@ -824,6 +828,7 @@ class FClassSimulator
     // ===== HUD =====
     this.hudElements = {
       container: document.getElementById('shotHud'),
+      target: document.getElementById('hudTarget'),
       shots: document.getElementById('hudShots'),
       score: document.getElementById('hudScore'),
       dropped: document.getElementById('hudDropped'),
@@ -1234,47 +1239,27 @@ class FClassSimulator
     const cy = size / 2;
     const r = size / 2 - 8; // Closer to edge (just inside for the stroke)
 
-    // Draw black circular border
+    // Draw simple dark red crosshair (no center dot)
+    ctx.strokeStyle = '#8B0000'; // Dark red
+    ctx.lineWidth = 4;
+
+    // Horizontal line (stop at ring edge)
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy);
+    ctx.lineTo(cx + r, cy);
+    ctx.stroke();
+
+    // Vertical line (stop at ring edge)
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx, cy + r);
+    ctx.stroke();
+
+    // Draw black circular border on top
     ctx.strokeStyle = 'black';
     ctx.lineWidth = 8; // Thinner border to match spotting scope
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Draw crosshair
-    ctx.strokeStyle = '#808080'; // Medium grey
-    ctx.fillStyle = '#808080';
-    ctx.lineWidth = 2; // Thinner crosshair lines
-
-    // Center dot (smaller)
-    ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Crosshair lines
-    const crosshairLen = r * 0.4;
-    const gap = 12; // Smaller gap around center dot
-
-    // Horizontal lines
-    ctx.beginPath();
-    ctx.moveTo(cx - crosshairLen, cy);
-    ctx.lineTo(cx - gap, cy);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(cx + gap, cy);
-    ctx.lineTo(cx + crosshairLen, cy);
-    ctx.stroke();
-
-    // Vertical lines
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - crosshairLen);
-    ctx.lineTo(cx, cy - gap);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(cx, cy + gap);
-    ctx.lineTo(cx, cy + crosshairLen);
     ctx.stroke();
 
     const texture = new THREE.CanvasTexture(canvas);
@@ -2962,27 +2947,30 @@ class FClassSimulator
    */
   displayLastShotMarker(relativeX, relativeY)
   {
-    // Remove any existing last shot marker
+    // Remove any existing last shot marker (cleanup handled by resource system)
     if (this.lastShotMarker)
     {
       this.scene.remove(this.lastShotMarker);
-      this.lastShotMarker.geometry.dispose();
-      this.lastShotMarker.material.dispose();
       this.lastShotMarker = null;
     }
 
-
-    // Parameters are already in yards (no conversion needed)
-
-    // Create 1" red sphere marker (1 inch = 0.02778 yards, so 0.5" radius)
-    const markerGeometry = new THREE.SphereGeometry(0.5 * 0.02778, 8, 8); // 1" diameter = 0.5" radius in yards
-    const markerMaterial = new THREE.MeshBasicMaterial(
+    const spotterDiameterYards = this.distance * 0.25 / 3438;
+    const spotterRadiusYards = spotterDiameterYards / 2;
+    
+    const markerGeometry = new THREE.SphereGeometry(spotterRadiusYards, 8, 8);
+    const markerMaterial = new THREE.MeshStandardMaterial(
     {
-      color: new THREE.Color(1, 0, 0), // Explicit red RGB
+      color: new THREE.Color(1.0, 0.35, 0.0), // Red RGB
+      emissive: new THREE.Color(1.0, 0.0, 0.0), // Red emissive glow
+      emissiveIntensity: 0.8, // Strong glow
       toneMapped: false // Don't apply tone mapping/lighting
     });
 
     this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
+    
+    // Enable shadows
+    this.lastShotMarker.castShadow = true;
+    this.lastShotMarker.receiveShadow = true;
 
     // Position at target center with relative offset (Three.js coords)
     this.lastShotMarker.position.set(
@@ -2991,8 +2979,11 @@ class FClassSimulator
       this.targetCenterCoords.z + 0.1 // Slightly in front of target (towards shooter)
     );
 
-
     this.scene.add(this.lastShotMarker);
+    
+    // Register all resources for automatic cleanup
+    this.registerResource('geometries', markerGeometry);
+    this.registerResource('materials', markerMaterial);
     this.registerResource('meshes', this.lastShotMarker);
   }
 
@@ -3006,6 +2997,12 @@ class FClassSimulator
     const shotCount = this.match ? this.match.getHitCount() : 0;
     const totalScore = this.match ? this.match.getTotalScore() : 0;
     const xCount = this.match ? this.match.getXCount() : 0;
+
+    // Update target number
+    if (this.userTarget)
+    {
+      this.hudElements.target.textContent = `#${this.userTarget.targetNumber}`;
+    }
 
     // Update shot count and score (F-Class match is 60 shots)
     if (shotCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
