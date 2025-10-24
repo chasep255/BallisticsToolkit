@@ -231,7 +231,8 @@ export class EnvironmentSystem
       });
       
       const mountain = new THREE.Mesh(geometry, material);
-      mountain.position.set(data.x, data.height / 2, data.z);
+      // Position slightly below ground to ensure no gap (cone center is at geometric center)
+      mountain.position.set(data.x, data.height / 2 - 5, data.z);
       mountain.castShadow = true;
       mountain.receiveShadow = true;
       

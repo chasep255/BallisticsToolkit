@@ -17,6 +17,7 @@ import {
 import { FlagSystem } from './wind-flags.js';
 import { TargetSystem } from './target-system.js';
 import { EnvironmentSystem } from './environment-system.js';
+import { BallisticsSystem } from './ballistics-system.js';
 
 // BTK module instance
 let btk = null;
@@ -271,7 +272,7 @@ class FClassSimulator
   // Environment constants moved to EnvironmentSystem class
 
   // Ground/scenery
-  static GROUND_EXTENSION_BEYOND_TARGETS = 500; // yards
+  static GROUND_EXTENSION_BEYOND_TARGETS = 2500; // yards (extends to mountains)
 
   // Shadow camera bounds
   static SHADOW_CAMERA_HORIZONTAL = 350; // yards
@@ -416,15 +417,8 @@ class FClassSimulator
     });
 
     // ===== BALLISTICS & SHOOTING =====
-    this.ballisticSimulator = null;
-    this.match = null;
-    this.btkTarget = null;
-    this.bullet = null;
-    this.bulletDiameter = 0;
-    this.zeroedBullet = null;
-    this.nominalMV = 0;
-    this.mvSd = 0;
-    this.rifleAccuracyMoa = 0;
+    // Ballistics system will be initialized in start() after targets are created
+    this.ballisticsSystem = null;
     this.lastShotMarker = null;
 
     // ===== AUDIO =====
@@ -1181,7 +1175,10 @@ class FClassSimulator
     }
 
     // Update bullet animation (if any)
-    this.updateBulletAnimation();
+    if (this.ballisticsSystem)
+    {
+      this.ballisticsSystem.updateBulletAnimation();
+    }
 
     // Update and render flags
     this.flagSystem.updateFlags(this.getDeltaTime(), this.getTime(), this.windGenerator);
@@ -1242,7 +1239,7 @@ class FClassSimulator
     // Setup ballistic system for shot firing
     try
     {
-      await this.setupBallisticSystem();
+      this.setupBallisticSystem();
     }
     catch (error)
     {
@@ -1463,7 +1460,7 @@ class FClassSimulator
   /**
    * Setup ballistic system with zeroing
    */
-  async setupBallisticSystem()
+  setupBallisticSystem()
   {
     try
     {
@@ -1475,36 +1472,25 @@ class FClassSimulator
       const mvSdFps = parseFloat(document.getElementById('mvSd').value);
       const rifleAccuracyMoa = parseFloat(document.getElementById('rifleAccuracy').value);
 
-      this.nominalMV = mvFps; // Store in fps
-      this.bulletDiameter = diameterInches; // Store in inches
-      this.mvSd = mvSdFps; // Store in fps
-      this.rifleAccuracyMoa = rifleAccuracyMoa; // Store in MOA
+      // Create ballistics system
+      this.ballisticsSystem = new BallisticsSystem({
+        scene: this.scene,
+        targetSystem: this.targetSystem,
+        windGenerator: this.windGenerator,
+        getTime: () => this.getTime(),
+        distance: this.distance,
+        onShotComplete: (shotData) => this.onShotComplete(shotData)
+      });
 
-      // Get BTK target from target system (already created in start())
-      this.btkTarget = this.targetSystem.getBtkTarget();
-      
-      // Get game parameters
-      const gameParams = getGameParams();
-      const rangeYards = gameParams.distance; // Already in yards
-
-      // Create bullet (wrapper handles unit conversions)
-      this.bullet = new BtkBulletWrapper(0, this.bulletDiameter, 0, bc, dragFunction);
-
-      // Create atmosphere (wrapper handles unit conversions)
-      const atmosphere = new BtkAtmosphereWrapper(59, 0, 0.5, 0.0);
-
-      // Create ballistic simulator (wrapped for transparent coordinate conversion)
-      this.ballisticSimulator = new BtkBallisticsSimulatorWrapper();
-      this.ballisticSimulator.setInitialBullet(this.bullet);
-      this.ballisticSimulator.setAtmosphere(atmosphere);
-      this.ballisticSimulator.setWind(new BtkVector3Wrapper(0, 0, 0));
-
-      // Custom zeroing routine to hit target center (accounting for Y offset)
-      this.zeroedBullet = this.computeZeroToTarget(this.nominalMV, rangeYards);
-
-      // Create match object for recording shots (wrapped)
-      this.match = new BtkMatchWrapper();
-
+      // Setup ballistic system with bullet parameters
+      this.ballisticsSystem.setupBallisticSystem({
+        mvFps: mvFps,
+        bc: bc,
+        dragFunction: dragFunction,
+        diameterInches: diameterInches,
+        mvSdFps: mvSdFps,
+        rifleAccuracyMoa: rifleAccuracyMoa
+      });
     }
     catch (error)
     {
@@ -1518,98 +1504,6 @@ class FClassSimulator
    * @param {number} mv - Muzzle velocity (fps)
    * @param {number} range - Range (yards)
    */
-  computeZeroToTarget(mv, range)
-  {
-    // Get target coordinates from target system
-    const targetCenter = this.targetSystem.getUserTargetCenter();
-    if (!targetCenter)
-    {
-      throw new Error('Cannot compute zero: user target not available');
-    }
-    
-    // Target coordinates in yards (Three.js units)
-    const targetX = targetCenter.x; // Three X (crossrange)
-    const targetY = targetCenter.y; // Three Y (up)
-    const targetZ = targetCenter.z; // Three Z (downrange, negative)
-
-
-    // Initial angles - start with reasonable elevation and windage
-    let elevation = 0.01; // Start with 0.01 radian elevation (about 0.57 degrees)
-    let windage = 0.0; // Start with no windage
-
-    const dt = 0.001;
-    const maxIterations = 1000;
-    const tolerance = 0.01; // 0.01 yards (~0.36 inches) tolerance
-
-    for (let iter = 0; iter < maxIterations; iter++)
-    {
-      // Create velocity vector from angles in Three.js coordinates (fps)
-      // Three.js: X=right, Y=up, Z=towards camera (negative Z = downrange)
-      // Elevation: angle above horizontal (pitch)
-      // Windage: angle left/right from center (yaw)
-      const velX = mv * Math.sin(windage) * Math.cos(elevation); // Crossrange (right)
-      const velY = mv * Math.sin(elevation); // Vertical (up)
-      const velZ = -mv * Math.cos(windage) * Math.cos(elevation); // Downrange (negative Z)
-
-      // First iteration - no special handling needed
-
-      // Create velocity and position using wrappers
-      const vel = new BtkVelocityWrapper(velX, velY, velZ);
-      const pos = new BtkVector3Wrapper(0, 0, 0); // Start at muzzle
-
-      // Create bullet using wrapper (accepts wrapped pos and vel)
-      const bullet = new BtkBulletWrapper(this.bullet, pos, vel, 0.0);
-
-      // Simulate trajectory using wrapper
-      this.ballisticSimulator.setInitialBullet(bullet);
-      this.ballisticSimulator.resetToInitial();
-      this.ballisticSimulator.setWind(new BtkVector3Wrapper(0, 0, 0)); // No wind for zeroing
-
-      const trajectory = this.ballisticSimulator.simulate(range * 1.1, dt, 5.0);
-      const pointAtRange = trajectory.atDistance(range);
-
-      if (!pointAtRange)
-      {
-        break;
-      }
-
-      const bulletPos = pointAtRange.getState().getPosition();
-      // Both bulletPos and target coordinates are in yards (Three.js units)
-      const errorX = bulletPos.x - targetX;
-      const errorY = bulletPos.y - targetY;
-      const errorZ = bulletPos.z - targetZ;
-      // Only consider X and Y errors for convergence (Z is interpolation error)
-      const totalError = Math.sqrt(errorX * errorX + errorY * errorY);
-
-      if (totalError < tolerance)
-      {
-        break;
-      }
-
-      // Adjust angles based on errors
-      const correctionFactor = 0.5;
-      elevation -= errorY * correctionFactor / range; // Adjust elevation for vertical error (Y)
-      windage -= errorX * correctionFactor / range; // Adjust windage for crossrange error (X)
-
-      // Keep angles reasonable
-      elevation = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, elevation));
-      windage = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, windage));
-    }
-
-    // Create final velocity from converged angles in Three.js coordinates
-    const finalVelX = mv * Math.sin(windage) * Math.cos(elevation); // Crossrange (right)
-    const finalVelY = mv * Math.sin(elevation); // Vertical (up)
-    const finalVelZ = -mv * Math.cos(windage) * Math.cos(elevation); // Downrange (negative Z)
-
-    // Create final bullet using wrappers
-    const finalVel = new BtkVelocityWrapper(finalVelX, finalVelY, finalVelZ);
-    const finalPos = new BtkVector3Wrapper(0, 0, 0);
-    const zeroedBullet = new BtkBulletWrapper(this.bullet, finalPos, finalVel, 0.0);
-
-
-    return zeroedBullet; // Return the wrapped bullet
-  }
-
   // ===== UI & DISPLAY =====
 
   /**
@@ -1627,14 +1521,15 @@ class FClassSimulator
   {
     if (!this.hudElements.container) return;
 
-    const shotCount = this.match ? this.match.getHitCount() : 0;
-    const totalScore = this.match ? this.match.getTotalScore() : 0;
-    const xCount = this.match ? this.match.getXCount() : 0;
+    const match = this.ballisticsSystem ? this.ballisticsSystem.getMatch() : null;
+    const shotCount = match ? match.getHitCount() : 0;
+    const totalScore = match ? match.getTotalScore() : 0;
+    const xCount = match ? match.getXCount() : 0;
 
     // Update target number
-    if (this.userTarget)
+    if (this.targetSystem && this.targetSystem.userTarget)
     {
-      this.hudElements.target.textContent = `#${this.userTarget.targetNumber}`;
+      this.hudElements.target.textContent = `#${this.targetSystem.userTarget.targetNumber}`;
     }
 
     // Update shot count and score (F-Class match is 60 shots)
@@ -1696,10 +1591,11 @@ class FClassSimulator
       border: 2px solid #1e7e34;
     `;
 
-    const totalScore = this.match.getTotalScore();
-    const xCount = this.match.getXCount();
-    const groupSize = this.match.getGroupSizeInches().toFixed(2);
-    const shotCount = this.match.getHitCount();
+    const match = this.ballisticsSystem.getMatch();
+    const totalScore = match.getTotalScore();
+    const xCount = match.getXCount();
+    const groupSize = match.getGroupSizeInches().toFixed(2);
+    const shotCount = match.getHitCount();
     const maxPossibleScore = shotCount * 10;
     const maxPossibleX = shotCount;
     const droppedPoints = maxPossibleScore - totalScore;
@@ -1740,16 +1636,9 @@ class FClassSimulator
    */
   async fireShot()
   {
-    if (!this.ballisticSimulator || !this.targetSystem || !this.targetSystem.userTarget)
+    if (!this.ballisticsSystem)
     {
-      console.error('Ballistic simulator or targets not initialized');
-      return;
-    }
-
-    // Check if match is complete (60 shots for F-Class)
-    const currentShots = this.match ? this.match.getHitCount() : 0;
-    if (currentShots >= FClassSimulator.FCLASS_MATCH_SHOTS)
-    {
+      console.error('Ballistics system not initialized');
       return;
     }
 
@@ -1759,120 +1648,37 @@ class FClassSimulator
     // Play shot sound
     this.playShotSound();
 
-    try
+    // Update ballistics system with current rifle scope aim
+    this.ballisticsSystem.setRifleScopeAim(this.rifleScopeYaw, this.rifleScopePitch);
+
+    // Fire shot through ballistics system
+    await this.ballisticsSystem.fireShot();
+
+    // Start bullet animation
+    this.ballisticsSystem.startBulletAnimation();
+  }
+
+  /**
+   * Handle shot completion (called by BallisticsSystem after bullet animation)
+   */
+  onShotComplete(shotData)
+  {
+    // Show the shot marker
+    this.displayLastShotMarker(shotData.relativeX, shotData.relativeY);
+
+    // Update HUD with shot data
+    this.lastShotData = {
+      score: shotData.score,
+      isX: shotData.isX,
+      mvFps: shotData.mvFps,
+      impactVelocityFps: shotData.impactVelocityFps
+    };
+    this.updateHUD();
+
+    // Check if match is complete (60 shots for F-Class)
+    if (shotData.hitCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
     {
-      const range = this.distance;
-      const dt = 0.001;
-
-      // Apply MV variation in fps
-      const mvVariationFps = (Math.random() - 0.5) * 2.0 * this.mvSd; // fps
-      const actualMVFps = this.nominalMV + mvVariationFps; // fps
-
-      // Rifle accuracy as uniform distribution within a circle (diameter)
-      // Generate random point within unit circle using rejection sampling
-      let accuracyX, accuracyY;
-      do {
-        accuracyX = (Math.random() - 0.5) * 2.0; // -1 to 1
-        accuracyY = (Math.random() - 0.5) * 2.0; // -1 to 1
-      } while (accuracyX * accuracyX + accuracyY * accuracyY > 1.0);
-
-      // Rifle accuracy in MOA, convert to radians for angular error
-      const accuracyMoa = this.rifleAccuracyMoa;
-      const accuracyRad = btk.Conversions.moaToRadians(accuracyMoa);
-      const accuracyRadius = accuracyRad / 2.0; // Convert diameter to radius
-      const accuracyErrorH = accuracyX * accuracyRadius; // radians
-      const accuracyErrorV = accuracyY * accuracyRadius; // radians
-
-      // Apply scope aim and accuracy errors to the zeroed velocity
-      const zeroVel = this.zeroedBullet.getVelocity();
-      const zeroVelMag = zeroVel.magnitude();
-      // Compute true unit direction in fps space (avoid wrapper normalized cross-unit issues)
-      const zx = zeroVel.x,
-        zy = zeroVel.y,
-        zz = zeroVel.z;
-      const ux0 = zx / zeroVelMag;
-      const uy0 = zy / zeroVelMag;
-      const uz0 = zz / zeroVelMag;
-
-      // Apply scope aim as small angular adjustments to the zeroed direction
-      const yawAdjustment = this.rifleScopeYaw + accuracyErrorH;
-      const pitchAdjustment = -(this.rifleScopePitch + accuracyErrorV); // Invert pitch for correct behavior
-
-      // Create new velocity by rotating the zeroed direction
-      const cosYaw = Math.cos(yawAdjustment);
-      const sinYaw = Math.sin(yawAdjustment);
-      const cosPitch = Math.cos(pitchAdjustment);
-      const sinPitch = Math.sin(pitchAdjustment);
-
-      // Rotate unit direction (fps space): yaw around Y, then pitch around X
-      const rx = ux0 * cosYaw - uz0 * sinYaw;
-      const rz = ux0 * sinYaw + uz0 * cosYaw;
-      const ry = uy0;
-      const ux = rx;
-      const uy = ry * cosPitch + rz * sinPitch;
-      const uz = -ry * sinPitch + rz * cosPitch;
-
-      // Scale by actual MV (fps)
-      const variedVel = new BtkVelocityWrapper(
-        ux * actualMVFps,
-        uy * actualMVFps,
-        uz * actualMVFps
-      );
-
-      // Create bullet with varied initial state - start from muzzle (z=0)
-      const bulletStartPos = new BtkVector3Wrapper(0, 0, 0);
-
-      const variedBullet = new BtkBulletWrapper(
-        this.zeroedBullet,
-        bulletStartPos,
-        variedVel,
-        this.zeroedBullet.getSpinRate()
-      );
-
-      // Reset simulator with varied bullet
-      this.ballisticSimulator.setInitialBullet(variedBullet);
-      this.ballisticSimulator.resetToInitial();
-
-      // Simulate with wind generator (wrapper handles unit conversion)
-      this.lastTrajectory = this.ballisticSimulator.simulateWithWind(range, dt, 5.0, this.windGenerator, this.getTime());
-      const pointAtTarget = this.lastTrajectory.atDistance(range); // distance in yards
-
-      if (!pointAtTarget)
-      {
-        console.error('Failed to get trajectory point at target distance');
-        return;
-      }
-
-      // Get bullet position and velocity at target (now in Three.js coords, yards)
-      const bulletState = pointAtTarget.getState();
-      const bulletPos = bulletState.getPosition(); // Three.js coords in yards
-      const bulletVel = bulletState.getVelocity(); // Three.js coords in fps
-      const impactVelocityFps = Math.sqrt(bulletVel.x ** 2 + bulletVel.y ** 2 + bulletVel.z ** 2); // fps
-
-      // Get target coordinates from target system (Three.js coords, yards)
-      const targetCenter = this.targetSystem.getUserTargetCenter();
-      const targetX = targetCenter.x;
-      const targetY = targetCenter.y;
-      const targetZ = targetCenter.z;
-
-      // Impact relative to target center (in target plane: X=horizontal, Y=vertical)
-      const relativeX = bulletPos.x - targetX; // Horizontal offset in yards
-      const relativeY = bulletPos.y - targetY; // Vertical offset in yards
-
-      // Store all shot data for processing after animation completes
-      this.pendingShotData = {
-        relativeX: relativeX, // yards (will be converted by match.addHit)
-        relativeY: relativeY, // yards (will be converted by match.addHit)
-        mvFps: actualMVFps,
-        impactVelocityFps: impactVelocityFps
-      };
-
-      // Log that animation is starting
-    }
-    catch (error)
-    {
-      console.error('Failed to fire shot:', error);
-      throw error;
+      this.showMatchCompleteNotification();
     }
   }
 
@@ -1885,10 +1691,11 @@ class FClassSimulator
    */
   displayShotImpact(relativeX, relativeY, score, isX)
   {
-    if (!this.userTarget) return;
+    if (!this.targetSystem || !this.targetSystem.userTarget) return;
 
     // Create shot impact marker
-    const shotGeometry = new THREE.SphereGeometry(this.bulletDiameter / 2, 8, 8);
+    const bulletDiameter = this.ballisticsSystem ? this.ballisticsSystem.getBulletDiameter() : 0.308;
+    const shotGeometry = new THREE.SphereGeometry(bulletDiameter / 2, 8, 8);
     const shotMaterial = new THREE.MeshBasicMaterial(
     {
       color: isX ? FClassSimulator.COLOR_X_RING : (score >= FClassSimulator.SCORE_THRESHOLD_RED ? FClassSimulator.COLOR_HIGH_SCORE : FClassSimulator.COLOR_LOW_SCORE)
@@ -1897,9 +1704,9 @@ class FClassSimulator
 
     // Position on user target (apply crossrange to X, vertical to Y)
     shotMesh.position.set(
-      this.userTarget.mesh.position.x + relativeX,
-      this.userTarget.mesh.position.y + relativeY,
-      this.userTarget.mesh.position.z
+      this.targetSystem.userTarget.mesh.position.x + relativeX,
+      this.targetSystem.userTarget.mesh.position.y + relativeY,
+      this.targetSystem.userTarget.mesh.position.z
     );
 
     this.scene.add(shotMesh);
@@ -1925,9 +1732,10 @@ class FClassSimulator
     }
 
     // Clear match data
-    if (this.match)
+    const match = this.ballisticsSystem ? this.ballisticsSystem.getMatch() : null;
+    if (match)
     {
-      this.match.clear();
+      match.clear();
     }
   }
 
@@ -1940,184 +1748,20 @@ class FClassSimulator
     {
       if (event.code === 'Space')
       {
-        if (this.bulletAnim)
+        if (this.ballisticsSystem && this.ballisticsSystem.isBulletAnimating())
         {
           // Bullet animation in progress - ignore spacebar completely
           event.preventDefault();
           return;
         }
 
-        if (this.isRunning && this.ballisticSimulator)
+        if (this.isRunning && this.ballisticsSystem)
         {
           event.preventDefault();
           await this.fireShot();
-          // Start bullet animation for this shot if trajectory is available
-          this.startBulletAnimation();
         }
       }
     });
-  }
-
-  // ===== BULLET ANIMATION =====
-
-  createBulletGlowTexture()
-  {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-
-    // Create radial gradient for motion blur effect
-    const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)'); // Very faint white center
-    gradient.addColorStop(0.2, 'rgba(200, 200, 200, 0.2)'); // Light gray
-    gradient.addColorStop(0.5, 'rgba(150, 150, 150, 0.1)'); // Faint gray
-    gradient.addColorStop(0.8, 'rgba(100, 100, 100, 0.05)'); // Very faint
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Transparent edge
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 128, 128);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    this.registerResource('textures', texture);
-    return texture;
-  }
-
-  startBulletAnimation()
-  {
-    if (!this.lastTrajectory)
-      return;
-
-    if (!this.bulletMaterial)
-    {
-      // Copper color: #B87333 (RGB: 184, 115, 51)
-      this.bulletMaterial = new THREE.MeshBasicMaterial(
-      {
-        color: new THREE.Color(0.722, 0.451, 0.200), // Copper color
-        toneMapped: false
-      });
-      this.registerResource('materials', this.bulletMaterial);
-    }
-
-    if (!this.bulletGeometry)
-    {
-      // Use actual bullet diameter from UI parameters
-      const radiusYards = btk.Conversions.inchesToYards(this.bulletDiameter) / 2.0;
-      this.bulletGeometry = new THREE.SphereGeometry(radiusYards, 16, 16);
-      this.registerResource('geometries', this.bulletGeometry);
-    }
-
-    if (!this.bulletMesh)
-    {
-      this.bulletMesh = new THREE.Mesh(this.bulletGeometry, this.bulletMaterial);
-      this.bulletMesh.castShadow = true;
-      this.bulletMesh.receiveShadow = false;
-      this.scene.add(this.bulletMesh);
-      this.registerResource('meshes', this.bulletMesh);
-    }
-
-    // Create pressure wave glow sprite
-    if (!this.bulletGlowSprite)
-    {
-      const glowTexture = this.createBulletGlowTexture();
-      const glowMaterial = new THREE.SpriteMaterial(
-      {
-        map: glowTexture,
-        transparent: true,
-        blending: THREE.NormalBlending, // Subtle blur instead of bright glow
-        depthWrite: false
-      });
-      this.registerResource('materials', glowMaterial);
-      this.bulletGlowSprite = new THREE.Sprite(glowMaterial);
-      this.registerResource('meshes', this.bulletGlowSprite);
-      // Make blur larger for motion trail effect
-      const glowSize = btk.Conversions.inchesToYards(this.bulletDiameter) * 15.0;
-      this.bulletGlowSprite.scale.set(glowSize, glowSize, 1);
-      this.scene.add(this.bulletGlowSprite);
-    }
-
-    // Make bullet and glow visible for new animation
-    this.bulletMesh.visible = true;
-    this.bulletGlowSprite.visible = true;
-
-    // Animation state
-    const totalTimeS = this.lastTrajectory.getTotalTime();
-    this.bulletAnim = {
-      totalTimeS,
-      startTimeMs: performance.now()
-    };
-
-    // Initialize position at t=0 (wrapped trajectory returns Three.js coords in yards)
-    const optPoint0 = this.lastTrajectory.atTime(0);
-    if (optPoint0 !== undefined)
-    {
-      const pos = optPoint0.getState().getPosition(); // Already Three.js coords, yards!
-      this.bulletMesh.position.set(pos.x, pos.y, pos.z);
-    }
-  }
-
-  updateBulletAnimation()
-  {
-    if (!this.bulletAnim || !this.bulletMesh || !this.lastTrajectory) return;
-
-    // Compute elapsed time (1x real-time)
-    const now = performance.now();
-    const elapsedRealS = (now - this.bulletAnim.startTimeMs) / 1000.0;
-    let t = elapsedRealS;
-    if (t >= this.bulletAnim.totalTimeS)
-    {
-      // Clamp to end and stop animating; keep bullet at impact for a brief time
-      t = this.bulletAnim.totalTimeS;
-    }
-
-    const optPoint = this.lastTrajectory.atTime(t);
-    if (optPoint !== undefined)
-    {
-      const pos = optPoint.getState().getPosition(); // Already Three.js coords, yards!
-      this.bulletMesh.position.set(pos.x, pos.y, pos.z);
-      this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
-    }
-
-    // End animation when time reaches total
-    if (t >= this.bulletAnim.totalTimeS)
-    {
-      // Hide bullet mesh, glow, and end animation
-      this.bulletMesh.visible = false;
-      this.bulletGlowSprite.visible = false;
-
-      // Process shot completion: score hit, show marker, update HUD
-      if (this.pendingShotData)
-      {
-        const data = this.pendingShotData;
-
-        // NOW score the hit (add to match)
-        const hit = this.match.addHit(data.relativeX, data.relativeY, this.btkTarget, this.bulletDiameter);
-
-        // Show the shot marker (data is already in yards)
-        this.displayLastShotMarker(data.relativeX, data.relativeY);
-
-        // Update HUD with shot data
-        this.lastShotData = {
-          score: hit.getScore(),
-          isX: hit.isX(),
-          mvFps: data.mvFps,
-          impactVelocityFps: data.impactVelocityFps
-        };
-        this.updateHUD();
-
-        // Check if match is complete (60 shots)
-        if (this.match.getHitCount() >= FClassSimulator.FCLASS_MATCH_SHOTS)
-        {
-          this.showMatchCompleteNotification();
-        }
-
-        // Log the final results
-
-        this.pendingShotData = null;
-      }
-
-      this.bulletAnim = null;
-    }
   }
 
   // ===== CLEANUP =====
