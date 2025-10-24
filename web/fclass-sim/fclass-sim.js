@@ -1,16 +1,7 @@
 // Import BTK wrappers
 import {
   initializeBTK,
-  getBTK,
-  BtkVector3Wrapper,
-  BtkVelocityWrapper,
-  BtkBulletWrapper,
-  BtkTrajectoryPointWrapper,
-  BtkTrajectoryWrapper,
-  BtkWindGeneratorWrapper,
-  BtkBallisticsSimulatorWrapper,
-  BtkAtmosphereWrapper,
-  BtkMatchWrapper
+  BtkWindGeneratorWrapper
 } from './btk-wrappers.js';
 
 // Import feature modules
@@ -21,8 +12,6 @@ import { BallisticsSystem } from './ballistics-system.js';
 
 // BTK module instance
 let btk = null;
-
-let createCircularMaskTextureb = null;
 
 // F-Class distance to target mapping
 const FCLASS_DISTANCE_TO_TARGET = {
@@ -435,7 +424,6 @@ class FClassSimulator
 
     // ===== SCENE SETUP =====
     this.setupCamera();
-    this.setupRange();
 
     // ===== ENVIRONMENT =====
     this.environmentSystem.createEnvironment();
@@ -455,8 +443,7 @@ class FClassSimulator
     this.setupShotFiringControls();
 
     // ===== INITIALIZATION =====
-    this.createWindGenerator();
-    this.createWindFlags();
+    this.initializeWind();
     // Audio will be initialized when needed (user interaction required)
 
   }
@@ -929,143 +916,21 @@ class FClassSimulator
     document.addEventListener('keyup', this.rifleScopeKeyHandler);
   }
 
-  // ===== RANGE SETUP =====
-  setupRange()
-  {
-    const rangeLength = this.distance; // yards
-    const groundLength = rangeLength + FClassSimulator.GROUND_EXTENSION_BEYOND_TARGETS;
-    // PlaneGeometry(width, height) - after rotation: width=X, height=Z
-    const brownGroundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_TOTAL_WIDTH * 4, groundLength);
-    this.registerResource('geometries', brownGroundGeometry);
-    
-    // Load dirt textures for brown ground
-    const dirtLoader = new THREE.TextureLoader();
-    const dirtColor = dirtLoader.load('textures/dirt/Ground082S_1K-JPG_Color.jpg');
-    const dirtNormal = dirtLoader.load('textures/dirt/Ground082S_1K-JPG_NormalGL.jpg');
-    const dirtRoughness = dirtLoader.load('textures/dirt/Ground082S_1K-JPG_Roughness.jpg');
-    
-    // Configure texture wrapping and repeat
-    [dirtColor, dirtNormal, dirtRoughness].forEach(texture => {
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(FClassSimulator.RANGE_TOTAL_WIDTH * 4 / 20, groundLength / 20); // Repeat every 20 yards
-      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-      this.registerResource('textures', texture);
-    });
-    
-    const brownGroundMaterial = new THREE.MeshStandardMaterial({
-      map: dirtColor,
-      normalMap: dirtNormal,
-      roughnessMap: dirtRoughness,
-      color: 0x8b7355, // Darker brown tint
-      roughness: 1.0,
-      metalness: 0.0,
-      side: THREE.FrontSide // Single-sided to avoid shadow acne
-    });
-    this.registerResource('materials', brownGroundMaterial);
-    const brownGround = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
-    brownGround.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
-    brownGround.position.set(0, -0.1, -groundLength / 2); // Center downrange (negative Z), slightly below ground
-    brownGround.receiveShadow = true; // Enable shadow receiving on ground
-    this.scene.add(brownGround);
-    this.registerResource('meshes', brownGround);
-
-    // Add a range plane - just the shooting lanes with grass texture
-    // PlaneGeometry(width, height) - after rotation: width=X, height=Z
-    const groundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_LANE_WIDTH, rangeLength);
-    this.registerResource('geometries', groundGeometry);
-
-    // Load grass textures
-    const grassLoader = new THREE.TextureLoader();
-    const grassColor = grassLoader.load('textures/grass/Grass004_1K-JPG_Color.jpg');
-    const grassNormal = grassLoader.load('textures/grass/Grass004_1K-JPG_NormalGL.jpg');
-    const grassRoughness = grassLoader.load('textures/grass/Grass004_1K-JPG_Roughness.jpg');
-    
-    // Configure texture wrapping and repeat
-    [grassColor, grassNormal, grassRoughness].forEach(texture => {
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(FClassSimulator.RANGE_LANE_WIDTH / 10, rangeLength / 10); // Repeat every 10 yards
-      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-      this.registerResource('textures', texture);
-    });
-
-    // Create grass material with PBR textures
-    const groundMaterial = new THREE.MeshStandardMaterial({
-      map: grassColor,
-      normalMap: grassNormal,
-      roughnessMap: grassRoughness,
-      color: 0x6b8e23, // Darker green tint
-      roughness: 1.0,
-      metalness: 0.0,
-      side: THREE.FrontSide // Single-sided to avoid shadow acne
-    });
-    this.registerResource('materials', groundMaterial);
-
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
-    ground.position.set(0, 0, -rangeLength / 2); // Center downrange (negative Z)
-    ground.receiveShadow = true; // Enable shadow receiving on grass
-    this.scene.add(ground);
-    this.registerResource('meshes', ground);
-
-    // Add pits at the end of the range
-    // BoxGeometry(width, height, depth) = (X, Y, Z) in Three.js coords
-    const pitsGeometry = new THREE.BoxGeometry(FClassSimulator.RANGE_LANE_WIDTH, FClassSimulator.PITS_HEIGHT, FClassSimulator.PITS_DEPTH);
-    this.registerResource('geometries', pitsGeometry);
-    
-    // Load concrete textures for pits
-    const concreteLoader = new THREE.TextureLoader();
-    const concreteColor = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_Color.jpg');
-    const concreteNormal = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_NormalGL.jpg');
-    const concreteRoughness = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_Roughness.jpg');
-    
-    // Configure texture wrapping and repeat
-    [concreteColor, concreteNormal, concreteRoughness].forEach(texture => {
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(FClassSimulator.RANGE_LANE_WIDTH / 5, FClassSimulator.PITS_DEPTH / 5); // Repeat every 5 yards
-      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-      this.registerResource('textures', texture);
-    });
-    
-    const pitsMaterial = new THREE.MeshStandardMaterial({
-      map: concreteColor,
-      normalMap: concreteNormal,
-      roughnessMap: concreteRoughness,
-      color: 0x8b8b8b, // Lighter gray tint
-      roughness: 1.0,
-      metalness: 0.0
-    });
-    this.registerResource('materials', pitsMaterial);
-    const pits = new THREE.Mesh(pitsGeometry, pitsMaterial);
-
-    // Enable shadows on pits
-    pits.castShadow = true;
-    pits.receiveShadow = true;
-
-    // Position pits at rangeLength - PITS_OFFSET to obscure targets when lowered (Three.js coords)
-    pits.position.set(0, FClassSimulator.PITS_HEIGHT / 2, -(rangeLength - FClassSimulator.PITS_OFFSET + FClassSimulator.PITS_DEPTH / 2));
-    pits.matrixAutoUpdate = false;
-    this.scene.add(pits);
-    pits.updateMatrix();
-    this.registerResource('meshes', pits);
-
-    // Targets will be created by TargetSystem when ballistic system is initialized
-  }
-
-
   // ===== SCENERY =====
 
-
   // Environment methods moved to EnvironmentSystem class
+  // Range setup (ground, pits) moved to EnvironmentSystem and TargetSystem
 
   // ===== GAME LOOP & LIFECYCLE =====
-  createWindGenerator()
+  
+  initializeWind()
   {
     // Create wind generator from preset and wrap it
     const rawWindGen = btk.WindPresets.getPreset(this.windPreset);
     this.windGenerator = new BtkWindGeneratorWrapper(rawWindGen);
+    
+    // Create wind flags
+    this.createWindFlags();
   }
 
   // ===== RENDERING =====
@@ -1428,14 +1293,6 @@ class FClassSimulator
   // ===== UI & DISPLAY =====
 
   /**
-   * Display a 1" red marker for the last shot
-   */
-  displayLastShotMarker(relativeX, relativeY)
-  {
-    this.targetSystem.markShot(relativeX, relativeY, this.distance);
-  }
-
-  /**
    * Update the HUD with current shot statistics
    */
   updateHUD()
@@ -1578,8 +1435,8 @@ class FClassSimulator
    */
   onShotComplete(shotData)
   {
-    // Show the shot marker
-    this.displayLastShotMarker(shotData.relativeX, shotData.relativeY);
+    // Show the shot marker via TargetSystem
+    this.targetSystem.markLastShot(shotData.relativeX, shotData.relativeY, this.distance);
 
     // Update HUD with shot data
     this.lastShotData = {
@@ -1594,63 +1451,6 @@ class FClassSimulator
     if (shotData.hitCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
     {
       this.showMatchCompleteNotification();
-    }
-  }
-
-  /**
-   * Display shot impact on the target
-   * @param {number} relativeX - Crossrange impact position (yards)
-   * @param {number} relativeY - Vertical impact position (yards)
-   * @param {number} score - Shot score
-   * @param {boolean} isX - Whether shot is X-ring
-   */
-  displayShotImpact(relativeX, relativeY, score, isX)
-  {
-    if (!this.targetSystem || !this.targetSystem.userTarget) return;
-
-    // Create shot impact marker
-    const bulletDiameter = this.ballisticsSystem ? this.ballisticsSystem.getBulletDiameter() : 0.308;
-    const shotGeometry = new THREE.SphereGeometry(bulletDiameter / 2, 8, 8);
-    const shotMaterial = new THREE.MeshBasicMaterial(
-    {
-      color: isX ? FClassSimulator.COLOR_X_RING : (score >= FClassSimulator.SCORE_THRESHOLD_RED ? FClassSimulator.COLOR_HIGH_SCORE : FClassSimulator.COLOR_LOW_SCORE)
-    });
-    const shotMesh = new THREE.Mesh(shotGeometry, shotMaterial);
-
-    // Position on user target (apply crossrange to X, vertical to Y)
-    shotMesh.position.set(
-      this.targetSystem.userTarget.mesh.position.x + relativeX,
-      this.targetSystem.userTarget.mesh.position.y + relativeY,
-      this.targetSystem.userTarget.mesh.position.z
-    );
-
-    this.scene.add(shotMesh);
-
-    if (!this.shotMarkers) this.shotMarkers = [];
-    this.shotMarkers.push(shotMesh);
-  }
-
-  /**
-   * Clear all shot markers from the scene
-   */
-  clearShotMarkers()
-  {
-    if (this.shotMarkers)
-    {
-      this.shotMarkers.forEach(marker =>
-      {
-        this.scene.remove(marker);
-        marker.geometry.dispose();
-        marker.material.dispose();
-      });
-      this.shotMarkers = [];
-    }
-
-    // Clear match data
-    const match = this.ballisticsSystem ? this.ballisticsSystem.getMatch() : null;
-    if (match)
-    {
-      match.clear();
     }
   }
 

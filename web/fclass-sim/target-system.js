@@ -239,16 +239,38 @@ export class TargetSystem
     // Create shared target texture
     this.targetTexture = this.createTargetTexture();
     
-    // Create pits (brown box below targets)
+    // Create pits with concrete texture
     const pitsGeometry = new THREE.BoxGeometry(this.rangeWidth, this.pitsHeight, this.pitsDepth);
-    const pitsMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
+    
+    // Load concrete textures for pits
+    const concreteLoader = new THREE.TextureLoader();
+    const concreteColor = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_Color.jpg');
+    const concreteNormal = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_NormalGL.jpg');
+    const concreteRoughness = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_Roughness.jpg');
+    
+    // Configure texture wrapping and repeat
+    [concreteColor, concreteNormal, concreteRoughness].forEach(texture => {
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(this.rangeWidth / 5, this.pitsDepth / 5); // Repeat every 5 yards
+      texture.anisotropy = 16;
+    });
+    
+    const pitsMaterial = new THREE.MeshStandardMaterial({
+      map: concreteColor,
+      normalMap: concreteNormal,
+      roughnessMap: concreteRoughness,
+      roughness: 0.9,
+      metalness: 0.1
+    });
+    
     this.pits = new THREE.Mesh(pitsGeometry, pitsMaterial);
     
     this.pits.castShadow = true;
     this.pits.receiveShadow = true;
     
-    // Position pits at target distance
-    this.pits.position.set(0, this.pitsHeight / 2, -(this.rangeDistance + this.pitsOffset));
+    // Position pits in front of targets (closer to shooter)
+    this.pits.position.set(0, this.pitsHeight / 2, -(this.rangeDistance - this.pitsOffset));
     this.scene.add(this.pits);
 
     // Calculate how many targets fit in the range width
@@ -529,6 +551,73 @@ export class TargetSystem
         targetFrame.numberBox.position.y = targetFrame.baseHeight + this.cfg.targetSize + 0.2 + targetFrame.currentHeight;
         targetFrame.numberBox.updateMatrix();
       }
+    }
+  }
+  
+  // ===== SHOT MARKERS =====
+  
+  /**
+   * Mark the last shot on the target with a red glowing marker
+   */
+  markLastShot(relativeX, relativeY, distance)
+  {
+    if (!this.userTarget) return;
+    
+    // Remove previous marker if it exists
+    if (this.lastShotMarker)
+    {
+      this.scene.remove(this.lastShotMarker);
+      this.lastShotMarker.geometry.dispose();
+      this.lastShotMarker.material.dispose();
+      this.lastShotMarker = null;
+    }
+    
+    // Calculate spotter diameter (0.25 MOA at range distance)
+    const spotterDiameterYards = distance * 0.25 / 3438;
+    const spotterRadiusYards = spotterDiameterYards / 2;
+    
+    // Create glowing red marker
+    const markerGeometry = new THREE.SphereGeometry(spotterRadiusYards, 8, 8);
+    const markerMaterial = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(1.0, 0.35, 0.0),
+      emissive: new THREE.Color(1.0, 0.0, 0.0),
+      emissiveIntensity: 0.8,
+      toneMapped: false
+    });
+    
+    this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
+    this.lastShotMarker.castShadow = true;
+    this.lastShotMarker.receiveShadow = true;
+    
+    // Get user target center
+    const targetCenter = this.getUserTargetCenter();
+    if (!targetCenter)
+    {
+      console.warn('Cannot mark shot: no user target');
+      return;
+    }
+    
+    // Position at target center with relative offset
+    this.lastShotMarker.position.set(
+      targetCenter.x + relativeX,
+      targetCenter.y + relativeY,
+      targetCenter.z + 0.1 // Slightly in front of target
+    );
+    
+    this.scene.add(this.lastShotMarker);
+  }
+  
+  /**
+   * Clear the last shot marker
+   */
+  clearLastShotMarker()
+  {
+    if (this.lastShotMarker)
+    {
+      this.scene.remove(this.lastShotMarker);
+      this.lastShotMarker.geometry.dispose();
+      this.lastShotMarker.material.dispose();
+      this.lastShotMarker = null;
     }
   }
 }
