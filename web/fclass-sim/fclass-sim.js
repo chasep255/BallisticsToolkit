@@ -1,7 +1,7 @@
 // Import BTK wrappers
 import {
-  initializeBTK,
-  BtkWindGeneratorWrapper
+  waitForBTK,
+  createWindGeneratorFromPreset
 } from './btk-wrappers.js';
 
 // Import feature modules
@@ -10,9 +10,6 @@ import { TargetSystem } from './target-system.js';
 import { EnvironmentSystem } from './environment-system.js';
 import { BallisticsSystem } from './ballistics-system.js';
 import { ScopeSystem } from './scope-system.js';
-
-// BTK module instance
-let btk = null;
 
 // F-Class distance to target mapping
 const FCLASS_DISTANCE_TO_TARGET = {
@@ -26,13 +23,6 @@ const FCLASS_DISTANCE_TO_TARGET = {
 
 // WebGL game instance
 let webglGame = null;
-
-// Initialize the game
-async function init()
-{
-  // Game initialization is handled by the FClassSimulator constructor
-  // This function is kept for compatibility with the existing initialization flow
-}
 
 // Lock canvas size once on page load
 function lockCanvasSize()
@@ -191,7 +181,9 @@ function getGameParams()
 function populateWindPresetDropdown()
 {
   const windSelect = document.getElementById('windPreset');
-  if (!windSelect || !btk) return;
+  if (!windSelect || !window.btk) return;
+  
+  const btk = window.btk;
 
   windSelect.innerHTML = '';
 
@@ -378,7 +370,9 @@ class FClassSimulator
     this.compositionCamera.position.z = 5; // Position camera at z=5 to see layers 0-3
 
     // ===== WIND & ENVIRONMENT =====
+    // Wind generator will be created in start() after BTK loads
     this.windGenerator = null;
+    
     this.flagSystem = new FlagSystem({
       scene: this.scene,
       renderer: this.renderer
@@ -407,14 +401,8 @@ class FClassSimulator
     });
 
     // ===== BALLISTICS & SHOOTING =====
-    this.ballisticsSystem = new BallisticsSystem({
-      scene: this.scene,
-      targetSystem: this.targetSystem,
-      windGenerator: this.windGenerator,
-      getTime: () => this.getTime(),
-      distance: this.distance,
-      onShotComplete: (shotData) => this.onShotComplete(shotData)
-    });
+    // Ballistics system will be created in start() after wind is initialized
+    this.ballisticsSystem = null;
 
     // ===== HUD =====
     this.hudElements = {
@@ -445,7 +433,7 @@ class FClassSimulator
       renderer: this.renderer,
       canvasWidth: this.canvasWidth,
       canvasHeight: this.canvasHeight,
-      cameraPosition: { x: 0, y: FClassSimulator.CAMERA_EYE_HEIGHT, z: 1 },
+      cameraPosition: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: 1 },
       rangeDistance: this.distance,
       targetSize: FClassSimulator.TARGET_SIZE,
       targetCenterHeight: FClassSimulator.TARGET_CENTER_HEIGHT,
@@ -476,7 +464,7 @@ class FClassSimulator
     this.setupShotFiringControls();
 
     // ===== INITIALIZATION =====
-    this.initializeWind();
+    // Wind will be initialized in start() after BTK is loaded
     // Audio will be initialized when needed (user interaction required)
 
   }
@@ -616,7 +604,7 @@ class FClassSimulator
         if (scope)
         {
           scope.zoom = Math.max(FClassSimulator.RIFLE_SCOPE_ZOOM_MIN, scope.zoom - FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
-          this.updateRifleScopeZoom();
+        this.updateRifleScopeZoom();
         }
         event.preventDefault();
       }
@@ -626,7 +614,7 @@ class FClassSimulator
         if (scope)
         {
           scope.zoom = Math.min(FClassSimulator.RIFLE_SCOPE_ZOOM_MAX, scope.zoom + FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
-          this.updateRifleScopeZoom();
+        this.updateRifleScopeZoom();
         }
         event.preventDefault();
       }
@@ -642,16 +630,6 @@ class FClassSimulator
   // Range setup (ground, pits) moved to EnvironmentSystem and TargetSystem
 
   // ===== GAME LOOP & LIFECYCLE =====
-  
-  initializeWind()
-  {
-    // Create wind generator from preset and wrap it
-    const rawWindGen = btk.WindPresets.getPreset(this.windPreset);
-    this.windGenerator = new BtkWindGeneratorWrapper(rawWindGen);
-    
-    // Create wind flags
-    this.createWindFlags();
-  }
 
   // ===== RENDERING =====
   render()
@@ -724,6 +702,10 @@ class FClassSimulator
     this.clock.start();
     this.gameStartTime = performance.now();
 
+    // Create wind generator (BTK is now loaded)
+    this.windGenerator = createWindGeneratorFromPreset(this.windPreset);
+    this.createWindFlags();
+
     // Create targets (requires BTK to be loaded)
     try
     {
@@ -735,9 +717,18 @@ class FClassSimulator
       throw error;
     }
 
-    // Setup ballistic system for shot firing
+    // Create and setup ballistic system
     try
     {
+      this.ballisticsSystem = new BallisticsSystem({
+        scene: this.scene,
+        targetSystem: this.targetSystem,
+        windGenerator: this.windGenerator,
+        getTime: () => this.getTime(),
+        distance: this.distance,
+        onShotComplete: (shotData) => this.onShotComplete(shotData)
+      });
+      
       await this.setupBallisticSystem();
     }
     catch (error)
@@ -781,8 +772,6 @@ class FClassSimulator
       this.hudElements.container.style.display = 'none';
     }
   }
-
-
 
   // ===== TARGET ANIMATION =====
   /**
@@ -1327,9 +1316,6 @@ class FClassSimulator
 }
 
 
-
-
-
 // Help menu functionality
 function setupHelpMenu()
 {
@@ -1373,13 +1359,13 @@ function setupHelpMenu()
 }
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', async () =>
+async function initializeApp()
 {
   try
   {
-    btk = await initializeBTK();
-    window.btk = btk; // Make BTK globally accessible for modules
-    await init();
+    // Wait for BTK to load
+    await waitForBTK();
+    
     setupUI();
     lockCanvasSize(); // Lock canvas size once on page load
     populateWindPresetDropdown();
@@ -1389,4 +1375,15 @@ document.addEventListener('DOMContentLoaded', async () =>
   {
     console.error('Failed to initialize:', err);
   }
-});
+}
+
+// Check if DOM is already loaded (in case module loads after DOMContentLoaded)
+if (document.readyState === 'loading')
+{
+  document.addEventListener('DOMContentLoaded', initializeApp);
+}
+else
+{
+  // DOM already loaded, initialize immediately
+  initializeApp();
+}

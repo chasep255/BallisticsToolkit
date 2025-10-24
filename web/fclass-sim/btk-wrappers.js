@@ -1,16 +1,23 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 
+// Load BTK module at module level (promise-based, non-blocking)
 let btk = null;
-
-// Initialize BTK module
-export async function initializeBTK() {
-  if (!btk) {
-    btk = await BallisticsToolkit();
+const btkPromise = BallisticsToolkit().then(module => {
+  btk = module;
+  // Make BTK globally accessible once loaded
+  if (typeof window !== 'undefined') {
+    window.btk = btk;
   }
+  return module;
+});
+
+// Wait for BTK to be ready
+export async function waitForBTK() {
+  await btkPromise;
   return btk;
 }
 
-// Export btk for direct access
+// Get BTK (may be null if not loaded yet)
 export function getBTK() {
   return btk;
 }
@@ -270,6 +277,18 @@ export class BtkTrajectoryWrapper
   {
     return this._btk;
   }
+}
+
+/**
+ * Create a wind generator from a preset name
+ * @param {string} presetName - Name of the wind preset (e.g., 'Calm', 'LightBreeze', 'Typical')
+ * @param {number} seed - Optional random seed
+ * @returns {BtkWindGeneratorWrapper} Wrapped wind generator
+ */
+export function createWindGeneratorFromPreset(presetName, seed = 0)
+{
+  const rawWindGen = btk.WindPresets.getPreset(presetName, seed);
+  return new BtkWindGeneratorWrapper(rawWindGen);
 }
 
 /**

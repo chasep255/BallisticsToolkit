@@ -136,7 +136,7 @@ export class ScopeSystem
 
     scope.camera = new THREE.PerspectiveCamera(fov, 1.0, 0.5, 2500);
     
-    // Set fixed camera position (never changes)
+    // Set camera position from config
     scope.camera.position.set(
       this.cameraPosition.x,
       this.cameraPosition.y,
@@ -344,7 +344,7 @@ export class ScopeSystem
 
       // Calculate look-at target with offsets
       const lookX = this.rangeDistance * Math.tan(scope.yaw);
-      const lookY = this.targetCenterHeight + this.rangeDistance * Math.tan(scope.pitch);
+      const lookY = this.cameraPosition.y + this.rangeDistance * Math.tan(scope.pitch);
       const lookZ = -this.rangeDistance;
 
       scope.camera.lookAt(lookX, lookY, lookZ);
