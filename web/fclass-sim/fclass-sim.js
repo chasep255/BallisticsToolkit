@@ -15,6 +15,7 @@ import {
 
 // Import feature modules
 import { FlagSystem } from './wind-flags.js';
+import { TargetSystem } from './target-system.js';
 
 // BTK module instance
 let btk = null;
@@ -346,7 +347,7 @@ class FClassSimulator
 
     // Game parameters
     this.distance = params.distance || 1000;
-    this.target = params.target || 'MR-1FCA';
+    this.targetType = params.target || 'MR-1FCA';
     this.windPreset = params.windPreset || 'Calm';
 
     // Time tracking
@@ -384,9 +385,6 @@ class FClassSimulator
     this.currentAbsTime = 0;
     this.currentDeltaTime = 0;
 
-    // Geometry cache for reuse
-    this._geoBoxCache = {};
-
     // ===== RENDER TARGETS =====
     // Main scene render target
     this.mainSceneRenderTarget = new THREE.WebGLRenderTarget(
@@ -420,12 +418,15 @@ class FClassSimulator
     });
 
     // ===== TARGETS =====
-    this.targetFrames = [];
-    this.targetAnimationTime = 0;
-    this.targetAnimationSpeed = 2.0;
-
-    // Target animation state tracking
-    this.targetAnimationStates = []; // Array of {isUp: bool, timeInState: number, maxDownTime: number}
+    this.targetSystem = new TargetSystem({
+      scene: this.scene,
+      rangeDistance: this.distance,
+      rangeWidth: FClassSimulator.RANGE_LANE_WIDTH,
+      pitsHeight: FClassSimulator.PITS_HEIGHT,
+      pitsDepth: FClassSimulator.PITS_DEPTH,
+      pitsOffset: FClassSimulator.PITS_OFFSET,
+      targetType: this.targetType
+    });
 
     // ===== BALLISTICS & SHOOTING =====
     this.ballisticSimulator = null;
@@ -1149,9 +1150,8 @@ class FClassSimulator
 
     // Add pits at the end of the range
     // BoxGeometry(width, height, depth) = (X, Y, Z) in Three.js coords
-    if (!this._geoBoxCache) this._geoBoxCache = {};
-    const pitsBoxKey = `${FClassSimulator.RANGE_LANE_WIDTH}|${FClassSimulator.PITS_HEIGHT}|${FClassSimulator.PITS_DEPTH}`;
-    const pitsGeometry = this._geoBoxCache[pitsBoxKey] || (this._geoBoxCache[pitsBoxKey] = new THREE.BoxGeometry(FClassSimulator.RANGE_LANE_WIDTH, FClassSimulator.PITS_HEIGHT, FClassSimulator.PITS_DEPTH));
+    const pitsGeometry = new THREE.BoxGeometry(FClassSimulator.RANGE_LANE_WIDTH, FClassSimulator.PITS_HEIGHT, FClassSimulator.PITS_DEPTH);
+    this.registerResource('geometries', pitsGeometry);
     
     // Load concrete textures for pits
     const concreteLoader = new THREE.TextureLoader();
@@ -1190,247 +1190,9 @@ class FClassSimulator
     pits.updateMatrix();
     this.registerResource('meshes', pits);
 
-    // Add target frames above the pits
-    this.setupTargets(rangeLength);
+    // Targets will be created by TargetSystem when ballistic system is initialized
   }
 
-  setupTargets(rangeLength)
-  {
-    const targetSize = FClassSimulator.TARGET_SIZE; // yards
-    const targetSpacing = 1; // yards between targets
-    const totalTargetWidth = targetSize + targetSpacing;
-
-    // Calculate how many targets fit in the range width
-    const rangeWidth = FClassSimulator.RANGE_LANE_WIDTH;
-    const maxTargets = Math.floor(rangeWidth / totalTargetWidth);
-
-    // Position targets above the pits - centered on the range width
-    const targetHeight = FClassSimulator.TARGET_CENTER_HEIGHT;
-    const totalTargetsWidth = maxTargets * targetSize + (maxTargets - 1) * targetSpacing; // Total width including spacing
-    const startX = -totalTargetsWidth / 2 + targetSize / 2; // Start from left (negative X), centered
-
-    // Create target texture once for all targets
-    const targetTexture = this.createTargetTexture();
-
-    for (let i = 0; i < maxTargets; i++)
-    {
-      // BoxGeometry(width, height, depth) for target facing shooter (thin in Z)
-      const targetBoxKey = `${targetSize}|${targetSize}|0.1`;
-      const targetGeometry = this._geoBoxCache[targetBoxKey] || (this._geoBoxCache[targetBoxKey] = new THREE.BoxGeometry(targetSize, targetSize, 0.1));
-      const targetMaterial = new THREE.MeshStandardMaterial({
-        map: targetTexture,
-        metalness: 0.3,  // Moderate metalness for subtle metallic look
-        roughness: 0.4,  // Moderate roughness for realistic metal
-        envMapIntensity: 0.8 // Environment map reflection intensity
-      });
-      this.registerResource('materials', targetMaterial);
-      const target = new THREE.Mesh(targetGeometry, targetMaterial);
-
-      // Enable shadows on target
-      target.castShadow = true;
-      target.receiveShadow = true;
-
-      // Position target at exact distance downrange (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
-      // Target #1 at leftmost (most negative X), incrementing to the right
-      const xPos = startX + i * totalTargetWidth; // Horizontal position (left to right: #1, #2, #3...)
-      target.position.set(xPos, targetHeight, -rangeLength); // Downrange (negative Z)
-      target.matrixAutoUpdate = false;
-      this.scene.add(target);
-      target.updateMatrix();
-      this.registerResource('meshes', target);
-
-      // Store target frame for animation
-      this.targetFrames.push(
-      {
-        mesh: target,
-        baseHeight: targetHeight,
-        targetNumber: i + 1,
-        numberBox: null, // Will be set when we create the number box
-        currentHeight: 0, // Current offset from baseHeight
-        targetHeightGoal: 0, // Where we're animating to
-        animating: false
-      });
-
-      // Add white target number box 0.2 yards above the target with number texture
-      // Target 1 is at i=0 (leftmost position)
-      const numberGeometry = targetGeometry; // reuse same thin box geometry
-      const numberTexture = this.createNumberTexture(i + 1);
-      const numberMaterial = new THREE.MeshStandardMaterial(
-      {
-        map: numberTexture,
-        transparent: true
-      });
-      this.registerResource('materials', numberMaterial);
-      const numberBox = new THREE.Mesh(numberGeometry, numberMaterial);
-
-      // Enable shadows on number box
-      numberBox.castShadow = true;
-      numberBox.receiveShadow = true;
-
-      numberBox.position.set(xPos, targetHeight + targetSize + 0.2, -rangeLength); // 0.2 yards above target
-      numberBox.matrixAutoUpdate = false;
-      this.scene.add(numberBox);
-      numberBox.updateMatrix();
-      this.registerResource('meshes', numberBox);
-
-      // Store number box reference for animation
-      this.targetFrames[i].numberBox = numberBox;
-    }
-
-    // After the loop, find the center target (closest to X=0)
-    let centerTargetIndex = 0;
-    let minDistance = Infinity;
-    for (let i = 0; i < this.targetFrames.length; i++)
-    {
-      const xPos = Math.abs(this.targetFrames[i].mesh.position.x);
-      if (xPos < minDistance)
-      {
-        minDistance = xPos;
-        centerTargetIndex = i;
-      }
-    }
-
-    // Store reference to user's target
-    this.userTarget = this.targetFrames[centerTargetIndex];
-
-    // Initialize animation states for all targets
-    this.targetAnimationStates = [];
-    for (let i = 0; i < this.targetFrames.length; i++)
-    {
-      this.targetAnimationStates.push(
-      {
-        isUp: true, // Start with all targets up
-        timeInState: 0, // Time in current state (seconds)
-        nextDropTime: Math.random() * 120 + 30 // Random time until next drop (30-150 seconds, avg ~90s)
-      });
-    }
-
-    // Target animation states initialized
-
-  }
-
-  // ===== TARGET SYSTEM =====
-
-  createTargetTexture()
-  {
-    // Get the actual target from BTK for accurate dimensions
-    const target = btk.NRATargets.getTarget(String(this.target));
-
-    // Create canvas - use 1024x1024 for high resolution
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 1024;
-    canvas.height = 1024;
-
-    const centerX = 512;
-    const centerY = 512;
-
-    // Scale: 2 yards = 1024 pixels, so 1 yard = 512 pixels
-    const pixelsPerYard = 512;
-
-    // Fill entire canvas with light buff/tan color
-    context.fillStyle = '#F1DD9E'; // Light buff/tan
-    context.fillRect(0, 0, 1024, 1024);
-
-    // Draw concentric circles from outer to inner (buff outer, black center)
-    const ringSpecs = [
-    {
-      ring: 5,
-      fill: '#F1DD9E' // Light buff/tan
-    },
-    {
-      ring: 6,
-      fill: '#F1DD9E' // Light buff/tan
-    },
-    {
-      ring: 7,
-      fill: 'black'
-    },
-    {
-      ring: 8,
-      fill: 'black'
-    },
-    {
-      ring: 9,
-      fill: 'black'
-    },
-    {
-      ring: 10,
-      fill: 'black'
-    }];
-
-    for (const spec of ringSpecs)
-    {
-      const ringDiameterMeters = target.getRingInnerDiameter(spec.ring);
-      const ringDiameterYards = btk.Conversions.metersToYards(ringDiameterMeters);
-      const radiusPixels = (ringDiameterYards / 2) * pixelsPerYard;
-
-      // Draw filled circle
-      context.beginPath();
-      context.arc(centerX, centerY, radiusPixels, 0, 2 * Math.PI);
-      context.fillStyle = spec.fill;
-      context.fill();
-
-      // Draw boundary line
-      context.strokeStyle = spec.fill === 'black' ? 'white' : 'black';
-      context.lineWidth = 2;
-      context.stroke();
-    }
-
-    // Draw X-ring
-    const xRingDiameterMeters = target.getXRingDiameter();
-    const xRingDiameterYards = btk.Conversions.metersToYards(xRingDiameterMeters);
-    const xRingRadius = (xRingDiameterYards / 2) * pixelsPerYard;
-
-    context.beginPath();
-    context.arc(centerX, centerY, xRingRadius, 0, 2 * Math.PI);
-    context.fillStyle = 'black';
-    context.fill();
-    context.strokeStyle = 'white';
-    context.lineWidth = 2;
-    context.stroke();
-
-    // Draw white X in center
-    const xSize = xRingRadius * 0.5;
-    context.strokeStyle = 'white';
-    context.lineWidth = 4;
-    context.beginPath();
-    context.moveTo(centerX - xSize, centerY - xSize);
-    context.lineTo(centerX + xSize, centerY + xSize);
-    context.moveTo(centerX - xSize, centerY + xSize);
-    context.lineTo(centerX + xSize, centerY - xSize);
-    context.stroke();
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    this.registerResource('textures', texture);
-    return texture;
-  }
-
-  createNumberTexture(number)
-  {
-    // Create canvas for number texture
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 256;
-    canvas.height = 256;
-
-    // Clear canvas with white background for number boxes
-    context.fillStyle = '#ffffff'; // White
-    context.fillRect(0, 0, 256, 256);
-
-    // Draw number on canvas (no rotation needed)
-    context.fillStyle = '#000000'; // Black text
-    context.font = 'bold 200px Arial';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillText(number.toString(), 128, 128);
-
-    // Create and return texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    this.registerResource('textures', texture);
-    return texture;
-  }
 
   // ===== SCENERY =====
 
@@ -1814,7 +1576,10 @@ class FClassSimulator
     this.updateClouds();
 
     // Update target frame animations
-    this.updateTargetAnimations();
+    if (this.targetSystem)
+    {
+      this.targetSystem.updateAnimations(this.getDeltaTime());
+    }
 
     // Update scope camera orientations
     this.updateSpottingScopeCamera();
@@ -1848,6 +1613,17 @@ class FClassSimulator
 
     this.clock.start();
     this.gameStartTime = performance.now();
+
+    // Create targets (requires BTK to be loaded)
+    try
+    {
+      this.targetSystem.createTargets();
+    }
+    catch (error)
+    {
+      console.error('Failed to create targets:', error);
+      throw error;
+    }
 
     // Setup ballistic system for shot firing
     try
@@ -1897,90 +1673,6 @@ class FClassSimulator
   }
 
 
-  updateTargetAnimations()
-  {
-    const deltaTime = this.getDeltaTime();
-
-    for (let i = 0; i < this.targetFrames.length; i++)
-    {
-      const targetFrame = this.targetFrames[i];
-      const animationState = this.targetAnimationStates[i];
-      const targetSize = 2; // yards
-
-      // Skip user's target - it stays up
-      if (targetFrame === this.userTarget)
-      {
-        continue;
-      }
-
-      // Update time in current state
-      animationState.timeInState += deltaTime;
-
-      // Handle state transitions
-      if (animationState.isUp)
-      {
-        // Target is up - check if it's time to drop
-        if (animationState.timeInState >= animationState.nextDropTime)
-        {
-          animationState.isUp = false;
-          animationState.timeInState = 0;
-          // Target dropping down
-        }
-      }
-      else
-      {
-        // Target is down - stay down for 5 seconds then go back up
-        if (animationState.timeInState >= 5.0)
-        {
-          animationState.isUp = true;
-          animationState.timeInState = 0;
-          // Set next random drop time (30-150 seconds, avg ~90s = ~1 minute)
-          animationState.nextDropTime = Math.random() * 120 + 30;
-          // Target going back up
-        }
-      }
-
-      // Animate to target position
-      const targetHeight = animationState.isUp ? 0 : FClassSimulator.TARGET_MIN_HEIGHT;
-
-      if (targetFrame.animating)
-      {
-        const direction = Math.sign(targetHeight - targetFrame.currentHeight);
-        const moveDistance = FClassSimulator.TARGET_ANIMATION_SPEED * deltaTime * direction;
-        const newHeight = targetFrame.currentHeight + moveDistance;
-
-        // Check if we've reached or passed the goal
-        if ((direction > 0 && newHeight >= targetHeight) ||
-          (direction < 0 && newHeight <= targetHeight))
-        {
-          targetFrame.currentHeight = targetHeight;
-          targetFrame.animating = false;
-        }
-        else
-        {
-          targetFrame.currentHeight = newHeight;
-        }
-      }
-      else if (Math.abs(targetFrame.currentHeight - targetHeight) > 0.01)
-      {
-        // Start animating if not at target position
-        // Starting target animation
-        targetFrame.targetHeightGoal = targetHeight;
-        targetFrame.animating = true;
-      }
-
-      // Update target position (Three.js coords: Y is height)
-      targetFrame.mesh.position.y = targetFrame.baseHeight + targetFrame.currentHeight;
-      targetFrame.mesh.updateMatrix(); // Required because matrixAutoUpdate = false
-
-      // Update number box position to move with target (Three.js coords: Y is height)
-      if (targetFrame.numberBox)
-      {
-        targetFrame.numberBox.position.y = targetFrame.baseHeight + targetSize + 0.2 + targetFrame.currentHeight;
-        targetFrame.numberBox.updateMatrix(); // Required because matrixAutoUpdate = false
-      }
-    }
-  }
 
   // ===== TARGET ANIMATION =====
   /**
@@ -1989,30 +1681,26 @@ class FClassSimulator
    */
   raiseTarget(targetNumber)
   {
-    // Validate target number
-    if (targetNumber < 1 || targetNumber > this.targetFrames.length)
+    if (this.targetSystem)
     {
-      console.warn(`Invalid target number: ${targetNumber}. Valid range: 1-${this.targetFrames.length}`);
-      return;
+      this.targetSystem.raiseTarget(targetNumber);
     }
-
-    const target = this.targetFrames[targetNumber - 1];
-    target.targetHeightGoal = FClassSimulator.TARGET_MAX_HEIGHT;
-    target.animating = true;
   }
 
   lowerTarget(targetNumber)
   {
-    const target = this.targetFrames[targetNumber - 1];
-    target.targetHeightGoal = FClassSimulator.TARGET_MIN_HEIGHT;
-    target.animating = true;
+    if (this.targetSystem)
+    {
+      this.targetSystem.lowerTarget(targetNumber);
+    }
   }
 
   halfMastTarget(targetNumber)
   {
-    const target = this.targetFrames[targetNumber - 1];
-    target.targetHeightGoal = FClassSimulator.TARGET_HALF_MAST;
-    target.animating = true;
+    if (this.targetSystem)
+    {
+      this.targetSystem.halfMastTarget(targetNumber);
+    }
   }
 
   updateSpottingScopeCamera()
@@ -2085,11 +1773,10 @@ class FClassSimulator
    */
   updateRifleScopeCamera()
   {
-    // Check if user target exists
-    if (!this.userTarget)
+    // Check if target system and user target exist
+    if (!this.targetSystem || !this.targetSystem.userTarget)
     {
-      console.warn('User target not found, skipping rifle scope update');
-      return;
+      return; // Silently skip if targets not created yet
     }
 
     // Calculate angular movement in radians from MOA
@@ -2133,9 +1820,10 @@ class FClassSimulator
     this.rifleScopeCamera.up.set(0, 1, 0); // Y is up in Three.js
 
     // Calculate look-at target with offsets relative to user's target (Three.js coords)
-    const lookX = this.userTarget.mesh.position.x + this.distance * Math.tan(this.rifleScopeYaw); // Horizontal
-    const lookY = this.userTarget.mesh.position.y + this.distance * Math.tan(this.rifleScopePitch); // Vertical
-    const lookZ = this.userTarget.mesh.position.z; // Downrange position (negative)
+    const userTarget = this.targetSystem.userTarget;
+    const lookX = userTarget.mesh.position.x + this.distance * Math.tan(this.rifleScopeYaw); // Horizontal
+    const lookY = userTarget.mesh.position.y + this.distance * Math.tan(this.rifleScopePitch); // Vertical
+    const lookZ = userTarget.mesh.position.z; // Downrange position (negative)
 
     this.rifleScopeCamera.lookAt(lookX, lookY, lookZ);
   }
@@ -2178,9 +1866,11 @@ class FClassSimulator
       this.mvSd = mvSdFps; // Store in fps
       this.rifleAccuracyMoa = rifleAccuracyMoa; // Store in MOA
 
+      // Get BTK target from target system (already created in start())
+      this.btkTarget = this.targetSystem.getBtkTarget();
+      
       // Get game parameters
       const gameParams = getGameParams();
-      this.btkTarget = btk.NRATargets.getTarget(String(gameParams.target));
       const rangeYards = gameParams.distance; // Already in yards
 
       // Create bullet (wrapper handles unit conversions)
@@ -2194,9 +1884,6 @@ class FClassSimulator
       this.ballisticSimulator.setInitialBullet(this.bullet);
       this.ballisticSimulator.setAtmosphere(atmosphere);
       this.ballisticSimulator.setWind(new BtkVector3Wrapper(0, 0, 0));
-
-      // Calculate target center coordinates for the selected target
-      this.targetCenterCoords = this.calculateTargetCenterCoords();
 
       // Custom zeroing routine to hit target center (accounting for Y offset)
       this.zeroedBullet = this.computeZeroToTarget(this.nominalMV, rangeYards);
@@ -2213,31 +1900,23 @@ class FClassSimulator
   }
 
   /**
-   * Calculate the center coordinates of the selected target
-   */
-  calculateTargetCenterCoords()
-  { // Get the actual position from the 3D mesh (Three.js coords: X=right, Y=up, Z=towards camera)
-    const mesh = this.userTarget.mesh;
-    const position = mesh.position;
-    // Return position as-is (already in Three.js coordinates)
-    return {
-      x: position.x, // Horizontal position
-      y: position.y, // Vertical position (center of target)
-      z: position.z // Downrange position (negative)
-    };
-  }
-
-  /**
    * Custom zeroing routine to hit target center accounting for Y offset
    * @param {number} mv - Muzzle velocity (fps)
    * @param {number} range - Range (yards)
    */
   computeZeroToTarget(mv, range)
   {
+    // Get target coordinates from target system
+    const targetCenter = this.targetSystem.getUserTargetCenter();
+    if (!targetCenter)
+    {
+      throw new Error('Cannot compute zero: user target not available');
+    }
+    
     // Target coordinates in yards (Three.js units)
-    const targetX = this.targetCenterCoords.x; // Three X (crossrange)
-    const targetY = this.targetCenterCoords.y; // Three Y (up)
-    const targetZ = this.targetCenterCoords.z; // Three Z (downrange, negative)
+    const targetX = targetCenter.x; // Three X (crossrange)
+    const targetY = targetCenter.y; // Three Y (up)
+    const targetZ = targetCenter.z; // Three Z (downrange, negative)
 
 
     // Initial angles - start with reasonable elevation and windage
@@ -2324,44 +2003,7 @@ class FClassSimulator
    */
   displayLastShotMarker(relativeX, relativeY)
   {
-    // Remove any existing last shot marker (cleanup handled by resource system)
-    if (this.lastShotMarker)
-    {
-      this.scene.remove(this.lastShotMarker);
-      this.lastShotMarker = null;
-    }
-
-    const spotterDiameterYards = this.distance * 0.25 / 3438;
-    const spotterRadiusYards = spotterDiameterYards / 2;
-    
-    const markerGeometry = new THREE.SphereGeometry(spotterRadiusYards, 8, 8);
-    const markerMaterial = new THREE.MeshStandardMaterial(
-    {
-      color: new THREE.Color(1.0, 0.35, 0.0), // Red RGB
-      emissive: new THREE.Color(1.0, 0.0, 0.0), // Red emissive glow
-      emissiveIntensity: 0.8, // Strong glow
-      toneMapped: false // Don't apply tone mapping/lighting
-    });
-
-    this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-    
-    // Enable shadows
-    this.lastShotMarker.castShadow = true;
-    this.lastShotMarker.receiveShadow = true;
-
-    // Position at target center with relative offset (Three.js coords)
-    this.lastShotMarker.position.set(
-      this.targetCenterCoords.x + relativeX, // Target center X + horizontal offset
-      this.targetCenterCoords.y + relativeY, // Target center Y + vertical offset
-      this.targetCenterCoords.z + 0.1 // Slightly in front of target (towards shooter)
-    );
-
-    this.scene.add(this.lastShotMarker);
-    
-    // Register all resources for automatic cleanup
-    this.registerResource('geometries', markerGeometry);
-    this.registerResource('materials', markerMaterial);
-    this.registerResource('meshes', this.lastShotMarker);
+    this.targetSystem.markShot(relativeX, relativeY, this.distance);
   }
 
   /**
@@ -2484,9 +2126,9 @@ class FClassSimulator
    */
   fireShot()
   {
-    if (!this.ballisticSimulator || !this.userTarget)
+    if (!this.ballisticSimulator || !this.targetSystem || !this.targetSystem.userTarget)
     {
-      console.error('Ballistic simulator not initialized');
+      console.error('Ballistic simulator or targets not initialized');
       return;
     }
 
@@ -2590,10 +2232,11 @@ class FClassSimulator
       const bulletVel = bulletState.getVelocity(); // Three.js coords in fps
       const impactVelocityFps = Math.sqrt(bulletVel.x ** 2 + bulletVel.y ** 2 + bulletVel.z ** 2); // fps
 
-      // Target coordinates are also in Three.js coords, yards
-      const targetX = this.targetCenterCoords.x;
-      const targetY = this.targetCenterCoords.y;
-      const targetZ = this.targetCenterCoords.z;
+      // Get target coordinates from target system (Three.js coords, yards)
+      const targetCenter = this.targetSystem.getUserTargetCenter();
+      const targetX = targetCenter.x;
+      const targetY = targetCenter.y;
+      const targetZ = targetCenter.z;
 
       // Impact relative to target center (in target plane: X=horizontal, Y=vertical)
       const relativeX = bulletPos.x - targetX; // Horizontal offset in yards
@@ -3096,6 +2739,7 @@ document.addEventListener('DOMContentLoaded', async () =>
   try
   {
     btk = await initializeBTK();
+    window.btk = btk; // Make BTK globally accessible for modules
     await init();
     setupUI();
     lockCanvasSize(); // Lock canvas size once on page load
