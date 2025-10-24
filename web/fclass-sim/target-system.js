@@ -68,7 +68,13 @@ export class TargetSystem
     {
       this.scene.remove(this.pits);
       this.pits.geometry.dispose();
-      this.pits.material.dispose();
+      if (this.pits.material)
+      {
+        if (this.pits.material.map) this.pits.material.map.dispose();
+        if (this.pits.material.normalMap) this.pits.material.normalMap.dispose();
+        if (this.pits.material.roughnessMap) this.pits.material.roughnessMap.dispose();
+        this.pits.material.dispose();
+      }
     }
     
     // Remove last shot marker

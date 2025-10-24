@@ -65,6 +65,10 @@ export class EnvironmentSystem
     
     // Environment objects
     this.clouds = [];
+    this.mountains = [];
+    this.trees = [];
+    this.ground = null;
+    this.brownGround = null;
     this.sun = null;
     this.ambientLight = null;
     this.hemiLight = null;
@@ -72,10 +76,10 @@ export class EnvironmentSystem
     // Shared resources
     this.mountainTexture = null;
     this.cloudTextures = [];
-    this.treeTrunkTexture = null;
-    this.treeCrownTexture = null;
-    this.treeTrunkGeometry = null;
-    this.treeCrownGeometry = null;
+    this.grassTextures = [];
+    this.dirtTextures = [];
+    this.barkTextures = [];
+    this.foliageTexture = null;
   }
 
   dispose()
@@ -83,9 +87,58 @@ export class EnvironmentSystem
     // Remove clouds
     for (const cloud of this.clouds)
     {
-      this.scene.remove(cloud);
-      cloud.geometry.dispose();
-      cloud.material.dispose();
+      this.scene.remove(cloud.mesh);
+      cloud.mesh.geometry.dispose();
+      cloud.mesh.material.dispose();
+    }
+    
+    // Remove mountains
+    for (const mountain of this.mountains)
+    {
+      this.scene.remove(mountain);
+      mountain.geometry.dispose();
+      mountain.material.dispose();
+    }
+    
+    // Remove trees
+    for (const tree of this.trees)
+    {
+      this.scene.remove(tree);
+      tree.geometry.dispose();
+      if (tree.material)
+      {
+        if (tree.material.map) tree.material.map.dispose();
+        if (tree.material.normalMap) tree.material.normalMap.dispose();
+        if (tree.material.roughnessMap) tree.material.roughnessMap.dispose();
+        tree.material.dispose();
+      }
+    }
+    
+    // Remove ground
+    if (this.ground)
+    {
+      this.scene.remove(this.ground);
+      this.ground.geometry.dispose();
+      if (this.ground.material)
+      {
+        if (this.ground.material.map) this.ground.material.map.dispose();
+        if (this.ground.material.normalMap) this.ground.material.normalMap.dispose();
+        if (this.ground.material.roughnessMap) this.ground.material.roughnessMap.dispose();
+        this.ground.material.dispose();
+      }
+    }
+    
+    if (this.brownGround)
+    {
+      this.scene.remove(this.brownGround);
+      this.brownGround.geometry.dispose();
+      if (this.brownGround.material)
+      {
+        if (this.brownGround.material.map) this.brownGround.material.map.dispose();
+        if (this.brownGround.material.normalMap) this.brownGround.material.normalMap.dispose();
+        if (this.brownGround.material.roughnessMap) this.brownGround.material.roughnessMap.dispose();
+        this.brownGround.material.dispose();
+      }
     }
     
     // Remove lighting
@@ -103,7 +156,7 @@ export class EnvironmentSystem
       this.scene.remove(this.hemiLight);
     }
     
-    // Dispose shared resources
+    // Dispose shared textures
     if (this.mountainTexture)
     {
       this.mountainTexture.dispose();
@@ -112,22 +165,31 @@ export class EnvironmentSystem
     {
       texture.dispose();
     }
-    if (this.treeTrunkTexture)
+    for (const texture of this.grassTextures)
     {
-      this.treeTrunkTexture.dispose();
+      texture.dispose();
     }
-    if (this.treeCrownTexture)
+    for (const texture of this.dirtTextures)
     {
-      this.treeCrownTexture.dispose();
+      texture.dispose();
     }
-    if (this.treeTrunkGeometry)
+    for (const texture of this.barkTextures)
     {
-      this.treeTrunkGeometry.dispose();
+      texture.dispose();
     }
-    if (this.treeCrownGeometry)
+    if (this.foliageTexture)
     {
-      this.treeCrownGeometry.dispose();
+      this.foliageTexture.dispose();
     }
+    
+    // Clear arrays
+    this.clouds = [];
+    this.mountains = [];
+    this.trees = [];
+    this.cloudTextures = [];
+    this.grassTextures = [];
+    this.dirtTextures = [];
+    this.barkTextures = [];
     
     this.clouds = [];
     this.sun = null;
@@ -237,6 +299,7 @@ export class EnvironmentSystem
       mountain.receiveShadow = true;
       
       this.scene.add(mountain);
+      this.mountains.push(mountain);
     }
   }
 
@@ -375,6 +438,7 @@ export class EnvironmentSystem
       texture.repeat.set(0.5, 2.0); // Vertical bark pattern
       texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     });
+    this.barkTextures.push(barkColor, barkNormal, barkRoughness);
     
     const trunkMaterial = new THREE.MeshStandardMaterial({
       map: barkColor,
@@ -387,16 +451,16 @@ export class EnvironmentSystem
 
     // Load grass texture for foliage (like original)
     const foliageLoader = new THREE.TextureLoader();
-    const foliageColor = foliageLoader.load('textures/grass/Grass004_1K-JPG_Color.jpg');
+    this.foliageTexture = foliageLoader.load('textures/grass/Grass004_1K-JPG_Color.jpg');
     
     // Configure texture wrapping and repeat
-    foliageColor.wrapS = THREE.RepeatWrapping;
-    foliageColor.wrapT = THREE.RepeatWrapping;
-    foliageColor.repeat.set(1.0, 1.0); // Normal repeat
-    foliageColor.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    this.foliageTexture.wrapS = THREE.RepeatWrapping;
+    this.foliageTexture.wrapT = THREE.RepeatWrapping;
+    this.foliageTexture.repeat.set(1.0, 1.0); // Normal repeat
+    this.foliageTexture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     
     const foliageMaterial = new THREE.MeshStandardMaterial({
-      map: foliageColor,
+      map: this.foliageTexture,
       color: 0x2d5016, // Dark green tint
       roughness: 0.9, // Rough surface for leaves
       metalness: 0.0, // Non-metallic
@@ -442,6 +506,7 @@ export class EnvironmentSystem
       trunk.castShadow = true;
       trunk.receiveShadow = true;
       this.scene.add(trunk);
+      this.trees.push(trunk);
 
       // Create foliage - positioned so base (widest part of cone) overlaps with top of trunk
       const foliage = new THREE.Mesh(foliageGeo, foliageMaterial);
@@ -452,6 +517,7 @@ export class EnvironmentSystem
       foliage.castShadow = true;
       foliage.receiveShadow = true;
       this.scene.add(foliage);
+      this.trees.push(foliage);
     }
   }
 
@@ -476,6 +542,7 @@ export class EnvironmentSystem
       texture.repeat.set(this.rangeTotalWidth * 4 / 20, groundLength / 20); // Repeat every 20 yards
       texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     });
+    this.dirtTextures.push(dirtColor, dirtNormal, dirtRoughness);
     
     const brownGroundMaterial = new THREE.MeshStandardMaterial({
       map: dirtColor,
@@ -486,11 +553,11 @@ export class EnvironmentSystem
       metalness: 0.0,
       side: THREE.FrontSide // Single-sided to avoid shadow acne
     });
-    const brownGround = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
-    brownGround.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
-    brownGround.position.set(0, -0.1, -groundLength / 2); // Center downrange (negative Z), slightly below ground
-    brownGround.receiveShadow = true; // Enable shadow receiving on ground
-    this.scene.add(brownGround);
+    this.brownGround = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
+    this.brownGround.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
+    this.brownGround.position.set(0, -0.1, -groundLength / 2); // Center downrange (negative Z), slightly below ground
+    this.brownGround.receiveShadow = true; // Enable shadow receiving on ground
+    this.scene.add(this.brownGround);
 
     // Add a range plane - just the shooting lanes with grass texture
     const groundGeometry = new THREE.PlaneGeometry(this.rangeWidth, rangeLength);
@@ -508,6 +575,7 @@ export class EnvironmentSystem
       texture.repeat.set(this.rangeWidth / 10, rangeLength / 10); // Repeat every 10 yards
       texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     });
+    this.grassTextures.push(grassColor, grassNormal, grassRoughness);
 
     // Create grass material with PBR textures
     const groundMaterial = new THREE.MeshStandardMaterial({
@@ -520,11 +588,11 @@ export class EnvironmentSystem
       side: THREE.FrontSide // Single-sided to avoid shadow acne
     });
 
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
-    ground.position.set(0, 0, -rangeLength / 2); // Center downrange (negative Z)
-    ground.receiveShadow = true; // Enable shadow receiving on grass
-    this.scene.add(ground);
+    this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    this.ground.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
+    this.ground.position.set(0, 0, -rangeLength / 2); // Center downrange (negative Z)
+    this.ground.receiveShadow = true; // Enable shadow receiving on grass
+    this.scene.add(this.ground);
   }
 
   updateClouds(deltaTime, windGenerator, currentTime)

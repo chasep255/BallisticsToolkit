@@ -1588,46 +1588,15 @@ class FClassSimulator
       {}
     });
 
-    // Clear all arrays and delete geometry cache
+    // Clear all arrays
     Object.keys(this.resources).forEach(key => this.resources[key] = []);
-    if (this._geoBoxCache)
-    {
-      Object.values(this._geoBoxCache).forEach(geo =>
-      {
-        try
-        {
-          geo.dispose();
-        }
-        catch (_)
-        {}
-      });
-      this._geoBoxCache = {};
-    }
   }
 
   destroy()
   {
     this.stop();
 
-    // Remove lights and shadow target from scene
-    if (this.scene)
-    {
-      this.scene.children.slice().forEach(child =>
-      {
-        if (child.isLight)
-        {
-          this.scene.remove(child);
-        }
-      });
-
-      // Note: shadowTarget property does not exist in this implementation
-      // Shadow casting is handled by individual objects (flags, poles, etc.)
-    }
-
-    // Clean up all registered resources automatically
-    this.cleanupResources();
-
-    // Remove event listeners
+    // Remove event listeners first (before nulling references)
     if (this.spottingScopeKeyHandler)
     {
       document.removeEventListener('keydown', this.spottingScopeKeyHandler);
@@ -1638,22 +1607,43 @@ class FClassSimulator
       document.removeEventListener('keydown', this.rifleScopeKeyHandler);
       document.removeEventListener('keyup', this.rifleScopeKeyHandler);
     }
-
-    // Clear all references (let garbage collector handle the rest)
-    Object.keys(this).forEach(key =>
-    {
-      if (key !== 'resources') this[key] = null;
-    });
     if (this.shotFiringHandler)
     {
       document.removeEventListener('keydown', this.shotFiringHandler);
     }
+
+    // Dispose all system modules
+    if (this.flagSystem)
+    {
+      this.flagSystem.dispose();
+    }
+    if (this.targetSystem)
+    {
+      this.targetSystem.dispose();
+    }
+    if (this.environmentSystem)
+    {
+      this.environmentSystem.dispose();
+    }
+    if (this.ballisticsSystem)
+    {
+      this.ballisticsSystem.dispose();
+    }
+
+    // Clean up all registered resources automatically
+    this.cleanupResources();
 
     // Dispose renderer
     if (this.renderer)
     {
       this.renderer.dispose();
     }
+
+    // Clear all references (let garbage collector handle the rest)
+    Object.keys(this).forEach(key =>
+    {
+      if (key !== 'resources') this[key] = null;
+    });
   }
 }
 
