@@ -419,12 +419,6 @@ class FClassSimulator
     // ===== BALLISTICS & SHOOTING =====
     // Ballistics system will be initialized in start() after targets are created
     this.ballisticsSystem = null;
-    this.lastShotMarker = null;
-
-    // ===== AUDIO =====
-    this.audioContext = null;
-    this.shotSound = null;
-    this.audioMuted = false;
 
     // ===== HUD =====
     this.hudElements = {
@@ -476,79 +470,6 @@ class FClassSimulator
   getDeltaTime()
   {
     return this.currentDeltaTime;
-  }
-
-  // ===== AUDIO SYSTEM =====
-
-  /**
-   * Initialize audio system and load shot sound
-   */
-  async initializeAudio()
-  {
-    // Only initialize if not already done
-    if (this.audioContext) return;
-    
-    try
-    {
-      // Create audio context
-      this.audioContext = new(window.AudioContext || window.webkitAudioContext)();
-
-      // Load shot sound
-      await this.loadShotSound();
-
-    }
-    catch (error)
-    {
-      console.warn('Could not initialize audio system:', error);
-    }
-  }
-
-  /**
-   * Load shot sound from audio file
-   */
-  async loadShotSound()
-  {
-    try
-    {
-      const response = await fetch('audio/shot1.mp3');
-      if (!response.ok)
-      {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      this.shotSound = await this.audioContext.decodeAudioData(arrayBuffer);
-
-    }
-    catch (error)
-    {
-      console.warn('Could not load shot sound:', error);
-      this.shotSound = null;
-    }
-  }
-
-  /**
-   * Play shot sound when firing
-   */
-  playShotSound()
-  {
-    if (this.audioMuted || !this.shotSound || !this.audioContext)
-    {
-      return;
-    }
-
-    try
-    {
-      const source = this.audioContext.createBufferSource();
-      source.buffer = this.shotSound;
-      source.connect(this.audioContext.destination);
-      source.start();
-
-    }
-    catch (error)
-    {
-      console.warn('Could not play shot sound:', error);
-    }
   }
 
   // ===== SCOPE SYSTEM =====
@@ -1239,7 +1160,7 @@ class FClassSimulator
     // Setup ballistic system for shot firing
     try
     {
-      this.setupBallisticSystem();
+      await this.setupBallisticSystem();
     }
     catch (error)
     {
@@ -1460,7 +1381,7 @@ class FClassSimulator
   /**
    * Setup ballistic system with zeroing
    */
-  setupBallisticSystem()
+  async setupBallisticSystem()
   {
     try
     {
@@ -1483,7 +1404,7 @@ class FClassSimulator
       });
 
       // Setup ballistic system with bullet parameters
-      this.ballisticsSystem.setupBallisticSystem({
+      await this.ballisticsSystem.setupBallisticSystem({
         mvFps: mvFps,
         bc: bc,
         dragFunction: dragFunction,
@@ -1634,7 +1555,7 @@ class FClassSimulator
   /**
    * Fire a shot and display the impact
    */
-  async fireShot()
+  fireShot()
   {
     if (!this.ballisticsSystem)
     {
@@ -1642,17 +1563,11 @@ class FClassSimulator
       return;
     }
 
-    // Initialize audio on first shot (requires user interaction)
-    await this.initializeAudio();
-
-    // Play shot sound
-    this.playShotSound();
-
     // Update ballistics system with current rifle scope aim
     this.ballisticsSystem.setRifleScopeAim(this.rifleScopeYaw, this.rifleScopePitch);
 
-    // Fire shot through ballistics system
-    await this.ballisticsSystem.fireShot();
+    // Fire shot through ballistics system (handles audio internally)
+    this.ballisticsSystem.fireShot();
 
     // Start bullet animation
     this.ballisticsSystem.startBulletAnimation();
@@ -1744,7 +1659,7 @@ class FClassSimulator
    */
   setupShotFiringControls()
   {
-    document.addEventListener('keydown', async (event) =>
+    document.addEventListener('keydown', (event) =>
     {
       if (event.code === 'Space')
       {
@@ -1758,7 +1673,7 @@ class FClassSimulator
         if (this.isRunning && this.ballisticsSystem)
         {
           event.preventDefault();
-          await this.fireShot();
+          this.fireShot();
         }
       }
     });
@@ -1911,12 +1826,6 @@ class FClassSimulator
 
     // Clean up all registered resources automatically
     this.cleanupResources();
-
-    // Clean up audio
-    if (this.audioContext)
-    {
-      this.audioContext.close();
-    }
 
     // Remove event listeners
     if (this.spottingScopeKeyHandler)

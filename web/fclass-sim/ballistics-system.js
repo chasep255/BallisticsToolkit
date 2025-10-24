@@ -52,6 +52,11 @@ export class BallisticsSystem
     this.bulletGlowMaterial = null;
     this.pendingShotData = null;
     
+    // Audio
+    this.audioContext = null;
+    this.shotSound = null;
+    this.audioMuted = false;
+    
     // Callbacks
     this.onShotComplete = config.onShotComplete || null;
   }
@@ -59,7 +64,7 @@ export class BallisticsSystem
   /**
    * Setup ballistic system with zeroing
    */
-  setupBallisticSystem(bulletParams)
+  async setupBallisticSystem(bulletParams)
   {
     try
     {
@@ -89,6 +94,9 @@ export class BallisticsSystem
       
       // Create match object for recording shots (wrapped)
       this.match = new BtkMatchWrapper();
+      
+      // Pre-load audio (so first shot plays immediately)
+      await this.initializeAudio();
     }
     catch (error)
     {
@@ -183,16 +191,91 @@ export class BallisticsSystem
     throw new Error('Failed to converge on zero solution');
   }
   
+  // ===== AUDIO SYSTEM =====
+  
+  /**
+   * Initialize audio system and load shot sound
+   */
+  async initializeAudio()
+  {
+    // Only initialize if not already done
+    if (this.audioContext) return;
+    
+    try
+    {
+      // Create audio context
+      this.audioContext = new(window.AudioContext || window.webkitAudioContext)();
+      
+      // Load shot sound
+      await this.loadShotSound();
+    }
+    catch (error)
+    {
+      console.warn('Could not initialize audio system:', error);
+    }
+  }
+  
+  /**
+   * Load shot sound from audio file
+   */
+  async loadShotSound()
+  {
+    try
+    {
+      const response = await fetch('audio/shot1.mp3');
+      if (!response.ok)
+      {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      this.shotSound = await this.audioContext.decodeAudioData(arrayBuffer);
+    }
+    catch (error)
+    {
+      console.warn('Could not load shot sound:', error);
+      this.shotSound = null;
+    }
+  }
+  
+  /**
+   * Play shot sound when firing
+   */
+  playShotSound()
+  {
+    if (this.audioMuted || !this.shotSound || !this.audioContext)
+    {
+      return;
+    }
+    
+    try
+    {
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.shotSound;
+      source.connect(this.audioContext.destination);
+      source.start();
+    }
+    catch (error)
+    {
+      console.warn('Could not play shot sound:', error);
+    }
+  }
+  
+  // ===== SHOT FIRING =====
+  
   /**
    * Fire a shot and compute impact
    */
-  async fireShot()
+  fireShot()
   {
     if (!this.ballisticSimulator || !this.targetSystem || !this.targetSystem.userTarget)
     {
       console.error('Ballistic simulator or targets not initialized');
       return null;
     }
+    
+    // Play shot sound (audio pre-loaded during setup)
+    this.playShotSound();
     
     try
     {
@@ -549,6 +632,14 @@ export class BallisticsSystem
       this.bulletGlowTexture.dispose();
       this.bulletGlowTexture = null;
     }
+    
+    // Clean up audio
+    if (this.audioContext)
+    {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    this.shotSound = null;
     
     // Clear BTK objects
     this.ballisticSimulator = null;
