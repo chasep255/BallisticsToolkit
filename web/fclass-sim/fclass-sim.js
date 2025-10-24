@@ -13,7 +13,13 @@ import {
   BtkMatchWrapper
 } from './btk-wrappers.js';
 
+// Import feature modules
+import { FlagSystem } from './wind-flags.js';
+
+// BTK module instance
 let btk = null;
+
+let createCircularMaskTextureb = null;
 
 // F-Class distance to target mapping
 const FCLASS_DISTANCE_TO_TARGET = {
@@ -422,8 +428,27 @@ class FClassSimulator
 
     // ===== WIND & ENVIRONMENT =====
     this.windGenerator = null;
-    this.flagMeshes = [];
-    this.flagPositions = [];
+    this.flagSystem = new FlagSystem({
+      scene: this.scene,
+      renderer: this.renderer,
+      poleHeight: FClassSimulator.POLE_HEIGHT,
+      poleThickness: FClassSimulator.POLE_THICKNESS,
+      flagBaseWidth: FClassSimulator.FLAG_BASE_WIDTH,
+      flagTipWidth: FClassSimulator.FLAG_TIP_WIDTH,
+      flagLength: FClassSimulator.FLAG_LENGTH,
+      flagThickness: FClassSimulator.FLAG_THICKNESS,
+      flagSegments: FClassSimulator.FLAG_SEGMENTS,
+      flagMinAngle: FClassSimulator.FLAG_MIN_ANGLE,
+      flagMaxAngle: FClassSimulator.FLAG_MAX_ANGLE,
+      flagDegreesPerMph: FClassSimulator.FLAG_DEGREES_PER_MPH,
+      flagAngleInterpolationSpeed: FClassSimulator.FLAG_ANGLE_INTERPOLATION_SPEED,
+      flagDirectionInterpolationSpeed: FClassSimulator.FLAG_DIRECTION_INTERPOLATION_SPEED,
+      flagFlapFrequencyBase: FClassSimulator.FLAG_FLAP_FREQUENCY_BASE,
+      flagFlapFrequencyScale: FClassSimulator.FLAG_FLAP_FREQUENCY_SCALE,
+      flagFlapAmplitude: FClassSimulator.FLAG_FLAP_AMPLITUDE,
+      flagWaveLength: FClassSimulator.FLAG_WAVE_LENGTH,
+      flagPhaseDriftRange: FClassSimulator.FLAG_PHASE_DRIFT_RANGE
+    });
 
     // ===== TARGETS =====
     this.targetFrames = [];
@@ -920,148 +945,18 @@ class FClassSimulator
   }
 
   // ===== FLAG SYSTEM =====
-
-  createFlagTexture()
+  createWindFlags()
   {
-    // Create a canvas for red/yellow flag
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-
-    // Top half red
-    ctx.fillStyle = '#ff0000';
-    ctx.fillRect(0, 0, 256, 128);
-
-    // Bottom half yellow
-    ctx.fillStyle = '#ffff00';
-    ctx.fillRect(0, 128, 256, 128);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    this.registerResource('textures', texture);
-    return texture;
-  }
-
-  // Helper method - calculates vertex positions for one flag segment
-  calculateFlagSegmentPosition(segmentIndex, angleDeg, direction, flapPhase)
-  {
-    const halfBase = FClassSimulator.FLAG_BASE_WIDTH / 2;
-    const halfTip = FClassSimulator.FLAG_TIP_WIDTH / 2;
-    const length = FClassSimulator.FLAG_LENGTH;
-    const thickness = FClassSimulator.FLAG_THICKNESS;
-    const numSegments = FClassSimulator.FLAG_SEGMENTS;
-
-    const t = segmentIndex / (numSegments - 1);
-    const halfWidth = halfBase + (halfTip - halfBase) * t;
-
-    // Calculate position with wind angle and flapping
-    const angleRad = angleDeg * Math.PI / 180;
-    const cosDir = Math.cos(direction);
-    const sinDir = Math.sin(direction);
-    const cosPitch = Math.cos(angleRad);
-    const sinPitch = Math.sin(angleRad);
-
-    // In Three.js coords: X=right, Y=up, Z=towards camera (negative Z = downrange)
-    // Flag extends from pole: 0° = hanging down, 90° = horizontal
-    // Wind angle determines how much the flag lifts (0° = hanging down, 90° = straight out)
-    // direction parameter is the wind direction angle (0° = right, 90° = up, 180° = left, 270° = down)
-
-    const segmentX = Math.cos(direction) * sinPitch * length * t; // Horizontal extension in wind direction
-    const segmentY = -cosPitch * length * t; // Vertical droop (negative Y = down)
-    const segmentZ = Math.sin(direction) * sinPitch * length * t; // Depth extension in wind direction
-
-    // Flapping animation - flag waves in the wind
-    const wavePosition = t * FClassSimulator.FLAG_WAVE_LENGTH;
-    const waveOffset = Math.sin(flapPhase + wavePosition * 2 * Math.PI) * FClassSimulator.FLAG_FLAP_AMPLITUDE;
-    const flapAmplitude = waveOffset * t;
-
-    // Flapping perpendicular to wind direction (makes flag visible from all angles)
-    // When wind blows right (0°), flag flaps in Z (depth)
-    // When wind blows downrange (90°), flag flaps in X (horizontal)
-    const flapX = -Math.sin(direction) * flapAmplitude; // Horizontal flapping
-    const flapY = 0; // No vertical flapping
-    const flapZ = Math.cos(direction) * flapAmplitude; // Depth flapping
-
-    // Return 4 vertices: [topFront, bottomFront, topBack, bottomBack]
-    // Flag is vertical (in XY plane), with top/bottom in Y direction
-    // Front/back faces are offset in Z direction (thickness)
-    return {
-      topFront: [segmentX + flapX, segmentY + flapY + halfWidth, segmentZ + flapZ + thickness / 2],
-      bottomFront: [segmentX + flapX, segmentY + flapY - halfWidth, segmentZ + flapZ + thickness / 2],
-      topBack: [segmentX + flapX, segmentY + flapY + halfWidth, segmentZ + flapZ - thickness / 2],
-      bottomBack: [segmentX + flapX, segmentY + flapY - halfWidth, segmentZ + flapZ - thickness / 2]
-    };
-  }
-
-
-  createFlagGeometry()
-  {
-    // Create thick segmented trapezoid flag with configurable segments for flapping animation
-    // Uses helper method for initial positions (no wind, no flapping)
-    const geometry = new THREE.BufferGeometry();
-    this.registerResource('geometries', geometry);
-    const numSegments = FClassSimulator.FLAG_SEGMENTS;
-
-    // Create vertices for thick flag using multiple layers
-    const vertices = [];
-    const uvs = [];
-    const indices = [];
-
-    // Create front and back faces for each segment using helper
-    for (let i = 0; i < numSegments; i++)
+    // Initialize flag system
+    this.flagSystem.initialize();
+    
+    // Calculate flag positions and add them
+    const laneBorder = -FClassSimulator.RANGE_LANE_WIDTH / 2;
+    
+    for (let yds = FClassSimulator.POLE_INTERVAL; yds < this.distance; yds += FClassSimulator.POLE_INTERVAL)
     {
-      const t = i / (numSegments - 1); // 0 to 1
-
-      // Get initial positions (no wind, no flapping)
-      const positions = this.calculateFlagSegmentPosition(i, 0, 0, 0);
-
-      // Add vertices in order: topFront, bottomFront, topBack, bottomBack
-      vertices.push(...positions.topFront);
-      vertices.push(...positions.bottomFront);
-      vertices.push(...positions.topBack);
-      vertices.push(...positions.bottomBack);
-
-      // UV coordinates (red top, yellow bottom) for both faces
-      uvs.push(t, 0); // Top front
-      uvs.push(t, 1); // Bottom front
-      uvs.push(t, 0); // Top back
-      uvs.push(t, 1); // Bottom back
+      this.flagSystem.addFlag(laneBorder, -yds);
     }
-
-    // Create indices for front and back faces
-    for (let i = 0; i < numSegments - 1; i++)
-    {
-      const idx = i * 4; // 4 vertices per segment (2 front + 2 back)
-
-      // Front face triangles
-      indices.push(idx, idx + 1, idx + 4); // First triangle
-      indices.push(idx + 1, idx + 5, idx + 4); // Second triangle
-
-      // Back face triangles (reverse winding)
-      indices.push(idx + 2, idx + 6, idx + 3); // First triangle
-      indices.push(idx + 3, idx + 6, idx + 7); // Second triangle
-    }
-
-    // Add side faces to connect front and back
-    for (let i = 0; i < numSegments - 1; i++)
-    {
-      const idx = i * 4;
-
-      // Top edge side face
-      indices.push(idx, idx + 4, idx + 2); // First triangle
-      indices.push(idx + 2, idx + 4, idx + 6); // Second triangle
-
-      // Bottom edge side face
-      indices.push(idx + 1, idx + 3, idx + 5); // First triangle
-      indices.push(idx + 3, idx + 7, idx + 5); // Second triangle
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-    geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-
-    return geometry;
   }
 
   // ===== SCENE SETUP =====
@@ -1944,7 +1839,7 @@ class FClassSimulator
     this.updateBulletAnimation();
 
     // Update and render flags
-    this.updateFlags();
+    this.flagSystem.updateFlags(this.getDeltaTime(), this.getTime(), this.windGenerator);
 
     // Update clouds
     this.updateClouds();
@@ -2032,204 +1927,6 @@ class FClassSimulator
     }
   }
 
-  createWindFlags()
-  {
-
-    // Create flag texture once
-    const flagTexture = this.createFlagTexture();
-
-    // Create flag poles every 100 yards from 100 to target distance at the border of the 50-yard lane
-    const maxDistance = this.distance; // yards
-    const laneBorder = -FClassSimulator.RANGE_LANE_WIDTH / 2; // yards from center (left border of 50-yard lane)
-
-    this.flagMeshes = [];
-
-    for (let yds = FClassSimulator.POLE_INTERVAL; yds < maxDistance; yds += FClassSimulator.POLE_INTERVAL)
-    {
-      // BoxGeometry(width, height, depth) for vertical pole (thin in X and Z, tall in Y)
-      const poleBoxKey = `${FClassSimulator.POLE_THICKNESS}|${FClassSimulator.POLE_HEIGHT}|${FClassSimulator.POLE_THICKNESS}`;
-      const poleGeometry = this._geoBoxCache[poleBoxKey] || (this._geoBoxCache[poleBoxKey] = new THREE.BoxGeometry(FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_HEIGHT, FClassSimulator.POLE_THICKNESS));
-      const poleMaterial = new THREE.MeshStandardMaterial({
-        color: 0xc0c0c0, // Light metallic silver
-        metalness: 0.8,  // High metalness for reflective surface
-        roughness: 0.2,  // Low roughness for shine
-        envMapIntensity: 1.0 // Environment map reflection intensity
-      });
-      this.registerResource('materials', poleMaterial);
-      const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-
-      // Enable shadow casting and receiving
-      pole.castShadow = true;
-      pole.receiveShadow = true;
-
-      // Position pole (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
-      pole.position.set(laneBorder, FClassSimulator.POLE_HEIGHT / 2, -yds);
-      this.scene.add(pole);
-      this.registerResource('meshes', pole);
-
-      // Create flag geometry and mesh
-      const flagGeometry = this.createFlagGeometry();
-      
-      // Load cloth textures for flags
-      const clothLoader = new THREE.TextureLoader();
-      const clothColor = clothLoader.load('textures/cloth/Fabric030_1K-JPG_Color.jpg');
-      const clothNormal = clothLoader.load('textures/cloth/Fabric030_1K-JPG_NormalGL.jpg');
-      const clothRoughness = clothLoader.load('textures/cloth/Fabric030_1K-JPG_Roughness.jpg');
-      
-      // Configure texture wrapping and repeat
-      [clothColor, clothNormal, clothRoughness].forEach(texture => {
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(0.5, 0.5); // Small repeat for fabric detail
-        texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-        this.registerResource('textures', texture);
-      });
-      
-      const flagMaterial = new THREE.MeshStandardMaterial({
-        map: flagTexture, // Keep the red/yellow flag pattern
-        normalMap: clothNormal,
-        roughnessMap: clothRoughness,
-        color: 0xffffff, // White tint to preserve flag colors
-        roughness: 0.8, // Slightly rough fabric
-        metalness: 0.0, // Non-metallic
-        side: THREE.DoubleSide
-      });
-      this.registerResource('materials', flagMaterial);
-      const flagMesh = new THREE.Mesh(flagGeometry, flagMaterial);
-
-      // Enable shadow casting and receiving
-      flagMesh.castShadow = true;
-      flagMesh.receiveShadow = true;
-
-      // Position flag at top of pole (Three.js coords: X=horizontal, Y=vertical, Z=downrange)
-      const flagY = FClassSimulator.POLE_HEIGHT - FClassSimulator.FLAG_BASE_WIDTH / 2;
-      flagMesh.position.set(laneBorder, flagY, -yds);
-      this.scene.add(flagMesh);
-      this.registerResource('meshes', flagMesh);
-
-      // Store flag data for animation
-      this.flagMeshes.push(
-      {
-        pole: pole,
-        flagGeometry: flagGeometry,
-        flagMesh: flagMesh,
-        position:
-        {
-          x: laneBorder,
-          y: flagY,
-          z: -yds
-        },
-        currentAngle: FClassSimulator.FLAG_MIN_ANGLE,
-        targetAngle: FClassSimulator.FLAG_MIN_ANGLE,
-        currentDirection: 0, // yaw rotation in radians
-        flapPhase: Math.random() * FClassSimulator.FLAG_PHASE_DRIFT_RANGE // Random starting phase for variety
-      });
-    }
-
-  }
-
-
-
-  updateFlags()
-  {
-    // Smooth interpolation speed (radians per second for direction, degrees per second for angle)
-    const deltaTime = this.getDeltaTime();
-    const angleSpeed = FClassSimulator.FLAG_ANGLE_INTERPOLATION_SPEED; // degrees per second
-    const directionSpeed = FClassSimulator.FLAG_DIRECTION_INTERPOLATION_SPEED; // radians per second
-
-    // Update each flag mesh based on wind
-    for (let i = 0; i < this.flagMeshes.length; i++)
-    {
-      const flag = this.flagMeshes[i];
-      const pos = flag.position;
-
-      // Get wind at flag position (wrapper returns mph directly)
-      const t_s = this.getTime();
-      const windVector = this.windGenerator.getWindAt(pos.x, pos.y, pos.z, t_s);
-
-      // Wind vector is already in mph (Three.js coords)
-      const windX_mph = windVector.x; // mph
-      const windY_mph = windVector.y; // mph  
-      const windZ_mph = windVector.z; // mph
-
-      // Calculate wind magnitude (primarily horizontal and downrange components)
-      const windSpeedMph = Math.sqrt(windX_mph * windX_mph + windY_mph * windY_mph + windZ_mph * windZ_mph);
-
-      // Calculate target angle based on wind speed
-      const targetAngleDeg = Math.min(
-        FClassSimulator.FLAG_MIN_ANGLE + windSpeedMph * FClassSimulator.FLAG_DEGREES_PER_MPH,
-        FClassSimulator.FLAG_MAX_ANGLE
-      );
-
-      // Calculate wind direction (yaw) - flag points in direction wind is blowing TO
-      // In Three.js coords: X=right, Z=towards-camera (negative Z = downrange)
-      // atan2(Y, X) gives angle from positive X axis (right = 0°)
-      const targetDirection = Math.atan2(windZ_mph, windX_mph); // Flag points where wind blows TO
-
-      // Smooth interpolate current angle toward target
-      const angleDiff = targetAngleDeg - flag.currentAngle;
-      const angleStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), angleSpeed * deltaTime);
-      flag.currentAngle += angleStep;
-
-      // Smooth interpolate current direction toward target
-      let dirDiff = targetDirection - flag.currentDirection;
-      // Normalize to [-PI, PI]
-      while (dirDiff > Math.PI) dirDiff -= 2 * Math.PI;
-      while (dirDiff < -Math.PI) dirDiff += 2 * Math.PI;
-      const dirStep = Math.sign(dirDiff) * Math.min(Math.abs(dirDiff), directionSpeed * deltaTime);
-      flag.currentDirection += dirStep;
-
-      // Update flap phase based on wind speed
-      const flapFrequency = FClassSimulator.FLAG_FLAP_FREQUENCY_BASE + windSpeedMph * FClassSimulator.FLAG_FLAP_FREQUENCY_SCALE;
-      flag.flapPhase += flapFrequency * 2 * Math.PI * deltaTime;
-
-      // Update flag geometry with flapping
-      this.updateFlagVertices(flag, flag.currentAngle, flag.currentDirection, windSpeedMph);
-    }
-  }
-
-
-  updateFlagVertices(flag, angleDeg, direction, windSpeedMph)
-  {
-    // Update all segments with flapping animation for thick flag
-    // Uses helper method for position calculations
-    const numSegments = FClassSimulator.FLAG_SEGMENTS;
-
-    // Get the position attribute from the geometry
-    const positions = flag.flagGeometry.attributes.position.array;
-
-    // Update each segment (4 vertices per segment: 2 front + 2 back)
-    for (let i = 0; i < numSegments; i++)
-    {
-      // Get positions using helper method with actual wind parameters
-      const segmentPositions = this.calculateFlagSegmentPosition(i, angleDeg, direction, flag.flapPhase);
-
-      // Update all 4 vertices for this segment (front and back faces)
-      const idx = i * 4; // 4 vertices per segment
-
-      // Front face vertices (positive X)
-      positions[idx * 3 + 0] = segmentPositions.topFront[0]; // Top front X
-      positions[idx * 3 + 1] = segmentPositions.topFront[1]; // Top front Y
-      positions[idx * 3 + 2] = segmentPositions.topFront[2]; // Top front Z
-
-      positions[(idx + 1) * 3 + 0] = segmentPositions.bottomFront[0]; // Bottom front X
-      positions[(idx + 1) * 3 + 1] = segmentPositions.bottomFront[1]; // Bottom front Y
-      positions[(idx + 1) * 3 + 2] = segmentPositions.bottomFront[2]; // Bottom front Z
-
-      // Back face vertices (negative X)
-      positions[(idx + 2) * 3 + 0] = segmentPositions.topBack[0]; // Top back X
-      positions[(idx + 2) * 3 + 1] = segmentPositions.topBack[1]; // Top back Y
-      positions[(idx + 2) * 3 + 2] = segmentPositions.topBack[2]; // Top back Z
-
-      positions[(idx + 3) * 3 + 0] = segmentPositions.bottomBack[0]; // Bottom back X
-      positions[(idx + 3) * 3 + 1] = segmentPositions.bottomBack[1]; // Bottom back Y
-      positions[(idx + 3) * 3 + 2] = segmentPositions.bottomBack[2]; // Bottom back Z
-    }
-
-    // Mark the geometry as needing an update
-    flag.flagGeometry.attributes.position.needsUpdate = true;
-    flag.flagGeometry.computeVertexNormals();
-  }
 
   updateTargetAnimations()
   {
