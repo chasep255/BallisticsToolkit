@@ -172,7 +172,14 @@ function getGameParams()
     distance: distanceYards,
     target: targetType,
     windPreset: document.getElementById('windPreset').value,
-    fclassMode: fclassMode
+    fclassMode: fclassMode,
+    // Bullet parameters
+    mv: parseFloat(document.getElementById('mv').value),
+    bc: parseFloat(document.getElementById('bc').value),
+    dragFunction: document.getElementById('dragFunction').value,
+    diameter: parseFloat(document.getElementById('diameter').value),
+    mvSd: parseFloat(document.getElementById('mvSd').value),
+    rifleAccuracy: parseFloat(document.getElementById('rifleAccuracy').value)
   };
 }
 
@@ -306,9 +313,17 @@ class FClassSimulator
     this.animationId = null;
 
     // Game parameters
-    this.distance = params.distance || 1000;
-    this.targetType = params.target || 'MR-1FCA';
-    this.windPreset = params.windPreset || 'Calm';
+    this.distance = params.distance;
+    this.targetType = params.target;
+    this.windPreset = params.windPreset;
+    
+    // Bullet parameters
+    this.mv = params.mv;
+    this.bc = params.bc;
+    this.dragFunction = params.dragFunction;
+    this.diameter = params.diameter;
+    this.mvSd = params.mvSd;
+    this.rifleAccuracy = params.rifleAccuracy;
 
     // Time tracking
     this.gameStartTime = 0;
@@ -316,156 +331,12 @@ class FClassSimulator
     this.frameCount = 0;
     this.fps = 0;
 
-    // ===== THREE.JS CORE =====
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87ceeb);
-
-    // Renderer setup
-    this.canvasWidth = parseInt(canvas.dataset.lockedWidth) || canvas.clientWidth;
-    this.canvasHeight = parseInt(canvas.dataset.lockedHeight) || canvas.clientHeight;
-    // IMPORTANT: disable logarithmicDepthBuffer; it breaks shadow maps in Three.js
-    this.renderer = new THREE.WebGLRenderer(
-    {
-      canvas,
-      antialias: true,
-      logarithmicDepthBuffer: false // Required for proper shadow rendering
-    });
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.NoToneMapping;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft antialiased shadows
-    this.renderer.shadowMap.autoUpdate = true;
-    this.renderer.shadowMap.needsUpdate = true;
-    this.renderer.setSize(this.canvasWidth, this.canvasHeight);
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-    this.renderer.autoClear = false;
-
-    // Animation clock and cached time values
-    this.clock = new THREE.Clock();
-    this.currentAbsTime = 0;
-    this.currentDeltaTime = 0;
-
-    // ===== RENDER TARGETS =====
-    // Main scene render target
-    this.mainSceneRenderTarget = new THREE.WebGLRenderTarget(
-      this.canvasWidth,
-      this.canvasHeight,
-      {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.LinearFilter,
-        format: THREE.RGBAFormat,
-        samples: 4
-      }
-    );
-    this.registerResource('renderTargets', this.mainSceneRenderTarget);
-
-    // ===== COMPOSITION SYSTEM =====
-    // 2D orthographic scene for compositing all views
-    this.compositionScene = new THREE.Scene();
-    this.compositionCamera = new THREE.OrthographicCamera(
-      -this.canvasWidth / 2, this.canvasWidth / 2,
-      this.canvasHeight / 2, -this.canvasHeight / 2,
-      0, 10
-    );
-    this.compositionCamera.position.z = 5; // Position camera at z=5 to see layers 0-3
-
-    // ===== WIND & ENVIRONMENT =====
-    // Wind generator will be created in start() after BTK loads
-    this.windGenerator = null;
-    
-    this.flagSystem = new FlagSystem({
-      scene: this.scene,
-      renderer: this.renderer
-      // Uses FlagSystem defaults for all flag parameters
-    });
-
-    // ===== TARGETS =====
-    this.targetSystem = new TargetSystem({
-      scene: this.scene,
-      rangeDistance: this.distance,
-      rangeWidth: FClassSimulator.RANGE_LANE_WIDTH,
-      pitsHeight: FClassSimulator.PITS_HEIGHT,
-      pitsDepth: FClassSimulator.PITS_DEPTH,
-      pitsOffset: FClassSimulator.PITS_OFFSET,
-      targetType: this.targetType
-    });
-
-    // ===== ENVIRONMENT =====
-    this.environmentSystem = new EnvironmentSystem({
-      scene: this.scene,
-      renderer: this.renderer,
-      rangeDistance: this.distance,
-      rangeWidth: FClassSimulator.RANGE_LANE_WIDTH,
-      rangeTotalWidth: FClassSimulator.RANGE_TOTAL_WIDTH,
-      groundExtension: FClassSimulator.GROUND_EXTENSION_BEYOND_TARGETS
-    });
-
-    // ===== BALLISTICS & SHOOTING =====
-    // Ballistics system will be created in start() after wind is initialized
-    this.ballisticsSystem = null;
-
-    // ===== HUD =====
-    this.hudElements = {
-      container: document.getElementById('shotHud'),
-      target: document.getElementById('hudTarget'),
-      shots: document.getElementById('hudShots'),
-      score: document.getElementById('hudScore'),
-      dropped: document.getElementById('hudDropped'),
-      lastScore: document.getElementById('hudLastScore'),
-      mv: document.getElementById('hudMV'),
-      impactV: document.getElementById('hudImpactV'),
-      fps: document.getElementById('hudFPS')
-    };
-
-    // ===== SCENE SETUP =====
-    this.setupCamera();
-
-    // ===== ENVIRONMENT =====
-    this.environmentSystem.createEnvironment();
-
-    // ===== COMPOSITION SETUP =====
-    this.createMainViewQuad();
-    
-    // ===== SCOPE SYSTEM =====
-    this.scopeSystem = new ScopeSystem({
-      scene: this.scene,
-      compositionScene: this.compositionScene,
-      renderer: this.renderer,
-      canvasWidth: this.canvasWidth,
-      canvasHeight: this.canvasHeight,
-      cameraPosition: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: 1 },
-      rangeDistance: this.distance,
-      targetSize: FClassSimulator.TARGET_SIZE,
-      targetCenterHeight: FClassSimulator.TARGET_CENTER_HEIGHT,
-      scopes: [
-        {
-          type: 'spotting',
-          position: 'bottom-left',
-          sizeFraction: FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION,
-          initialFOV: FClassSimulator.CAMERA_FOV / 4,
-          minMagnification: FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION,
-          maxMagnification: FClassSimulator.SPOTTING_SCOPE_MAX_MAGNIFICATION,
-          crosshairType: 'simple'
-        },
-        {
-          type: 'rifle',
-          position: 'bottom-right',
-          sizeFraction: FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION,
-          fovMultiplier: FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER,
-          crosshairType: 'reticle',
-          crosshairColor: '#8B0000'
-        }
-      ]
-    });
-
-    // ===== INPUT =====
-    this.setupSpottingScopeControls();
-    this.setupRifleScopeControls();
-    this.setupShotFiringControls();
+    // Store canvas reference for later use
+    this.canvas = canvas;
 
     // ===== INITIALIZATION =====
-    // Wind will be initialized in start() after BTK is loaded
-    // Audio will be initialized when needed (user interaction required)
+    // All heavy initialization moved to start() method
+    // Only basic parameter capture happens in constructor
 
   }
 
@@ -485,7 +356,6 @@ class FClassSimulator
   {
     // Create full-screen quad showing the main scene
     const geometry = new THREE.PlaneGeometry(this.canvasWidth, this.canvasHeight);
-    this.registerResource('geometries', geometry);
     const material = new THREE.MeshBasicMaterial(
     {
       map: this.mainSceneRenderTarget.texture,
@@ -493,12 +363,10 @@ class FClassSimulator
       depthTest: false,
       depthWrite: false
     });
-    this.registerResource('materials', material);
     this.mainViewQuad = new THREE.Mesh(geometry, material);
     this.mainViewQuad.position.set(0, 0, 0);
     this.mainViewQuad.frustumCulled = false;
     this.compositionScene.add(this.mainViewQuad);
-    this.registerResource('meshes', this.mainViewQuad);
   }
 
 
@@ -699,12 +567,147 @@ class FClassSimulator
   {
     if (this.isRunning) return;
 
-    this.clock.start();
-    this.gameStartTime = performance.now();
+    // ===== THREE.JS CORE =====
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x87ceeb);
 
-    // Create wind generator (BTK is now loaded)
+    // Renderer setup
+    this.canvasWidth = parseInt(this.canvas.dataset.lockedWidth) || this.canvas.clientWidth;
+    this.canvasHeight = parseInt(this.canvas.dataset.lockedHeight) || this.canvas.clientHeight;
+    // IMPORTANT: disable logarithmicDepthBuffer; it breaks shadow maps in Three.js
+    this.renderer = new THREE.WebGLRenderer(
+    {
+      canvas: this.canvas,
+      antialias: true,
+      logarithmicDepthBuffer: false // Required for proper shadow rendering
+    });
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft antialiased shadows
+    this.renderer.shadowMap.autoUpdate = true;
+    this.renderer.shadowMap.needsUpdate = true;
+    this.renderer.setSize(this.canvasWidth, this.canvasHeight);
+    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+    this.renderer.autoClear = false;
+
+    // Animation clock and cached time values
+    this.clock = new THREE.Clock();
+    this.currentAbsTime = 0;
+    this.currentDeltaTime = 0;
+
+    // ===== RENDER TARGETS =====
+    // Main scene render target
+    this.mainSceneRenderTarget = new THREE.WebGLRenderTarget(
+      this.canvasWidth,
+      this.canvasHeight,
+      {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        samples: 4
+      }
+    );
+
+    // ===== COMPOSITION SYSTEM =====
+    // 2D orthographic scene for compositing all views
+    this.compositionScene = new THREE.Scene();
+    this.compositionCamera = new THREE.OrthographicCamera(
+      -this.canvasWidth / 2, this.canvasWidth / 2,
+      this.canvasHeight / 2, -this.canvasHeight / 2,
+      0, 10
+    );
+    this.compositionCamera.position.z = 5; // Position camera at z=5 to see layers 0-3
+
+    // ===== WIND & ENVIRONMENT =====
     this.windGenerator = createWindGeneratorFromPreset(this.windPreset);
+    
+    this.flagSystem = new FlagSystem({
+      scene: this.scene,
+      renderer: this.renderer
+      // Uses FlagSystem defaults for all flag parameters
+    });
     this.createWindFlags();
+
+    // ===== TARGETS =====
+    this.targetSystem = new TargetSystem({
+      scene: this.scene,
+      rangeDistance: this.distance,
+      rangeWidth: FClassSimulator.RANGE_LANE_WIDTH,
+      pitsHeight: FClassSimulator.PITS_HEIGHT,
+      pitsDepth: FClassSimulator.PITS_DEPTH,
+      pitsOffset: FClassSimulator.PITS_OFFSET,
+      targetType: this.targetType
+    });
+
+    // ===== ENVIRONMENT =====
+    this.environmentSystem = new EnvironmentSystem({
+      scene: this.scene,
+      renderer: this.renderer,
+      rangeDistance: this.distance,
+      rangeWidth: FClassSimulator.RANGE_LANE_WIDTH,
+      rangeTotalWidth: FClassSimulator.RANGE_TOTAL_WIDTH,
+      groundExtension: FClassSimulator.GROUND_EXTENSION_BEYOND_TARGETS
+    });
+
+    // ===== HUD =====
+    this.hudElements = {
+      container: document.getElementById('shotHud'),
+      target: document.getElementById('hudTarget'),
+      shots: document.getElementById('hudShots'),
+      score: document.getElementById('hudScore'),
+      dropped: document.getElementById('hudDropped'),
+      lastScore: document.getElementById('hudLastScore'),
+      mv: document.getElementById('hudMV'),
+      impactV: document.getElementById('hudImpactV'),
+      fps: document.getElementById('hudFPS')
+    };
+
+    // ===== SCENE SETUP =====
+    this.setupCamera();
+
+    // ===== ENVIRONMENT =====
+    this.environmentSystem.createEnvironment();
+
+    // ===== COMPOSITION SETUP =====
+    this.createMainViewQuad();
+    
+    // ===== SCOPE SYSTEM =====
+    this.scopeSystem = new ScopeSystem({
+      scene: this.scene,
+      compositionScene: this.compositionScene,
+      renderer: this.renderer,
+      canvasWidth: this.canvasWidth,
+      canvasHeight: this.canvasHeight,
+      cameraPosition: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: 1 },
+      rangeDistance: this.distance,
+      targetSize: FClassSimulator.TARGET_SIZE,
+      targetCenterHeight: FClassSimulator.TARGET_CENTER_HEIGHT,
+      scopes: [
+        {
+          type: 'spotting',
+          position: 'bottom-left',
+          sizeFraction: FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION,
+          initialFOV: FClassSimulator.CAMERA_FOV / 4,
+          minMagnification: FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION,
+          maxMagnification: FClassSimulator.SPOTTING_SCOPE_MAX_MAGNIFICATION,
+          crosshairType: 'simple'
+        },
+        {
+          type: 'rifle',
+          position: 'bottom-right',
+          sizeFraction: FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION,
+          fovMultiplier: FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER,
+          crosshairType: 'reticle',
+          crosshairColor: '#8B0000'
+        }
+      ]
+    });
+
+    // ===== INPUT =====
+    this.setupSpottingScopeControls();
+    this.setupRifleScopeControls();
+    this.setupShotFiringControls();
 
     // Create targets (requires BTK to be loaded)
     try
@@ -736,6 +739,10 @@ class FClassSimulator
       console.error('Failed to setup ballistic system:', error);
       throw error;
     }
+
+    // Start game
+    this.clock.start();
+    this.gameStartTime = performance.now();
 
     // Show HUD
     if (this.hudElements.container)
@@ -916,22 +923,14 @@ class FClassSimulator
   {
     try
     {
-      // Get bullet parameters from UI
-      const mvFps = parseFloat(document.getElementById('mv').value);
-      const bc = parseFloat(document.getElementById('bc').value);
-      const dragFunction = document.getElementById('dragFunction').value;
-      const diameterInches = parseFloat(document.getElementById('diameter').value);
-      const mvSdFps = parseFloat(document.getElementById('mvSd').value);
-      const rifleAccuracyMoa = parseFloat(document.getElementById('rifleAccuracy').value);
-
-      // Initialize ballistic system with bullet parameters
+      // Use bullet parameters from constructor (passed via params)
       await this.ballisticsSystem.setupBallisticSystem({
-        mvFps: mvFps,
-        bc: bc,
-        dragFunction: dragFunction,
-        diameterInches: diameterInches,
-        mvSdFps: mvSdFps,
-        rifleAccuracyMoa: rifleAccuracyMoa
+        mvFps: this.mv,
+        bc: this.bc,
+        dragFunction: this.dragFunction,
+        diameterInches: this.diameter,
+        mvSdFps: this.mvSd,
+        rifleAccuracyMoa: this.rifleAccuracy
       });
     }
     catch (error)
@@ -1145,117 +1144,6 @@ class FClassSimulator
 
   // ===== CLEANUP =====
 
-  // ===== RESOURCE MANAGEMENT =====
-
-  // Register a resource for automatic cleanup
-  registerResource(type, resource)
-  {
-    if (!this.resources) this.resources = {
-      geometries: [],
-      materials: [],
-      textures: [],
-      renderTargets: [],
-      meshes: [],
-      objects: []
-    };
-    if (this.resources[type])
-    {
-      this.resources[type].push(resource);
-    }
-  }
-
-  // Clean up all registered resources
-  cleanupResources()
-  {
-    if (!this.resources) return;
-
-    // Dispose geometries
-    this.resources.geometries.forEach(geo =>
-    {
-      if (geo && !geo.isDisposed)
-      {
-        try
-        {
-          geo.dispose();
-        }
-        catch (_)
-        {}
-      }
-    });
-
-    // Dispose materials
-    this.resources.materials.forEach(mat =>
-    {
-      try
-      {
-        if (mat && mat.map) mat.map.dispose();
-        if (mat) mat.dispose();
-      }
-      catch (_)
-      {}
-    });
-
-    // Dispose textures
-    this.resources.textures.forEach(tex =>
-    {
-      try
-      {
-        tex && tex.dispose();
-      }
-      catch (_)
-      {}
-    });
-
-    // Dispose render targets
-    this.resources.renderTargets.forEach(rt =>
-    {
-      try
-      {
-        rt && rt.dispose();
-      }
-      catch (_)
-      {}
-    });
-
-    // Remove meshes from scene and dispose
-    this.resources.meshes.forEach(mesh =>
-    {
-      try
-      {
-        if (mesh.parent) mesh.parent.remove(mesh);
-        if (mesh.geometry)
-        {
-          try
-          {
-            mesh.geometry.dispose();
-          }
-          catch (_)
-          {}
-        }
-        if (mesh.material)
-        {
-          try
-          {
-            if (mesh.material.map) mesh.material.map.dispose();
-          }
-          catch (_)
-          {}
-          try
-          {
-            mesh.material.dispose();
-          }
-          catch (_)
-          {}
-        }
-      }
-      catch (_)
-      {}
-    });
-
-    // Clear all arrays
-    Object.keys(this.resources).forEach(key => this.resources[key] = []);
-  }
-
   destroy()
   {
     this.stop();
@@ -1297,10 +1185,29 @@ class FClassSimulator
     {
       this.scopeSystem.dispose();
     }
-
-    // Clean up all registered resources automatically
-    this.cleanupResources();
-
+    
+    // Dispose wind generator
+    if (this.windGenerator)
+    {
+      this.windGenerator.dispose();
+    }
+    
+    // Dispose main view quad
+    if (this.mainViewQuad)
+    {
+      this.compositionScene.remove(this.mainViewQuad);
+      this.mainViewQuad.geometry.dispose();
+      this.mainViewQuad.material.dispose();
+      this.mainViewQuad = null;
+    }
+    
+    // Dispose render targets
+    if (this.mainSceneRenderTarget)
+    {
+      this.mainSceneRenderTarget.dispose();
+      this.mainSceneRenderTarget = null;
+    }
+    
     // Dispose renderer
     if (this.renderer)
     {

@@ -94,6 +94,14 @@ export class BtkVector3Wrapper
   {
     return this._btk;
   } // For passing to BTK functions
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
+  }
 }
 
 /**
@@ -151,6 +159,14 @@ export class BtkVelocityWrapper
   {
     return this._btk;
   } // For passing to BTK functions
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
+  }
 }
 
 /**
@@ -219,6 +235,14 @@ export class BtkBulletWrapper
   {
     return this._btk;
   }
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
+  }
 }
 
 /**
@@ -242,6 +266,14 @@ export class BtkTrajectoryPointWrapper
   get raw()
   {
     return this._btk;
+  }
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
   }
 }
 
@@ -276,6 +308,14 @@ export class BtkTrajectoryWrapper
   get raw()
   {
     return this._btk;
+  }
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
   }
 }
 
@@ -325,6 +365,14 @@ export class BtkWindGeneratorWrapper
   get raw()
   {
     return this._btk;
+  }
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
   }
 }
 
@@ -383,6 +431,14 @@ export class BtkBallisticsSimulatorWrapper
   {
     return this._btk;
   }
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
+  }
 }
 
 /**
@@ -403,6 +459,52 @@ export class BtkAtmosphereWrapper
   get raw()
   {
     return this._btk;
+  }
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
+  }
+}
+
+/**
+ * Wraps BTK Target - provides methods in yards instead of meters
+ */
+export class BtkTargetWrapper
+{
+  constructor(btkTarget)
+  {
+    this._btk = btkTarget;
+  }
+
+  getRingInnerDiameter(ring)
+  {
+    // Convert from meters to yards
+    const diameterMeters = this._btk.getRingInnerDiameter(ring);
+    return btk.Conversions.metersToYards(diameterMeters);
+  }
+
+  getXRingDiameter()
+  {
+    // Convert from meters to yards
+    const diameterMeters = this._btk.getXRingDiameter();
+    return btk.Conversions.metersToYards(diameterMeters);
+  }
+
+  get raw()
+  {
+    return this._btk;
+  }
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
   }
 }
 
@@ -436,7 +538,11 @@ export class BtkMatchWrapper
     const relativeX_m = btk.Conversions.yardsToMeters(relativeX);
     const relativeY_m = btk.Conversions.yardsToMeters(relativeY);
     const bulletDiameterMeters = btk.Conversions.inchesToMeters(bulletDiameterInches);
-    return this._btk.addHit(relativeX_m, relativeY_m, target, bulletDiameterMeters);
+    
+    // Unpack target if it's a wrapper object
+    const rawTarget = target.raw || target;
+    
+    return this._btk.addHit(relativeX_m, relativeY_m, rawTarget, bulletDiameterMeters);
   }
 
   // Return group size in inches
@@ -454,6 +560,14 @@ export class BtkMatchWrapper
   get raw()
   {
     return this._btk;
+  }
+
+  dispose()
+  {
+    if (this._btk) {
+      this._btk.delete();
+      this._btk = null;
+    }
   }
 }
 

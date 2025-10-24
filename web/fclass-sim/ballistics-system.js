@@ -641,10 +641,31 @@ export class BallisticsSystem
     }
     this.shotSound = null;
     
-    // Clear BTK objects
+    // Dispose BTK objects
+    if (this.bullet) {
+      this.bullet.dispose();
+    }
+    if (this.zeroedBullet) {
+      this.zeroedBullet.dispose();
+    }
+    if (this.atmosphere) {
+      this.atmosphere.dispose();
+    }
+    if (this.ballisticSimulator) {
+      this.ballisticSimulator.dispose();
+    }
+    if (this.match) {
+      this.match.dispose();
+    }
+    if (this.lastTrajectory) {
+      this.lastTrajectory.dispose();
+    }
+    
+    // Clear references
     this.ballisticSimulator = null;
     this.bullet = null;
     this.zeroedBullet = null;
+    this.atmosphere = null;
     this.btkTarget = null;
     this.match = null;
     this.lastTrajectory = null;

@@ -1,5 +1,6 @@
 // target-system.js - Target system for FClass simulator
 // THREE is loaded globally via script tag in HTML
+import { BtkTargetWrapper } from './btk-wrappers.js';
 
 export class TargetSystem
 {
@@ -97,6 +98,13 @@ export class TargetSystem
       this.targetTexture.dispose();
     }
     
+    // Dispose BTK target
+    if (this.btkTarget)
+    {
+      this.btkTarget.dispose();
+      this.btkTarget = null;
+    }
+    
     this.targetFrames = [];
     this.targetAnimationStates = [];
     this.userTarget = null;
@@ -161,8 +169,7 @@ export class TargetSystem
 
     for (const spec of ringSpecs)
     {
-      const ringDiameterMeters = this.btkTarget.getRingInnerDiameter(spec.ring);
-      const ringDiameterYards = btk.Conversions.metersToYards(ringDiameterMeters);
+      const ringDiameterYards = this.btkTarget.getRingInnerDiameter(spec.ring);
       const radiusPixels = (ringDiameterYards / 2) * pixelsPerYard;
 
       // Draw filled circle
@@ -178,8 +185,7 @@ export class TargetSystem
     }
 
     // Draw X-ring
-    const xRingDiameterMeters = this.btkTarget.getXRingDiameter();
-    const xRingDiameterYards = btk.Conversions.metersToYards(xRingDiameterMeters);
+    const xRingDiameterYards = this.btkTarget.getXRingDiameter();
     const xRingRadius = (xRingDiameterYards / 2) * pixelsPerYard;
 
     context.beginPath();
@@ -240,7 +246,8 @@ export class TargetSystem
     }
     
     // Create BTK target for dimensions
-    this.btkTarget = btk.NRATargets.getTarget(String(this.targetType));
+    const rawBtkTarget = btk.NRATargets.getTarget(String(this.targetType));
+    this.btkTarget = new BtkTargetWrapper(rawBtkTarget);
     
     // Create shared target texture
     this.targetTexture = this.createTargetTexture();
