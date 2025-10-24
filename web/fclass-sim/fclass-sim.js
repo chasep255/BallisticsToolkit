@@ -9,6 +9,7 @@ import { FlagSystem } from './wind-flags.js';
 import { TargetSystem } from './target-system.js';
 import { EnvironmentSystem } from './environment-system.js';
 import { BallisticsSystem } from './ballistics-system.js';
+import { ScopeSystem } from './scope-system.js';
 
 // BTK module instance
 let btk = null;
@@ -406,8 +407,14 @@ class FClassSimulator
     });
 
     // ===== BALLISTICS & SHOOTING =====
-    // Ballistics system will be initialized in start() after targets are created
-    this.ballisticsSystem = null;
+    this.ballisticsSystem = new BallisticsSystem({
+      scene: this.scene,
+      targetSystem: this.targetSystem,
+      windGenerator: this.windGenerator,
+      getTime: () => this.getTime(),
+      distance: this.distance,
+      onShotComplete: (shotData) => this.onShotComplete(shotData)
+    });
 
     // ===== HUD =====
     this.hudElements = {
@@ -430,12 +437,38 @@ class FClassSimulator
 
     // ===== COMPOSITION SETUP =====
     this.createMainViewQuad();
-    this.createSpottingScopeOverlay();
-    this.createScopeViewMesh();
-    this.createSpottingScopeCrosshair();
-    this.createRifleScopeOverlay();
-    this.createRifleScopeViewMesh();
-    this.createRifleScopeCrosshair();
+    
+    // ===== SCOPE SYSTEM =====
+    this.scopeSystem = new ScopeSystem({
+      scene: this.scene,
+      compositionScene: this.compositionScene,
+      renderer: this.renderer,
+      canvasWidth: this.canvasWidth,
+      canvasHeight: this.canvasHeight,
+      cameraPosition: { x: 0, y: FClassSimulator.CAMERA_EYE_HEIGHT, z: 1 },
+      rangeDistance: this.distance,
+      targetSize: FClassSimulator.TARGET_SIZE,
+      targetCenterHeight: FClassSimulator.TARGET_CENTER_HEIGHT,
+      scopes: [
+        {
+          type: 'spotting',
+          position: 'bottom-left',
+          sizeFraction: FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION,
+          initialFOV: FClassSimulator.CAMERA_FOV / 4,
+          minMagnification: FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION,
+          maxMagnification: FClassSimulator.SPOTTING_SCOPE_MAX_MAGNIFICATION,
+          crosshairType: 'simple'
+        },
+        {
+          type: 'rifle',
+          position: 'bottom-right',
+          sizeFraction: FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION,
+          fovMultiplier: FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER,
+          crosshairType: 'reticle',
+          crosshairColor: '#8B0000'
+        }
+      ]
+    });
 
     // ===== INPUT =====
     this.setupSpottingScopeControls();
@@ -459,33 +492,6 @@ class FClassSimulator
     return this.currentDeltaTime;
   }
 
-  // ===== SCOPE SYSTEM =====
-
-  createCircularMaskTexture(size)
-  {
-    const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = size;
-    maskCanvas.height = size;
-    const maskCtx = maskCanvas.getContext('2d');
-
-    const cx = size / 2;
-    const cy = size / 2;
-    const r = size / 2 - 5;
-
-    maskCtx.fillStyle = 'black';
-    maskCtx.fillRect(0, 0, size, size);
-
-    maskCtx.fillStyle = 'white';
-    maskCtx.beginPath();
-    maskCtx.arc(cx, cy, r, 0, Math.PI * 2);
-    maskCtx.fill();
-
-    const maskTexture = new THREE.CanvasTexture(maskCanvas);
-    this.registerResource('textures', maskTexture);
-    return maskTexture;
-  }
-
-  // ===== COMPOSITION SYSTEM =====
 
   createMainViewQuad()
   {
@@ -507,301 +513,7 @@ class FClassSimulator
     this.registerResource('meshes', this.mainViewQuad);
   }
 
-  // ===== SCOPE SYSTEM =====
 
-  createSpottingScopeOverlay()
-  {
-    // Add 10px padding on each side to prevent overlap
-    const availableWidth = this.canvasWidth - 20; // 10px padding on each side
-    const availableHeight = this.canvasHeight - 20; // 10px padding on each side
-    const maxScopeSize = Math.min(availableWidth, availableHeight);
-    const scopeSize = Math.floor(maxScopeSize * FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION);
-    const renderSize = scopeSize * 2;
-
-    this.spottingScopeRenderTarget = new THREE.WebGLRenderTarget(renderSize, renderSize,
-    {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat,
-      samples: 4
-    });
-    this.registerResource('renderTargets', this.spottingScopeRenderTarget);
-
-    this.spottingScopeSize = scopeSize;
-    this.spottingScopeX = 10; // 10px padding from left edge
-    // Position at bottom of screen with padding
-    this.spottingScopeY = this.canvasHeight - scopeSize - 10; // 10px padding from bottom
-
-    // Create spotting scope camera (use current magnification)
-    const scopeFOV = FClassSimulator.CAMERA_FOV / 4; // initial 4x, matches this.spottingScopeMagnification
-    this.spottingScopeCamera = new THREE.PerspectiveCamera(scopeFOV, 1.0, 0.5, 2500);
-    this.spottingScopeCamera.position.set(0, FClassSimulator.CAMERA_EYE_HEIGHT, 1); // At shooter, slightly behind
-    this.spottingScopeCamera.up.set(0, 1, 0); // Y is up
-    this.spottingScopeCamera.lookAt(0, FClassSimulator.CAMERA_EYE_HEIGHT, -this.distance); // Look downrange
-
-    // Initialize control state
-    this.spottingScopeYaw = 0;
-    this.spottingScopePitch = 0;
-    this.spottingScopeMagnification = 4;
-  }
-
-  /**
-   * Creates the rifle scope for precise aiming at user's target
-   * FOV is calculated to show 1.5x target frame width
-   * Movement is bounded to the target frame boundaries
-   */
-  createRifleScopeOverlay()
-  {
-    // Create rifle scope (bottom-right)
-    // Add 10px padding on each side to prevent overlap
-    const availableWidth = this.canvasWidth - 20; // 10px padding on each side
-    const availableHeight = this.canvasHeight - 20; // 10px padding on each side
-    const maxScopeSize = Math.min(availableWidth, availableHeight);
-    const rifleScopeSize = Math.floor(maxScopeSize * FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION);
-    const rifleScopeRenderSize = rifleScopeSize * 2;
-
-    this.rifleScopeRenderTarget = new THREE.WebGLRenderTarget(rifleScopeRenderSize, rifleScopeRenderSize,
-    {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat,
-      samples: 4
-    });
-    this.registerResource('renderTargets', this.rifleScopeRenderTarget);
-
-    this.rifleScopeSize = rifleScopeSize;
-    this.rifleScopeX = this.canvasWidth - rifleScopeSize - 10; // 10px padding from right edge
-    this.rifleScopeY = this.canvasHeight - rifleScopeSize - 10; // 10px padding from bottom
-
-    // Calculate FOV for 1.5x target width
-    const targetFrameWidth = FClassSimulator.TARGET_SIZE; // yards
-    const fovRadians = Math.atan((FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER * targetFrameWidth) / this.distance);
-    const fovDegrees = fovRadians * 180 / Math.PI;
-
-    // Create rifle scope camera
-    this.rifleScopeCamera = new THREE.PerspectiveCamera(fovDegrees, 1.0, 0.5, 2500);
-    this.rifleScopeCamera.position.set(0, FClassSimulator.CAMERA_EYE_HEIGHT, 0); // At muzzle
-    this.rifleScopeCamera.up.set(0, 1, 0); // Y is up
-
-    // Point at center target position (will be updated when user target is selected)
-    const targetCenterX = 0; // Center horizontally
-    const targetCenterY = FClassSimulator.TARGET_CENTER_HEIGHT; // Target height
-    const targetCenterZ = -this.distance; // Downrange
-    this.rifleScopeCamera.lookAt(targetCenterX, targetCenterY, targetCenterZ);
-
-    // Initialize rifle scope control state
-    this.rifleScopePitch = 0;
-    this.rifleScopeYaw = 0;
-    this.rifleScopeZoom = FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER; // Current zoom level (FOV multiplier)
-
-    // Calculate movement limits (allow 3x target radius for scope bounding box)
-    const scopeBoundingBoxSize = targetFrameWidth * 3; // 3x target size
-    const maxYawRadians = Math.atan(scopeBoundingBoxSize / (2 * this.distance));
-    const maxPitchRadians = Math.atan(scopeBoundingBoxSize / (2 * this.distance));
-    this.rifleScopeMaxYaw = maxYawRadians;
-    this.rifleScopeMaxPitch = maxPitchRadians;
-  }
-
-  createScopeViewMesh()
-  {
-    const size = this.spottingScopeSize;
-    const x = this.spottingScopeX;
-    const y = this.spottingScopeY;
-
-    // Convert screen coordinates to composition camera coordinates
-    // Composition camera: left=-canvasW/2, right=canvasW/2, top=canvasH/2, bottom=-canvasH/2
-    const canvasW = this.canvasWidth;
-    const canvasH = this.canvasHeight;
-    // Three.js meshes are positioned by center, so offset by half size
-    const compX = x + size / 2 - canvasW / 2;
-    const compY = canvasH / 2 - (y + size / 2); // Flip Y coordinate and offset by half size
-
-    // Create circular mask texture
-    const maskTexture = this.createCircularMaskTexture(size);
-
-    // Create scope view mesh
-    const scopeGeom = new THREE.PlaneGeometry(size, size);
-    this.registerResource('geometries', scopeGeom);
-    const scopeMat = new THREE.MeshBasicMaterial(
-    {
-      map: this.spottingScopeRenderTarget.texture,
-      alphaMap: maskTexture,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false
-    });
-    this.registerResource('materials', scopeMat);
-
-    this.spottingScopeViewMesh = new THREE.Mesh(scopeGeom, scopeMat);
-    this.spottingScopeViewMesh.position.set(compX, compY, 1); // Layer 1 for scope views
-    this.spottingScopeViewMesh.renderOrder = 1; // Render after main view but before crosshairs
-    this.spottingScopeViewMesh.frustumCulled = false;
-
-    this.compositionScene.add(this.spottingScopeViewMesh);
-    this.registerResource('meshes', this.spottingScopeViewMesh);
-  }
-
-  createRifleScopeViewMesh()
-  {
-    const rifleScopeSize = this.rifleScopeSize;
-    const rifleScopeX = this.rifleScopeX;
-    const rifleScopeY = this.rifleScopeY;
-
-    // Convert screen coordinates to composition camera coordinates for rifle scope
-    const canvasW = this.canvasWidth;
-    const canvasH = this.canvasHeight;
-    const rifleScopeCompX = rifleScopeX + rifleScopeSize / 2 - canvasW / 2;
-    const rifleScopeCompY = canvasH / 2 - (rifleScopeY + rifleScopeSize / 2);
-
-    // Create circular mask texture for rifle scope
-    const rifleScopeMaskTexture = this.createCircularMaskTexture(rifleScopeSize);
-
-    // Create rifle scope view mesh
-    const rifleScopeGeom = new THREE.PlaneGeometry(rifleScopeSize, rifleScopeSize);
-    this.registerResource('geometries', rifleScopeGeom);
-    const rifleScopeMat = new THREE.MeshBasicMaterial(
-    {
-      map: this.rifleScopeRenderTarget.texture,
-      alphaMap: rifleScopeMaskTexture,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false
-    });
-    this.registerResource('materials', rifleScopeMat);
-
-    this.rifleScopeViewMesh = new THREE.Mesh(rifleScopeGeom, rifleScopeMat);
-    this.rifleScopeViewMesh.position.set(rifleScopeCompX, rifleScopeCompY, 1); // Layer 1 for scope views
-    this.rifleScopeViewMesh.renderOrder = 1; // Render after main view but before crosshairs
-    this.rifleScopeViewMesh.frustumCulled = false;
-
-    this.compositionScene.add(this.rifleScopeViewMesh);
-    this.registerResource('meshes', this.rifleScopeViewMesh);
-  }
-
-  createSpottingScopeCrosshair()
-  {
-    // Create simple crosshair texture for spotting scope
-    const size = 1024; // High resolution to avoid blurriness
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-
-    // Clear to transparent
-    ctx.clearRect(0, 0, size, size);
-
-    // Draw black circular border
-    const cx = size / 2;
-    const cy = size / 2;
-    const r = size / 2 - 8; // Closer to edge (just inside for the stroke)
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 8; // Thinner border
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-
-    const texture = new THREE.CanvasTexture(canvas);
-    this.registerResource('textures', texture);
-    const scopeSize = this.spottingScopeSize;
-    const x = this.spottingScopeX;
-    const y = this.spottingScopeY;
-    const canvasW = this.canvasWidth;
-    const canvasH = this.canvasHeight;
-    const compX = x + scopeSize / 2 - canvasW / 2;
-    const compY = canvasH / 2 - (y + scopeSize / 2);
-
-    // Use a plane mesh instead of sprite for proper layering
-    const geometry = new THREE.PlaneGeometry(scopeSize, scopeSize);
-    this.registerResource('geometries', geometry);
-    const material = new THREE.MeshBasicMaterial(
-    {
-      map: texture,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false
-    });
-    this.registerResource('materials', material);
-
-    this.spottingScopeCrosshairSprite = new THREE.Mesh(geometry, material);
-    this.spottingScopeCrosshairSprite.position.set(compX, compY, 2);
-    this.spottingScopeCrosshairSprite.renderOrder = 2; // Render after scope views
-    this.spottingScopeCrosshairSprite.frustumCulled = false;
-    this.compositionScene.add(this.spottingScopeCrosshairSprite);
-    this.registerResource('meshes', this.spottingScopeCrosshairSprite);
-  }
-
-  createRifleScopeCrosshair()
-  {
-    // Create precision reticle texture for rifle scope
-    const size = 1024; // High resolution to match spotting scope
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-
-    // Clear to transparent
-    ctx.clearRect(0, 0, size, size);
-
-    const cx = size / 2;
-    const cy = size / 2;
-    const r = size / 2 - 8; // Closer to edge (just inside for the stroke)
-
-    // Draw simple dark red crosshair (no center dot)
-    ctx.strokeStyle = '#8B0000'; // Dark red
-    ctx.lineWidth = 4;
-
-    // Horizontal line (stop at ring edge)
-    ctx.beginPath();
-    ctx.moveTo(cx - r, cy);
-    ctx.lineTo(cx + r, cy);
-    ctx.stroke();
-
-    // Vertical line (stop at ring edge)
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - r);
-    ctx.lineTo(cx, cy + r);
-    ctx.stroke();
-
-    // Draw black circular border on top
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 8; // Thinner border to match spotting scope
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-
-    const texture = new THREE.CanvasTexture(canvas);
-    this.registerResource('textures', texture);
-    const scopeSize = this.rifleScopeSize;
-    const x = this.rifleScopeX;
-    const y = this.rifleScopeY;
-    const canvasW = this.canvasWidth;
-    const canvasH = this.canvasHeight;
-    const compX = x + scopeSize / 2 - canvasW / 2;
-    const compY = canvasH / 2 - (y + scopeSize / 2);
-
-    // Use a plane mesh instead of sprite for proper layering
-    const geometry = new THREE.PlaneGeometry(scopeSize, scopeSize);
-    this.registerResource('geometries', geometry);
-    const material = new THREE.MeshBasicMaterial(
-    {
-      map: texture,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false
-    });
-    this.registerResource('materials', material);
-
-    this.rifleScopeCrosshairSprite = new THREE.Mesh(geometry, material);
-    this.rifleScopeCrosshairSprite.position.set(compX, compY, 2);
-    this.rifleScopeCrosshairSprite.renderOrder = 2; // Render after scope views
-    this.rifleScopeCrosshairSprite.frustumCulled = false;
-    this.compositionScene.add(this.rifleScopeCrosshairSprite);
-    this.registerResource('meshes', this.rifleScopeCrosshairSprite);
-  }
 
   // ===== FLAG SYSTEM =====
   createWindFlags()
@@ -900,14 +612,22 @@ class FClassSimulator
       }
       else if (isKeyDown && (event.key === '+' || event.key === '='))
       {
-        this.rifleScopeZoom = Math.max(FClassSimulator.RIFLE_SCOPE_ZOOM_MIN, this.rifleScopeZoom - FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
-        this.updateRifleScopeZoom();
+        const scope = this.scopeSystem.getScope('rifle');
+        if (scope)
+        {
+          scope.zoom = Math.max(FClassSimulator.RIFLE_SCOPE_ZOOM_MIN, scope.zoom - FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
+          this.updateRifleScopeZoom();
+        }
         event.preventDefault();
       }
       else if (isKeyDown && (event.key === '-' || event.key === '_'))
       {
-        this.rifleScopeZoom = Math.min(FClassSimulator.RIFLE_SCOPE_ZOOM_MAX, this.rifleScopeZoom + FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
-        this.updateRifleScopeZoom();
+        const scope = this.scopeSystem.getScope('rifle');
+        if (scope)
+        {
+          scope.zoom = Math.min(FClassSimulator.RIFLE_SCOPE_ZOOM_MAX, scope.zoom + FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
+          this.updateRifleScopeZoom();
+        }
         event.preventDefault();
       }
     };
@@ -982,23 +702,16 @@ class FClassSimulator
     this.updateSpottingScopeCamera();
     this.updateRifleScopeCamera();
 
-    // 4-pass rendering architecture:
+    // 3-pass rendering architecture:
     // 1) Render main scene to texture
     this.renderer.setRenderTarget(this.mainSceneRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
 
-    // 2) Render spotting scope to texture
-    this.renderer.setRenderTarget(this.spottingScopeRenderTarget);
-    this.renderer.clear();
-    this.renderer.render(this.scene, this.spottingScopeCamera);
+    // 2) Render all scopes to their textures
+    this.scopeSystem.renderScopes();
 
-    // 3) Render rifle scope to texture
-    this.renderer.setRenderTarget(this.rifleScopeRenderTarget);
-    this.renderer.clear();
-    this.renderer.render(this.scene, this.rifleScopeCamera);
-
-    // 4) Composite everything to screen
+    // 3) Composite everything to screen
     this.renderer.setRenderTarget(null);
     this.renderer.clear();
     this.renderer.render(this.compositionScene, this.compositionCamera);
@@ -1102,65 +815,45 @@ class FClassSimulator
 
   updateSpottingScopeCamera()
   {
+    const scope = this.scopeSystem.getScope('spotting');
+    if (!scope) return;
+
     const deltaTime = this.getDeltaTime();
     // Calculate pan speed that slows down linearly with magnification
     // At 2x mag: full speed, at 100x mag: 1/50th speed
-    const speedFactor = 2.0 / this.spottingScopeMagnification; // 2x = 1.0, 100x = 0.02
+    const speedFactor = 2.0 / scope.magnification; // 2x = 1.0, 100x = 0.02
     const panSpeed = FClassSimulator.SPOTTING_SCOPE_PAN_SPEED * deltaTime * speedFactor;
 
     // W/S: adjust pitch (tilt up/down)
-    // W = tilt up (positive pitch)
-    // S = tilt down (negative pitch)
-    if (this.spottingScopeKeys.w) this.spottingScopePitch += panSpeed;
-    if (this.spottingScopeKeys.s) this.spottingScopePitch -= panSpeed;
+    if (this.spottingScopeKeys.w) scope.pitch += panSpeed;
+    if (this.spottingScopeKeys.s) scope.pitch -= panSpeed;
 
-    // A/D: pan left/right (move crossrange position)
-    // A = pan left (negative X in Three.js coords)
-    // D = pan right (positive X in Three.js coords)
-    if (this.spottingScopeKeys.a) this.spottingScopeYaw -= panSpeed;
-    if (this.spottingScopeKeys.d) this.spottingScopeYaw += panSpeed;
+    // A/D: pan left/right
+    if (this.spottingScopeKeys.a) scope.yaw -= panSpeed;
+    if (this.spottingScopeKeys.d) scope.yaw += panSpeed;
 
     // E/Q: adjust magnification (exponential scaling)
-    // E = increase magnification
-    // Q = decrease magnification
     if (this.spottingScopeKeys.e)
     {
-      this.spottingScopeMagnification = Math.min(
-        FClassSimulator.SPOTTING_SCOPE_MAX_MAGNIFICATION,
-        this.spottingScopeMagnification * Math.pow(1.1, deltaTime * 10) // 10% increase per second
+      scope.magnification = Math.min(
+        scope.maxMagnification,
+        scope.magnification * Math.pow(1.1, deltaTime * 10)
       );
     }
     if (this.spottingScopeKeys.q)
     {
-      this.spottingScopeMagnification = Math.max(
-        FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION,
-        this.spottingScopeMagnification / Math.pow(1.1, deltaTime * 10) // 10% decrease per second
+      scope.magnification = Math.max(
+        scope.minMagnification,
+        scope.magnification / Math.pow(1.1, deltaTime * 10)
       );
     }
 
     // Clamp pitch and yaw to reasonable limits
-    this.spottingScopePitch = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, this.spottingScopePitch));
-    this.spottingScopeYaw = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, this.spottingScopeYaw));
+    scope.pitch = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, scope.pitch));
+    scope.yaw = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, scope.yaw));
 
-    // Update scope camera FOV based on current magnification
-    const scopeFOV = FClassSimulator.CAMERA_FOV / this.spottingScopeMagnification;
-    this.spottingScopeCamera.fov = scopeFOV;
-    this.spottingScopeCamera.updateProjectionMatrix();
-
-    // Apply rotation to scope camera
-    // Start from main camera position and orientation
-    this.spottingScopeCamera.position.copy(this.camera.position);
-    this.spottingScopeCamera.up.set(0, 1, 0); // Y is up in Three.js
-
-    // Calculate look-at target with offsets (Three.js coords: X=right, Y=up, Z=towards camera)
-    // scopeYaw controls horizontal (X-axis) offset at distance
-    // scopePitch controls vertical (Y-axis) offset
-    const targetCenterHeight = FClassSimulator.TARGET_CENTER_HEIGHT; // Use actual target center height
-    const lookX = this.distance * Math.tan(this.spottingScopeYaw); // Pan left/right
-    const lookY = targetCenterHeight + this.distance * Math.tan(this.spottingScopePitch); // Tilt up/down
-    const lookZ = -this.distance; // Downrange (negative Z)
-
-    this.spottingScopeCamera.lookAt(lookX, lookY, lookZ);
+    // Update scope camera
+    this.scopeSystem.updateScopeCamera(scope);
   }
 
   /**
@@ -1170,6 +863,9 @@ class FClassSimulator
    */
   updateRifleScopeCamera()
   {
+    const scope = this.scopeSystem.getScope('rifle');
+    if (!scope) return;
+
     // Check if target system and user target exist
     if (!this.targetSystem || !this.targetSystem.userTarget)
     {
@@ -1177,67 +873,48 @@ class FClassSimulator
     }
 
     // Calculate angular movement in radians from MOA
-    const moaIncrement = FClassSimulator.RIFLE_SCOPE_PAN_SPEED; // 0.1 MOA per key press
-    const angularIncrement = moaIncrement * (Math.PI / 180) / 60; // Convert MOA to radians
+    const moaIncrement = FClassSimulator.RIFLE_SCOPE_PAN_SPEED;
+    const angularIncrement = moaIncrement * (Math.PI / 180) / 60;
 
     // Arrow keys: adjust pitch and yaw (per key press, not per frame)
-    // Up arrow: increase pitch (tilt up)
-    // Down arrow: decrease pitch (tilt down)
     if (this.rifleScopeKeys.up)
     {
-      this.rifleScopePitch += angularIncrement;
-      this.rifleScopeKeys.up = false; // Reset key state after one press
+      scope.pitch += angularIncrement;
+      this.rifleScopeKeys.up = false;
     }
     if (this.rifleScopeKeys.down)
     {
-      this.rifleScopePitch -= angularIncrement;
-      this.rifleScopeKeys.down = false; // Reset key state after one press
+      scope.pitch -= angularIncrement;
+      this.rifleScopeKeys.down = false;
     }
-
-    // Left arrow: decrease yaw (pan left)
-    // Right arrow: increase yaw (pan right)
     if (this.rifleScopeKeys.left)
     {
-      this.rifleScopeYaw -= angularIncrement;
-      this.rifleScopeKeys.left = false; // Reset key state after one press
+      scope.yaw -= angularIncrement;
+      this.rifleScopeKeys.left = false;
     }
     if (this.rifleScopeKeys.right)
     {
-      this.rifleScopeYaw += angularIncrement;
-      this.rifleScopeKeys.right = false; // Reset key state after one press
+      scope.yaw += angularIncrement;
+      this.rifleScopeKeys.right = false;
     }
 
     // Clamp pitch and yaw to target frame limits
-    this.rifleScopePitch = Math.max(-this.rifleScopeMaxPitch, Math.min(this.rifleScopeMaxPitch, this.rifleScopePitch));
-    this.rifleScopeYaw = Math.max(-this.rifleScopeMaxYaw, Math.min(this.rifleScopeMaxYaw, this.rifleScopeYaw));
+    scope.pitch = Math.max(-scope.maxPitch, Math.min(scope.maxPitch, scope.pitch));
+    scope.yaw = Math.max(-scope.maxYaw, Math.min(scope.maxYaw, scope.yaw));
 
-    // Apply rotation to rifle scope camera
-    // Use user's target as the center reference point
-    this.rifleScopeCamera.position.copy(this.camera.position);
-    this.rifleScopeCamera.up.set(0, 1, 0); // Y is up in Three.js
-
-    // Calculate look-at target with offsets relative to user's target (Three.js coords)
+    // Update scope camera
     const userTarget = this.targetSystem.userTarget;
-    const lookX = userTarget.mesh.position.x + this.distance * Math.tan(this.rifleScopeYaw); // Horizontal
-    const lookY = userTarget.mesh.position.y + this.distance * Math.tan(this.rifleScopePitch); // Vertical
-    const lookZ = userTarget.mesh.position.z; // Downrange position (negative)
-
-    this.rifleScopeCamera.lookAt(lookX, lookY, lookZ);
+    this.scopeSystem.updateScopeCamera(scope, userTarget.mesh.position);
   }
 
   updateRifleScopeZoom()
   {
-    if (!this.rifleScopeCamera) return;
+    const scope = this.scopeSystem.getScope('rifle');
+    if (!scope || !this.targetSystem || !this.targetSystem.userTarget) return;
 
-    // Recalculate FOV based on current zoom level
-    const targetFrameWidth = FClassSimulator.TARGET_SIZE; // yards
-    const fovRadians = Math.atan((this.rifleScopeZoom * targetFrameWidth) / this.distance);
-    const fovDegrees = fovRadians * 180 / Math.PI;
-
-    // Update camera FOV
-    this.rifleScopeCamera.fov = fovDegrees;
-    this.rifleScopeCamera.updateProjectionMatrix();
-
+    // Update scope camera with new zoom
+    const userTarget = this.targetSystem.userTarget;
+    this.scopeSystem.updateScopeCamera(scope, userTarget.mesh.position);
   }
 
 
@@ -1258,17 +935,7 @@ class FClassSimulator
       const mvSdFps = parseFloat(document.getElementById('mvSd').value);
       const rifleAccuracyMoa = parseFloat(document.getElementById('rifleAccuracy').value);
 
-      // Create ballistics system
-      this.ballisticsSystem = new BallisticsSystem({
-        scene: this.scene,
-        targetSystem: this.targetSystem,
-        windGenerator: this.windGenerator,
-        getTime: () => this.getTime(),
-        distance: this.distance,
-        onShotComplete: (shotData) => this.onShotComplete(shotData)
-      });
-
-      // Setup ballistic system with bullet parameters
+      // Initialize ballistic system with bullet parameters
       await this.ballisticsSystem.setupBallisticSystem({
         mvFps: mvFps,
         bc: bc,
@@ -1420,8 +1087,16 @@ class FClassSimulator
       return;
     }
 
+    // Get rifle scope aim
+    const rifleScope = this.scopeSystem.getScope('rifle');
+    if (!rifleScope)
+    {
+      console.error('Rifle scope not found');
+      return;
+    }
+
     // Update ballistics system with current rifle scope aim
-    this.ballisticsSystem.setRifleScopeAim(this.rifleScopeYaw, this.rifleScopePitch);
+    this.ballisticsSystem.setRifleScopeAim(rifleScope.yaw, rifleScope.pitch);
 
     // Fire shot through ballistics system (handles audio internally)
     this.ballisticsSystem.fireShot();
@@ -1628,6 +1303,10 @@ class FClassSimulator
     if (this.ballisticsSystem)
     {
       this.ballisticsSystem.dispose();
+    }
+    if (this.scopeSystem)
+    {
+      this.scopeSystem.dispose();
     }
 
     // Clean up all registered resources automatically
