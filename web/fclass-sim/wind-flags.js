@@ -3,31 +3,50 @@
 
 export class FlagSystem
 {
+  // Default flag configuration
+  static POLE_HEIGHT = 12; // yards
+  static POLE_THICKNESS = 0.05; // yards
+  static FLAG_BASE_WIDTH = 60 / 36; // 60 inches = 1.67 yards
+  static FLAG_TIP_WIDTH = 24 / 36; // 24 inches = 0.67 yards
+  static FLAG_LENGTH = 16 / 3; // 16 feet = 5.33 yards
+  static FLAG_THICKNESS = 0.05; // yards
+  static FLAG_SEGMENTS = 10; // Number of segments for flag geometry
+  static FLAG_MIN_ANGLE = 1; // degrees from vertical
+  static FLAG_MAX_ANGLE = 90; // degrees from vertical
+  static FLAG_DEGREES_PER_MPH = (90 - 1) / 10; // degrees of lift per mph
+  static FLAG_ANGLE_INTERPOLATION_SPEED = 30; // degrees per second
+  static FLAG_DIRECTION_INTERPOLATION_SPEED = 1.0; // radians per second
+  static FLAG_FLAP_FREQUENCY_BASE = 0.5; // Hz at 10 mph
+  static FLAG_FLAP_FREQUENCY_SCALE = 0.25; // Additional Hz per mph
+  static FLAG_FLAP_AMPLITUDE = 0.3; // Max ripple amplitude in yards
+  static FLAG_WAVE_LENGTH = 1.5; // Wavelength along flag length
+  static FLAG_PHASE_DRIFT_RANGE = Math.PI * 2; // Random phase offset range
+
   constructor(config)
   {
     // Required config
     this.scene = config.scene;
     this.renderer = config.renderer;
     
-    // Flag configuration (all required, no defaults)
+    // Flag configuration with defaults from static constants
     this.cfg = {
-      poleHeight: config.poleHeight,
-      poleThickness: config.poleThickness,
-      flagBaseWidth: config.flagBaseWidth,
-      flagTipWidth: config.flagTipWidth,
-      flagLength: config.flagLength,
-      flagThickness: config.flagThickness,
-      flagSegments: config.flagSegments,
-      flagMinAngle: config.flagMinAngle,
-      flagMaxAngle: config.flagMaxAngle,
-      flagDegreesPerMph: config.flagDegreesPerMph,
-      flagAngleInterpolationSpeed: config.flagAngleInterpolationSpeed,
-      flagDirectionInterpolationSpeed: config.flagDirectionInterpolationSpeed,
-      flagFlapFrequencyBase: config.flagFlapFrequencyBase,
-      flagFlapFrequencyScale: config.flagFlapFrequencyScale,
-      flagFlapAmplitude: config.flagFlapAmplitude,
-      flagWaveLength: config.flagWaveLength,
-      flagPhaseDriftRange: config.flagPhaseDriftRange
+      poleHeight: config.poleHeight ?? FlagSystem.POLE_HEIGHT,
+      poleThickness: config.poleThickness ?? FlagSystem.POLE_THICKNESS,
+      flagBaseWidth: config.flagBaseWidth ?? FlagSystem.FLAG_BASE_WIDTH,
+      flagTipWidth: config.flagTipWidth ?? FlagSystem.FLAG_TIP_WIDTH,
+      flagLength: config.flagLength ?? FlagSystem.FLAG_LENGTH,
+      flagThickness: config.flagThickness ?? FlagSystem.FLAG_THICKNESS,
+      flagSegments: config.flagSegments ?? FlagSystem.FLAG_SEGMENTS,
+      flagMinAngle: config.flagMinAngle ?? FlagSystem.FLAG_MIN_ANGLE,
+      flagMaxAngle: config.flagMaxAngle ?? FlagSystem.FLAG_MAX_ANGLE,
+      flagDegreesPerMph: config.flagDegreesPerMph ?? FlagSystem.FLAG_DEGREES_PER_MPH,
+      flagAngleInterpolationSpeed: config.flagAngleInterpolationSpeed ?? FlagSystem.FLAG_ANGLE_INTERPOLATION_SPEED,
+      flagDirectionInterpolationSpeed: config.flagDirectionInterpolationSpeed ?? FlagSystem.FLAG_DIRECTION_INTERPOLATION_SPEED,
+      flagFlapFrequencyBase: config.flagFlapFrequencyBase ?? FlagSystem.FLAG_FLAP_FREQUENCY_BASE,
+      flagFlapFrequencyScale: config.flagFlapFrequencyScale ?? FlagSystem.FLAG_FLAP_FREQUENCY_SCALE,
+      flagFlapAmplitude: config.flagFlapAmplitude ?? FlagSystem.FLAG_FLAP_AMPLITUDE,
+      flagWaveLength: config.flagWaveLength ?? FlagSystem.FLAG_WAVE_LENGTH,
+      flagPhaseDriftRange: config.flagPhaseDriftRange ?? FlagSystem.FLAG_PHASE_DRIFT_RANGE
     };
     
     this.flagMeshes = [];

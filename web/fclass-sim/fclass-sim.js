@@ -263,22 +263,7 @@ class FClassSimulator
   static TARGET_ANIMATION_SPEED = 0.75; // yards per second
 
   // === WIND VISUALIZATION ===
-  // Wind flags (manual conversions since BTK not available at class definition time)
-  static FLAG_BASE_WIDTH = 60 / 36; // 60 inches = 1.67 yards (larger flags)
-  static FLAG_TIP_WIDTH = 24 / 36; // 24 inches = 0.67 yards (larger flags)
-  static FLAG_LENGTH = 16 / 3; // 16 feet = 5.33 yards (longer flags)
-  static FLAG_THICKNESS = 0.05;
-  static FLAG_MIN_ANGLE = 1; // degrees from vertical
-  static FLAG_MAX_ANGLE = 90; // degrees from vertical
-  static FLAG_DEGREES_PER_MPH = (90 - 1) / 10; 
-  static FLAG_FLAP_FREQUENCY_BASE = 0.5; // Hz at 10 mph (faster flapping)
-  static FLAG_FLAP_FREQUENCY_SCALE = 0.25; // Additional Hz per mph (more responsive)
-  static FLAG_FLAP_AMPLITUDE = 0.3; // Max ripple amplitude in yards (very visible flapping)
-  static FLAG_WAVE_LENGTH = 1.5; // Wavelength along flag length
-  static FLAG_ANGLE_INTERPOLATION_SPEED = 30; // degrees per second
-  static FLAG_DIRECTION_INTERPOLATION_SPEED = 1.0; // radians per second
-  static FLAG_SEGMENTS = 10; // Number of segments for flag geometry (more = smoother)
-  static FLAG_PHASE_DRIFT_RANGE = Math.PI * 2; // Random phase offset range (0 to 2π)
+  // Flag configuration is now in FlagSystem class
 
   // === SCENERY POSITIONING ===
   // Cloud positioning
@@ -430,24 +415,8 @@ class FClassSimulator
     this.windGenerator = null;
     this.flagSystem = new FlagSystem({
       scene: this.scene,
-      renderer: this.renderer,
-      poleHeight: FClassSimulator.POLE_HEIGHT,
-      poleThickness: FClassSimulator.POLE_THICKNESS,
-      flagBaseWidth: FClassSimulator.FLAG_BASE_WIDTH,
-      flagTipWidth: FClassSimulator.FLAG_TIP_WIDTH,
-      flagLength: FClassSimulator.FLAG_LENGTH,
-      flagThickness: FClassSimulator.FLAG_THICKNESS,
-      flagSegments: FClassSimulator.FLAG_SEGMENTS,
-      flagMinAngle: FClassSimulator.FLAG_MIN_ANGLE,
-      flagMaxAngle: FClassSimulator.FLAG_MAX_ANGLE,
-      flagDegreesPerMph: FClassSimulator.FLAG_DEGREES_PER_MPH,
-      flagAngleInterpolationSpeed: FClassSimulator.FLAG_ANGLE_INTERPOLATION_SPEED,
-      flagDirectionInterpolationSpeed: FClassSimulator.FLAG_DIRECTION_INTERPOLATION_SPEED,
-      flagFlapFrequencyBase: FClassSimulator.FLAG_FLAP_FREQUENCY_BASE,
-      flagFlapFrequencyScale: FClassSimulator.FLAG_FLAP_FREQUENCY_SCALE,
-      flagFlapAmplitude: FClassSimulator.FLAG_FLAP_AMPLITUDE,
-      flagWaveLength: FClassSimulator.FLAG_WAVE_LENGTH,
-      flagPhaseDriftRange: FClassSimulator.FLAG_PHASE_DRIFT_RANGE
+      renderer: this.renderer
+      // Uses FlagSystem defaults for all flag parameters
     });
 
     // ===== TARGETS =====
