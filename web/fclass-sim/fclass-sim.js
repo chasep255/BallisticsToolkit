@@ -679,6 +679,45 @@ class FClassSimulator
   static FLAG_FLAP_FREQUENCY_SCALE = 0.25; // Additional Hz per mph (more responsive)
   static FLAG_FLAP_AMPLITUDE = 0.3; // Max ripple amplitude in yards (very visible flapping)
   static FLAG_WAVE_LENGTH = 1.5; // Wavelength along flag length
+  static FLAG_ANGLE_INTERPOLATION_SPEED = 30; // degrees per second
+  static FLAG_DIRECTION_INTERPOLATION_SPEED = 1.0; // radians per second
+  static FLAG_SEGMENTS = 10; // Number of segments for flag geometry (more = smoother)
+  static FLAG_PHASE_DRIFT_RANGE = Math.PI * 2; // Random phase offset range (0 to 2π)
+
+  // === SCENERY POSITIONING ===
+  // Cloud positioning
+  static CLOUD_HEIGHT_MIN = 80; // yards
+  static CLOUD_HEIGHT_MAX = 330; // yards
+  static CLOUD_HORIZONTAL_SPREAD = 600; // yards (-300 to +300)
+  static CLOUD_BEHIND_SHOOTER = 200; // yards
+  static CLOUD_BEYOND_TARGETS = 500; // yards
+  static CLOUD_COUNT = 60;
+  static CLOUD_BASE_SCALE_MIN = 60; // yards
+  static CLOUD_BASE_SCALE_MAX = 120; // yards
+
+  // Tree positioning
+  static TREE_SIDE_MIN_DISTANCE = 30; // yards from center
+  static TREE_SIDE_MAX_DISTANCE = 110; // yards from center
+  static TREE_BEHIND_TARGET_WIDTH = 80; // yards
+  static TREE_BEHIND_TARGET_MIN = 10; // yards behind targets
+  static TREE_BEHIND_TARGET_MAX = 130; // yards behind targets
+  static TREE_COUNT_SIDES = 160;
+  static TREE_COUNT_BEHIND = 80;
+
+  // Mountain positioning
+  static MOUNTAIN_DISTANCE_MIN = 1500; // yards
+  static MOUNTAIN_DISTANCE_MAX = 2400; // yards (within camera far plane of 2500)
+  static MOUNTAIN_HEIGHT_MIN = 50; // yards
+  static MOUNTAIN_HEIGHT_MAX = 150; // yards
+  static MOUNTAIN_COUNT = 16;
+
+  // Ground/scenery
+  static GROUND_EXTENSION_BEYOND_TARGETS = 500; // yards
+
+  // Shadow camera bounds
+  static SHADOW_CAMERA_HORIZONTAL = 350; // yards
+  static SHADOW_CAMERA_TOP = 100; // yards from shooter
+  static SHADOW_CAMERA_NEAR = 100; // yards
 
 
   // === CAMERA SETTINGS ===
@@ -698,10 +737,6 @@ class FClassSimulator
 
   // === MATCH & SCORING ===
   static FCLASS_MATCH_SHOTS = 60;
-
-  // === ANIMATION & TIMING ===
-  static FLAG_ANGLE_INTERPOLATION_SPEED = 30; // degrees per second
-  static FLAG_DIRECTION_INTERPOLATION_SPEED = 1.0; // radians per second
 
   // Spotting scope constants (WASD pan, EQ zoom)
   static SPOTTING_SCOPE_DIAMETER_FRACTION = 0.5; // Fraction of screen height
@@ -756,7 +791,7 @@ class FClassSimulator
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap; // Crisper edges
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft antialiased shadows
     this.renderer.shadowMap.autoUpdate = true;
     this.renderer.shadowMap.needsUpdate = true;
     this.renderer.setSize(this.canvasWidth, this.canvasHeight);
@@ -834,7 +869,8 @@ class FClassSimulator
       dropped: document.getElementById('hudDropped'),
       lastScore: document.getElementById('hudLastScore'),
       mv: document.getElementById('hudMV'),
-      impactV: document.getElementById('hudImpactV')
+      impactV: document.getElementById('hudImpactV'),
+      fps: document.getElementById('hudFPS')
     };
 
     // ===== SCENE SETUP =====
@@ -1323,7 +1359,7 @@ class FClassSimulator
     const halfTip = FClassSimulator.FLAG_TIP_WIDTH / 2;
     const length = FClassSimulator.FLAG_LENGTH;
     const thickness = FClassSimulator.FLAG_THICKNESS;
-    const numSegments = 5;
+    const numSegments = FClassSimulator.FLAG_SEGMENTS;
 
     const t = segmentIndex / (numSegments - 1);
     const halfWidth = halfBase + (halfTip - halfBase) * t;
@@ -1370,11 +1406,11 @@ class FClassSimulator
 
   createFlagGeometry()
   {
-    // Create thick segmented trapezoid flag with 5 segments for flapping animation
+    // Create thick segmented trapezoid flag with configurable segments for flapping animation
     // Uses helper method for initial positions (no wind, no flapping)
     const geometry = new THREE.BufferGeometry();
     this.registerResource('geometries', geometry);
-    const numSegments = 5;
+    const numSegments = FClassSimulator.FLAG_SEGMENTS;
 
     // Create vertices for thick flag using multiple layers
     const vertices = [];
@@ -1438,56 +1474,6 @@ class FClassSimulator
     return geometry;
   }
 
-  // ===== RANGE & SCENE SETUP =====
-
-  createNoiseTexture()
-  {
-    // Create a canvas for dense grass texture
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-
-    // Create dense grass pattern
-    const imageData = ctx.createImageData(512, 512);
-    const data = imageData.data;
-
-    for (let i = 0; i < data.length; i += 4)
-    {
-      const x = (i / 4) % 512;
-      const y = Math.floor((i / 4) / 512);
-
-      // Generate multiple layers of noise for density
-      let noise = 0;
-      noise += Math.random() * 0.3;
-      noise += Math.random() * 0.2;
-      noise += Math.random() * 0.1;
-      noise += Math.random() * 0.05;
-      noise = Math.min(1, noise);
-
-      // Add some grass blade patterns
-      const grassPattern = Math.sin(x * 0.1) * Math.cos(y * 0.1) * 0.1;
-      noise += grassPattern;
-
-      data[i] = noise * 255; // R
-      data[i + 1] = noise * 255; // G  
-      data[i + 2] = noise * 255; // B
-      data[i + 3] = 255; // A
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-
-    // Create Three.js texture with proper wrapping
-    const texture = new THREE.CanvasTexture(canvas);
-    this.registerResource('textures', texture);
-    const maxAniso = this.renderer.capabilities.getMaxAnisotropy?.() || 1;
-    texture.anisotropy = maxAniso;
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(4, 4); // Reduced repeats to avoid visible seams
-    return texture;
-  }
-
   // ===== SCENE SETUP =====
   setupCamera()
   {
@@ -1515,29 +1501,32 @@ class FClassSimulator
 
     // Directional light (sun) for depth and shadows
     const sun = new THREE.DirectionalLight(0xffffff, 2.0);
-    sun.position.set(200, 150, 300); // High and to the side
+    sun.position.set(300, 600, 0); // Higher above and in front of shooter for cloud shadows on range
     sun.castShadow = true;
 
     // Aim the light toward the middle of the range
-    sun.target.position.set(0, 0, -this.distance / 2);
+    sun.target.position.set(0, 0, -this.distance);
     this.scene.add(sun.target);
     this.scene.add(sun);
 
-    // Shadow map quality
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
+    // Shadow map quality - maximum for detailed shadows in spotting scope
+    // Note: 16384 is typically the max supported by most GPUs
+    sun.shadow.mapSize.width = 16384;
+    sun.shadow.mapSize.height = 16384;
 
-    // Shadow camera bounds
-    sun.shadow.camera.left = -150;
-    sun.shadow.camera.right = 150;
-    sun.shadow.camera.top = 150;
-    sun.shadow.camera.bottom = -150;
-    sun.shadow.camera.near = 10;
-    sun.shadow.camera.far = 1200;
+    // Shadow camera bounds - cover only range area, not mountains
+    // Sun is at (300, 600, 0) looking toward targets
+    sun.shadow.camera.left = -FClassSimulator.SHADOW_CAMERA_HORIZONTAL;
+    sun.shadow.camera.right = FClassSimulator.SHADOW_CAMERA_HORIZONTAL;
+    sun.shadow.camera.top = FClassSimulator.SHADOW_CAMERA_TOP;
+    sun.shadow.camera.bottom = -this.distance - FClassSimulator.GROUND_EXTENSION_BEYOND_TARGETS;
+    sun.shadow.camera.near = FClassSimulator.SHADOW_CAMERA_NEAR;
+    sun.shadow.camera.far = this.distance + FClassSimulator.GROUND_EXTENSION_BEYOND_TARGETS + 200;
 
-    // Shadow bias
+    // Shadow bias and smoothing
     sun.shadow.bias = -0.0005;
     sun.shadow.normalBias = 0.02;
+    sun.shadow.radius = 4; // Increased blur radius for softer cloud shadows
 
     this.sun = sun;
   }
@@ -1628,13 +1617,33 @@ class FClassSimulator
   setupRange()
   {
     const rangeLength = this.distance; // yards
-    const groundLength = rangeLength + 500; // Extend 500 yards beyond target for scenery
+    const groundLength = rangeLength + FClassSimulator.GROUND_EXTENSION_BEYOND_TARGETS;
     // PlaneGeometry(width, height) - after rotation: width=X, height=Z
     const brownGroundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_TOTAL_WIDTH * 4, groundLength);
     this.registerResource('geometries', brownGroundGeometry);
-    const brownGroundMaterial = new THREE.MeshLambertMaterial(
-    {
-      color: 0xc19a6b, // Lighter tan/brown color
+    
+    // Load dirt textures for brown ground
+    const dirtLoader = new THREE.TextureLoader();
+    const dirtColor = dirtLoader.load('textures/dirt/Ground082S_1K-JPG_Color.jpg');
+    const dirtNormal = dirtLoader.load('textures/dirt/Ground082S_1K-JPG_NormalGL.jpg');
+    const dirtRoughness = dirtLoader.load('textures/dirt/Ground082S_1K-JPG_Roughness.jpg');
+    
+    // Configure texture wrapping and repeat
+    [dirtColor, dirtNormal, dirtRoughness].forEach(texture => {
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(FClassSimulator.RANGE_TOTAL_WIDTH * 4 / 20, groundLength / 20); // Repeat every 20 yards
+      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+      this.registerResource('textures', texture);
+    });
+    
+    const brownGroundMaterial = new THREE.MeshStandardMaterial({
+      map: dirtColor,
+      normalMap: dirtNormal,
+      roughnessMap: dirtRoughness,
+      color: 0x8b7355, // Darker brown tint
+      roughness: 1.0,
+      metalness: 0.0,
       side: THREE.FrontSide // Single-sided to avoid shadow acne
     });
     this.registerResource('materials', brownGroundMaterial);
@@ -1650,18 +1659,33 @@ class FClassSimulator
     const groundGeometry = new THREE.PlaneGeometry(FClassSimulator.RANGE_LANE_WIDTH, rangeLength);
     this.registerResource('geometries', groundGeometry);
 
-    // Create grass material with dense texture variation
-    const groundMaterial = new THREE.MeshLambertMaterial(
-    {
-      color: 0x5a9a5a, // Bright, vibrant grass green
+    // Load grass textures
+    const grassLoader = new THREE.TextureLoader();
+    const grassColor = grassLoader.load('textures/grass/Grass004_1K-JPG_Color.jpg');
+    const grassNormal = grassLoader.load('textures/grass/Grass004_1K-JPG_NormalGL.jpg');
+    const grassRoughness = grassLoader.load('textures/grass/Grass004_1K-JPG_Roughness.jpg');
+    
+    // Configure texture wrapping and repeat
+    [grassColor, grassNormal, grassRoughness].forEach(texture => {
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(FClassSimulator.RANGE_LANE_WIDTH / 10, rangeLength / 10); // Repeat every 10 yards
+      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+      this.registerResource('textures', texture);
+    });
+
+    // Create grass material with PBR textures
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      map: grassColor,
+      normalMap: grassNormal,
+      roughnessMap: grassRoughness,
+      color: 0x6b8e23, // Darker green tint
+      roughness: 1.0,
+      metalness: 0.0,
       side: THREE.FrontSide // Single-sided to avoid shadow acne
     });
     this.registerResource('materials', groundMaterial);
 
-    // Add some noise for texture
-    const noiseTexture = this.createNoiseTexture();
-    groundMaterial.bumpMap = noiseTexture;
-    groundMaterial.normalMap = noiseTexture;
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
     ground.position.set(0, 0, -rangeLength / 2); // Center downrange (negative Z)
@@ -1674,10 +1698,30 @@ class FClassSimulator
     if (!this._geoBoxCache) this._geoBoxCache = {};
     const pitsBoxKey = `${FClassSimulator.RANGE_LANE_WIDTH}|${FClassSimulator.PITS_HEIGHT}|${FClassSimulator.PITS_DEPTH}`;
     const pitsGeometry = this._geoBoxCache[pitsBoxKey] || (this._geoBoxCache[pitsBoxKey] = new THREE.BoxGeometry(FClassSimulator.RANGE_LANE_WIDTH, FClassSimulator.PITS_HEIGHT, FClassSimulator.PITS_DEPTH));
-    const pitsMaterial = new THREE.MeshStandardMaterial(
-    {
-      color: 0x8b7355
-    }); // Grey-brown
+    
+    // Load concrete textures for pits
+    const concreteLoader = new THREE.TextureLoader();
+    const concreteColor = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_Color.jpg');
+    const concreteNormal = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_NormalGL.jpg');
+    const concreteRoughness = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_Roughness.jpg');
+    
+    // Configure texture wrapping and repeat
+    [concreteColor, concreteNormal, concreteRoughness].forEach(texture => {
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(FClassSimulator.RANGE_LANE_WIDTH / 5, FClassSimulator.PITS_DEPTH / 5); // Repeat every 5 yards
+      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+      this.registerResource('textures', texture);
+    });
+    
+    const pitsMaterial = new THREE.MeshStandardMaterial({
+      map: concreteColor,
+      normalMap: concreteNormal,
+      roughnessMap: concreteRoughness,
+      color: 0x8b8b8b, // Lighter gray tint
+      roughness: 1.0,
+      metalness: 0.0
+    });
     this.registerResource('materials', pitsMaterial);
     const pits = new THREE.Mesh(pitsGeometry, pitsMaterial);
 
@@ -1719,9 +1763,11 @@ class FClassSimulator
       // BoxGeometry(width, height, depth) for target facing shooter (thin in Z)
       const targetBoxKey = `${targetSize}|${targetSize}|0.1`;
       const targetGeometry = this._geoBoxCache[targetBoxKey] || (this._geoBoxCache[targetBoxKey] = new THREE.BoxGeometry(targetSize, targetSize, 0.1));
-      const targetMaterial = new THREE.MeshStandardMaterial(
-      {
-        map: targetTexture
+      const targetMaterial = new THREE.MeshStandardMaterial({
+        map: targetTexture,
+        metalness: 0.3,  // Moderate metalness for subtle metallic look
+        roughness: 0.4,  // Moderate roughness for realistic metal
+        envMapIntensity: 0.8 // Environment map reflection intensity
       });
       this.registerResource('materials', targetMaterial);
       const target = new THREE.Mesh(targetGeometry, targetMaterial);
@@ -1936,64 +1982,23 @@ class FClassSimulator
 
   createMountains()
   {
-    // Create mountain peaks at a fixed distance (always visible with extended camera)
-    const mountainCount = 9;
-    const fixedDistance = 2000; // Fixed at 2000 yards from camera (within 2500 yard far plane)
-    const mountainData = [
+    // Create mountain peaks in the distance
+    const mountainCount = FClassSimulator.MOUNTAIN_COUNT;
+    const mountainData = [];
+    
+    for (let i = 0; i < mountainCount; i++)
     {
-      x: -180,
-      z: -fixedDistance + 200,
-      height: 55,
-      radius: 110
-    },
-    {
-      x: -130,
-      z: -fixedDistance,
-      height: 70,
-      radius: 125
-    },
-    {
-      x: -70,
-      z: -fixedDistance + 250,
-      height: 48,
-      radius: 95
-    },
-    {
-      x: -20,
-      z: -fixedDistance + 100,
-      height: 65,
-      radius: 115
-    },
-    {
-      x: 30,
-      z: -fixedDistance - 50,
-      height: 75,
-      radius: 130
-    },
-    {
-      x: 80,
-      z: -fixedDistance + 300,
-      height: 50,
-      radius: 100
-    },
-    {
-      x: 130,
-      z: -fixedDistance + 120,
-      height: 68,
-      radius: 120
-    },
-    {
-      x: 180,
-      z: -fixedDistance + 200,
-      height: 60,
-      radius: 108
-    },
-    {
-      x: 230,
-      z: -fixedDistance + 80,
-      height: 72,
-      radius: 118
-    }];
+      const x = (Math.random() - 0.5) * 3000;
+      const y = FClassSimulator.MOUNTAIN_HEIGHT_MIN + Math.random() * (FClassSimulator.MOUNTAIN_HEIGHT_MAX - FClassSimulator.MOUNTAIN_HEIGHT_MIN);
+      const z = -(FClassSimulator.MOUNTAIN_DISTANCE_MIN + Math.random() * (FClassSimulator.MOUNTAIN_DISTANCE_MAX - FClassSimulator.MOUNTAIN_DISTANCE_MIN));
+      
+      mountainData.push({
+        x: x,
+        z: z,
+        height: y,
+        radius: y * 1.8 // Radius proportional to height
+      });
+    }
 
     // Create mountain texture (brown base with white snow cap)
     const canvas = document.createElement('canvas');
@@ -2042,7 +2047,7 @@ class FClassSimulator
     // Create clouds at various positions with varied shapes
     this.clouds = [];
 
-    const cloudCount = 40; // More clouds for better coverage
+    const cloudCount = FClassSimulator.CLOUD_COUNT;
 
     for (let i = 0; i < cloudCount; i++)
     {
@@ -2089,37 +2094,55 @@ class FClassSimulator
       const cloudTexture = new THREE.CanvasTexture(canvas);
       this.registerResource('textures', cloudTexture);
 
-      const cloudMaterial = new THREE.SpriteMaterial(
+      // Use MeshStandardMaterial for lighting interaction
+      const cloudMaterial = new THREE.MeshStandardMaterial(
       {
         map: cloudTexture,
         transparent: true,
         opacity: 0.85,
-        depthWrite: false // Prevent z-fighting between clouds
+        alphaTest: 0.01, // Discard fully transparent pixels
+        depthWrite: false, // Prevent z-fighting between clouds
+        side: THREE.DoubleSide, // Visible from both sides
+        roughness: 1.0, // Fully diffuse
+        metalness: 0.0, // Not metallic
+        emissive: new THREE.Color(0.95, 0.95, 0.95), // Slight self-illumination
+        emissiveIntensity: 0.3 // Subtle glow so clouds aren't too dark
       });
       this.registerResource('materials', cloudMaterial);
 
-      const cloud = new THREE.Sprite(cloudMaterial);
+      // Use a plane geometry instead of sprite for lighting interaction
+      const baseScale = FClassSimulator.CLOUD_BASE_SCALE_MIN + Math.random() * (FClassSimulator.CLOUD_BASE_SCALE_MAX - FClassSimulator.CLOUD_BASE_SCALE_MIN);
+      const cloudGeometry = new THREE.PlaneGeometry(baseScale, baseScale / 2);
+      this.registerResource('geometries', cloudGeometry);
 
-      // Position clouds in sky - fixed distance range for consistent coverage at all ranges
-      // Camera far plane is at 2500 yards, so we have plenty of room
-      const x = (Math.random() - 0.5) * 600; // -300 to 300 yards (wide horizontal spread)
-      const y = 120 + Math.random() * 180; // 120 to 300 yards high
-      const z = -(500 + Math.random() * 1500); // 500 to 2000 yards downrange (always visible)
+      const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+
+      // Enable shadow casting for clouds
+      cloud.castShadow = true;
+      cloud.receiveShadow = false; // Clouds don't receive shadows from other clouds
+
+      // Position clouds at varying heights over the range
+      const x = (Math.random() - 0.5) * FClassSimulator.CLOUD_HORIZONTAL_SPREAD;
+      const y = FClassSimulator.CLOUD_HEIGHT_MIN + Math.random() * (FClassSimulator.CLOUD_HEIGHT_MAX - FClassSimulator.CLOUD_HEIGHT_MIN);
+      const z = FClassSimulator.CLOUD_BEHIND_SHOOTER - Math.random() * (this.distance + FClassSimulator.CLOUD_BEYOND_TARGETS + FClassSimulator.CLOUD_BEHIND_SHOOTER);
 
       cloud.position.set(x, y, z);
 
-      // Scale clouds - larger and more varied
-      const scale = 60 + Math.random() * 60; // 60-120 yards wide (cloud size)
-      cloud.scale.set(scale, scale / 2, 1);
+      // Scale with distance for perspective
+      const distanceFactor = Math.abs(z) / 500;
+      const scale = 0.5 + distanceFactor * 0.5;
+      cloud.scale.set(scale, scale, 1);
 
-      // Store drift velocity for cloud movement
-      const driftSpeed = 0.1 + Math.random() * 0.2; // 0.1-0.3 yards/second (cloud drift)
+      // Store randomness factor for wind variation (each cloud drifts slightly differently)
+      const randomnessFactor = 0.8 + Math.random() * 0.4; // 0.8-1.2x wind speed
 
       this.clouds.push(
       {
-        sprite: cloud,
-        driftSpeed: driftSpeed,
-        startX: x
+        mesh: cloud,
+        randomnessFactor: randomnessFactor,
+        initialY: y,
+        initialZ: z,
+        baseScale: baseScale
       });
 
       this.scene.add(cloud);
@@ -2130,24 +2153,49 @@ class FClassSimulator
   updateClouds()
   {
     const deltaTime = this.getDeltaTime();
+    const currentTime = this.getTime();
 
     for (const cloud of this.clouds)
     {
-      // Drift clouds to the right
-      cloud.sprite.position.x += cloud.driftSpeed * deltaTime;
+      // Make cloud face the camera (billboard effect)
+      cloud.mesh.quaternion.copy(this.camera.quaternion);
 
-      // Wrap around when cloud goes too far right
-      if (cloud.sprite.position.x > 300)
+      // Get wind at cloud's position using the wrapper (returns mph in Three.js coords)
+      const pos = cloud.mesh.position;
+      const windVector = this.windGenerator.getWindAt(pos.x, pos.y, pos.z, currentTime);
+      
+      // Wind crosswind component (x in Three.js coords, in mph)
+      // Convert mph to m/s, then m/s to yards/s
+      const windCrosswindMps = btk.Conversions.mphToMps(windVector.x);
+      const windCrosswindYardsPerSec = btk.Conversions.metersToYards(windCrosswindMps);
+      
+      // Apply wind speed with randomness factor
+      const driftSpeed = windCrosswindYardsPerSec * cloud.randomnessFactor;
+      
+      // Move cloud based on wind (horizontal drift only)
+      cloud.mesh.position.x += driftSpeed * deltaTime;
+
+      // Respawn cloud naturally when it drifts too far off screen
+      const maxDrift = FClassSimulator.CLOUD_HORIZONTAL_SPREAD * 0.67;
+      if (Math.abs(cloud.mesh.position.x) > maxDrift)
       {
-        cloud.sprite.position.x = -300;
+        // Respawn on opposite side with new random position
+        cloud.mesh.position.x = -Math.sign(cloud.mesh.position.x) * (FClassSimulator.CLOUD_HORIZONTAL_SPREAD / 2 + Math.random() * 50);
+        cloud.mesh.position.y = cloud.initialY + (Math.random() - 0.5) * 40;
+        cloud.mesh.position.z = cloud.initialZ + (Math.random() - 0.5) * 100;
+        
+        // Update scale for new distance
+        const distanceFactor = Math.abs(cloud.mesh.position.z) / 500;
+        const scale = 0.5 + distanceFactor * 0.5;
+        cloud.mesh.scale.set(scale, scale, 1);
       }
     }
   }
 
   createForestBackdrop()
   {
-    // Create 240 trees: very dense forest along both sides and behind targets
-    const treeCount = 240; // Total number of trees for dense forest backdrop
+    // Create trees: dense forest along both sides and behind targets
+    const treeCount = FClassSimulator.TREE_COUNT_SIDES + FClassSimulator.TREE_COUNT_BEHIND;
 
     // Cache tree geometries
     const trunkGeometries = [];
@@ -2169,36 +2217,68 @@ class FClassSimulator
     }
 
     // Create materials
-    const trunkMaterial = new THREE.MeshLambertMaterial(
-    {
-      color: 0x4a3728
-    }); // Brown
+    // Load bark textures for tree trunks
+    const barkLoader = new THREE.TextureLoader();
+    const barkColor = barkLoader.load('textures/bark/Bark012_1K-JPG_Color.jpg');
+    const barkNormal = barkLoader.load('textures/bark/Bark012_1K-JPG_NormalGL.jpg');
+    const barkRoughness = barkLoader.load('textures/bark/Bark012_1K-JPG_Roughness.jpg');
+    
+    // Configure texture wrapping and repeat
+    [barkColor, barkNormal, barkRoughness].forEach(texture => {
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(0.5, 2.0); // Vertical bark pattern
+      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+      this.registerResource('textures', texture);
+    });
+    
+    const trunkMaterial = new THREE.MeshStandardMaterial({
+      map: barkColor,
+      normalMap: barkNormal,
+      roughnessMap: barkRoughness,
+      color: 0x4a3728, // Darker brown tint
+      roughness: 1.0,
+      metalness: 0.0
+    });
     this.registerResource('materials', trunkMaterial);
 
-    const foliageMaterial = new THREE.MeshLambertMaterial(
-    {
-      color: 0x2d5016
-    }); // Dark green
+    // Load grass texture for foliage (color only)
+    const foliageLoader = new THREE.TextureLoader();
+    const foliageColor = foliageLoader.load('textures/grass/Grass004_1K-JPG_Color.jpg');
+    
+    // Configure texture wrapping and repeat
+    foliageColor.wrapS = THREE.RepeatWrapping;
+    foliageColor.wrapT = THREE.RepeatWrapping;
+    foliageColor.repeat.set(1.0, 1.0); // Normal repeat
+    foliageColor.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    this.registerResource('textures', foliageColor);
+    
+    const foliageMaterial = new THREE.MeshStandardMaterial({
+      map: foliageColor,
+      color: 0x2d5016, // Dark green tint
+      roughness: 0.9, // Rough surface for leaves
+      metalness: 0.0, // Non-metallic
+      side: THREE.DoubleSide // Double-sided to prevent artifacts
+    });
     this.registerResource('materials', foliageMaterial);
 
     for (let i = 0; i < treeCount; i++)
     {
       let x, z;
 
-      // 160 trees: very dense forest along both sides of the range
-      // 80 trees: behind the targets
-      if (i < 160)
+      // Trees along both sides of the range
+      if (i < FClassSimulator.TREE_COUNT_SIDES)
       {
-        // Very dense trees along both sides
+        // Dense trees along both sides
         const side = (i % 2 === 0) ? -1 : 1;
-        x = side * (30 + Math.random() * 80); // 30-110 yards from center (very dense)
-        z = -50 - Math.random() * (this.distance + 200); // From -50 to beyond target
+        x = side * (FClassSimulator.TREE_SIDE_MIN_DISTANCE + Math.random() * (FClassSimulator.TREE_SIDE_MAX_DISTANCE - FClassSimulator.TREE_SIDE_MIN_DISTANCE));
+        z = -50 - Math.random() * (this.distance + 200);
       }
       else
       {
-        // Behind targets - very dense backdrop
-        x = (Math.random() - 0.5) * 80; // -40 to 40 yards (wider behind target area)
-        z = -(this.distance + 10 + Math.random() * 120); // 10-130 yards behind targets
+        // Behind targets - dense backdrop
+        x = (Math.random() - 0.5) * FClassSimulator.TREE_BEHIND_TARGET_WIDTH;
+        z = -(this.distance + FClassSimulator.TREE_BEHIND_TARGET_MIN + Math.random() * (FClassSimulator.TREE_BEHIND_TARGET_MAX - FClassSimulator.TREE_BEHIND_TARGET_MIN));
       }
 
       // Vary tree size
@@ -2249,7 +2329,26 @@ class FClassSimulator
     // Update cached time values once per frame
     this.currentDeltaTime = Math.min(0.05, Math.max(0.0005, this.clock.getDelta())); // clamp 0.5ms-50ms
     this.currentAbsTime = this.clock.getElapsedTime();
+    
+    // Calculate FPS by sampling over 1 second
+    const currentTime = performance.now();
     this.frameCount++;
+    
+    if (!this.fpsStartTime)
+    {
+      this.fpsStartTime = currentTime;
+    }
+    
+    // Update FPS every second
+    if (currentTime - this.fpsStartTime >= 1000)
+    {
+      this.fps = Math.round(this.frameCount * 1000 / (currentTime - this.fpsStartTime));
+      this.frameCount = 0;
+      this.fpsStartTime = currentTime;
+      
+      // Update HUD display
+      this.hudElements.fps.textContent = this.fps > 0 ? this.fps.toString() : '--';
+    }
 
     // Update bullet animation (if any)
     this.updateBulletAnimation();
@@ -2360,10 +2459,12 @@ class FClassSimulator
       // BoxGeometry(width, height, depth) for vertical pole (thin in X and Z, tall in Y)
       const poleBoxKey = `${FClassSimulator.POLE_THICKNESS}|${FClassSimulator.POLE_HEIGHT}|${FClassSimulator.POLE_THICKNESS}`;
       const poleGeometry = this._geoBoxCache[poleBoxKey] || (this._geoBoxCache[poleBoxKey] = new THREE.BoxGeometry(FClassSimulator.POLE_THICKNESS, FClassSimulator.POLE_HEIGHT, FClassSimulator.POLE_THICKNESS));
-      const poleMaterial = new THREE.MeshStandardMaterial(
-      {
-        color: 0x808080
-      }); // Grey
+      const poleMaterial = new THREE.MeshStandardMaterial({
+        color: 0xc0c0c0, // Light metallic silver
+        metalness: 0.8,  // High metalness for reflective surface
+        roughness: 0.2,  // Low roughness for shine
+        envMapIntensity: 1.0 // Environment map reflection intensity
+      });
       this.registerResource('materials', poleMaterial);
       const pole = new THREE.Mesh(poleGeometry, poleMaterial);
 
@@ -2378,9 +2479,29 @@ class FClassSimulator
 
       // Create flag geometry and mesh
       const flagGeometry = this.createFlagGeometry();
-      const flagMaterial = new THREE.MeshStandardMaterial(
-      {
-        map: flagTexture,
+      
+      // Load cloth textures for flags
+      const clothLoader = new THREE.TextureLoader();
+      const clothColor = clothLoader.load('textures/cloth/Fabric030_1K-JPG_Color.jpg');
+      const clothNormal = clothLoader.load('textures/cloth/Fabric030_1K-JPG_NormalGL.jpg');
+      const clothRoughness = clothLoader.load('textures/cloth/Fabric030_1K-JPG_Roughness.jpg');
+      
+      // Configure texture wrapping and repeat
+      [clothColor, clothNormal, clothRoughness].forEach(texture => {
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(0.5, 0.5); // Small repeat for fabric detail
+        texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        this.registerResource('textures', texture);
+      });
+      
+      const flagMaterial = new THREE.MeshStandardMaterial({
+        map: flagTexture, // Keep the red/yellow flag pattern
+        normalMap: clothNormal,
+        roughnessMap: clothRoughness,
+        color: 0xffffff, // White tint to preserve flag colors
+        roughness: 0.8, // Slightly rough fabric
+        metalness: 0.0, // Non-metallic
         side: THREE.DoubleSide
       });
       this.registerResource('materials', flagMaterial);
@@ -2411,7 +2532,7 @@ class FClassSimulator
         currentAngle: FClassSimulator.FLAG_MIN_ANGLE,
         targetAngle: FClassSimulator.FLAG_MIN_ANGLE,
         currentDirection: 0, // yaw rotation in radians
-        flapPhase: Math.random() * Math.PI * 2 // Random starting phase for variety
+        flapPhase: Math.random() * FClassSimulator.FLAG_PHASE_DRIFT_RANGE // Random starting phase for variety
       });
     }
 
@@ -2482,7 +2603,7 @@ class FClassSimulator
   {
     // Update all segments with flapping animation for thick flag
     // Uses helper method for position calculations
-    const numSegments = 5;
+    const numSegments = FClassSimulator.FLAG_SEGMENTS;
 
     // Get the position attribute from the geometry
     const positions = flag.flagGeometry.attributes.position.array;
