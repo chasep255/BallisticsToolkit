@@ -30,7 +30,6 @@ export class BallisticsSystem
     this.bullet = null;
     this.zeroedBullet = null;
     this.btkTarget = null;
-    this.match = null;
     this.lastTrajectory = null;
     
     // Bullet parameters (from UI)
@@ -99,9 +98,6 @@ export class BallisticsSystem
       
       // Custom zeroing routine to hit target center (accounting for Y offset)
       this.zeroedBullet = this.computeZeroToTarget(this.nominalMV, this.distance);
-      
-      // Create match object for recording shots (wrapped)
-      this.match = new BtkMatchWrapper();
       
       // Pre-load audio (so first shot plays immediately)
       await this.initializeAudio();
@@ -433,13 +429,6 @@ export class BallisticsSystem
     this.rifleScopePitch = pitch;
   }
   
-  /**
-   * Get match object
-   */
-  getMatch()
-  {
-    return this.match;
-  }
   
   /**
    * Get bullet diameter in inches
@@ -586,13 +575,16 @@ export class BallisticsSystem
       {
         const data = this.pendingShotData;
         
-        // Score the hit
-        const hit = this.match.addHit(data.relativeX, data.relativeY, this.btkTarget, this.bulletDiameter);
+        // Score the hit using BTK target scoring
+        // Create a temporary match just for scoring this one shot
+        const tempMatch = new BtkMatchWrapper();
+        const hit = tempMatch.addHit(data.relativeX, data.relativeY, this.btkTarget, this.bulletDiameter);
         
         // Extract data from Hit before disposing
         const score = hit.getScore();
         const isX = hit.isX();
         hit.delete(); // Dispose Hit object to prevent memory leak
+        tempMatch.dispose(); // Dispose temporary match
         
         // Call completion callback with shot data
         if (this.onShotComplete)
@@ -603,8 +595,7 @@ export class BallisticsSystem
             score: score,
             isX: isX,
             mvFps: data.mvFps,
-            impactVelocityFps: data.impactVelocityFps,
-            hitCount: this.match.getHitCount()
+            impactVelocityFps: data.impactVelocityFps
           });
         }
         
@@ -691,9 +682,6 @@ export class BallisticsSystem
     if (this.ballisticSimulator) {
       this.ballisticSimulator.dispose();
     }
-    if (this.match) {
-      this.match.dispose();
-    }
     if (this.lastTrajectory) {
       this.lastTrajectory.dispose();
     }
@@ -702,9 +690,8 @@ export class BallisticsSystem
     this.ballisticSimulator = null;
     this.bullet = null;
     this.zeroedBullet = null;
-    this.btkTarget = null;
-    this.match = null;
     this.lastTrajectory = null;
+    this.btkTarget = null;
     this.bulletAnim = null;
     this.pendingShotData = null;
   }

@@ -6,7 +6,7 @@ export class FlagSystem
 {
   // Default flag configuration
   static POLE_HEIGHT = 12; // yards
-  static POLE_THICKNESS = 0.05; // yards
+  static POLE_THICKNESS = 0.1; // yards
   static FLAG_BASE_WIDTH = 60 / 36; // 60 inches = 1.67 yards
   static FLAG_TIP_WIDTH = 24 / 36; // 24 inches = 0.67 yards
   static FLAG_LENGTH = 16 / 3; // 16 feet = 5.33 yards

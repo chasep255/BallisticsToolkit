@@ -14,6 +14,8 @@ import { EnvironmentSystem } from './environment-system.js';
 import { BallisticsSystem } from './ballistics-system.js';
 import { Scope } from './scope.js';
 import { HudSystem } from './hud-system.js';
+import { RelayManager } from './relay-manager.js';
+import { Scorecard } from './scorecard.js';
 
 // F-Class distance to target mapping
 const FCLASS_DISTANCE_TO_TARGET = {
@@ -101,6 +103,25 @@ function setupUI()
 
   // Restart button
   document.getElementById('restartBtn').addEventListener('click', restartGame);
+  
+  // Scorecard button
+  document.getElementById('scorecardBtn').addEventListener('click', () =>
+  {
+    if (webglGame && webglGame.scorecard)
+    {
+      webglGame.scorecard.toggle();
+    }
+  });
+  
+  // Go For Record button
+  document.getElementById('goForRecordBtn').addEventListener('click', () =>
+  {
+    if (webglGame && webglGame.relayManager)
+    {
+      webglGame.relayManager.goForRecord();
+      webglGame.updateGoForRecordButton();
+    }
+  });
 }
 
 function startGame()
@@ -124,6 +145,8 @@ function startGame()
     // Update UI
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('restartBtn').style.display = 'inline-block';
+    document.getElementById('scorecardBtn').style.display = 'inline-block';
+    document.getElementById('goForRecordBtn').style.display = 'inline-block';
 
   }
   catch (error)
@@ -285,7 +308,6 @@ class FClassSimulator
   static COLOR_HIGH_SCORE = 0xff0000;
   static COLOR_LOW_SCORE = 0xff8800;
   static SCORE_THRESHOLD_RED = 9;
-  static DEBUG_WIND_OVERLAY = false; // Set to true to show wind speed overlay
 
   // === MATCH & SCORING ===
   static FCLASS_MATCH_SHOTS = 60;
@@ -330,6 +352,17 @@ class FClassSimulator
     this.lastTime = 0;
     this.frameCount = 0;
     this.fps = 0;
+    
+    // Check for debug mode from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    this.debugMode = urlParams.get('debug') === '1';
+    
+    // Relay management
+    this.relayManager = new RelayManager(this.debugMode);
+    this.shotLog = []; // Array of all shots: { relay, isSighter, recordIndex, score, isX, mvFps, impactVelocityFps, timeSec }
+    
+    // Scorecard
+    this.scorecard = new Scorecard();
   }
 
   // ===== TIME ACCESSORS =====
@@ -363,8 +396,8 @@ class FClassSimulator
 
   createWindInfoText()
   {
-    // Only create if debug flag is enabled
-    if (!FClassSimulator.DEBUG_WIND_OVERLAY) return;
+    // Only create if debug mode is enabled
+    if (!this.debugMode) return;
     
     // Create canvas for text rendering
     const canvas = document.createElement('canvas');
@@ -404,7 +437,7 @@ class FClassSimulator
 
   updateWindInfoText()
   {
-    if (!this.windInfoCanvas || !this.windInfoContext) return;
+    if (!this.debugMode || !this.windInfoCanvas || !this.windInfoContext) return;
     
     const ctx = this.windInfoContext;
     const canvas = this.windInfoCanvas;
@@ -624,6 +657,20 @@ class FClassSimulator
     {
       this.targetSystem.updateAnimations(this.getDeltaTime());
     }
+    
+    // Update relay timer and check for relay end
+    this.relayManager.tick(performance.now() / 1000);
+    if (this.relayManager.justEnded())
+    {
+      this.showRelayCompleteNotification();
+    }
+    
+    // Update HUD with relay and timer
+    if (this.hudSystem)
+    {
+      this.hudSystem.updateRelay(this.relayManager.getRelayDisplay());
+      this.hudSystem.updateTimer(this.relayManager.getTimeFormatted());
+    }
 
     // Update scope camera orientations
     this.updateSpottingScopeCamera();
@@ -826,6 +873,9 @@ class FClassSimulator
       throw error;
     }
 
+    // Initialize scorecard
+    this.scorecard.initialize();
+    
     // Start game
     this.clock.start();
     this.gameStartTime = performance.now();
@@ -1010,10 +1060,11 @@ class FClassSimulator
   {
     if (!this.hudSystem) return;
 
-    const match = this.ballisticsSystem ? this.ballisticsSystem.getMatch() : null;
-    const shotCount = match ? match.getHitCount() : 0;
-    const totalScore = match ? match.getTotalScore() : 0;
-    const xCount = match ? match.getXCount() : 0;
+    // Count only record shots from shot log (exclude sighters)
+    const recordShots = this.shotLog.filter(shot => !shot.isSighter);
+    const shotCount = recordShots.length;
+    const totalScore = recordShots.reduce((sum, shot) => sum + shot.score, 0);
+    const xCount = recordShots.filter(shot => shot.isX).length;
 
     // Update target number
     if (this.targetSystem && this.targetSystem.userTarget)
@@ -1021,9 +1072,10 @@ class FClassSimulator
       this.hudSystem.updateTarget(this.targetSystem.userTarget.targetNumber);
     }
 
-    // Update shot count and score (F-Class match is 60 shots)
-    const isComplete = shotCount >= FClassSimulator.FCLASS_MATCH_SHOTS;
-    this.hudSystem.updateShots(shotCount, FClassSimulator.FCLASS_MATCH_SHOTS, isComplete);
+    // Update shot count and score (total shots = max per relay * 3 relays)
+    const totalMaxShots = this.relayManager.maxRecordShots * 3;
+    const isComplete = shotCount >= totalMaxShots;
+    this.hudSystem.updateShots(shotCount, totalMaxShots, isComplete);
     this.hudSystem.updateScore(totalScore, xCount);
 
     // Calculate dropped points (10 - score for each shot, 1 - X for each X)
@@ -1050,6 +1102,101 @@ class FClassSimulator
   }
 
   /**
+   * Show relay completion notification
+   */
+  showRelayCompleteNotification()
+  {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #ff9800;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: bold;
+      text-align: center;
+      z-index: 10001;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      border: 2px solid #f57c00;
+    `;
+    
+    const relayNum = this.relayManager.relayIndex;
+    const recordShots = this.relayManager.recordShotsFired;
+    
+    if (this.relayManager.isMatchComplete())
+    {
+      // Match complete - show final results
+      notification.innerHTML = `
+        <div style="margin-bottom: 12px;">🎯 Match Complete!</div>
+        <div style="font-size: 14px; margin-bottom: 16px;">
+          All 3 relays finished<br>
+          Check scorecard for final results
+        </div>
+        <button id="viewScorecardBtn" style="
+          background: white;
+          color: #ff9800;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: bold;
+        ">View Scorecard</button>
+      `;
+    }
+    else
+    {
+      // Relay complete - offer next relay
+      notification.innerHTML = `
+        <div style="margin-bottom: 12px;">⏱️ Relay ${relayNum} Complete!</div>
+        <div style="font-size: 14px; margin-bottom: 16px;">
+          ${recordShots} record shots fired<br>
+          Ready for Relay ${relayNum + 1}
+        </div>
+        <button id="nextRelayBtn" style="
+          background: white;
+          color: #ff9800;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: bold;
+        ">Start Relay ${relayNum + 1}</button>
+      `;
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Add button handlers
+    const nextRelayBtn = document.getElementById('nextRelayBtn');
+    const viewScorecardBtn = document.getElementById('viewScorecardBtn');
+    
+    if (nextRelayBtn)
+    {
+      nextRelayBtn.addEventListener('click', () =>
+      {
+        this.relayManager.advanceRelay();
+        notification.remove();
+        this.updateGoForRecordButton();
+      });
+    }
+    
+    if (viewScorecardBtn)
+    {
+      viewScorecardBtn.addEventListener('click', () =>
+      {
+        this.scorecard.show();
+        notification.remove();
+      });
+    }
+  }
+  
+  /**
    * Show match completion notification
    */
   showMatchCompleteNotification()
@@ -1072,11 +1219,11 @@ class FClassSimulator
       border: 2px solid #1e7e34;
     `;
 
-    const match = this.ballisticsSystem.getMatch();
-    const totalScore = match.getTotalScore();
-    const xCount = match.getXCount();
-    const groupSize = match.getGroupSizeInches().toFixed(2);
-    const shotCount = match.getHitCount();
+    // Calculate stats from shot log (record shots only)
+    const recordShots = this.shotLog.filter(shot => !shot.isSighter);
+    const totalScore = recordShots.reduce((sum, shot) => sum + shot.score, 0);
+    const xCount = recordShots.filter(shot => shot.isX).length;
+    const shotCount = recordShots.length;
     const maxPossibleScore = shotCount * 10;
     const maxPossibleX = shotCount;
     const droppedPoints = maxPossibleScore - totalScore;
@@ -1086,8 +1233,7 @@ class FClassSimulator
       <div style="font-size: 24px; margin-bottom: 10px;">🎯 Match Complete!</div>
       <div>Final Score: ${totalScore}-${xCount}x</div>
       <div>Dropped: ${droppedPoints}-${droppedX}x</div>
-      <div>Group Size: ${groupSize}"</div>
-      <div style="margin-top: 15px; font-size: 14px; opacity: 0.9;">Click Restart to start a new match</div>
+      <div style="margin-top: 15px; font-size: 14px; opacity: 0.9;">View Scorecard for details or click Restart</div>
       <button onclick="this.parentElement.remove()" style="
         margin-top: 15px;
         padding: 8px 16px;
@@ -1129,6 +1275,13 @@ class FClassSimulator
       return;
     }
     
+    // Check if relay is ended
+    if (this.relayManager.isEnded())
+    {
+      console.log('Relay ended - wait for next relay');
+      return;
+    }
+    
     // Check if target is ready (not animating)
     if (!this.targetSystem.isTargetReady())
     {
@@ -1136,14 +1289,9 @@ class FClassSimulator
       return;
     }
 
-    // Check if match is complete (60 shots fired)
-    const match = this.ballisticsSystem.getMatch();
-    if (match && match.getHitCount() >= FClassSimulator.FCLASS_MATCH_SHOTS)
-    {
-      console.log('Match complete - no more shots allowed');
-      return;
-    }
-
+    // Start relay timer on first shot
+    this.relayManager.startIfNeeded(performance.now() / 1000);
+    
     // Get rifle scope aim
     const aim = this.rifleScope.getAim();
 
@@ -1162,6 +1310,27 @@ class FClassSimulator
    */
   onShotComplete(shotData)
   {
+    // Determine if this is a sighter or record shot
+    const isRecord = this.relayManager.isRecordPhase();
+    
+    // Log the shot
+    this.shotLog.push({
+      relay: this.relayManager.relayIndex,
+      isSighter: !isRecord,
+      recordIndex: isRecord ? this.relayManager.recordShotsFired + 1 : null,
+      score: shotData.score,
+      isX: shotData.isX,
+      mvFps: shotData.mvFps,
+      impactVelocityFps: shotData.impactVelocityFps,
+      timeSec: this.relayManager.elapsed()
+    });
+    
+    // Update relay manager with shot
+    this.relayManager.onShot(isRecord);
+    
+    // Update scorecard
+    this.scorecard.update(this.shotLog);
+    
     // Store shot data for when target animation completes
     this.lastShotData = {
       score: shotData.score,
@@ -1190,10 +1359,43 @@ class FClassSimulator
     // Update HUD with shot data now that target is back up
     this.updateHUD();
     
+    // Update Go For Record button visibility
+    this.updateGoForRecordButton();
+    
     // Check if match is complete (60 shots for F-Class)
     if (this.lastShotData && this.lastShotData.hitCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
     {
       this.showMatchCompleteNotification();
+    }
+  }
+  
+  /**
+   * Update Go For Record button visibility based on relay state
+   */
+  updateGoForRecordButton()
+  {
+    const btn = document.getElementById('goForRecordBtn');
+    if (!btn) return;
+    
+    // Show button only during sighters phase
+    if (this.relayManager.isSightersPhase())
+    {
+      btn.style.display = 'inline-block';
+      
+      // Update button text with sighters remaining
+      const remaining = this.relayManager.getSightersRemaining();
+      if (remaining === Infinity)
+      {
+        btn.textContent = 'Go For Record';
+      }
+      else
+      {
+        btn.textContent = `Go For Record (${remaining} sighters left)`;
+      }
+    }
+    else
+    {
+      btn.style.display = 'none';
     }
   }
 

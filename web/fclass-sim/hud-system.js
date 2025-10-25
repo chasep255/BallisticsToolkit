@@ -32,6 +32,19 @@ export class HudSystem
     
     let currentY = startY;
     
+    // Relay
+    this.relayCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
+    this.relayMesh = this.createHudMesh(this.relayCanvas, canvasWidth, canvasHeight, startX, currentY);
+    currentY -= lineHeight;
+    
+    // Timer
+    this.timerCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
+    this.timerMesh = this.createHudMesh(this.timerCanvas, canvasWidth, canvasHeight, startX, currentY);
+    currentY -= lineHeight;
+    
+    // Separator
+    currentY -= separatorHeight;
+    
     // Target
     this.targetCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
     this.targetMesh = this.createHudMesh(this.targetCanvas, canvasWidth, canvasHeight, startX, currentY);
@@ -81,6 +94,8 @@ export class HudSystem
     this.fpsMesh = this.createHudMesh(this.fpsCanvas, canvasWidth, canvasHeight, startX, currentY);
     
     // Initialize with default values
+    this.updateRelay('1/3');
+    this.updateTimer('20:00');
     this.updateTarget('--');
     this.updateShots(0, 60, false);
     this.updateScore(0, 0);
@@ -153,10 +168,22 @@ export class HudSystem
     ctx.fillText(value, canvas.width - 8, canvas.height / 2);
   }
   
+  updateRelay(relayDisplay)
+  {
+    this.drawHudText(this.relayCanvas, 'Relay:', relayDisplay);
+    this.hudTextures[0].needsUpdate = true;
+  }
+  
+  updateTimer(timeDisplay)
+  {
+    this.drawHudText(this.timerCanvas, 'Timer:', timeDisplay);
+    this.hudTextures[1].needsUpdate = true;
+  }
+  
   updateTarget(targetNumber)
   {
     this.drawHudText(this.targetCanvas, 'Target:', `#${targetNumber}`);
-    this.hudTextures[0].needsUpdate = true;
+    this.hudTextures[2].needsUpdate = true;
   }
   
   updateShots(current, total, isComplete)
@@ -164,19 +191,19 @@ export class HudSystem
     const value = isComplete ? `${total}/${total} (Complete!)` : `${current}/${total}`;
     const color = isComplete ? '#28a745' : '#ffffff';
     this.drawHudText(this.shotsCanvas, 'Shots:', value, color);
-    this.hudTextures[1].needsUpdate = true;
+    this.hudTextures[3].needsUpdate = true;
   }
   
   updateScore(score, xCount)
   {
     this.drawHudText(this.scoreCanvas, 'Score:', `${score}-${xCount}x`);
-    this.hudTextures[2].needsUpdate = true;
+    this.hudTextures[4].needsUpdate = true;
   }
   
   updateDropped(points, xCount)
   {
     this.drawHudText(this.droppedCanvas, 'Dropped:', `${points}-${xCount}x`);
-    this.hudTextures[3].needsUpdate = true;
+    this.hudTextures[5].needsUpdate = true;
   }
   
   updateLastShot(score, isX, mvFps, impactVFps)
@@ -194,16 +221,16 @@ export class HudSystem
       this.drawHudText(this.mvCanvas, 'MV:', `${Math.round(mvFps)} fps`);
       this.drawHudText(this.impactVCanvas, 'Impact V:', `${Math.round(impactVFps)} fps`);
     }
-    this.hudTextures[4].needsUpdate = true;
-    this.hudTextures[5].needsUpdate = true;
     this.hudTextures[6].needsUpdate = true;
+    this.hudTextures[7].needsUpdate = true;
+    this.hudTextures[8].needsUpdate = true;
   }
   
   updateFPS(fps)
   {
     const value = fps > 0 ? fps.toString() : '--';
     this.drawHudText(this.fpsCanvas, 'FPS:', value);
-    this.hudTextures[7].needsUpdate = true;
+    this.hudTextures[9].needsUpdate = true;
   }
   
   show()
