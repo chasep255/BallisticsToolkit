@@ -10,7 +10,8 @@
 #gameCanvas {
   width: 100%;
   max-width: 1200px;
-  aspect-ratio: 1;
+  max-height: 85vh;
+  aspect-ratio: 4/3;
   display: block;
   border: 1px solid #ddd;
   background: #f8f9fa;

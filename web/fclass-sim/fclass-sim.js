@@ -53,9 +53,33 @@ function lockCanvasSize()
     showWarning('Screen Too Small', `Please maximize your browser window. Current: ${screenWidth}px, Recommended: ${minRecommendedWidth}px+`);
   }
 
-  // Read canvas size from CSS (will be square due to aspect-ratio: 1)
-  const canvasWidth = canvas.clientWidth;
-  const canvasHeight = canvas.clientHeight;
+  // Calculate canvas size respecting both width and height constraints
+  // Target aspect ratio: 4:3
+  const aspectRatio = 4 / 3;
+  const maxWidth = 1200;
+  const maxHeightVh = 0.85; // 85vh
+  
+  // Get available dimensions
+  const availableWidth = Math.min(canvas.clientWidth, maxWidth);
+  const availableHeight = window.innerHeight * maxHeightVh;
+  
+  // Calculate dimensions maintaining 4:3 aspect ratio
+  let canvasWidth, canvasHeight;
+  
+  // Try width-constrained first
+  canvasWidth = availableWidth;
+  canvasHeight = canvasWidth / aspectRatio;
+  
+  // If height exceeds available space, constrain by height instead
+  if (canvasHeight > availableHeight)
+  {
+    canvasHeight = availableHeight;
+    canvasWidth = canvasHeight * aspectRatio;
+  }
+  
+  // Round to integers for clean rendering
+  canvasWidth = Math.floor(canvasWidth);
+  canvasHeight = Math.floor(canvasHeight);
 
   // Lock canvas size permanently - no resizing allowed
   canvas.width = canvasWidth;
@@ -325,7 +349,7 @@ class FClassSimulator
   static SPOTTING_SCOPE_MAX_MAGNIFICATION = 100; // maximum zoom (100x)
 
   // Rifle scope constants (arrow keys pan, +/- zoom)
-  static RIFLE_SCOPE_DIAMETER_FRACTION = 0.5; // Same size as spotting scope
+  static RIFLE_SCOPE_DIAMETER_FRACTION = 0.6; // Same size as spotting scope
   static RIFLE_SCOPE_PAN_SPEED = 0.1; // MOA per key press
   static RIFLE_SCOPE_FOV_MULTIPLIER = 1.5; // Show 1.5x target width (initial zoom)
   static RIFLE_SCOPE_ZOOM_MIN = 0.5; // Minimum FOV multiplier (most zoomed in - 0.5x target width)
