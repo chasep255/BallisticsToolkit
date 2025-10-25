@@ -298,8 +298,8 @@ class FClassSimulator
   static RIFLE_SCOPE_DIAMETER_FRACTION = 0.5; // Same size as spotting scope
   static RIFLE_SCOPE_PAN_SPEED = 0.1; // MOA per key press
   static RIFLE_SCOPE_FOV_MULTIPLIER = 1.5; // Show 1.5x target width (initial zoom)
-  static RIFLE_SCOPE_ZOOM_MIN = 1.0; // Minimum FOV multiplier (most zoomed in)
-  static RIFLE_SCOPE_ZOOM_MAX = 3.0; // Maximum FOV multiplier (most zoomed out)
+  static RIFLE_SCOPE_ZOOM_MIN = 0.5; // Minimum FOV multiplier (most zoomed in - 0.5x target width)
+  static RIFLE_SCOPE_ZOOM_MAX = 5.0; // Maximum FOV multiplier (most zoomed out)
   static RIFLE_SCOPE_ZOOM_FACTOR = 1.05; // Zoom factor per key press (5% change)
 
   // ===== CONSTRUCTOR & INITIALIZATION =====
@@ -1033,6 +1033,14 @@ class FClassSimulator
     if (!this.rifleScope)
     {
       console.error('Rifle scope not found');
+      return;
+    }
+
+    // Check if match is complete (60 shots fired)
+    const match = this.ballisticsSystem.getMatch();
+    if (match && match.getHitCount() >= FClassSimulator.FCLASS_MATCH_SHOTS)
+    {
+      console.log('Match complete - no more shots allowed');
       return;
     }
 
