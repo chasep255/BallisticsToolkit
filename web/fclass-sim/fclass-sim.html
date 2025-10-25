@@ -87,6 +87,19 @@
     <div class="canvas-wrap">
       <canvas id="gameCanvas" width="800" height="600"></canvas>
       
+      <!-- Quick Key Guide -->
+      <div class="quick-keys">
+        <div class="quick-keys-section">
+          <strong>Spotting Scope:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Pan • <kbd>E</kbd><kbd>Q</kbd> Zoom
+        </div>
+        <div class="quick-keys-section">
+          <strong>Rifle Scope:</strong> <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Aim • <kbd>+</kbd><kbd>-</kbd> Zoom
+        </div>
+        <div class="quick-keys-section">
+          <strong>Fire:</strong> <kbd>Space</kbd>
+        </div>
+      </div>
+      
       <!-- Shot Statistics HUD -->
       <div id="shotHud" class="shot-hud" style="display: none;">
         <div class="hud-section">
@@ -144,22 +157,25 @@
         <div class="help-section">
           <h3>Controls</h3>
           <div class="param-help">
-            <strong>Spotting Scope (Left):</strong><br>
-            - WASD keys: Pan and tilt the scope view<br>
-            - E key: Increase magnification<br>
-            - Q key: Decrease magnification<br>
-            - Range: 2x to 100x magnification<br><br>
+            <strong>Spotting Scope (Bottom-Left):</strong><br>
+            - <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> keys: Pan and tilt the scope view<br>
+            - <kbd>E</kbd> key: Zoom in (increase magnification)<br>
+            - <kbd>Q</kbd> key: Zoom out (decrease magnification)<br>
+            - Range: 2x to 100x magnification<br>
+            - Movement speed scales with zoom level (slower when zoomed in)<br><br>
             
-            <strong>Rifle Scope (Right):</strong><br>
-            - Arrow keys: Adjust aim point (0.1 MOA increments)<br>
-            - +/= keys: Zoom in (decrease field of view)<br>
-            - -/_ keys: Zoom out (increase field of view)<br>
-            - Crosshair shows current aim point<br><br>
+            <strong>Rifle Scope (Bottom-Right):</strong><br>
+            - <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Arrow keys: Adjust aim point (0.1 MOA per press)<br>
+            - <kbd>+</kbd><kbd>=</kbd> keys: Zoom in (5% per press)<br>
+            - <kbd>-</kbd><kbd>_</kbd> keys: Zoom out (5% per press)<br>
+            - Red crosshair shows current aim point<br>
+            - Automatically tracks your target<br><br>
             
             <strong>Firing:</strong><br>
-            - Space bar: Fire a shot<br>
+            - <kbd>Space</kbd> bar: Fire a shot<br>
             - Each shot is recorded and scored automatically<br>
-            - HUD shows current score and dropped points (points missed)<br>
+            - Red marker shows last shot impact<br>
+            - HUD shows current score and statistics<br>
             - Match completes after 60 shots (standard F-Class match)
           </div>
         </div>
