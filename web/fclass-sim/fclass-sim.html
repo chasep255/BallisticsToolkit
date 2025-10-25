@@ -99,45 +99,6 @@
           <strong>Fire:</strong> <kbd>Space</kbd>
         </div>
       </div>
-      
-      <!-- Shot Statistics HUD -->
-      <div id="shotHud" class="shot-hud" style="display: none;">
-        <div class="hud-section">
-          <div class="hud-label">Target:</div>
-          <div id="hudTarget" class="hud-value">--</div>
-        </div>
-        <div class="hud-separator"></div>
-        <div class="hud-section">
-          <div class="hud-label">Shots:</div>
-          <div id="hudShots" class="hud-value">0</div>
-        </div>
-        <div class="hud-section">
-          <div class="hud-label">Score:</div>
-          <div id="hudScore" class="hud-value">0-0x</div>
-        </div>
-        <div class="hud-section">
-          <div class="hud-label">Dropped:</div>
-          <div id="hudDropped" class="hud-value">0-0x</div>
-        </div>
-        <div class="hud-separator"></div>
-        <div class="hud-section">
-          <div class="hud-label">Last Shot:</div>
-          <div id="hudLastScore" class="hud-value">--</div>
-        </div>
-        <div class="hud-section">
-          <div class="hud-label">MV:</div>
-          <div id="hudMV" class="hud-value">-- fps</div>
-        </div>
-        <div class="hud-section">
-          <div class="hud-label">Impact V:</div>
-          <div id="hudImpactV" class="hud-value">-- fps</div>
-        </div>
-        <div class="hud-separator"></div>
-        <div class="hud-section">
-          <div class="hud-label">FPS:</div>
-          <div id="hudFPS" class="hud-value">--</div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -182,20 +143,49 @@
         </div>
         
         <div class="help-section">
-          <h3>Reading Wind Mirage</h3>
+          <h3>Wind Reading</h3>
           <div class="param-help">
-            <strong>What is Mirage?</strong> Heat shimmer caused by hot air rising from the ground. Essential for reading wind conditions at long range.<br><br>
-            <strong>How to Read:</strong><br>
-            - Mirage constantly boils upward at a fixed rate<br>
-            - Crosswind causes horizontal drift of the mirage pattern<br>
+            <strong>Wind Flags:</strong><br>
+            - Observe flag angle and flapping to estimate wind speed<br>
+            - Flags point in the direction wind is blowing<br>
+            - Watch flags at multiple distances for wind shear<br><br>
+            
+            <strong>Mirage (Heat Shimmer):</strong><br>
+            - Essential for reading wind at long range<br>
+            - Visible through both scopes (higher zoom = more mirage)<br>
+            - Constantly boils upward (vertical convection)<br>
+            - Crosswind causes horizontal drift of the pattern<br><br>
+            
+            <strong>Mirage Behavior by Wind Speed:</strong><br>
+            - &lt; 3 mph: Vertical boil dominates (straight up)<br>
+            - 3-6 mph: Mixed vertical/horizontal shimmer (leaning)<br>
+            - &gt; 8 mph: Horizontal flow dominates, boil fades<br><br>
+            
+            <strong>Reading Direction:</strong><br>
             - Left drift = right-to-left wind (hold right)<br>
-            - Right drift = left-to-right wind (hold left)<br><br>
-            <strong>Tips:</strong><br>
-            - Use spotting scope to scan downrange for wind changes<br>
-            - Higher zoom shows mirage more clearly<br>
-            - Watch mirage over rocks, bushes, and range markers<br>
-            - Mirage shows average wind across the range biased toward what you see downrange<br>
-            - Compare mirage at different distances for wind gradients and against the flags
+            - Right drift = left-to-right wind (hold left)<br>
+            - Mirage shows average wind biased toward target<br><br>
+            
+            <strong>Wind Presets:</strong><br>
+            - DeadCalm: &lt; 0.5 mph (essentially no wind)<br>
+            - Calm: 1-3 mph (light, smooth conditions)<br>
+            - LightBreeze: 2-4 mph (gentle, steady)<br>
+            - Moderate: 3-8 mph (realistic match conditions) - DEFAULT<br>
+            - Strong: 8-15 mph (difficult, steady wind)<br>
+            - Variable: 2-8 mph (highly variable, multiple scales)<br>
+            - Shear: 2-5 mph (direction changes over range)<br>
+            - Switchy: 1-3 mph (frequent direction changes)<br>
+            - Gusty: 2-8 mph (sudden strong gusts with calm periods)<br>
+            - Steady: 3-6 mph (consistent with minimal variation)<br>
+            - Turbulent: 2-6 mph (chaotic with rapid changes)<br>
+            - Mirage: 0.8-2 mph (very light, good for heat mirage)<br><br>
+            
+            <strong>Strategy:</strong><br>
+            - Use spotting scope to scan entire range<br>
+            - Compare flags and mirage at different distances<br>
+            - Watch mirage over rocks, bushes, and markers<br>
+            - Look for wind gradients (changes along range)<br>
+            - Make corrections based on previous impacts
           </div>
         </div>
         
@@ -203,44 +193,36 @@
           <h3>F-Class Competition</h3>
           <div class="param-help">
             <strong>Standard Distances:</strong> 300, 500, 600, 800, 900, and 1000 yards<br><br>
-            <strong>Target Types:</strong> NRA F-Class targets (MR63-FCA, MR65-FCA, MR1-FCA, LR-FCA) are automatically selected based on distance<br><br>
-            <strong>Scoring:</strong> Standard NRA scoring with 10-ring (X-ring) precision. Shots are scored based on impact position, with bullet diameter affecting line-breaking decisions<br><br>
-            <strong>Match Format:</strong> 60-shot F-Class match (standard competition format). HUD displays current score, dropped points (points missed), and shot count<br><br>
-            <strong>Dropped Points:</strong> Shows how many points you've missed (10 - score for each shot) and how many X-rings you've missed (1 - X for each X)
+            <strong>Target Types:</strong> NRA F-Class targets (MR63-FCA, MR65-FCA, MR1-FCA, LR-FCA) automatically selected by distance<br><br>
+            <strong>Scoring:</strong> Standard NRA scoring with 10-ring (X-ring) precision. Bullet diameter affects line-breaking<br><br>
+            <strong>Match Format:</strong> 60-shot match (standard F-Class competition)<br><br>
+            <strong>Dropped Points:</strong> Points missed (10 - score per shot) and X-rings missed (1 - X per shot)
           </div>
         </div>
         
         <div class="help-section">
           <h3>Ballistic Parameters</h3>
           <div class="param-help">
-            <strong>BC (Ballistic Coefficient):</strong> Measures aerodynamic efficiency. Higher values = less wind drift and drop. Range: 0.001-1.0<br><br>
-            <strong>Drag Function:</strong> G7 recommended for modern boat-tail bullets, G1 for flat-base or older projectiles<br><br>
-            <strong>MV (Muzzle Velocity):</strong> Initial bullet velocity in fps. Critical for trajectory and time-of-flight<br><br>
-            <strong>Diameter:</strong> Bullet caliber in inches. Affects line-breaking scoring rules<br><br>
-            <strong>MV σ (Standard Deviation):</strong> Muzzle velocity variation in fps. Lower is better. Default: 7 fps<br><br>
+            <strong>BC (Ballistic Coefficient):</strong> Aerodynamic efficiency (0.001-1.0). Higher = less wind drift and drop<br><br>
+            <strong>Drag Function:</strong> G7 for modern boat-tail bullets, G1 for flat-base or older projectiles<br><br>
+            <strong>MV (Muzzle Velocity):</strong> Initial velocity in fps. Critical for trajectory and time-of-flight<br><br>
+            <strong>Diameter:</strong> Bullet caliber in inches. Affects line-breaking scoring<br><br>
+            <strong>MV σ (Standard Deviation):</strong> Velocity variation in fps. Lower = more consistent. Default: 7 fps<br><br>
             <strong>Accuracy (MOA):</strong> Rifle+shooter precision. 1 MOA ≈ 1 inch at 100 yards. Default: 0.25 MOA
           </div>
         </div>
         
         <div class="help-section">
-          <h3>Wind Reading</h3>
+          <h3>HUD (Top-Right Overlay)</h3>
           <div class="param-help">
-            <strong>Wind Flags:</strong> Observe flag angle and flapping to estimate wind speed. Flags point in wind direction<br><br>
-            <strong>Mirage:</strong> Watch heat shimmer through scopes. Horizontal drift indicates crosswind speed and direction<br><br>
-            <strong>Wind Presets:</strong> Select from Calm, LightBreeze, Moderate, Shear, Strong, or Variable conditions<br><br>
-            <strong>Wind Effects:</strong> Crosswind causes horizontal drift. The effect increases with distance and time-of-flight<br><br>
-            <strong>Strategy:</strong> Use spotting scope to observe flags and mirage downrange. Compare multiple indicators. Adjust aim based on wind reading and previous shot impacts
-          </div>
-        </div>
-        
-        <div class="help-section">
-          <h3>HUD (Shot Statistics)</h3>
-          <div class="param-help">
-            <strong>Shots:</strong> Total shots fired in current session<br><br>
-            <strong>Score:</strong> Cumulative match score in "XXX-Yx" format (points-X count)<br><br>
-            <strong>Last Shot:</strong> Most recent shot score (10, 9, 8, etc.) with X-ring indicator<br><br>
-            <strong>MV:</strong> Actual muzzle velocity of last shot (includes random variation)<br><br>
-            <strong>Impact V:</strong> Bullet velocity at target impact for last shot
+            <strong>Target:</strong> Current target number<br><br>
+            <strong>Shots:</strong> Current shot count / 60 total<br><br>
+            <strong>Score:</strong> Total score in "XXX-Yx" format (points-X count)<br><br>
+            <strong>Dropped:</strong> Missed points and X-rings<br><br>
+            <strong>Last Shot:</strong> Most recent shot score with X indicator<br><br>
+            <strong>MV:</strong> Actual muzzle velocity of last shot (with variation)<br><br>
+            <strong>Impact V:</strong> Bullet velocity at target<br><br>
+            <strong>FPS:</strong> Rendering frame rate
           </div>
         </div>
         

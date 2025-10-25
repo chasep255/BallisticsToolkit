@@ -57,8 +57,8 @@ namespace btk::physics
       return w;
     };
 
-    // Typical wind - realistic match conditions (moderate with some challenge)
-    presets_["Typical"] = []()
+    // Moderate wind - realistic match conditions (moderate with some challenge)
+    presets_["Moderate"] = []()
     {
       WindGenerator w;
       w.addWindComponent(2.2f, 7200.0f, 100000.0f, 0.5f); // Very slow bias
@@ -88,16 +88,6 @@ namespace btk::physics
       return w;
     };
 
-    // Moderate wind - more active with some gusts
-    presets_["Moderate"] = []()
-    {
-      WindGenerator w;
-      w.addWindComponent(1.8f, 7200.0f, 100000.0f, 0.5f); // Very slow bias (2+ hour cycles, 100km wavelength)
-      w.addWindComponent(3.0f, 300.0f, 2000.0f, 1.0f);    // Slow background (5+ min cycles, 2km wavelength)
-      w.addWindComponent(2.2f, 60.0f, 200.0f, 1.5f);      // Medium gusts (1-2 min cycles, 200m wavelength)
-      w.addWindComponent(1.8f, 2.0f, 100.0f, 2.0f);       // Quick gusts (2 sec cycles, 100m wavelength)
-      return w;
-    };
 
     // Strong wind - steady with occasional gusts
     presets_["Strong"] = []()

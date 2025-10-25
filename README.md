@@ -32,11 +32,14 @@ Professional web-based ballistics calculator and match simulation suite for long
 ### 🎮 F-Class Simulator
 - **Interactive 3D Shooting** - Realistic F-Class competition simulation with 3D visualization
 - **Dual Scope System** - Spotting scope for wind reading, rifle scope for aiming
+- **Realistic Heat Mirage** - Physics-based mirage effect for wind reading (responds to wind speed and direction)
+- **Reactive Wind Flags** - 3D wind flags that respond dynamically to wind speed and direction
 - **Realistic Ballistics** - Full ballistic simulation with wind effects and shot statistics
 - **F-Class Distances** - Standard competition ranges from 300-1000 yards
 - **NRA Target Integration** - Automatic target selection based on distance
-- **Wind Reading Practice** - Interactive wind flags and atmospheric conditions
-- **Shot Statistics** - Real-time HUD with scoring, velocity, and impact data
+- **Wind Reading Practice** - Interactive wind flags, mirage, and dynamic atmospheric conditions
+- **3D HUD Overlay** - Real-time statistics rendered in-scene with scoring, velocity, and impact data
+- **Procedural Environment** - Rolling terrain with scattered range objects for visual reference
 
 ## Quick Start
 

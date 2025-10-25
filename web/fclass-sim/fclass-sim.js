@@ -13,6 +13,7 @@ import { TargetSystem } from './target-system.js';
 import { EnvironmentSystem } from './environment-system.js';
 import { BallisticsSystem } from './ballistics-system.js';
 import { Scope } from './scope.js';
+import { HudSystem } from './hud-system.js';
 
 // F-Class distance to target mapping
 const FCLASS_DISTANCE_TO_TARGET = {
@@ -214,10 +215,10 @@ function populateWindPresetDropdown()
       windSelect.appendChild(option);
     });
 
-    // Set default selection to "Typical" if available, otherwise first preset
-    if (presetNames.includes('Typical'))
+    // Set default selection to "Moderate" if available, otherwise first preset
+    if (presetNames.includes('Moderate'))
     {
-      windSelect.value = 'Typical';
+      windSelect.value = 'Moderate';
     }
     else if (presetNames.length > 0)
     {
@@ -600,7 +601,10 @@ class FClassSimulator
       this.fpsStartTime = currentTime;
       
       // Update HUD display
-      this.hudElements.fps.textContent = this.fps > 0 ? this.fps.toString() : '--';
+      if (this.hudSystem)
+      {
+        this.hudSystem.updateFPS(this.fps);
+      }
     }
 
     // Update bullet animation (if any)
@@ -733,17 +737,11 @@ class FClassSimulator
     });
 
     // ===== HUD =====
-    this.hudElements = {
-      container: document.getElementById('shotHud'),
-      target: document.getElementById('hudTarget'),
-      shots: document.getElementById('hudShots'),
-      score: document.getElementById('hudScore'),
-      dropped: document.getElementById('hudDropped'),
-      lastScore: document.getElementById('hudLastScore'),
-      mv: document.getElementById('hudMV'),
-      impactV: document.getElementById('hudImpactV'),
-      fps: document.getElementById('hudFPS')
-    };
+    this.hudSystem = new HudSystem({
+      compositionScene: this.compositionScene,
+      canvasWidth: this.canvasWidth,
+      canvasHeight: this.canvasHeight
+    });
 
     // ===== SCENE SETUP =====
     this.setupCamera();
@@ -833,9 +831,9 @@ class FClassSimulator
     this.gameStartTime = performance.now();
 
     // Show HUD
-    if (this.hudElements.container)
+    if (this.hudSystem)
     {
-      this.hudElements.container.style.display = 'block';
+      this.hudSystem.show();
     }
     this.updateHUD();
 
@@ -862,9 +860,9 @@ class FClassSimulator
     if (this.clock) this.clock.stop();
 
     // Hide HUD
-    if (this.hudElements.container)
+    if (this.hudSystem)
     {
-      this.hudElements.container.style.display = 'none';
+      this.hudSystem.hide();
     }
   }
 
@@ -1010,7 +1008,7 @@ class FClassSimulator
    */
   updateHUD()
   {
-    if (!this.hudElements.container) return;
+    if (!this.hudSystem) return;
 
     const match = this.ballisticsSystem ? this.ballisticsSystem.getMatch() : null;
     const shotCount = match ? match.getHitCount() : 0;
@@ -1020,42 +1018,34 @@ class FClassSimulator
     // Update target number
     if (this.targetSystem && this.targetSystem.userTarget)
     {
-      this.hudElements.target.textContent = `#${this.targetSystem.userTarget.targetNumber}`;
+      this.hudSystem.updateTarget(this.targetSystem.userTarget.targetNumber);
     }
 
     // Update shot count and score (F-Class match is 60 shots)
-    if (shotCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
-    {
-      this.hudElements.shots.textContent = `${FClassSimulator.FCLASS_MATCH_SHOTS}/${FClassSimulator.FCLASS_MATCH_SHOTS} (Complete!)`;
-      this.hudElements.shots.style.color = '#28a745'; // Green for complete
-    }
-    else
-    {
-      this.hudElements.shots.textContent = `${shotCount}/${FClassSimulator.FCLASS_MATCH_SHOTS}`;
-      this.hudElements.shots.style.color = ''; // Reset color
-    }
-    this.hudElements.score.textContent = `${totalScore}-${xCount}x`;
+    const isComplete = shotCount >= FClassSimulator.FCLASS_MATCH_SHOTS;
+    this.hudSystem.updateShots(shotCount, FClassSimulator.FCLASS_MATCH_SHOTS, isComplete);
+    this.hudSystem.updateScore(totalScore, xCount);
 
     // Calculate dropped points (10 - score for each shot, 1 - X for each X)
     const maxPossibleScore = shotCount * 10; // 10 points per shot
     const maxPossibleX = shotCount; // 1 X per shot
     const droppedPoints = maxPossibleScore - totalScore;
     const droppedX = maxPossibleX - xCount;
-    this.hudElements.dropped.textContent = `${droppedPoints}-${droppedX}x`;
+    this.hudSystem.updateDropped(droppedPoints, droppedX);
 
     // Update last shot data
     if (this.lastShotData)
     {
-      const scoreText = `${this.lastShotData.score}${this.lastShotData.isX ? 'x' : ''}`;
-      this.hudElements.lastScore.textContent = scoreText;
-      this.hudElements.mv.textContent = `${Math.round(this.lastShotData.mvFps)} fps`;
-      this.hudElements.impactV.textContent = `${Math.round(this.lastShotData.impactVelocityFps)} fps`;
+      this.hudSystem.updateLastShot(
+        this.lastShotData.score,
+        this.lastShotData.isX,
+        this.lastShotData.mvFps,
+        this.lastShotData.impactVelocityFps
+      );
     }
     else
     {
-      this.hudElements.lastScore.textContent = '--';
-      this.hudElements.mv.textContent = '-- fps';
-      this.hudElements.impactV.textContent = '-- fps';
+      this.hudSystem.updateLastShot('--', false, null, null);
     }
   }
 
@@ -1257,6 +1247,10 @@ class FClassSimulator
     if (this.rifleScope)
     {
       this.rifleScope.dispose();
+    }
+    if (this.hudSystem)
+    {
+      this.hudSystem.dispose();
     }
     
     // Dispose wind generator
