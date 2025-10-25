@@ -443,9 +443,7 @@ export class Scope
         time,
         this.currentFOV,
         windGenerator,
-        intersection,
-        this.yaw,
-        this.pitch
+        intersection
       );
       this.mirageEffect.apply(this.mirageTarget.texture, this.renderTarget);
     }

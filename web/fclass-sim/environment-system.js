@@ -81,6 +81,7 @@ export class EnvironmentSystem
     this.dirtTextures = [];
     this.barkTextures = [];
     this.foliageTexture = null;
+    this.rangeObjects = [];
   }
 
   dispose()
@@ -141,6 +142,15 @@ export class EnvironmentSystem
         this.brownGround.material.dispose();
       }
     }
+    
+    // Remove range objects
+    for (const obj of this.rangeObjects)
+    {
+      this.scene.remove(obj);
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) obj.material.dispose();
+    }
+    this.rangeObjects = [];
     
     // Remove lighting
     if (this.sun)
@@ -543,7 +553,36 @@ export class EnvironmentSystem
     this.scene.add(this.brownGround);
 
     // Add a range plane - just the shooting lanes with grass texture
-    const groundGeometry = new THREE.PlaneGeometry(this.rangeWidth, rangeLength);
+    // Use higher segments for terrain variation
+    const groundSegments = 200; // High resolution for smooth rolling hills
+    const groundGeometry = new THREE.PlaneGeometry(this.rangeWidth, rangeLength, groundSegments, groundSegments);
+    
+    // Add subtle rolling hills to the terrain (< 1 yard variation)
+    const positions = groundGeometry.attributes.position;
+    for (let i = 0; i < positions.count; i++)
+    {
+      const x = positions.getX(i);
+      const y = positions.getY(i);
+      
+      // Multiple octaves of noise for natural-looking terrain
+      // Use Perlin-like noise with sine waves
+      const freq1 = 0.05; // Large rolling hills
+      const freq2 = 0.15; // Medium undulations
+      const freq3 = 0.30; // Small bumps
+      
+      const height1 = Math.sin(x * freq1) * Math.cos(y * freq1) * 0.4;
+      const height2 = Math.sin(x * freq2 + 1.5) * Math.cos(y * freq2 + 2.3) * 0.25;
+      const height3 = Math.sin(x * freq3 + 3.7) * Math.cos(y * freq3 + 4.2) * 0.15;
+      
+      // Combine heights (total variation < 0.8 yards)
+      const totalHeight = height1 + height2 + height3;
+      
+      // Set Z coordinate (height) - positions are in X,Y plane before rotation
+      positions.setZ(i, totalHeight);
+    }
+    
+    // Recompute normals for proper lighting on the terrain
+    groundGeometry.computeVertexNormals();
     
     // Load grass textures
     const grassLoader = new THREE.TextureLoader();
@@ -609,6 +648,120 @@ export class EnvironmentSystem
     }
   }
 
+  createRangeObjects()
+  {
+    // Add random objects scattered on the range for mirage reference
+    // Rocks, bushes, range markers, etc.
+    
+    const rockLoader = new THREE.TextureLoader();
+    const rockColor = rockLoader.load('textures/rock/Rock030_256_Color.jpg');
+    const rockNormal = rockLoader.load('textures/rock/Rock030_256_NormalGL.jpg');
+    const rockRoughness = rockLoader.load('textures/rock/Rock030_256_Roughness.jpg');
+    
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      map: rockColor,
+      normalMap: rockNormal,
+      roughnessMap: rockRoughness,
+      roughness: 0.9,
+      metalness: 0.1
+    });
+    
+    // Create 30-50 random objects
+    const objectCount = 30 + Math.floor(Math.random() * 20);
+    
+    for (let i = 0; i < objectCount; i++)
+    {
+      // Random position within range bounds
+      const x = (Math.random() - 0.5) * this.rangeWidth * 0.8; // Stay within 80% of range width
+      const z = -Math.random() * this.rangeDistance * 0.95; // 0 to 95% downrange
+      
+      // Sample terrain height at this position
+      const terrainHeight = this.getTerrainHeight(x, z);
+      
+      // Random object type
+      const objType = Math.random();
+      
+      if (objType < 0.6)
+      {
+        // Rock (60% chance)
+        const rockSize = 0.2 + Math.random() * 0.4; // 0.2 to 0.6 yards
+        const geometry = new THREE.SphereGeometry(rockSize, 8, 6);
+        // Squash it a bit to make it look more like a rock
+        geometry.scale(1, 0.6, 1);
+        
+        const rock = new THREE.Mesh(geometry, rockMaterial.clone());
+        rock.position.set(x, terrainHeight + rockSize * 0.3, z);
+        rock.rotation.set(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI * 2,
+          Math.random() * Math.PI
+        );
+        rock.castShadow = true;
+        rock.receiveShadow = true;
+        
+        this.scene.add(rock);
+        this.rangeObjects.push(rock);
+      }
+      else if (objType < 0.85)
+      {
+        // Bush/shrub (25% chance)
+        const bushSize = 0.3 + Math.random() * 0.5; // 0.3 to 0.8 yards
+        const geometry = new THREE.SphereGeometry(bushSize, 6, 4);
+        
+        const bushMaterial = new THREE.MeshStandardMaterial({
+          color: 0x3a5f0b, // Dark green
+          roughness: 1.0,
+          metalness: 0.0
+        });
+        
+        const bush = new THREE.Mesh(geometry, bushMaterial);
+        bush.position.set(x, terrainHeight + bushSize * 0.5, z);
+        bush.scale.set(1, 0.8, 1); // Squash vertically
+        bush.castShadow = true;
+        bush.receiveShadow = true;
+        
+        this.scene.add(bush);
+        this.rangeObjects.push(bush);
+      }
+      else
+      {
+        // Range marker post (15% chance)
+        const postHeight = 1.0 + Math.random() * 0.5; // 1.0 to 1.5 yards tall
+        const postRadius = 0.05; // 0.05 yards (about 2 inches)
+        const geometry = new THREE.CylinderGeometry(postRadius, postRadius, postHeight, 8);
+        
+        const postMaterial = new THREE.MeshStandardMaterial({
+          color: 0xffa500, // Orange
+          roughness: 0.7,
+          metalness: 0.1
+        });
+        
+        const post = new THREE.Mesh(geometry, postMaterial);
+        post.position.set(x, terrainHeight + postHeight / 2, z);
+        post.castShadow = true;
+        post.receiveShadow = true;
+        
+        this.scene.add(post);
+        this.rangeObjects.push(post);
+      }
+    }
+  }
+  
+  // Helper to get terrain height at a given x, z position
+  getTerrainHeight(x, z)
+  {
+    // Match the terrain generation from createGround()
+    const freq1 = 0.05;
+    const freq2 = 0.15;
+    const freq3 = 0.30;
+    
+    const height1 = Math.sin(x * freq1) * Math.cos(z * freq1) * 0.4;
+    const height2 = Math.sin(x * freq2 + 1.5) * Math.cos(z * freq2 + 2.3) * 0.25;
+    const height3 = Math.sin(x * freq3 + 3.7) * Math.cos(z * freq3 + 4.2) * 0.15;
+    
+    return height1 + height2 + height3;
+  }
+
   createEnvironment()
   {
     this.setupLighting();
@@ -616,6 +769,7 @@ export class EnvironmentSystem
     this.createClouds();
     this.createTrees();
     this.createGround();
+    this.createRangeObjects();
   }
 
   getSun()

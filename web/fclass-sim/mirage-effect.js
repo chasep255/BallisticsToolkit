@@ -24,6 +24,10 @@ export class MirageEffect
     const geometry = new THREE.PlaneGeometry(2, 2);
     this.quad = new THREE.Mesh(geometry, this.material);
     this.scene.add(this.quad);
+    
+    // EMA for smoothing wind changes
+    this.smoothedWindX = 0;
+    this.emaAlpha = 0.001; // Smoothing factor at 60 FPS (0.02 = very smooth, 0.1 = faster)
   }
   
   createMaterial()
@@ -74,8 +78,7 @@ export class MirageEffect
       uniform sampler2D tDiffuse;
       uniform float time;
       uniform float intensity;
-      uniform vec2 windVector;
-      uniform float windSpeed;
+      uniform float windSpeed;  // Signed: positive = right, negative = left
       uniform vec2 worldOffset;  // World-space offset for anchoring mirage
       uniform float worldScale;  // Scale factor for world coordinates
       
@@ -99,13 +102,14 @@ export class MirageEffect
         vec2 worldPos = (uv - 0.5) * worldScale + worldOffset;
         
         // Vertical offset for upward boiling (constant speed in yards/sec)
-        // Heat rises at approximately 2 yards/second
-        float verticalRise = time * 2.0;
+        // Heat rises at approximately 4 yards/second
+        float verticalRise = time * 4.0;
         
         // Horizontal offset from wind (1:1 with wind speed in mph)
         // Convert mph to yards/second: 1 mph = 1.467 yards/second
+        // windSpeed is signed: positive = right, negative = left
         float mphToYardsPerSec = 1.467;
-        vec2 horizontalDrift = windVector * time * windSpeed * mphToYardsPerSec;
+        float horizontalDrift = time * windSpeed * mphToYardsPerSec;
         
         // Create multiple octaves of noise for realistic heat shimmer
         // All layers move upward at constant rate, horizontally at wind speed
@@ -113,19 +117,19 @@ export class MirageEffect
         
         // Layer 1: Large slow waves (scale 0.5)
         float noise1 = snoise(vec2(
-          worldPos.x * 0.5 - horizontalDrift.x * 0.5 * 0.3,
+          worldPos.x * 0.5 - horizontalDrift * 0.5 * 0.3,
           worldPos.y * 0.5 + verticalRise * 0.5 * 0.3
         ));
         
         // Layer 2: Medium waves (scale 1.0)
         float noise2 = snoise(vec2(
-          worldPos.x * 1.0 - horizontalDrift.x * 1.0 * 0.5,
+          worldPos.x * 1.0 - horizontalDrift * 1.0 * 0.5,
           worldPos.y * 1.0 + verticalRise * 1.0 * 0.5
         ));
         
         // Layer 3: Small fast waves (scale 2.0)
         float noise3 = snoise(vec2(
-          worldPos.x * 2.0 - horizontalDrift.x * 2.0 * 0.8,
+          worldPos.x * 2.0 - horizontalDrift * 2.0 * 0.8,
           worldPos.y * 2.0 + verticalRise * 2.0 * 0.8
         ));
         
@@ -154,7 +158,6 @@ export class MirageEffect
         tDiffuse: { value: null },
         time: { value: 0 },
         intensity: { value: 0 },
-        windVector: { value: new THREE.Vector2(0, 0) },
         windSpeed: { value: 0 },
         worldOffset: { value: new THREE.Vector2(0, 0) },
         worldScale: { value: 1.0 }
@@ -172,10 +175,8 @@ export class MirageEffect
    * @param {number} fov - Current field of view in degrees
    * @param {Object} windGenerator - Wind generator instance
    * @param {Object} intersection - Range box intersection {x, y, z, distance}
-   * @param {number} yaw - Scope yaw offset in radians
-   * @param {number} pitch - Scope pitch offset in radians
    */
-  update(time, fov, windGenerator, intersection, yaw, pitch)
+  update(time, fov, windGenerator, intersection)
   {
     // Update time for animation
     this.material.uniforms.time.value = time;
@@ -202,58 +203,49 @@ export class MirageEffect
     const worldScale = intersection.distance * Math.tan((fov * Math.PI / 180) / 2) * 2;
     this.material.uniforms.worldScale.value = worldScale;
     
-    // Sample wind at multiple distances and compute weighted average
-    // Heavily weighted toward where scope is pointing, but includes downrange wind
+    // Sample wind at random points within the viewing area
     const targetDistance = intersection.distance;
-    
-    // Sample points: 8 samples from 12.5% to 100%, weighted heavily toward target
-    const sampleDistances = [
-      { distance: targetDistance * 0.125, weight: 0.05 },
-      { distance: targetDistance * 0.250, weight: 0.05 },
-      { distance: targetDistance * 0.375, weight: 0.05 },
-      { distance: targetDistance * 0.500, weight: 0.10 },
-      { distance: targetDistance * 0.625, weight: 0.10 },
-      { distance: targetDistance * 0.750, weight: 0.15 },
-      { distance: targetDistance * 0.875, weight: 0.20 },
-      { distance: targetDistance * 1.000, weight: 0.30 }  // Heavily weighted to target
-    ];
+    const numSamples = 10; // Number of random sample points
     
     let totalWindX = 0;
-    let totalWindZ = 0;
-    let totalWeight = 0;
     
-    for (const sample of sampleDistances)
+    for (let i = 0; i < numSamples; i++)
     {
+      // Random distance along line of sight (slight bias toward longer range)
+      // Using square gives more samples at longer distances
+      const randomFactor = Math.pow(Math.random(), 0.7); // 0.7 gives slight bias toward target
+      const sampleDistance = targetDistance * randomFactor;
+      
       // Calculate position at this distance along the line of sight
-      const ratio = sample.distance / targetDistance;
+      const ratio = sampleDistance / targetDistance;
       const sampleX = intersection.x * ratio;
       const sampleY = intersection.y * ratio;
       const sampleZ = intersection.z * ratio;
+        
+      const wind = windGenerator.getWindAt(
+        sampleX,
+        sampleY,
+        sampleZ,
+        time
+      );
       
-      const wind = windGenerator.getWindAt(sampleX, sampleY, sampleZ, time);
-      totalWindX += wind.x * sample.weight;
-      totalWindZ += wind.z * sample.weight;
-      totalWeight += sample.weight;
+      totalWindX += wind.x;
     }
     
-    // Compute weighted average wind
-    const avgWindX = totalWindX / totalWeight;
-    const avgWindZ = totalWindZ / totalWeight;
-    const windSpeedMph = Math.sqrt(avgWindX * avgWindX + avgWindZ * avgWindZ);
+    // Compute average crosswind from random samples
+    const avgWindX = totalWindX / numSamples;
     
-    // Normalize wind direction (X is left-right, Z is downrange)
-    const windLength = Math.sqrt(avgWindX * avgWindX + avgWindZ * avgWindZ);
-    let windDir = new THREE.Vector2(0, 0);
-    if (windLength > 0.01)
-    {
-      windDir = new THREE.Vector2(avgWindX / windLength, avgWindZ / windLength);
-    }
+    // Apply exponential moving average (EMA) to smooth wind changes
+    // EMA formula: smoothed = alpha * new + (1 - alpha) * smoothed
+    this.smoothedWindX = this.emaAlpha * avgWindX + (1 - this.emaAlpha) * this.smoothedWindX;
     
-    this.material.uniforms.windVector.value = windDir;
-    
+    // For mirage, we only care about crosswind (X component)
+    // Downrange wind (Z) doesn't affect bullet drift
+    // Positive = left-to-right, negative = right-to-left
     // Wind speed should move mirage at 1:1 ratio
-    // windSpeedMph is already in mph, just pass it through
-    this.material.uniforms.windSpeed.value = windSpeedMph;
+    // Sign indicates direction: positive = right, negative = left
+    this.material.uniforms.windSpeed.value = this.smoothedWindX;
+    //console.log('Spotting scope:', this.smoothedWindX);
   }
   
   /**
