@@ -527,7 +527,7 @@ export class BallisticsSystem
     const totalTimeS = this.lastTrajectory.getTotalTime();
     this.bulletAnim = {
       totalTimeS,
-      startTimeMs: performance.now()
+      startTimeS: null // Will be set on first update
     };
     
     // Initialize position at t=0
@@ -541,13 +541,18 @@ export class BallisticsSystem
     
   }
   
-  updateBulletAnimation()
+  updateBulletAnimation(gameTime)
   {
     if (!this.bulletAnim || !this.bulletMesh || !this.lastTrajectory) return false;
     
-    // Compute elapsed time (1x real-time)
-    const now = performance.now();
-    const elapsedRealS = (now - this.bulletAnim.startTimeMs) / 1000.0;
+    // Initialize start time on first update
+    if (this.bulletAnim.startTimeS === null)
+    {
+      this.bulletAnim.startTimeS = gameTime;
+    }
+    
+    // Compute elapsed time using game time (pauses when tab is hidden)
+    const elapsedRealS = gameTime - this.bulletAnim.startTimeS;
     let t = elapsedRealS;
     if (t >= this.bulletAnim.totalTimeS)
     {

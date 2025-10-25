@@ -338,6 +338,7 @@ class FClassSimulator
     // ===== CORE STATE =====
     this.canvas = canvas;
     this.isRunning = false;
+    this.isPaused = false;
     this.animationId = null;
 
     // Game parameters
@@ -353,8 +354,7 @@ class FClassSimulator
     this.mvSd = params.mvSd;
     this.rifleAccuracy = params.rifleAccuracy;
 
-    // Time tracking
-    this.gameStartTime = 0;
+    // FPS tracking
     this.lastTime = 0;
     this.frameCount = 0;
     this.fps = 0;
@@ -730,7 +730,7 @@ class FClassSimulator
       console.warn('Could not update wind noise volume:', error);
     }
   }
-  
+
   // ===== FLAG SYSTEM =====
   createWindFlags()
   {
@@ -854,21 +854,9 @@ class FClassSimulator
   // ===== RENDERING =====
   render()
   {
-    // Update cached time values using real-world time (continues even when minimized)
-    const now = performance.now() / 1000; // Convert to seconds
-    
-    if (this.lastFrameTime === null)
-    {
-      this.lastFrameTime = now;
-      this.currentDeltaTime = 1/60; // Assume 60fps for first frame
-    }
-    else
-    {
-      this.currentDeltaTime = Math.min(0.1, now - this.lastFrameTime); // clamp to 100ms max
-      this.lastFrameTime = now;
-    }
-    
-    this.currentAbsTime = now - this.gameStartTime;
+    // Update cached time values once per frame
+    this.currentDeltaTime = Math.min(0.05, Math.max(0.0005, this.clock.getDelta())); // clamp 0.5ms-50ms
+    this.currentAbsTime = this.clock.getElapsedTime();
     
     // Calculate FPS by sampling over 1 second
     const currentTime = performance.now();
@@ -896,7 +884,7 @@ class FClassSimulator
     // Update bullet animation (if any)
     if (this.ballisticsSystem)
     {
-      this.ballisticsSystem.updateBulletAnimation();
+      this.ballisticsSystem.updateBulletAnimation(this.getTime());
     }
 
     // Update and render flags
@@ -914,8 +902,8 @@ class FClassSimulator
     // Update wind noise volume based on current wind speed
     this.updateWindNoiseVolume();
     
-    // Update relay timer and check for relay end
-    this.relayManager.tick(performance.now() / 1000);
+    // Update relay timer and check for relay end (uses game time, pauses when tab is hidden)
+    this.relayManager.tick(this.getTime());
     if (this.relayManager.justEnded())
     {
       // Only show notification if target is ready (not animating)
@@ -997,9 +985,8 @@ class FClassSimulator
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
     this.renderer.autoClear = false;
 
-    // Real-world time tracking (continues even when browser is minimized)
-    this.lastFrameTime = null;
-    this.gameStartTime = null;
+    // Animation clock and cached time values
+    this.clock = new THREE.Clock();
     this.currentAbsTime = 0;
     this.currentDeltaTime = 0;
 
@@ -1157,9 +1144,8 @@ class FClassSimulator
     // Initialize scorecard
     this.scorecard.initialize();
 
-    // Start game - initialize real-world time tracking
-    this.gameStartTime = performance.now() / 1000; // Convert to seconds
-    this.lastFrameTime = null; // Will be set on first render
+    // Start game clock
+    this.clock.start();
 
     // Show HUD
     if (this.hudSystem)
@@ -1191,10 +1177,7 @@ class FClassSimulator
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
-    
-    // Reset time tracking
-    this.lastFrameTime = null;
-    this.gameStartTime = null;
+    if (this.clock) this.clock.stop();
 
     // Hide HUD
     if (this.hudSystem)
@@ -1595,8 +1578,8 @@ class FClassSimulator
       return;
     }
 
-    // Start relay timer on first shot
-    this.relayManager.startIfNeeded(performance.now() / 1000);
+    // Start relay timer on first shot (uses game time)
+    this.relayManager.startIfNeeded(this.getTime());
     
     // Decrement sighters count when shot is fired (not when scored)
     if (this.relayManager.isSightersPhase())
