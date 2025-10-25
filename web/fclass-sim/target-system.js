@@ -24,6 +24,11 @@ export class TargetSystem
     this.pitsOffset = config.pitsOffset;
     this.targetType = config.targetType; // NRA target type (e.g., "MR-1")
     
+    // Audio context for background shot sounds
+    this.audioContext = config.audioContext || null;
+    this.bgShotSounds = [];
+    this.numBgShotSounds = 5;
+    
     // Target configuration with defaults
     this.cfg = {
       targetSize: config.targetSize ?? TargetSystem.TARGET_SIZE,
@@ -46,7 +51,7 @@ export class TargetSystem
     // Match-style animation state machine
     this.animationState = 'IDLE'; // IDLE, LOWERING, IN_PITS, RAISING
     this.pitLingerTimer = 0;
-    this.pitLingerDuration = 3.0; // seconds
+    this.pitLingerDuration = 1.0; // seconds
     this.pendingNewSpotterData = null; // Store new shot data for when target raises
     this.spotterRelativeX = 0; // Spotter position relative to target center
     this.spotterRelativeY = 0;
@@ -372,11 +377,11 @@ export class TargetSystem
         animating: false
       });
 
-      // Initialize animation state
+      // Initialize animation state - spread out initial drops
       this.targetAnimationStates.push({
         isUp: true,
         timeInState: 0,
-        nextDropTime: Math.random() * 120 + 30 // 30-150 seconds
+        nextDropTime: Math.random() * 30 + 10 // 10-40 seconds initial
       });
     }
 
@@ -691,16 +696,19 @@ export class TargetSystem
         {
           animationState.isUp = false;
           animationState.timeInState = 0;
+          
+          // Play background shot sound for other targets
+          this.playRandomBgShot();
         }
       }
       else
       {
-        // Target is down - stay down for 5 seconds then go back up
-        if (animationState.timeInState >= 5.0)
+        // Target is down - stay down for 3 seconds then go back up
+        if (animationState.timeInState >= 3.0)
         {
           animationState.isUp = true;
           animationState.timeInState = 0;
-          animationState.nextDropTime = Math.random() * 120 + 30; // 30-150 seconds
+          animationState.nextDropTime = Math.random() * 25 + 15; // 15-40 seconds
         }
       }
 
@@ -1010,6 +1018,64 @@ export class TargetSystem
       // Don't dispose geometry/material as they're shared
     }
     this.scoringDiscs = [];
+  }
+  
+  /**
+   * Load background shot sounds
+   */
+  async loadBgShotSounds()
+  {
+    if (!this.audioContext)
+    {
+      console.warn('Cannot load background shot sounds: no audio context');
+      return;
+    }
+    
+    try
+    {
+      for (let i = 1; i <= this.numBgShotSounds; i++)
+      {
+        const response = await fetch(`audio/bg_shot_${i}.mp3`);
+        if (!response.ok)
+        {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        this.bgShotSounds.push(audioBuffer);
+      }
+      console.log(`Loaded ${this.bgShotSounds.length} background shot sounds`);
+    }
+    catch (error)
+    {
+      console.warn('Could not load background shot sounds:', error);
+    }
+  }
+  
+  /**
+   * Play a random background shot sound
+   */
+  playRandomBgShot()
+  {
+    if (this.bgShotSounds.length === 0 || !this.audioContext) return;
+    
+    try
+    {
+      // Pick a random sound
+      const randomIndex = Math.floor(Math.random() * this.bgShotSounds.length);
+      const soundBuffer = this.bgShotSounds[randomIndex];
+      
+      // Create and play source
+      const source = this.audioContext.createBufferSource();
+      source.buffer = soundBuffer;
+      source.connect(this.audioContext.destination);
+      source.start();
+    }
+    catch (error)
+    {
+      console.warn('Could not play background shot sound:', error);
+    }
   }
 }
 

@@ -188,9 +188,16 @@ export class HudSystem
   
   updateShots(current, total, isComplete)
   {
-    const value = isComplete ? `${total}/${total} (Complete!)` : `${current}/${total}`;
+    const value = `${current}/${total}`;
     const color = isComplete ? '#28a745' : '#ffffff';
     this.drawHudText(this.shotsCanvas, 'Shots:', value, color);
+    this.hudTextures[3].needsUpdate = true;
+  }
+  
+  updateSighters(current, limit)
+  {
+    const value = `${current}/${limit}`;
+    this.drawHudText(this.shotsCanvas, 'Sighters:', value);
     this.hudTextures[3].needsUpdate = true;
   }
   

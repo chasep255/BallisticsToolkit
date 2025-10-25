@@ -47,8 +47,6 @@ export class RelayManager
    */
   tick(now)
   {
-    this.justEndedFlag = false;
-    
     if (!this.isRunning || this.phase === 'ended')
     {
       return;
@@ -92,16 +90,7 @@ export class RelayManager
         this.endRelay();
       }
     }
-    else
-    {
-      this.sightersFired++;
-      
-      // Auto-switch to record for relays 2 and 3 after 2 sighters
-      if (this.relayIndex > 1 && this.sightersFired >= 2 && this.phase === 'sighters')
-      {
-        this.phase = 'record';
-      }
-    }
+    // Note: Sighters are now handled in fireShot() for immediate UI updates
   }
   
   /**
@@ -149,7 +138,12 @@ export class RelayManager
    */
   justEnded()
   {
-    return this.justEndedFlag;
+    const result = this.justEndedFlag;
+    if (result)
+    {
+      this.justEndedFlag = false; // Clear flag after checking
+    }
+    return result;
   }
   
   /**

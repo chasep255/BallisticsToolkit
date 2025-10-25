@@ -184,6 +184,11 @@
   padding-left: 12px;
 }
 
+.relay-total-placeholder {
+  min-width: 100px;
+  padding-left: 12px;
+}
+
 .scorecard-footer {
   margin-top: 20px;
   padding-top: 16px;

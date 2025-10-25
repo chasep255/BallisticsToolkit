@@ -30,16 +30,14 @@ Professional web-based ballistics calculator and match simulation suite for long
 - Note: This feature is experimental and evolving
 
 ### 🎮 F-Class Simulator
-- **Interactive 3D Shooting** - Realistic F-Class competition simulation with 3D visualization
-- **Dual Scope System** - Spotting scope for wind reading, rifle scope for aiming
-- **Realistic Heat Mirage** - Physics-based mirage effect for wind reading (responds to wind speed and direction)
-- **Reactive Wind Flags** - 3D wind flags that respond dynamically to wind speed and direction
-- **Realistic Ballistics** - Full ballistic simulation with wind effects and shot statistics
-- **F-Class Distances** - Standard competition ranges from 300-1000 yards
-- **NRA Target Integration** - Automatic target selection based on distance
-- **Wind Reading Practice** - Interactive wind flags, mirage, and dynamic atmospheric conditions
-- **3D HUD Overlay** - Real-time statistics rendered in-scene with scoring, velocity, and impact data
-- **Procedural Environment** - Rolling terrain with scattered range objects for visual reference
+- **Real Match Flow** - 3× relays, 20 min each, 20 record shots; unlimited sighters (Relay 1), 2 sighters (Relays 2–3); “Go For Record” to end sighters early; relay-complete dialogs
+- **Unified Scopes** - Spotting scope for wind reading (FOV-scaled movement), rifle scope for aiming with MOA-based adjustments; reticle fixed to target base height during pit cycles
+- **Realistic Heat Mirage** - World-anchored shader effect that samples wind along line of sight; upward boil vs horizontal flow by wind; responds instantly to wind direction changes
+- **Wind & Flags** - Reactive 3D wind flags at intervals and at target; presets loaded from C++ with Moderate as default (renamed from Typical)
+- **Scoring & Animation** - Match-style target animation (lower/raise with scoring discs); per-shot scoring with X-count; scorecard modal with two rows of ten
+- **3D HUD Overlay** - Per‑relay stats: sighters or shots, score, X, dropped points, last shot, MV, impact V, relay/timer, FPS
+- **Procedural Environment** - Rolling terrain and range objects for visual reference
+- **Audio** - Wind noise scales smoothly with wind speed (silent at 0 mph)
 
 ## Quick Start
 
@@ -64,15 +62,15 @@ Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/
 Watch realistic shot impacts on NRA targets with detailed logging and statistical analysis.
 
 ### F-Class Simulator
-Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html) for interactive 3D shooting practice:
+Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html):
 
-1. **F-Class Mode** - Select distance (300-1000 yards) and target type
-2. **Ballistic Setup** - Configure bullet parameters (BC, MV, diameter, accuracy)
-3. **Wind Conditions** - Choose from realistic wind presets
-4. **Shooting Practice** - Use dual scopes to read wind and aim shots
-5. **Shot Analysis** - Review HUD statistics and shot impacts
+1. **Pick Distance** (300–1000 yds) and wind preset (default: Moderate)
+2. **Set Ballistics** (BC, MV, diameter, accuracy; G7 recommended)
+3. **Scopes** (spotting: WASD/EQ; rifle: arrows/±)
+4. **Match Flow** (Relay 1 sighters until “Go For Record”; Relays 2–3: 2 sighters)
+5. **Shoot & Score** (per‑relay HUD, scorecard modal)
 
-Experience realistic F-Class competition shooting with wind reading, ballistic calculations, and NRA scoring.
+Tip: Use mirage + flags together. Mirage leans with crosswind and increases with zoom.
 
 ## Building from Source
 

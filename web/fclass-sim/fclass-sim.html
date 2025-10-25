@@ -121,84 +121,56 @@
           <h3>Controls</h3>
           <div class="param-help">
             <strong>Spotting Scope (Bottom-Left):</strong><br>
-            - <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> keys: Pan and tilt the scope view<br>
-            - <kbd>E</kbd> key: Zoom in (increase magnification)<br>
-            - <kbd>Q</kbd> key: Zoom out (decrease magnification)<br>
-            - Range: 2x to 100x magnification<br>
-            - Movement speed scales with zoom level (slower when zoomed in)<br>
-            - Use to observe impacts and read wind mirage<br><br>
-            
+            - <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Pan • <kbd>E</kbd>/<kbd>Q</kbd> Zoom<br>
+            - Movement scales with FOV (slower when zoomed in)<br>
+            - Use to read mirage and flags across the range<br><br>
+
             <strong>Rifle Scope (Bottom-Right):</strong><br>
-            - <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Arrow keys: Adjust aim point (0.1 MOA per press)<br>
-            - <kbd>+</kbd><kbd>=</kbd> keys: Zoom in (5% per press)<br>
-            - <kbd>-</kbd><kbd>_</kbd> keys: Zoom out (5% per press)<br>
-            - Red crosshair shows current aim point<br>
-            - Shows mirage for wind reading at target<br><br>
-            
+            - <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Aim (MOA-based increments)<br>
+            - <kbd>+</kbd>/<kbd>-</kbd> Zoom (FOV-based)<br>
+            - Reticle stays fixed at target base height during pit cycles<br><br>
+
             <strong>Firing:</strong><br>
-            - <kbd>Space</kbd> bar: Fire a shot<br>
-            - Each shot is recorded and scored automatically<br>
-            - Red marker shows last shot impact<br>
-            - HUD shows current score and statistics<br>
-            - Match completes after 60 shots (standard F-Class match)
+            - <kbd>Space</kbd> Fire shot (blocked while your target is down)<br><br>
+
+            <strong>Buttons:</strong><br>
+            - Start: begin the match
+            - Restart: confirm dialog, restarts the match
+            - Scorecard: open detailed per-relay score view
+            - Go For Record: end sighters early in the current relay
           </div>
         </div>
         
         <div class="help-section">
-          <h3>Wind Reading</h3>
+          <h3>Wind & Mirage</h3>
           <div class="param-help">
             <strong>Wind Flags:</strong><br>
-            - Observe flag angle and flapping to estimate wind speed<br>
-            - Flags point in the direction wind is blowing<br>
-            - Watch flags at multiple distances for wind shear<br><br>
-            
-            <strong>Mirage (Heat Shimmer):</strong><br>
-            - Essential for reading wind at long range<br>
-            - Visible through both scopes (higher zoom = more mirage)<br>
-            - Constantly boils upward (vertical convection)<br>
-            - Crosswind causes horizontal drift of the pattern<br><br>
-            
-            <strong>Mirage Behavior by Wind Speed:</strong><br>
-            - &lt; 3 mph: Vertical boil dominates (straight up)<br>
-            - 3-6 mph: Mixed vertical/horizontal shimmer (leaning)<br>
-            - &gt; 8 mph: Horizontal flow dominates, boil fades<br><br>
-            
-            <strong>Reading Direction:</strong><br>
-            - Left drift = right-to-left wind (hold right)<br>
-            - Right drift = left-to-right wind (hold left)<br>
-            - Mirage shows average wind biased toward target<br><br>
-            
+            - Read angle/flap; watch multiple distances for shear<br><br>
+
+            <strong>Mirage (what you’ll see):</strong><br>
+            - Higher zoom = clearer shimmer; always rises upward<br>
+            - Crosswind pushes the pattern horizontally<br>
+            - &lt; 3 mph: vertical boil • 3–6 mph: leaning • &gt; 8 mph: mostly horizontal flow<br><br>
+
+            <strong>Mirage (how it works here):</strong><br>
+            - World-anchored distortion, not screen-space<br>
+            - Samples wind along your line of sight with long‑range bias<br>
+            - Drift integrates current crosswind over time (instant direction changes)<br><br>
+
             <strong>Wind Presets:</strong><br>
-            - DeadCalm: &lt; 0.5 mph (essentially no wind)<br>
-            - Calm: 1-3 mph (light, smooth conditions)<br>
-            - LightBreeze: 2-4 mph (gentle, steady)<br>
-            - Moderate: 3-8 mph (realistic match conditions) - DEFAULT<br>
-            - Strong: 8-15 mph (difficult, steady wind)<br>
-            - Variable: 2-8 mph (highly variable, multiple scales)<br>
-            - Shear: 2-5 mph (direction changes over range)<br>
-            - Switchy: 1-3 mph (frequent direction changes)<br>
-            - Gusty: 2-8 mph (sudden strong gusts with calm periods)<br>
-            - Steady: 3-6 mph (consistent with minimal variation)<br>
-            - Turbulent: 2-6 mph (chaotic with rapid changes)<br>
-            - Mirage: 0.8-2 mph (very light, good for heat mirage)<br><br>
-            
-            <strong>Strategy:</strong><br>
-            - Use spotting scope to scan entire range<br>
-            - Compare flags and mirage at different distances<br>
-            - Watch mirage over rocks, bushes, and markers<br>
-            - Look for wind gradients (changes along range)<br>
-            - Make corrections based on previous impacts
+            - Presets include Moderate (default), DeadCalm, Calm, LightBreeze, Strong, Variable, Shear, Switchy, Gusty, Steady, Turbulent, Mirage
           </div>
         </div>
         
         <div class="help-section">
-          <h3>F-Class Competition</h3>
+          <h3>Match Flow</h3>
           <div class="param-help">
-            <strong>Standard Distances:</strong> 300, 500, 600, 800, 900, and 1000 yards<br><br>
-            <strong>Target Types:</strong> NRA F-Class targets (MR63-FCA, MR65-FCA, MR1-FCA, LR-FCA) automatically selected by distance<br><br>
-            <strong>Scoring:</strong> Standard NRA scoring with 10-ring (X-ring) precision. Bullet diameter affects line-breaking<br><br>
-            <strong>Match Format:</strong> 60-shot match (standard F-Class competition)<br><br>
-            <strong>Dropped Points:</strong> Points missed (10 - score per shot) and X-rings missed (1 - X per shot)
+            - 3 relays • 20 minutes each • 20 record shots per relay<br>
+            - Relay 1: unlimited sighters • Relays 2–3: 2 sighters<br>
+            - “Go For Record” ends sighters early for the current relay<br>
+            - Relay ends at 20 record shots or when time expires<br>
+            - Acknowledge the relay-complete dialog to proceed<br>
+            - Your rifle scope is disabled while your target is down
           </div>
         </div>
         
@@ -215,16 +187,35 @@
         </div>
         
         <div class="help-section">
-          <h3>HUD (Top-Right Overlay)</h3>
+          <h3>HUD (Top-Right)</h3>
           <div class="param-help">
-            <strong>Target:</strong> Current target number<br><br>
-            <strong>Shots:</strong> Current shot count / 60 total<br><br>
-            <strong>Score:</strong> Total score in "XXX-Yx" format (points-X count)<br><br>
-            <strong>Dropped:</strong> Missed points and X-rings<br><br>
-            <strong>Last Shot:</strong> Most recent shot score with X indicator<br><br>
-            <strong>MV:</strong> Actual muzzle velocity of last shot (with variation)<br><br>
-            <strong>Impact V:</strong> Bullet velocity at target<br><br>
-            <strong>FPS:</strong> Rendering frame rate
+            - Relay and Timer<br>
+            - Sighters: N/∞ (Relay 1) or N/2 (Relays 2–3), shown only during sighters<br>
+            - Shots: N/20 during record phase (green at 20/20)<br>
+            - Score and X-count; Dropped points and X<br>
+            - Last Shot, MV, Impact V, FPS
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Scorecard</h3>
+          <div class="param-help">
+            - Per-relay view with sighters row and two rows of 10 record shots<br>
+            - Relay totals and overall match total at the bottom
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Audio</h3>
+          <div class="param-help">
+            - Wind noise volume scales smoothly with wind speed (silent at 0 mph)<br>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Debug Mode</h3>
+          <div class="param-help">
+            - Add <code>?debug=1</code> to the URL for 3‑minute relays with 3 record shots and wind overlay
           </div>
         </div>
         

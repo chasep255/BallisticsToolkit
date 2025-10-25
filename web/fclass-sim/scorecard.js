@@ -7,6 +7,7 @@ export class Scorecard
   {
     this.modal = null;
     this.isVisible = false;
+    this.clickHandler = null;
   }
   
   /**
@@ -22,13 +23,14 @@ export class Scorecard
     }
     
     // Close modal when clicking outside
-    this.modal.addEventListener('click', (e) =>
+    this.clickHandler = (e) =>
     {
       if (e.target === this.modal)
       {
         this.hide();
       }
-    });
+    };
+    this.modal.addEventListener('click', this.clickHandler);
   }
   
   /**
@@ -145,12 +147,15 @@ export class Scorecard
       
       html += `</div></div>`; // Close shot-cells and scorecard-row
       
-      // Record shots row
+      // Determine max shots per row (20 for normal, 3 for debug)
+      const maxShots = records.length > 0 ? Math.max(20, records.length) : 20;
+      const shotsPerRow = maxShots <= 10 ? maxShots : 10;
+      
+      // Record shots - first row
       html += `<div class="scorecard-row">`;
-      html += `<div class="row-label">Record</div>`;
       html += `<div class="shot-cells">`;
       
-      for (let i = 0; i < 20; i++)
+      for (let i = 0; i < shotsPerRow; i++)
       {
         if (i < records.length)
         {
@@ -166,9 +171,44 @@ export class Scorecard
       
       html += `</div>`; // Close shot-cells
       
-      // Relay total
-      html += `<div class="relay-total">${relayTotal}-${relayXCount}X</div>`;
+      // Relay total (spans both rows)
+      if (maxShots > shotsPerRow)
+      {
+        html += `<div class="relay-total-placeholder"></div>`;
+      }
+      else
+      {
+        html += `<div class="relay-total">${relayTotal}-${relayXCount}X</div>`;
+      }
       html += `</div>`; // Close scorecard-row
+      
+      // Record shots - second row if needed
+      if (maxShots > shotsPerRow)
+      {
+        html += `<div class="scorecard-row">`;
+        html += `<div class="shot-cells">`;
+        
+        for (let i = shotsPerRow; i < maxShots; i++)
+        {
+          if (i < records.length)
+          {
+            const shot = records[i];
+            const scoreText = shot.isX ? 'X' : shot.score.toString();
+            html += `<div class="shot-cell record">${scoreText}</div>`;
+          }
+          else
+          {
+            html += `<div class="shot-cell empty">-</div>`;
+          }
+        }
+        
+        html += `</div>`; // Close shot-cells
+        
+        // Relay total on second row
+        html += `<div class="relay-total">${relayTotal}-${relayXCount}X</div>`;
+        html += `</div>`; // Close scorecard-row
+      }
+      
       html += `</div>`; // Close scorecard-relay
     }
     
@@ -178,6 +218,19 @@ export class Scorecard
     html += `</div>`;
     
     content.innerHTML = html;
+  }
+  
+  /**
+   * Cleanup event listeners
+   */
+  dispose()
+  {
+    if (this.modal && this.clickHandler)
+    {
+      this.modal.removeEventListener('click', this.clickHandler);
+      this.clickHandler = null;
+    }
+    this.modal = null;
   }
 }
 

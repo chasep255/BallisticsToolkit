@@ -102,7 +102,13 @@ function setupUI()
   document.getElementById('startBtn').addEventListener('click', startGame);
 
   // Restart button
-  document.getElementById('restartBtn').addEventListener('click', restartGame);
+  document.getElementById('restartBtn').addEventListener('click', () =>
+  {
+    if (confirm('Are you sure you want to restart? All progress will be lost.'))
+    {
+      restartGame();
+    }
+  });
   
   // Scorecard button
   document.getElementById('scorecardBtn').addEventListener('click', () =>
@@ -120,6 +126,7 @@ function setupUI()
     {
       webglGame.relayManager.goForRecord();
       webglGame.updateGoForRecordButton();
+      webglGame.updateHUD(); // Update HUD to show shots instead of sighters
     }
   });
 }
@@ -146,7 +153,6 @@ function startGame()
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('restartBtn').style.display = 'inline-block';
     document.getElementById('scorecardBtn').style.display = 'inline-block';
-    document.getElementById('goForRecordBtn').style.display = 'inline-block';
 
   }
   catch (error)
@@ -352,7 +358,7 @@ class FClassSimulator
     this.lastTime = 0;
     this.frameCount = 0;
     this.fps = 0;
-    
+
     // Check for debug mode from URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     this.debugMode = urlParams.get('debug') === '1';
@@ -363,6 +369,19 @@ class FClassSimulator
     
     // Scorecard
     this.scorecard = new Scorecard();
+    
+    // Pending relay end notification (waiting for target to be ready)
+    this.pendingRelayEndNotification = false;
+    
+    // Background noise audio system
+    this.audioContext = null;
+    this.backgroundNoise = null;
+    this.backgroundNoiseSource = null;
+    
+    // Wind noise audio system
+    this.windNoise = null;
+    this.windNoiseSource = null;
+    this.windNoiseGainNode = null;
   }
 
   // ===== TIME ACCESSORS =====
@@ -488,8 +507,230 @@ class FClassSimulator
     }
   }
 
-
-
+  // ===== BACKGROUND NOISE =====
+  
+  /**
+   * Initialize background noise audio system
+   * Uses the ballistics system's audio context
+   */
+  async initializeBackgroundNoise()
+  {
+    try
+    {
+      // Use the ballistics system's audio context
+      if (!this.ballisticsSystem || !this.ballisticsSystem.audioContext)
+      {
+        console.warn('Cannot initialize background noise: ballistics audio context not available');
+        return;
+      }
+      
+      this.audioContext = this.ballisticsSystem.audioContext;
+      
+      // Load background noise and wind noise
+      await this.loadBackgroundNoise();
+      await this.loadWindNoise();
+      
+      // Start playing background noise and wind noise
+      this.startBackgroundNoise();
+      this.startWindNoise();
+    }
+    catch (error)
+    {
+      console.warn('Could not initialize background noise:', error);
+    }
+  }
+  
+  /**
+   * Load background noise from audio file
+   */
+  async loadBackgroundNoise()
+  {
+    try
+    {
+      const response = await fetch('audio/background_noise.mp3');
+      if (!response.ok)
+      {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      this.backgroundNoise = await this.audioContext.decodeAudioData(arrayBuffer);
+    }
+    catch (error)
+    {
+      console.warn('Could not load background noise:', error);
+      this.backgroundNoise = null;
+    }
+  }
+  
+  /**
+   * Start background noise (looping)
+   */
+  startBackgroundNoise()
+  {
+    if (!this.backgroundNoise || !this.audioContext) return;
+    
+    try
+    {
+      // Stop existing background noise if playing
+      this.stopBackgroundNoise();
+      
+      // Create new source
+      this.backgroundNoiseSource = this.audioContext.createBufferSource();
+      this.backgroundNoiseSource.buffer = this.backgroundNoise;
+      this.backgroundNoiseSource.loop = true;
+      this.backgroundNoiseSource.loopStart = 0;
+      this.backgroundNoiseSource.loopEnd = this.backgroundNoise.duration;
+      
+      // Connect to audio context
+      this.backgroundNoiseSource.connect(this.audioContext.destination);
+      
+      // Start playing
+      this.backgroundNoiseSource.start();
+    }
+    catch (error)
+    {
+      console.warn('Could not start background noise:', error);
+    }
+  }
+  
+  /**
+   * Stop background noise
+   */
+  stopBackgroundNoise()
+  {
+    if (this.backgroundNoiseSource)
+    {
+      try
+      {
+        this.backgroundNoiseSource.stop();
+        this.backgroundNoiseSource.disconnect();
+      }
+      catch (error)
+      {
+        // Source might already be stopped
+      }
+      this.backgroundNoiseSource = null;
+    }
+  }
+  
+  /**
+   * Load wind noise from audio file
+   */
+  async loadWindNoise()
+  {
+    try
+    {
+      const response = await fetch('audio/wind.mp3');
+      if (!response.ok)
+      {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      this.windNoise = await this.audioContext.decodeAudioData(arrayBuffer);
+    }
+    catch (error)
+    {
+      console.warn('Could not load wind noise:', error);
+      this.windNoise = null;
+    }
+  }
+  
+  /**
+   * Start wind noise (looping, volume controlled by wind speed)
+   */
+  startWindNoise()
+  {
+    if (!this.windNoise || !this.audioContext) 
+    {
+      console.warn('Cannot start wind noise: missing audio buffer or context');
+      return;
+    }
+    
+    try
+    {
+      // Stop existing wind noise if playing
+      this.stopWindNoise();
+      
+      // Create new source
+      this.windNoiseSource = this.audioContext.createBufferSource();
+      this.windNoiseSource.buffer = this.windNoise;
+      this.windNoiseSource.loop = true;
+      this.windNoiseSource.loopStart = 0;
+      this.windNoiseSource.loopEnd = this.windNoise.duration;
+      
+      // Create gain node for volume control
+      this.windNoiseGainNode = this.audioContext.createGain();
+      this.windNoiseGainNode.gain.value = 0; // Start silent
+      
+      // Connect: source -> gain -> destination
+      this.windNoiseSource.connect(this.windNoiseGainNode);
+      this.windNoiseGainNode.connect(this.audioContext.destination);
+      
+      // Start playing
+      this.windNoiseSource.start();
+      
+      console.log('Wind noise started successfully');
+    }
+    catch (error)
+    {
+      console.warn('Could not start wind noise:', error);
+    }
+  }
+  
+  /**
+   * Stop wind noise
+   */
+  stopWindNoise()
+  {
+    if (this.windNoiseSource)
+    {
+      try
+      {
+        this.windNoiseSource.stop();
+        this.windNoiseSource.disconnect();
+      }
+      catch (error)
+      {
+        // Source might already be stopped
+      }
+      this.windNoiseSource = null;
+    }
+    if (this.windNoiseGainNode)
+    {
+      this.windNoiseGainNode.disconnect();
+      this.windNoiseGainNode = null;
+    }
+  }
+  
+  /**
+   * Update wind noise volume based on wind speed at shooter position
+   */
+  updateWindNoiseVolume()
+  {
+    if (!this.windNoiseGainNode || !this.windGenerator) return;
+    
+    try
+    {
+      // Get wind at shooter position (0, 0, 0)
+      const windData = this.windGenerator.getWindAt(0, 0, 0, this.getTime());
+      const windSpeed = Math.sqrt(windData.x * windData.x + windData.y * windData.y + windData.z * windData.z);
+      
+      const volume = Math.max(0, Math.min((windSpeed - 2) / 20, 1.0));
+      
+      // Smooth volume changes to avoid audio artifacts
+      const currentGain = this.windNoiseGainNode.gain.value;
+      const targetGain = volume;
+      const smoothingFactor = 0.01; // Very slow transitions for natural wind changes
+      this.windNoiseGainNode.gain.value = currentGain + (targetGain - currentGain) * smoothingFactor;
+    }
+    catch (error)
+    {
+      console.warn('Could not update wind noise volume:', error);
+    }
+  }
+  
   // ===== FLAG SYSTEM =====
   createWindFlags()
   {
@@ -658,11 +899,31 @@ class FClassSimulator
       this.targetSystem.updateAnimations(this.getDeltaTime());
     }
     
+    // Update wind noise volume based on current wind speed
+    this.updateWindNoiseVolume();
+    
     // Update relay timer and check for relay end
     this.relayManager.tick(performance.now() / 1000);
     if (this.relayManager.justEnded())
     {
+      // Only show notification if target is ready (not animating)
+      if (this.targetSystem.isTargetReady())
+      {
+        this.showRelayCompleteNotification();
+        this.pendingRelayEndNotification = false;
+      }
+      else
+      {
+        // Target is animating, wait for it to finish
+        this.pendingRelayEndNotification = true;
+      }
+    }
+    
+    // Check for pending relay end notification when target becomes ready
+    if (this.pendingRelayEndNotification && this.targetSystem.isTargetReady())
+    {
       this.showRelayCompleteNotification();
+      this.pendingRelayEndNotification = false;
     }
     
     // Update HUD with relay and timer
@@ -810,11 +1071,11 @@ class FClassSimulator
       canvasHeight: this.canvasHeight,
       cameraPosition: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: 1 },
       rangeDistance: this.distance,
-      position: 'bottom-left',
-      sizeFraction: FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION,
+          position: 'bottom-left',
+          sizeFraction: FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION,
       minFOV: FClassSimulator.CAMERA_FOV / FClassSimulator.SPOTTING_SCOPE_MAX_MAGNIFICATION,
       maxFOV: FClassSimulator.CAMERA_FOV / FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION,
-      initialFOV: FClassSimulator.CAMERA_FOV / 4,
+          initialFOV: FClassSimulator.CAMERA_FOV / 4,
       initialLookAt: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: -this.distance },
       reticle: false
     });
@@ -828,8 +1089,8 @@ class FClassSimulator
       canvasHeight: this.canvasHeight,
       cameraPosition: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: 1 },
       rangeDistance: this.distance,
-      position: 'bottom-right',
-      sizeFraction: FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION,
+          position: 'bottom-right',
+          sizeFraction: FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION,
       minFOV: Math.atan((FClassSimulator.RIFLE_SCOPE_ZOOM_MIN * FClassSimulator.TARGET_SIZE) / this.distance) * 180 / Math.PI,
       maxFOV: Math.atan((FClassSimulator.RIFLE_SCOPE_ZOOM_MAX * FClassSimulator.TARGET_SIZE) / this.distance) * 180 / Math.PI,
       initialFOV: Math.atan((FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER * FClassSimulator.TARGET_SIZE) / this.distance) * 180 / Math.PI,
@@ -866,6 +1127,13 @@ class FClassSimulator
       });
       
       await this.setupBallisticSystem();
+      
+      // Initialize background noise and wind noise (after ballistics system has audio context)
+      await this.initializeBackgroundNoise();
+      
+      // Pass audio context to target system and load background shot sounds
+      this.targetSystem.audioContext = this.ballisticsSystem.audioContext;
+      await this.targetSystem.loadBgShotSounds();
     }
     catch (error)
     {
@@ -875,7 +1143,7 @@ class FClassSimulator
 
     // Initialize scorecard
     this.scorecard.initialize();
-    
+
     // Start game
     this.clock.start();
     this.gameStartTime = performance.now();
@@ -886,6 +1154,9 @@ class FClassSimulator
       this.hudSystem.show();
     }
     this.updateHUD();
+    
+    // Update Go For Record button visibility based on current relay state
+    this.updateGoForRecordButton();
 
     this.isRunning = true;
     const gameLoop = () =>
@@ -1043,6 +1314,7 @@ class FClassSimulator
         mvSdFps: this.mvSd,
         rifleAccuracyMoa: this.rifleAccuracy
       });
+      
     }
     catch (error)
     {
@@ -1060,8 +1332,12 @@ class FClassSimulator
   {
     if (!this.hudSystem) return;
 
-    // Count only record shots from shot log (exclude sighters)
-    const recordShots = this.shotLog.filter(shot => !shot.isSighter);
+    // Get current relay shots only
+    const currentRelay = this.relayManager.relayIndex;
+    const currentRelayShots = this.shotLog.filter(shot => shot.relay === currentRelay);
+    const recordShots = currentRelayShots.filter(shot => !shot.isSighter);
+    const sighterShots = currentRelayShots.filter(shot => shot.isSighter);
+    
     const shotCount = recordShots.length;
     const totalScore = recordShots.reduce((sum, shot) => sum + shot.score, 0);
     const xCount = recordShots.filter(shot => shot.isX).length;
@@ -1072,15 +1348,28 @@ class FClassSimulator
       this.hudSystem.updateTarget(this.targetSystem.userTarget.targetNumber);
     }
 
-    // Update shot count and score (total shots = max per relay * 3 relays)
-    const totalMaxShots = this.relayManager.maxRecordShots * 3;
-    const isComplete = shotCount >= totalMaxShots;
-    this.hudSystem.updateShots(shotCount, totalMaxShots, isComplete);
+    // Update shot count/sighters based on phase
+    const maxShots = this.relayManager.maxRecordShots;
+    const isComplete = shotCount >= maxShots;
+    
+    if (this.relayManager.isSightersPhase())
+    {
+      // Show sighters count during sighters phase
+      const sightersRemaining = this.relayManager.getSightersRemaining();
+      const sightersLimit = sightersRemaining === Infinity ? '∞' : this.relayManager.sightersAllowed[currentRelay];
+      this.hudSystem.updateSighters(sighterShots.length, sightersLimit);
+    }
+    else
+    {
+      // Show record shots during record phase
+      this.hudSystem.updateShots(shotCount, maxShots, isComplete);
+    }
+    
     this.hudSystem.updateScore(totalScore, xCount);
 
-    // Calculate dropped points (10 - score for each shot, 1 - X for each X)
-    const maxPossibleScore = shotCount * 10; // 10 points per shot
-    const maxPossibleX = shotCount; // 1 X per shot
+    // Calculate dropped points for current relay
+    const maxPossibleScore = shotCount * 10;
+    const maxPossibleX = shotCount;
     const droppedPoints = maxPossibleScore - totalScore;
     const droppedX = maxPossibleX - xCount;
     this.hudSystem.updateDropped(droppedPoints, droppedX);
@@ -1183,6 +1472,7 @@ class FClassSimulator
         this.relayManager.advanceRelay();
         notification.remove();
         this.updateGoForRecordButton();
+        this.updateHUD(); // Update HUD to show sighters for new relay
       });
     }
     
@@ -1195,7 +1485,7 @@ class FClassSimulator
       });
     }
   }
-  
+
   /**
    * Show match completion notification
    */
@@ -1292,6 +1582,22 @@ class FClassSimulator
     // Start relay timer on first shot
     this.relayManager.startIfNeeded(performance.now() / 1000);
     
+    // Decrement sighters count when shot is fired (not when scored)
+    if (this.relayManager.isSightersPhase())
+    {
+      this.relayManager.sightersFired++;
+      
+      // Auto-switch to record for relays 2 and 3 after 2 sighters
+      if (this.relayManager.relayIndex > 1 && this.relayManager.sightersFired >= 2)
+      {
+        this.relayManager.phase = 'record';
+      }
+      
+      // Update HUD and Go For Record button immediately
+      this.updateHUD();
+      this.updateGoForRecordButton();
+    }
+    
     // Get rifle scope aim
     const aim = this.rifleScope.getAim();
 
@@ -1361,7 +1667,7 @@ class FClassSimulator
     
     // Update Go For Record button visibility
     this.updateGoForRecordButton();
-    
+
     // Check if match is complete (60 shots for F-Class)
     if (this.lastShotData && this.lastShotData.hitCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
     {
@@ -1465,6 +1771,10 @@ class FClassSimulator
     {
       this.ballisticsSystem.dispose();
     }
+    
+    // Stop background noise and wind noise
+    this.stopBackgroundNoise();
+    this.stopWindNoise();
     if (this.spottingScope)
     {
       this.spottingScope.dispose();
@@ -1476,6 +1786,10 @@ class FClassSimulator
     if (this.hudSystem)
     {
       this.hudSystem.dispose();
+    }
+    if (this.scorecard)
+    {
+      this.scorecard.dispose();
     }
     
     // Dispose wind generator
@@ -1493,7 +1807,7 @@ class FClassSimulator
       if (this.mainViewQuad.material)
       {
         this.mainViewQuad.material.map = null;
-        this.mainViewQuad.material.dispose();
+      this.mainViewQuad.material.dispose();
       }
       this.mainViewQuad = null;
     }
