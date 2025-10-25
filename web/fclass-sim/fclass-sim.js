@@ -1605,16 +1605,11 @@ class FClassSimulator
     // Start relay timer on first shot (uses game time)
     this.relayManager.startIfNeeded(this.getTime());
     
-    // Decrement sighters count when shot is fired (not when scored)
-    if (this.relayManager.isSightersPhase())
+    // Track sighters when shot is fired (not when scored)
+    const isSighter = this.relayManager.isSightersPhase();
+    if (isSighter)
     {
       this.relayManager.sightersFired++;
-      
-      // Auto-switch to record for relays 2 and 3 after 2 sighters
-      if (this.relayManager.relayIndex > 1 && this.relayManager.sightersFired >= 2)
-      {
-        this.relayManager.phase = 'record';
-      }
       
       // Update HUD and Go For Record button immediately
       this.updateHUD();
@@ -1656,6 +1651,14 @@ class FClassSimulator
     
     // Update relay manager with shot
     this.relayManager.onShot(isRecord);
+    
+    // Auto-switch to record phase for relays 2 and 3 after 2 sighters are SCORED
+    if (!isRecord && this.relayManager.relayIndex > 1 && this.relayManager.sightersFired >= 2)
+    {
+      this.relayManager.phase = 'record';
+      this.updateHUD();
+      this.updateGoForRecordButton();
+    }
     
     // Update scorecard
     this.scorecard.update(this.shotLog);
