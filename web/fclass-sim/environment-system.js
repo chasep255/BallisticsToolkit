@@ -604,13 +604,13 @@ export class EnvironmentSystem
       const windVector = windGenerator.getWindAt(cloud.mesh.position.x, cloud.mesh.position.y, cloud.mesh.position.z, currentTime);
       
       // Wind crosswind component (x in Three.js coords, in mph)
-      // Convert mph to m/s, then m/s to yards/s
-      const windX = windVector.x * 0.44704 * 1.09361; // mph to m/s to yards/s
-      const windZ = windVector.z * 0.44704 * 1.09361; // mph to m/s to yards/s
+      // Convert mph to yards/s: mph * (1760 yards/mile) / (3600 s/hour) = mph * 0.4889
+      const windX = windVector.x * 0.4889; // mph to yards/s
+      const windZ = windVector.z * 0.4889; // mph to yards/s
       
-      // Move cloud with wind (scaled down for realistic movement)
-      cloud.mesh.position.x += windX * deltaTime * 0.1 * cloud.randomnessFactor;
-      cloud.mesh.position.z += windZ * deltaTime * 0.1 * cloud.randomnessFactor;
+      // Move cloud with wind (scaled for visible movement)
+      cloud.mesh.position.x += windX * deltaTime * cloud.randomnessFactor;
+      cloud.mesh.position.z += windZ * deltaTime * cloud.randomnessFactor;
       
       // Respawn clouds that have moved too far
       const distanceFromCenter = Math.sqrt(cloud.mesh.position.x * cloud.mesh.position.x + cloud.mesh.position.z * cloud.mesh.position.z);
