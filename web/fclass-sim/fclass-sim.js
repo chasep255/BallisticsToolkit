@@ -854,9 +854,21 @@ class FClassSimulator
   // ===== RENDERING =====
   render()
   {
-    // Update cached time values once per frame
-    this.currentDeltaTime = Math.min(0.05, Math.max(0.0005, this.clock.getDelta())); // clamp 0.5ms-50ms
-    this.currentAbsTime = this.clock.getElapsedTime();
+    // Update cached time values using real-world time (continues even when minimized)
+    const now = performance.now() / 1000; // Convert to seconds
+    
+    if (this.lastFrameTime === null)
+    {
+      this.lastFrameTime = now;
+      this.currentDeltaTime = 1/60; // Assume 60fps for first frame
+    }
+    else
+    {
+      this.currentDeltaTime = Math.min(0.1, now - this.lastFrameTime); // clamp to 100ms max
+      this.lastFrameTime = now;
+    }
+    
+    this.currentAbsTime = now - this.gameStartTime;
     
     // Calculate FPS by sampling over 1 second
     const currentTime = performance.now();
@@ -985,8 +997,9 @@ class FClassSimulator
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
     this.renderer.autoClear = false;
 
-    // Animation clock and cached time values
-    this.clock = new THREE.Clock();
+    // Real-world time tracking (continues even when browser is minimized)
+    this.lastFrameTime = null;
+    this.gameStartTime = null;
     this.currentAbsTime = 0;
     this.currentDeltaTime = 0;
 
@@ -1144,9 +1157,9 @@ class FClassSimulator
     // Initialize scorecard
     this.scorecard.initialize();
 
-    // Start game
-    this.clock.start();
-    this.gameStartTime = performance.now();
+    // Start game - initialize real-world time tracking
+    this.gameStartTime = performance.now() / 1000; // Convert to seconds
+    this.lastFrameTime = null; // Will be set on first render
 
     // Show HUD
     if (this.hudSystem)
@@ -1178,7 +1191,10 @@ class FClassSimulator
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
-    if (this.clock) this.clock.stop();
+    
+    // Reset time tracking
+    this.lastFrameTime = null;
+    this.gameStartTime = null;
 
     // Hide HUD
     if (this.hudSystem)
