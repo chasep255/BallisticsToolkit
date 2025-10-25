@@ -533,9 +533,10 @@ class FClassSimulator
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
 
-    // 2) Render all scopes to their textures
-    if (this.spottingScope) this.spottingScope.render();
-    if (this.rifleScope) this.rifleScope.render();
+    // 2) Render all scopes to their textures with mirage effect
+    const scopeTime = this.getTime();
+    if (this.spottingScope) this.spottingScope.render(this.windGenerator, scopeTime);
+    if (this.rifleScope) this.rifleScope.render(this.windGenerator, scopeTime);
 
     // 3) Composite everything to screen
     this.renderer.setRenderTarget(null);

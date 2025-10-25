@@ -4,6 +4,7 @@
  */
 
 import * as THREE from 'three';
+import { MirageEffect } from './mirage-effect.js';
 
 export class Scope
 {
@@ -53,6 +54,15 @@ export class Scope
     this.createCamera();
     this.createViewMesh();
     this.createCrosshair();
+    
+    // Create mirage effect and intermediate render target
+    this.mirageEffect = new MirageEffect(this.renderer);
+    this.mirageTarget = new THREE.WebGLRenderTarget(renderSize, renderSize, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      samples: 4
+    });
   }
 
   /**
@@ -299,14 +309,154 @@ export class Scope
   }
 
   /**
-   * Render scope to its render target
+   * Calculate where the scope's center ray intersects the range bounding box
+   * @returns {Object} Intersection point {x, y, z, distance}
    */
-  render()
+  calculateRangeIntersection()
+  {
+    // Range bounding box dimensions (in yards)
+    const rangeWidth = 50; // Assume 50 yards wide (adjust as needed)
+    const rangeHeight = 20; // Assume 20 yards tall (adjust as needed)
+    
+    // Camera position (shooter position)
+    const camPos = this.camera.position;
+    
+    // Calculate look direction from camera (center of view)
+    const lookDir = new THREE.Vector3(0, 0, -1);
+    lookDir.applyQuaternion(this.camera.quaternion);
+    lookDir.normalize();
+    
+    // Ray from camera in look direction
+    // We need to find where this ray intersects the range box
+    
+    // Range box bounds:
+    // X: -rangeWidth/2 to +rangeWidth/2
+    // Y: 0 (ground) to rangeHeight
+    // Z: 0 (shooter) to -rangeDistance (target)
+    
+    // Test intersection with each plane and find the closest valid one
+    let closestT = Infinity;
+    let intersection = { x: 0, y: 0, z: -this.rangeDistance, distance: this.rangeDistance };
+    
+    // Test ground plane (Y = 0)
+    if (lookDir.y !== 0)
+    {
+      const t = (0 - camPos.y) / lookDir.y;
+      if (t > 0)
+      {
+        const x = camPos.x + lookDir.x * t;
+        const z = camPos.z + lookDir.z * t;
+        if (x >= -rangeWidth/2 && x <= rangeWidth/2 && z >= -this.rangeDistance && z <= 0)
+        {
+          if (t < closestT)
+          {
+            closestT = t;
+            intersection = { x, y: 0, z, distance: -z };
+          }
+        }
+      }
+    }
+    
+    // Test back plane (Z = -rangeDistance, the target area)
+    if (lookDir.z !== 0)
+    {
+      const t = (-this.rangeDistance - camPos.z) / lookDir.z;
+      if (t > 0)
+      {
+        const x = camPos.x + lookDir.x * t;
+        const y = camPos.y + lookDir.y * t;
+        if (x >= -rangeWidth/2 && x <= rangeWidth/2 && y >= 0 && y <= rangeHeight)
+        {
+          if (t < closestT)
+          {
+            closestT = t;
+            intersection = { x, y, z: -this.rangeDistance, distance: this.rangeDistance };
+          }
+        }
+      }
+    }
+    
+    // Test left plane (X = -rangeWidth/2)
+    if (lookDir.x !== 0)
+    {
+      const t = (-rangeWidth/2 - camPos.x) / lookDir.x;
+      if (t > 0)
+      {
+        const y = camPos.y + lookDir.y * t;
+        const z = camPos.z + lookDir.z * t;
+        if (y >= 0 && y <= rangeHeight && z >= -this.rangeDistance && z <= 0)
+        {
+          if (t < closestT)
+          {
+            closestT = t;
+            intersection = { x: -rangeWidth/2, y, z, distance: -z };
+          }
+        }
+      }
+    }
+    
+    // Test right plane (X = +rangeWidth/2)
+    if (lookDir.x !== 0)
+    {
+      const t = (rangeWidth/2 - camPos.x) / lookDir.x;
+      if (t > 0)
+      {
+        const y = camPos.y + lookDir.y * t;
+        const z = camPos.z + lookDir.z * t;
+        if (y >= 0 && y <= rangeHeight && z >= -this.rangeDistance && z <= 0)
+        {
+          if (t < closestT)
+          {
+            closestT = t;
+            intersection = { x: rangeWidth/2, y, z, distance: -z };
+          }
+        }
+      }
+    }
+    
+    return intersection;
+  }
+  
+  /**
+   * Render scope to its render target with mirage effect
+   * @param {Object} windGenerator - Wind generator for mirage effect
+   * @param {number} time - Current time in seconds for animation
+   */
+  render(windGenerator, time)
   {
     this.updateCamera();
-    this.renderer.setRenderTarget(this.renderTarget);
+    
+    // Step 1: Render scene to intermediate mirage target
+    this.renderer.setRenderTarget(this.mirageTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
+    
+    // Step 2: Apply mirage effect from mirageTarget to final renderTarget
+    if (windGenerator && time !== undefined)
+    {
+      // Calculate where scope's center ray intersects the range bounding box
+      // Range box: X from -rangeWidth/2 to +rangeWidth/2, Y from 0 to maxHeight, Z from 0 to -rangeDistance
+      const intersection = this.calculateRangeIntersection();
+      
+      
+      this.mirageEffect.update(
+        time,
+        this.currentFOV,
+        windGenerator,
+        intersection,
+        this.yaw,
+        this.pitch
+      );
+      this.mirageEffect.apply(this.mirageTarget.texture, this.renderTarget);
+    }
+    else
+    {
+      // Fallback: copy without mirage effect
+      this.renderer.setRenderTarget(this.renderTarget);
+      this.renderer.clear();
+      this.renderer.render(this.scene, this.camera);
+    }
+    
     this.renderer.setRenderTarget(null);
   }
 
@@ -404,6 +554,18 @@ export class Scope
     {
       this.renderTarget.dispose();
       this.renderTarget = null;
+    }
+    
+    // Dispose mirage effect and target
+    if (this.mirageEffect)
+    {
+      this.mirageEffect.dispose();
+      this.mirageEffect = null;
+    }
+    if (this.mirageTarget)
+    {
+      this.mirageTarget.dispose();
+      this.mirageTarget = null;
     }
 
     // Null out camera reference (not owned by us, don't dispose)
