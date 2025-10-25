@@ -211,7 +211,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .field("releaseAngleV", &SimulatedShot::release_angle_v)
     .field("impactVelocity", &SimulatedShot::impact_velocity);
 
-  // Hit class
+  // Hit class - must use class_ because it has private members with getters
   class_<btk::match::Hit>("Hit")
     .constructor<>()
     .constructor<float, float, int, bool>()

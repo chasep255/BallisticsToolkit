@@ -118,6 +118,11 @@ function setupUI()
     state.meters = btk.Conversions.yardsToMeters(parseFloat(distanceYd.value) || 1000);
     state.preset = preset.value;
     state.density = Math.max(10, Math.min(400, parseInt(density.value || '60', 10)));
+    // Dispose old wind generator before creating new one
+    if (wind)
+    {
+      wind.delete();
+    }
     // Create a new wind from preset
     wind = btk.WindPresets.getPreset(state.preset);
   };
@@ -282,6 +287,7 @@ function drawFrame()
     const vx = wv.x; // tail/head
     const vy = wv.y; // cross (horizontal component we want to emphasize)
     const speed = Math.sqrt(vx * vx + vy * vy);
+    wv.delete(); // Dispose Vector3D to prevent memory leak (moved to end of usage)
     // Map world X to NDC Y (vertical axis for downrange view)
     const ndcX = 0.0;
     const ndcY = -1 + 2 * (x / state.meters);
@@ -374,6 +380,7 @@ function drawFrame()
         vy = wv.y;
       const mph = btk.Conversions.mpsToMph(Math.sqrt(vx * vx + vy * vy));
       ctx.fillText(`${mph.toFixed(1)} mph`, wCss - 150, y + 4);
+      wv.delete(); // Dispose Vector3D to prevent memory leak
     }
     // Removed top 'Distance' label
 
@@ -553,6 +560,7 @@ function drawFrame()
       const baseX = marginLeft;
       const baseY = y;
       drawFlag(yd, baseX, baseY, wv.x, wv.y, t, dt);
+      wv.delete(); // Dispose Vector3D to prevent memory leak
     }
   }
 }

@@ -1,5 +1,6 @@
 // ballistics-system.js - Ballistics system for FClass simulator
-// THREE is loaded globally via script tag in HTML
+
+import * as THREE from 'three';
 
 // Import BTK wrappers
 import {

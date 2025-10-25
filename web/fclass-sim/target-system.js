@@ -1,5 +1,6 @@
 // target-system.js - Target system for FClass simulator
-// THREE is loaded globally via script tag in HTML
+
+import * as THREE from 'three';
 import { BtkTargetWrapper } from './btk-wrappers.js';
 
 export class TargetSystem
@@ -246,8 +247,7 @@ export class TargetSystem
     }
     
     // Create BTK target for dimensions
-    const rawBtkTarget = btk.NRATargets.getTarget(String(this.targetType));
-    this.btkTarget = new BtkTargetWrapper(rawBtkTarget);
+    this.btkTarget = BtkTargetWrapper.getTarget(String(this.targetType));
     
     // Create shared target texture
     this.targetTexture = this.createTargetTexture();

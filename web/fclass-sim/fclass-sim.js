@@ -1,3 +1,6 @@
+// Import Three.js
+import * as THREE from 'three';
+
 // Import BTK wrappers
 import {
   waitForBTK,

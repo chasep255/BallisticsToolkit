@@ -1,5 +1,6 @@
 // environment-system.js - Environment system for FClass simulator
-// THREE is loaded globally via script tag in HTML
+
+import * as THREE from 'three';
 
 export class EnvironmentSystem
 {
@@ -406,26 +407,8 @@ export class EnvironmentSystem
   {
     // Create trees: dense forest along both sides and behind targets
     const treeCount = this.cfg.treeCountSides + this.cfg.treeCountBehind;
-    
 
-    // Cache tree geometries - multiple sizes like original
-    const trunkGeometries = [];
-    const foliageGeometries = [];
-
-    for (let i = 0; i < 3; i++)
-    {
-      const trunkRadius = 0.2 + i * 0.1;
-      const trunkHeight = 3 + i * 0.5;
-      const trunkGeo = new THREE.CylinderGeometry(trunkRadius, trunkRadius * 1.2, trunkHeight, 8);
-      trunkGeometries.push(trunkGeo);
-
-      const foliageRadius = 2 + i * 0.5;
-      const foliageHeight = 5 + i * 1;
-      const foliageGeo = new THREE.ConeGeometry(foliageRadius, foliageHeight, 8);
-      foliageGeometries.push(foliageGeo);
-    }
-
-    // Load bark textures for tree trunks (like original)
+    // Load bark textures for tree trunks
     const barkLoader = new THREE.TextureLoader();
     const barkColor = barkLoader.load('textures/bark/Bark012_1K-JPG_Color.jpg');
     const barkNormal = barkLoader.load('textures/bark/Bark012_1K-JPG_NormalGL.jpg');
@@ -449,23 +432,30 @@ export class EnvironmentSystem
       metalness: 0.0
     });
 
-    // Load grass texture for foliage (like original)
-    const foliageLoader = new THREE.TextureLoader();
-    this.foliageTexture = foliageLoader.load('textures/grass/Grass004_1K-JPG_Color.jpg');
-    
-    // Configure texture wrapping and repeat
-    this.foliageTexture.wrapS = THREE.RepeatWrapping;
-    this.foliageTexture.wrapT = THREE.RepeatWrapping;
-    this.foliageTexture.repeat.set(1.0, 1.0); // Normal repeat
-    this.foliageTexture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-    
+    // Foliage material - darker green with some variation
     const foliageMaterial = new THREE.MeshStandardMaterial({
-      map: this.foliageTexture,
-      color: 0x2d5016, // Dark green tint
-      roughness: 0.9, // Rough surface for leaves
-      metalness: 0.0, // Non-metallic
-      side: THREE.DoubleSide // Double-sided to prevent artifacts
+      color: 0x2d5016, // Dark green
+      roughness: 0.9,
+      metalness: 0.0,
+      side: THREE.DoubleSide
     });
+
+    // Cache tree geometries - multiple sizes
+    const trunkGeometries = [];
+    const foliageGeometries = [];
+
+    for (let i = 0; i < 3; i++)
+    {
+      const trunkRadius = 0.2 + i * 0.1;
+      const trunkHeight = 3 + i * 0.5;
+      const trunkGeo = new THREE.CylinderGeometry(trunkRadius, trunkRadius * 1.2, trunkHeight, 8);
+      trunkGeometries.push(trunkGeo);
+
+      const foliageRadius = 2 + i * 0.5;
+      const foliageHeight = 5 + i * 1;
+      const foliageGeo = new THREE.ConeGeometry(foliageRadius, foliageHeight, 8);
+      foliageGeometries.push(foliageGeo);
+    }
 
     // Create trees
     for (let i = 0; i < treeCount; i++)
@@ -493,26 +483,19 @@ export class EnvironmentSystem
       const foliageGeo = foliageGeometries[sizeVariant];
 
       const height = 8 + Math.random() * 7; // 8-15 yards total tree height
-      const trunkHeight = height * 0.35; // 35% of total height for trunk
-      const foliageHeight = height * 0.65; // 65% of total height for foliage
-
-      // Get actual geometry parameters for precise positioning
       const actualTrunkHeight = 3 + sizeVariant * 0.5;
       const actualFoliageHeight = 5 + sizeVariant * 1;
 
       // Create trunk - positioned so bottom is at ground (Y=0)
       const trunk = new THREE.Mesh(trunkGeo, trunkMaterial);
-      trunk.position.set(x, actualTrunkHeight / 2, z); // Center at half height so bottom is at Y=0
+      trunk.position.set(x, actualTrunkHeight / 2, z);
       trunk.castShadow = true;
       trunk.receiveShadow = true;
       this.scene.add(trunk);
       this.trees.push(trunk);
 
-      // Create foliage - positioned so base (widest part of cone) overlaps with top of trunk
+      // Create foliage - positioned so base overlaps with top of trunk
       const foliage = new THREE.Mesh(foliageGeo, foliageMaterial);
-      // Cone geometry: center is at middle, base (widest) is at Y - height/2
-      // Position so foliage base is slightly below trunk top for solid connection
-      // Overlap 25% of foliage height with trunk for solid connection
       foliage.position.set(x, actualTrunkHeight + actualFoliageHeight / 2 - actualFoliageHeight * 0.25, z);
       foliage.castShadow = true;
       foliage.receiveShadow = true;

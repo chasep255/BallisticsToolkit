@@ -1,5 +1,6 @@
 // wind-flags.js - Wind flag system for FClass simulator
-// THREE is loaded globally via script tag in HTML
+
+import * as THREE from 'three';
 
 export class FlagSystem
 {

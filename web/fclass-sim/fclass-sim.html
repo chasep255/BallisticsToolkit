@@ -7,8 +7,15 @@
   <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
   <link rel="stylesheet" href="../common.css">
   <link rel="stylesheet" href="fclass-sim.css">
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
   <script src="../common.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
   <script type="module" src="fclass-sim.js"></script>
 </head>
 <body data-page="fclass-sim">

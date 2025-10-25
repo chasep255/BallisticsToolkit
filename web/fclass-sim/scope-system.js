@@ -3,6 +3,8 @@
  * Encapsulates all scope-related Three.js objects and rendering logic
  */
 
+import * as THREE from 'three';
+
 export class ScopeSystem
 {
   constructor(config)

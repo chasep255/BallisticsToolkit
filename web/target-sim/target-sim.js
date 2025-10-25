@@ -12,6 +12,9 @@ class TargetSimulator
   constructor()
   {
     this.simulator = null;
+    this.bullet = null;
+    this.atmosphere = null;
+    this.target = null;
     this.currentShots = [];
     this.allShots = [];
     this.currentMatch = 0;
@@ -271,6 +274,28 @@ class TargetSimulator
 
   async setupSimulation()
   {
+    // Dispose old BTK objects before creating new ones
+    if (this.simulator)
+    {
+      this.simulator.delete();
+      this.simulator = null;
+    }
+    if (this.bullet)
+    {
+      this.bullet.delete();
+      this.bullet = null;
+    }
+    if (this.atmosphere)
+    {
+      this.atmosphere.delete();
+      this.atmosphere = null;
+    }
+    if (this.target)
+    {
+      this.target.delete();
+      this.target = null;
+    }
+    
     // Get parameters and convert to proper units
     const bc = parseFloat(document.getElementById('bc').value);
     const dragFunction = document.getElementById('dragFunction').value;
@@ -289,7 +314,7 @@ class TargetSimulator
     const temperature = btk.Conversions.fahrenheitToKelvin(parseFloat(document.getElementById('temperature').value));
     const humidity = parseFloat(document.getElementById('humidity').value) / 100.0;
     // Create bullet
-    const bullet = new btk.Bullet(
+    this.bullet = new btk.Bullet(
       btk.Conversions.grainsToKg(0), // Weight not used in 3DOF
       diameter,
       btk.Conversions.inchesToMeters(0), // Length not used
@@ -298,11 +323,11 @@ class TargetSimulator
     );
 
     // Create atmosphere
-    const atmosphere = new btk.Atmosphere(temperature, altitude, humidity, 0.0);
+    this.atmosphere = new btk.Atmosphere(temperature, altitude, humidity, 0.0);
 
     // Get target
-    const target = btk.NRATargets.getTarget(targetName);
-    if (!target)
+    this.target = btk.NRATargets.getTarget(targetName);
+    if (!this.target)
     {
       throw new Error(`Unknown target: ${targetName}`);
     }
@@ -310,11 +335,11 @@ class TargetSimulator
 
     // Create simulator
     this.simulator = new btk.MatchSimulator(
-      bullet,
+      this.bullet,
       mv,
-      target,
+      this.target,
       range,
-      atmosphere,
+      this.atmosphere,
       mvSd,
       windSd,
       headwindSd,

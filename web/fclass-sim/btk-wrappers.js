@@ -355,6 +355,8 @@ export class BtkWindGeneratorWrapper
     const windY_mph = btk.Conversions.mpsToMph(wind.z); // BTK Z (up) → Three Y (vertical)  
     const windZ_mph = btk.Conversions.mpsToMph(-wind.x); // BTK -X (downrange) → Three Z (downrange)
 
+    wind.delete(); // Dispose Vector3D to prevent memory leak
+
     return {
       x: windX_mph, // mph
       y: windY_mph, // mph
@@ -478,6 +480,11 @@ export class BtkTargetWrapper
   constructor(btkTarget)
   {
     this._btk = btkTarget;
+  }
+
+  static getTarget(targetName)
+  {
+    return new BtkTargetWrapper(btk.NRATargets.getTarget(targetName));
   }
 
   getRingInnerDiameter(ring)

@@ -65,7 +65,9 @@ function calculateTrajectory()
   simulator.setAtmosphere(atmosphere);
 
   // Compute zero with no wind
-  simulator.setWind(new btk.Vector3D(0, 0, 0));
+  const zeroWind = new btk.Vector3D(0, 0, 0);
+  simulator.setWind(zeroWind);
+  zeroWind.delete(); // Dispose Vector3D to prevent memory leak
   simulator.computeZero(
     muzzleVelocity,
     scopeHeight,
@@ -80,7 +82,9 @@ function calculateTrajectory()
   const windY = windSpeed * Math.sin(windDirection); // Crossrange component (positive = from right, negative = from left)
   const windZ = 0.0; // No vertical component for now
 
-  simulator.setWind(new btk.Vector3D(windX, windY, windZ));
+  const windVector = new btk.Vector3D(windX, windY, windZ);
+  simulator.setWind(windVector);
+  windVector.delete(); // Dispose Vector3D to prevent memory leak
 
   // Simulate trajectory
   const trajectoryObj = simulator.simulate(maxRange, 0.001, 60.0);
@@ -117,10 +121,18 @@ function calculateTrajectory()
       energy: point.getKineticEnergy(),
       time: point.getTime()
     });
+    
+    point.delete(); // Dispose TrajectoryPoint to prevent memory leak
   }
 
   // Display results
   displayResults(trajectory);
+  
+  // Dispose BTK objects to prevent memory leaks
+  trajectoryObj.delete();
+  simulator.delete();
+  atmosphere.delete();
+  bullet.delete();
 }
 
 function displayResults(trajectory)
