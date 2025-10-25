@@ -1171,11 +1171,13 @@ class FClassSimulator
       hitCount: shotData.hitCount
     };
     
-    // Start match-style target animation with shot marker
+    // Start match-style target animation with shot marker and scoring disc
     this.targetSystem.markShotWithAnimation(
       shotData.relativeX,
       shotData.relativeY,
       this.distance,
+      shotData.score,
+      shotData.isX,
       () => this.onTargetAnimationComplete()
     );
   }

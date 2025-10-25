@@ -53,6 +53,11 @@ export class TargetSystem
     this.spotterDistance = 0;
     this.onAnimationComplete = null; // Callback when target finishes raising
     
+    // F-Class scoring disc system
+    this.scoringDiscs = []; // Array of scoring disc meshes
+    this.discGeometry = null; // Shared geometry for all discs
+    this.discMaterial = null; // Shared material for all discs
+    
     // Shared resources
     this.targetTexture = null;
     this.targetGeometry = null;
@@ -114,6 +119,19 @@ export class TargetSystem
     {
       this.btkTarget.dispose();
       this.btkTarget = null;
+    }
+    
+    // Dispose scoring discs
+    this.clearScoringDiscs();
+    if (this.discGeometry)
+    {
+      this.discGeometry.dispose();
+      this.discGeometry = null;
+    }
+    if (this.discMaterial)
+    {
+      this.discMaterial.dispose();
+      this.discMaterial = null;
     }
     
     this.targetFrames = [];
@@ -375,6 +393,9 @@ export class TargetSystem
       }
     }
     this.userTarget = this.targetFrames[centerTargetIndex];
+    
+    // Initialize scoring disc resources
+    this.initializeScoringDiscResources();
   }
 
   getTargetCenter(targetNumber)
@@ -493,7 +514,7 @@ export class TargetSystem
     this.lastShotMarker.position.set(
       targetCenter.x + relativeX,
       targetCenter.y + relativeY,
-      targetCenter.z + 0.1 // Slightly in front of target
+      targetCenter.z + 0.15 // Slightly in front of target
     );
 
     this.scene.add(this.lastShotMarker);
@@ -526,6 +547,9 @@ export class TargetSystem
             {
               targetFrame.currentHeight = this.cfg.targetMinHeight;
               targetFrame.animating = false;
+              
+              // Clear old scoring discs from previous shot
+              this.clearScoringDiscs();
               
               // Transition to IN_PITS state
               this.animationState = 'IN_PITS';
@@ -578,6 +602,13 @@ export class TargetSystem
               this.scene.add(this.lastShotMarker);
               
               // Position will be updated in updateSpotterPosition()
+              
+              // Add scoring disc(s) for this shot
+              this.addScoringDiscForScore(
+                this.pendingNewSpotterData.score,
+                this.pendingNewSpotterData.isX
+              );
+              
               this.pendingNewSpotterData = null;
             }
           }
@@ -624,6 +655,13 @@ export class TargetSystem
       {
         targetFrame.numberBox.position.y = targetFrame.baseHeight + this.cfg.targetSize + 0.2 + targetFrame.currentHeight;
         targetFrame.numberBox.updateMatrix();
+      }
+      
+      // Update scoring disc positions to follow target
+      for (const disc of this.scoringDiscs)
+      {
+        disc.position.x = targetFrame.mesh.position.x + disc.userData.relativeX;
+        disc.position.y = targetFrame.mesh.position.y + disc.userData.relativeY;
       }
       
       // Update spotter position to follow target
@@ -754,7 +792,7 @@ export class TargetSystem
     this.lastShotMarker.position.set(
       targetCenter.x + relativeX,
       targetCenter.y + relativeY,
-      targetCenter.z + 0.1 // Slightly in front of target
+      targetCenter.z + 0.15 // Slightly in front of target
     );
     
     this.scene.add(this.lastShotMarker);
@@ -777,7 +815,7 @@ export class TargetSystem
   /**
    * Mark shot with match-style animation (target lowers, lingers, raises with new spotter)
    */
-  markShotWithAnimation(relativeX, relativeY, distance, onComplete)
+  markShotWithAnimation(relativeX, relativeY, distance, score, isX, onComplete)
   {
     if (!this.userTarget)
     {
@@ -789,7 +827,9 @@ export class TargetSystem
     this.pendingNewSpotterData = {
       relativeX: relativeX,
       relativeY: relativeY,
-      distance: distance
+      distance: distance,
+      score: score,
+      isX: isX
     };
     
     // Store callback for when animation completes
@@ -831,8 +871,145 @@ export class TargetSystem
     this.lastShotMarker.position.set(
       targetCenter.x + this.spotterRelativeX,
       targetCenter.y + this.spotterRelativeY,
-      targetCenter.z + 0.1 // Slightly in front of target
+      targetCenter.z + 0.15 // Slightly in front of target
     );
+  }
+  
+  // ===== F-CLASS SCORING DISC SYSTEM =====
+  
+  /**
+   * Initialize shared resources for scoring discs
+   */
+  initializeScoringDiscResources()
+  {
+    // Disc size: consistent 6 inches diameter (convert to yards: 6/36 = 0.167 yards)
+    const discDiameterYards = 6.0 / 36.0;
+    const discRadiusYards = discDiameterYards / 2.0;
+    
+    // Create shared geometry (thin cylinder for flat disc appearance)
+    this.discGeometry = new THREE.CylinderGeometry(
+      discRadiusYards,  // radiusTop
+      discRadiusYards,  // radiusBottom
+      0.01,             // height (very thin)
+      16                // radialSegments
+    );
+    
+    // Rotate geometry 90 degrees so disc faces forward (along Z axis)
+    this.discGeometry.rotateX(Math.PI / 2);
+    
+    // Create shared material (bright orange, MeshBasicMaterial is unlit so always visible)
+    this.discMaterial = new THREE.MeshBasicMaterial({
+      color: 0xFF8C00,        // Bright orange
+      toneMapped: false,
+      side: THREE.DoubleSide  // Visible from both sides
+    });
+  }
+  
+  /**
+   * Create a single scoring disc at specified position
+   */
+  createScoringDisc(x, y, z)
+  {
+    if (!this.discGeometry || !this.discMaterial)
+    {
+      console.error('Scoring disc resources not initialized');
+      return null;
+    }
+    
+    const disc = new THREE.Mesh(this.discGeometry, this.discMaterial);
+    disc.position.set(x, y, z);
+    disc.renderOrder = 2; // Render after target but before UI
+    return disc;
+  }
+  
+  /**
+   * Add scoring disc(s) for a given score
+   */
+  addScoringDiscForScore(score, isX)
+  {
+    if (!this.userTarget) return;
+    
+    const frameHalfSize = 1.0; // Target frame is 2x2 yards
+    const gapInches = 1.0; // 1 inch gap between disc and frame edge
+    const gapYards = gapInches / 36.0; // Convert to yards
+    const discRadiusYards = (6.0 / 36.0) / 2.0; // 6 inch disc radius in yards
+    const edgePos = frameHalfSize - gapYards - discRadiusYards; // Position discs with 1" gap from edge
+    
+    // Use actual target position (not base height) so discs are positioned correctly
+    const targetX = this.userTarget.mesh.position.x;
+    const targetY = this.userTarget.mesh.position.y;
+    const targetZ = this.userTarget.mesh.position.z;
+    
+    // Z position in front of target but behind shot marker (marker is at +0.1)
+    const discZ = targetZ + 0.1;
+    
+    // Define disc positions for each score (relative to target center)
+    // Positions are inset from frame edges to keep discs on the frame
+    const positions = {
+      'X': [{ x: edgePos, y: 0 }],  // 3 o'clock
+      '10': [{ x: edgePos, y: -edgePos }],  // Bottom-right corner
+      '9': [{ x: 0, y: -edgePos }],  // Bottom-center
+      '8': [{ x: -edgePos, y: -edgePos }],  // Bottom-left corner
+      '7': [{ x: -edgePos, y: 0 }],  // 9 o'clock
+      '6': [{ x: edgePos, y: 0 }],  // 3 o'clock
+      '5': [{ x: edgePos, y: -edgePos }],  // Bottom-right corner
+      'miss': [
+        { x: -edgePos, y: -edgePos },  // Bottom-left
+        { x: edgePos, y: -edgePos }    // Bottom-right
+      ]
+    };
+    
+    // Determine which positions to use
+    let discPositions = [];
+    
+    if (score < 5)
+    {
+      // Miss: two discs in bottom corners
+      discPositions = positions['miss'];
+    }
+    else if (score === 10 && isX)
+    {
+      // X-ring hit: 3 o'clock position
+      discPositions = positions['X'];
+    }
+    else
+    {
+      // Regular score: use score as key
+      discPositions = positions[score.toString()] || [];
+    }
+    
+    // Create and add disc(s)
+    for (const pos of discPositions)
+    {
+      const disc = this.createScoringDisc(
+        targetX + pos.x,
+        targetY + pos.y,
+        discZ
+      );
+      
+      if (disc)
+      {
+        // Store relative position so we can update disc as target moves
+        disc.userData.relativeX = pos.x;
+        disc.userData.relativeY = pos.y;
+        
+        this.scene.add(disc);
+        this.scoringDiscs.push(disc);
+      }
+    }
+  }
+  
+  /**
+   * Clear all scoring discs
+   */
+  clearScoringDiscs()
+  {
+    for (const disc of this.scoringDiscs)
+    {
+      this.scene.remove(disc);
+      // Don't dispose geometry/material as they're shared
+    }
+    this.scoringDiscs = [];
   }
 }
 
