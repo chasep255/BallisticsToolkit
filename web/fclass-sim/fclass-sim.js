@@ -969,9 +969,9 @@ class FClassSimulator
       this.rifleScopeKeys.right = false;
     }
 
-    // Update rifle scope to look at user's target
+    // Update rifle scope to look at user's target (always at base height, not animated position)
     const userTarget = this.targetSystem.userTarget;
-    this.rifleScope.lookAt(userTarget.mesh.position.x, userTarget.mesh.position.y, userTarget.mesh.position.z);
+    this.rifleScope.lookAt(userTarget.mesh.position.x, userTarget.baseHeight, userTarget.mesh.position.z);
   }
 
 
@@ -1128,6 +1128,13 @@ class FClassSimulator
       console.error('Rifle scope not found');
       return;
     }
+    
+    // Check if target is ready (not animating)
+    if (!this.targetSystem.isTargetReady())
+    {
+      console.log('Target not ready - wait for target to raise');
+      return;
+    }
 
     // Check if match is complete (60 shots fired)
     const match = this.ballisticsSystem.getMatch();
@@ -1155,20 +1162,34 @@ class FClassSimulator
    */
   onShotComplete(shotData)
   {
-    // Show the shot marker via TargetSystem
-    this.targetSystem.markLastShot(shotData.relativeX, shotData.relativeY, this.distance);
-
-    // Update HUD with shot data
+    // Store shot data for when target animation completes
     this.lastShotData = {
       score: shotData.score,
       isX: shotData.isX,
       mvFps: shotData.mvFps,
-      impactVelocityFps: shotData.impactVelocityFps
+      impactVelocityFps: shotData.impactVelocityFps,
+      hitCount: shotData.hitCount
     };
+    
+    // Start match-style target animation with shot marker
+    this.targetSystem.markShotWithAnimation(
+      shotData.relativeX,
+      shotData.relativeY,
+      this.distance,
+      () => this.onTargetAnimationComplete()
+    );
+  }
+  
+  /**
+   * Handle target animation completion (called when target finishes raising)
+   */
+  onTargetAnimationComplete()
+  {
+    // Update HUD with shot data now that target is back up
     this.updateHUD();
-
+    
     // Check if match is complete (60 shots for F-Class)
-    if (shotData.hitCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
+    if (this.lastShotData && this.lastShotData.hitCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
     {
       this.showMatchCompleteNotification();
     }

@@ -43,6 +43,16 @@ export class TargetSystem
     this.lastShotMarker = null;
     this.btkTarget = null; // Will be created when createTargets is called
     
+    // Match-style animation state machine
+    this.animationState = 'IDLE'; // IDLE, LOWERING, IN_PITS, RAISING
+    this.pitLingerTimer = 0;
+    this.pitLingerDuration = 3.0; // seconds
+    this.pendingNewSpotterData = null; // Store new shot data for when target raises
+    this.spotterRelativeX = 0; // Spotter position relative to target center
+    this.spotterRelativeY = 0;
+    this.spotterDistance = 0;
+    this.onAnimationComplete = null; // Callback when target finishes raising
+    
     // Shared resources
     this.targetTexture = null;
     this.targetGeometry = null;
@@ -491,12 +501,142 @@ export class TargetSystem
 
   updateAnimations(deltaTime)
   {
+    // Handle user target animation state machine
+    if (this.userTarget)
+    {
+      const targetFrame = this.userTarget;
+      
+      // Update state machine
+      switch (this.animationState)
+      {
+        case 'IDLE':
+          // Target is up and ready, no animation needed
+          break;
+          
+        case 'LOWERING':
+          // Animate target down
+          if (targetFrame.animating)
+          {
+            const direction = Math.sign(this.cfg.targetMinHeight - targetFrame.currentHeight);
+            const moveDistance = this.cfg.targetAnimationSpeed * deltaTime * direction;
+            const newHeight = targetFrame.currentHeight + moveDistance;
+            
+            // Check if we've reached the bottom
+            if (newHeight <= this.cfg.targetMinHeight)
+            {
+              targetFrame.currentHeight = this.cfg.targetMinHeight;
+              targetFrame.animating = false;
+              
+              // Transition to IN_PITS state
+              this.animationState = 'IN_PITS';
+              this.pitLingerTimer = 0;
+            }
+            else
+            {
+              targetFrame.currentHeight = newHeight;
+            }
+          }
+          break;
+          
+        case 'IN_PITS':
+          // Wait in the pits for the linger duration
+          this.pitLingerTimer += deltaTime;
+          
+          if (this.pitLingerTimer >= this.pitLingerDuration)
+          {
+            // Time to raise the target
+            this.animationState = 'RAISING';
+            targetFrame.targetHeightGoal = this.cfg.targetMaxHeight;
+            targetFrame.animating = true;
+            
+            // Clear old spotter and create new one if we have pending data
+            if (this.pendingNewSpotterData)
+            {
+              // Remove old spotter
+              this.clearLastShotMarker();
+              
+              // Store relative position for new spotter
+              this.spotterRelativeX = this.pendingNewSpotterData.relativeX;
+              this.spotterRelativeY = this.pendingNewSpotterData.relativeY;
+              this.spotterDistance = this.pendingNewSpotterData.distance;
+              
+              // Create new spotter marker
+              const spotterDiameterYards = this.spotterDistance * 0.25 / 3438;
+              const spotterRadiusYards = spotterDiameterYards / 2;
+              
+              const markerGeometry = new THREE.SphereGeometry(spotterRadiusYards, 8, 8);
+              const markerMaterial = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(1.0, 0.35, 0.0),
+                emissive: new THREE.Color(1.0, 0.0, 0.0),
+                emissiveIntensity: 0.8,
+                toneMapped: false
+              });
+              
+              this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
+              this.lastShotMarker.castShadow = true;
+              this.lastShotMarker.receiveShadow = true;
+              this.scene.add(this.lastShotMarker);
+              
+              // Position will be updated in updateSpotterPosition()
+              this.pendingNewSpotterData = null;
+            }
+          }
+          break;
+          
+        case 'RAISING':
+          // Animate target up
+          if (targetFrame.animating)
+          {
+            const direction = Math.sign(this.cfg.targetMaxHeight - targetFrame.currentHeight);
+            const moveDistance = this.cfg.targetAnimationSpeed * deltaTime * direction;
+            const newHeight = targetFrame.currentHeight + moveDistance;
+            
+            // Check if we've reached the top
+            if (newHeight >= this.cfg.targetMaxHeight)
+            {
+              targetFrame.currentHeight = this.cfg.targetMaxHeight;
+              targetFrame.animating = false;
+              
+              // Transition back to IDLE state
+              this.animationState = 'IDLE';
+              
+              // Call completion callback if set
+              if (this.onAnimationComplete)
+              {
+                this.onAnimationComplete();
+                this.onAnimationComplete = null;
+              }
+            }
+            else
+            {
+              targetFrame.currentHeight = newHeight;
+            }
+          }
+          break;
+      }
+      
+      // Update user target position
+      targetFrame.mesh.position.y = targetFrame.baseHeight + targetFrame.currentHeight;
+      targetFrame.mesh.updateMatrix();
+      
+      // Update number box position
+      if (targetFrame.numberBox)
+      {
+        targetFrame.numberBox.position.y = targetFrame.baseHeight + this.cfg.targetSize + 0.2 + targetFrame.currentHeight;
+        targetFrame.numberBox.updateMatrix();
+      }
+      
+      // Update spotter position to follow target
+      this.updateSpotterPosition();
+    }
+    
+    // Handle other targets (non-user targets)
     for (let i = 0; i < this.targetFrames.length; i++)
     {
       const targetFrame = this.targetFrames[i];
       const animationState = this.targetAnimationStates[i];
 
-      // Skip user's target - it stays up
+      // Skip user's target - handled above
       if (targetFrame === this.userTarget)
       {
         continue;
@@ -632,6 +772,67 @@ export class TargetSystem
       this.lastShotMarker.material.dispose();
       this.lastShotMarker = null;
     }
+  }
+  
+  /**
+   * Mark shot with match-style animation (target lowers, lingers, raises with new spotter)
+   */
+  markShotWithAnimation(relativeX, relativeY, distance, onComplete)
+  {
+    if (!this.userTarget)
+    {
+      console.warn('Cannot mark shot: no user target');
+      return;
+    }
+    
+    // Store the new shot data to be applied when target raises
+    this.pendingNewSpotterData = {
+      relativeX: relativeX,
+      relativeY: relativeY,
+      distance: distance
+    };
+    
+    // Store callback for when animation completes
+    this.onAnimationComplete = onComplete;
+    
+    // Start the animation sequence by lowering the target
+    this.animationState = 'LOWERING';
+    this.userTarget.targetHeightGoal = this.cfg.targetMinHeight;
+    this.userTarget.animating = true;
+  }
+  
+  /**
+   * Check if target is ready for shooting (fully raised and idle)
+   */
+  isTargetReady()
+  {
+    return this.animationState === 'IDLE';
+  }
+  
+  /**
+   * Get current animation state
+   */
+  getAnimationState()
+  {
+    return this.animationState;
+  }
+  
+  /**
+   * Update spotter marker position to follow target
+   */
+  updateSpotterPosition()
+  {
+    if (!this.lastShotMarker || !this.userTarget) return;
+    
+    const targetCenter = this.getUserTargetCenter();
+    if (!targetCenter) return;
+    
+    // Update spotter position based on target's current position
+    this.lastShotMarker.position.set(
+      targetCenter.x + this.spotterRelativeX,
+      targetCenter.y + this.spotterRelativeY,
+      targetCenter.z + 0.1 // Slightly in front of target
+    );
   }
 }
 
