@@ -224,9 +224,9 @@ export class EnvironmentSystem
     this.scene.add(this.sun.target);
     this.scene.add(this.sun);
 
-    // Shadow map quality - maximum for detailed shadows in spotting scope
-    this.sun.shadow.mapSize.width = 16384;
-    this.sun.shadow.mapSize.height = 16384;
+    // Shadow map quality - optimized for long range (more resolution along length)
+    this.sun.shadow.mapSize.width = 4096;  // Width (left-right across range)
+    this.sun.shadow.mapSize.height = 8192; // Height (downrange length)
 
     // Shadow camera bounds - cover only range area, not mountains
     this.sun.shadow.camera.left = -this.cfg.shadowCameraHorizontal;
@@ -240,9 +240,9 @@ export class EnvironmentSystem
     this.sun.shadow.camera.updateProjectionMatrix();
 
     // Shadow quality settings
-    this.sun.shadow.bias = -0.0005; // Reduce shadow acne
-    this.sun.shadow.normalBias = 0.02; // Reduce shadow acne
-    this.sun.shadow.radius = 4; // Increased blur radius for softer cloud shadows
+    this.sun.shadow.bias = -0.0002; // Reduce shadow acne
+    this.sun.shadow.normalBias = 0.02; // Reduce shadow acne on angled surfaces
+    this.sun.shadow.radius = 3; // Softer shadows with moderate blur
     // Renderer shadow settings are handled by main simulator
   }
 

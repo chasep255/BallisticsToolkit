@@ -12,7 +12,7 @@ import { FlagSystem } from './wind-flags.js';
 import { TargetSystem } from './target-system.js';
 import { EnvironmentSystem } from './environment-system.js';
 import { BallisticsSystem } from './ballistics-system.js';
-import { ScopeSystem } from './scope-system.js';
+import { Scope } from './scope.js';
 
 // F-Class distance to target mapping
 const FCLASS_DISTANCE_TO_TARGET = {
@@ -186,8 +186,6 @@ function getGameParams()
   };
 }
 
-// Target dropdown no longer needed - targets are determined by F-Class mode
-
 function populateWindPresetDropdown()
 {
   const windSelect = document.getElementById('windPreset');
@@ -292,20 +290,17 @@ class FClassSimulator
 
   // Spotting scope constants (WASD pan, EQ zoom)
   static SPOTTING_SCOPE_DIAMETER_FRACTION = 0.5; // Fraction of screen height
-  static SPOTTING_SCOPE_MARGIN = 20; // pixels from screen edges
   static SPOTTING_SCOPE_PAN_SPEED = 0.1; // radians per second
-  static SPOTTING_SCOPE_MIN_MAGNIFICATION = 2; // minimum zoom
-  static SPOTTING_SCOPE_MAX_MAGNIFICATION = 100; // maximum zoom
-  static SPOTTING_SCOPE_MAGNIFICATION_STEP = 0.5; // zoom step size
+  static SPOTTING_SCOPE_MIN_MAGNIFICATION = 2; // minimum zoom (2x)
+  static SPOTTING_SCOPE_MAX_MAGNIFICATION = 100; // maximum zoom (100x)
 
-  // Rifle scope constants (arrow keys pan, fixed zoom for targeting)
+  // Rifle scope constants (arrow keys pan, +/- zoom)
   static RIFLE_SCOPE_DIAMETER_FRACTION = 0.5; // Same size as spotting scope
-  static RIFLE_SCOPE_MARGIN = 20; // pixels from edge
   static RIFLE_SCOPE_PAN_SPEED = 0.1; // MOA per key press
-  static RIFLE_SCOPE_FOV_MULTIPLIER = 1.5; // Show 1.5x target width
-  static RIFLE_SCOPE_ZOOM_MIN = 0.5; // Minimum FOV multiplier (zoomed in)
-  static RIFLE_SCOPE_ZOOM_MAX = 3.0; // Maximum FOV multiplier (zoomed out)
-  static RIFLE_SCOPE_ZOOM_STEP = 0.1; // Zoom change per key press
+  static RIFLE_SCOPE_FOV_MULTIPLIER = 1.5; // Show 1.5x target width (initial zoom)
+  static RIFLE_SCOPE_ZOOM_MIN = 1.0; // Minimum FOV multiplier (most zoomed in)
+  static RIFLE_SCOPE_ZOOM_MAX = 3.0; // Maximum FOV multiplier (most zoomed out)
+  static RIFLE_SCOPE_ZOOM_FACTOR = 1.05; // Zoom factor per key press (5% change)
 
   // ===== CONSTRUCTOR & INITIALIZATION =====
   constructor(canvas, params = {})
@@ -333,14 +328,6 @@ class FClassSimulator
     this.lastTime = 0;
     this.frameCount = 0;
     this.fps = 0;
-
-    // Store canvas reference for later use
-    this.canvas = canvas;
-
-    // ===== INITIALIZATION =====
-    // All heavy initialization moved to start() method
-    // Only basic parameter capture happens in constructor
-
   }
 
   // ===== TIME ACCESSORS =====
@@ -471,21 +458,17 @@ class FClassSimulator
       }
       else if (isKeyDown && (event.key === '+' || event.key === '='))
       {
-        const scope = this.scopeSystem.getScope('rifle');
-        if (scope)
+        if (this.rifleScope)
         {
-          scope.zoom = Math.max(FClassSimulator.RIFLE_SCOPE_ZOOM_MIN, scope.zoom - FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
-        this.updateRifleScopeZoom();
+          this.rifleScope.zoomIn(FClassSimulator.RIFLE_SCOPE_ZOOM_FACTOR);
         }
         event.preventDefault();
       }
       else if (isKeyDown && (event.key === '-' || event.key === '_'))
       {
-        const scope = this.scopeSystem.getScope('rifle');
-        if (scope)
+        if (this.rifleScope)
         {
-          scope.zoom = Math.min(FClassSimulator.RIFLE_SCOPE_ZOOM_MAX, scope.zoom + FClassSimulator.RIFLE_SCOPE_ZOOM_STEP);
-        this.updateRifleScopeZoom();
+          this.rifleScope.zoomOut(FClassSimulator.RIFLE_SCOPE_ZOOM_FACTOR);
         }
         event.preventDefault();
       }
@@ -494,13 +477,6 @@ class FClassSimulator
     document.addEventListener('keydown', this.rifleScopeKeyHandler);
     document.addEventListener('keyup', this.rifleScopeKeyHandler);
   }
-
-  // ===== SCENERY =====
-
-  // Environment methods moved to EnvironmentSystem class
-  // Range setup (ground, pits) moved to EnvironmentSystem and TargetSystem
-
-  // ===== GAME LOOP & LIFECYCLE =====
 
   // ===== RENDERING =====
   render()
@@ -558,7 +534,8 @@ class FClassSimulator
     this.renderer.render(this.scene, this.camera);
 
     // 2) Render all scopes to their textures
-    this.scopeSystem.renderScopes();
+    if (this.spottingScope) this.spottingScope.render();
+    if (this.rifleScope) this.rifleScope.render();
 
     // 3) Composite everything to screen
     this.renderer.setRenderTarget(null);
@@ -675,8 +652,9 @@ class FClassSimulator
     // ===== COMPOSITION SETUP =====
     this.createMainViewQuad();
     
-    // ===== SCOPE SYSTEM =====
-    this.scopeSystem = new ScopeSystem({
+    // ===== SCOPES =====
+    // Spotting scope - wide FOV range for scanning
+    this.spottingScope = new Scope({
       scene: this.scene,
       compositionScene: this.compositionScene,
       renderer: this.renderer,
@@ -684,27 +662,31 @@ class FClassSimulator
       canvasHeight: this.canvasHeight,
       cameraPosition: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: 1 },
       rangeDistance: this.distance,
-      targetSize: FClassSimulator.TARGET_SIZE,
-      targetCenterHeight: FClassSimulator.TARGET_CENTER_HEIGHT,
-      scopes: [
-        {
-          type: 'spotting',
-          position: 'bottom-left',
-          sizeFraction: FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION,
-          initialFOV: FClassSimulator.CAMERA_FOV / 4,
-          minMagnification: FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION,
-          maxMagnification: FClassSimulator.SPOTTING_SCOPE_MAX_MAGNIFICATION,
-          crosshairType: 'simple'
-        },
-        {
-          type: 'rifle',
-          position: 'bottom-right',
-          sizeFraction: FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION,
-          fovMultiplier: FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER,
-          crosshairType: 'reticle',
-          crosshairColor: '#8B0000'
-        }
-      ]
+      position: 'bottom-left',
+      sizeFraction: FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION,
+      minFOV: FClassSimulator.CAMERA_FOV / FClassSimulator.SPOTTING_SCOPE_MAX_MAGNIFICATION,
+      maxFOV: FClassSimulator.CAMERA_FOV / FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION,
+      initialFOV: FClassSimulator.CAMERA_FOV / 4,
+      initialLookAt: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: -this.distance },
+      reticle: false
+    });
+
+    // Rifle scope - narrower FOV for precision aiming
+    this.rifleScope = new Scope({
+      scene: this.scene,
+      compositionScene: this.compositionScene,
+      renderer: this.renderer,
+      canvasWidth: this.canvasWidth,
+      canvasHeight: this.canvasHeight,
+      cameraPosition: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: 1 },
+      rangeDistance: this.distance,
+      position: 'bottom-right',
+      sizeFraction: FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION,
+      minFOV: Math.atan((FClassSimulator.RIFLE_SCOPE_ZOOM_MIN * FClassSimulator.TARGET_SIZE) / this.distance) * 180 / Math.PI,
+      maxFOV: Math.atan((FClassSimulator.RIFLE_SCOPE_ZOOM_MAX * FClassSimulator.TARGET_SIZE) / this.distance) * 180 / Math.PI,
+      initialFOV: Math.atan((FClassSimulator.RIFLE_SCOPE_FOV_MULTIPLIER * FClassSimulator.TARGET_SIZE) / this.distance) * 180 / Math.PI,
+      initialLookAt: { x: 0, y: FClassSimulator.TARGET_CENTER_HEIGHT, z: -this.distance },
+      reticle: true
     });
 
     // ===== INPUT =====
@@ -814,56 +796,47 @@ class FClassSimulator
 
   updateSpottingScopeCamera()
   {
-    const scope = this.scopeSystem.getScope('spotting');
-    if (!scope) return;
+    if (!this.spottingScope) return;
 
     const deltaTime = this.getDeltaTime();
-    // Calculate pan speed that slows down linearly with magnification
-    // At 2x mag: full speed, at 100x mag: 1/50th speed
-    const speedFactor = 2.0 / scope.magnification; // 2x = 1.0, 100x = 0.02
-    const panSpeed = FClassSimulator.SPOTTING_SCOPE_PAN_SPEED * deltaTime * speedFactor;
+    
+    // Calculate pan speed in MOA per second, scaled by current FOV
+    // As FOV decreases (more zoomed in), movement slows down proportionally
+    const currentFOV = this.spottingScope.getFOV();
+    const maxFOV = FClassSimulator.CAMERA_FOV / FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION;
+    const fovScale = currentFOV / maxFOV; // 1.0 at min zoom, smaller when zoomed in
+    
+    // Convert radians/sec to MOA/sec: radians * (180/PI) * 60
+    const moaPerSecond = FClassSimulator.SPOTTING_SCOPE_PAN_SPEED * (180 / Math.PI) * 60 * fovScale;
+    const moaIncrement = moaPerSecond * deltaTime;
 
     // W/S: adjust pitch (tilt up/down)
-    if (this.spottingScopeKeys.w) scope.pitch += panSpeed;
-    if (this.spottingScopeKeys.s) scope.pitch -= panSpeed;
+    if (this.spottingScopeKeys.w) this.spottingScope.up(moaIncrement);
+    if (this.spottingScopeKeys.s) this.spottingScope.down(moaIncrement);
 
     // A/D: pan left/right
-    if (this.spottingScopeKeys.a) scope.yaw -= panSpeed;
-    if (this.spottingScopeKeys.d) scope.yaw += panSpeed;
+    if (this.spottingScopeKeys.a) this.spottingScope.left(moaIncrement);
+    if (this.spottingScopeKeys.d) this.spottingScope.right(moaIncrement);
 
-    // E/Q: adjust magnification (exponential scaling)
+    // E/Q: adjust zoom (exponential scaling)
+    const zoomFactor = Math.pow(1.1, deltaTime * 10);
     if (this.spottingScopeKeys.e)
     {
-      scope.magnification = Math.min(
-        scope.maxMagnification,
-        scope.magnification * Math.pow(1.1, deltaTime * 10)
-      );
+      this.spottingScope.zoomIn(zoomFactor);
     }
     if (this.spottingScopeKeys.q)
     {
-      scope.magnification = Math.max(
-        scope.minMagnification,
-        scope.magnification / Math.pow(1.1, deltaTime * 10)
-      );
+      this.spottingScope.zoomOut(zoomFactor);
     }
-
-    // Clamp pitch and yaw to reasonable limits
-    scope.pitch = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, scope.pitch));
-    scope.yaw = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, scope.yaw));
-
-    // Update scope camera
-    this.scopeSystem.updateScopeCamera(scope);
   }
 
   /**
    * Updates rifle scope camera position based on arrow key input
-   * Pan movement is 0.1 inches linear at target distance
-   * Pitch/yaw are clamped to target frame boundaries
+   * Pan movement is 0.1 MOA per key press
    */
   updateRifleScopeCamera()
   {
-    const scope = this.scopeSystem.getScope('rifle');
-    if (!scope) return;
+    if (!this.rifleScope) return;
 
     // Check if target system and user target exist
     if (!this.targetSystem || !this.targetSystem.userTarget)
@@ -871,49 +844,33 @@ class FClassSimulator
       return; // Silently skip if targets not created yet
     }
 
-    // Calculate angular movement in radians from MOA
     const moaIncrement = FClassSimulator.RIFLE_SCOPE_PAN_SPEED;
-    const angularIncrement = moaIncrement * (Math.PI / 180) / 60;
 
     // Arrow keys: adjust pitch and yaw (per key press, not per frame)
     if (this.rifleScopeKeys.up)
     {
-      scope.pitch += angularIncrement;
+      this.rifleScope.up(moaIncrement);
       this.rifleScopeKeys.up = false;
     }
     if (this.rifleScopeKeys.down)
     {
-      scope.pitch -= angularIncrement;
+      this.rifleScope.down(moaIncrement);
       this.rifleScopeKeys.down = false;
     }
     if (this.rifleScopeKeys.left)
     {
-      scope.yaw -= angularIncrement;
+      this.rifleScope.left(moaIncrement);
       this.rifleScopeKeys.left = false;
     }
     if (this.rifleScopeKeys.right)
     {
-      scope.yaw += angularIncrement;
+      this.rifleScope.right(moaIncrement);
       this.rifleScopeKeys.right = false;
     }
 
-    // Clamp pitch and yaw to target frame limits
-    scope.pitch = Math.max(-scope.maxPitch, Math.min(scope.maxPitch, scope.pitch));
-    scope.yaw = Math.max(-scope.maxYaw, Math.min(scope.maxYaw, scope.yaw));
-
-    // Update scope camera
+    // Update rifle scope to look at user's target
     const userTarget = this.targetSystem.userTarget;
-    this.scopeSystem.updateScopeCamera(scope, userTarget.mesh.position);
-  }
-
-  updateRifleScopeZoom()
-  {
-    const scope = this.scopeSystem.getScope('rifle');
-    if (!scope || !this.targetSystem || !this.targetSystem.userTarget) return;
-
-    // Update scope camera with new zoom
-    const userTarget = this.targetSystem.userTarget;
-    this.scopeSystem.updateScopeCamera(scope, userTarget.mesh.position);
+    this.rifleScope.lookAt(userTarget.mesh.position.x, userTarget.mesh.position.y, userTarget.mesh.position.z);
   }
 
 
@@ -943,11 +900,6 @@ class FClassSimulator
     }
   }
 
-  /**
-   * Custom zeroing routine to hit target center accounting for Y offset
-   * @param {number} mv - Muzzle velocity (fps)
-   * @param {number} range - Range (yards)
-   */
   // ===== UI & DISPLAY =====
 
   /**
@@ -1078,16 +1030,17 @@ class FClassSimulator
       return;
     }
 
-    // Get rifle scope aim
-    const rifleScope = this.scopeSystem.getScope('rifle');
-    if (!rifleScope)
+    if (!this.rifleScope)
     {
       console.error('Rifle scope not found');
       return;
     }
 
+    // Get rifle scope aim
+    const aim = this.rifleScope.getAim();
+
     // Update ballistics system with current rifle scope aim
-    this.ballisticsSystem.setRifleScopeAim(rifleScope.yaw, rifleScope.pitch);
+    this.ballisticsSystem.setRifleScopeAim(aim.yaw, aim.pitch);
 
     // Fire shot through ballistics system (handles audio internally)
     this.ballisticsSystem.fireShot();
@@ -1186,9 +1139,13 @@ class FClassSimulator
     {
       this.ballisticsSystem.dispose();
     }
-    if (this.scopeSystem)
+    if (this.spottingScope)
     {
-      this.scopeSystem.dispose();
+      this.spottingScope.dispose();
+    }
+    if (this.rifleScope)
+    {
+      this.rifleScope.dispose();
     }
     
     // Dispose wind generator
@@ -1202,7 +1159,12 @@ class FClassSimulator
     {
       this.compositionScene.remove(this.mainViewQuad);
       this.mainViewQuad.geometry.dispose();
-      this.mainViewQuad.material.dispose();
+      // Null out material.map before disposing (render target disposed separately)
+      if (this.mainViewQuad.material)
+      {
+        this.mainViewQuad.material.map = null;
+        this.mainViewQuad.material.dispose();
+      }
       this.mainViewQuad = null;
     }
     
