@@ -48,6 +48,15 @@ namespace btk::physics
 
   void WindPresets::initializePresets()
   {
+    // Dead calm - essentially no wind (< 0.5 mph)
+    presets_["DeadCalm"] = []()
+    {
+      WindGenerator w;
+      w.addWindComponent(0.3f, 7200.0f, 100000.0f, 0.5f); // Barely perceptible drift
+      w.addWindComponent(0.2f, 1800.0f, 20000.0f, 0.6f);  // Extremely slow micro-variations
+      return w;
+    };
+
     // Typical wind - realistic match conditions (moderate with some challenge)
     presets_["Typical"] = []()
     {

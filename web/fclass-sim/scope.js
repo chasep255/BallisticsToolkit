@@ -438,6 +438,15 @@ export class Scope
       // Range box: X from -rangeWidth/2 to +rangeWidth/2, Y from 0 to maxHeight, Z from 0 to -rangeDistance
       const intersection = this.calculateRangeIntersection();
       
+      // Store current wind data for display
+      const wind = windGenerator.getWindAt(intersection.x, intersection.y, intersection.z, time);
+      const windSpeed = Math.sqrt(wind.x * wind.x + wind.z * wind.z);
+      const windAngle = Math.atan2(wind.x, -wind.z) * 180 / Math.PI;
+      this.currentWind = {
+        speed: windSpeed,
+        angle: windAngle,
+        distance: intersection.distance
+      };
       
       this.mirageEffect.update(
         time,
@@ -453,6 +462,7 @@ export class Scope
       this.renderer.setRenderTarget(this.renderTarget);
       this.renderer.clear();
       this.renderer.render(this.scene, this.camera);
+      this.currentWind = null;
     }
     
     this.renderer.setRenderTarget(null);
@@ -489,6 +499,22 @@ export class Scope
   getFOV()
   {
     return this.currentFOV;
+  }
+
+  /**
+   * Get current wind data (speed, angle, distance)
+   */
+  getWindData()
+  {
+    return this.currentWind;
+  }
+
+  /**
+   * Get smoothed wind speed from mirage effect
+   */
+  getSmoothedWindSpeed()
+  {
+    return this.mirageEffect ? this.mirageEffect.getSmoothedWindSpeed() : 0;
   }
 
   /**

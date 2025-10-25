@@ -284,6 +284,7 @@ class FClassSimulator
   static COLOR_HIGH_SCORE = 0xff0000;
   static COLOR_LOW_SCORE = 0xff8800;
   static SCORE_THRESHOLD_RED = 9;
+  static DEBUG_WIND_OVERLAY = false; // Set to true to show wind speed overlay
 
   // === MATCH & SCORING ===
   static FCLASS_MATCH_SHOTS = 60;
@@ -359,6 +360,100 @@ class FClassSimulator
     this.compositionScene.add(this.mainViewQuad);
   }
 
+  createWindInfoText()
+  {
+    // Only create if debug flag is enabled
+    if (!FClassSimulator.DEBUG_WIND_OVERLAY) return;
+    
+    // Create canvas for text rendering
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Store canvas and context for updates
+    this.windInfoCanvas = canvas;
+    this.windInfoContext = ctx;
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    
+    // Create mesh for text display at bottom of screen
+    const textWidth = 400;
+    const textHeight = 100;
+    const geometry = new THREE.PlaneGeometry(textWidth, textHeight);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+    
+    this.windInfoMesh = new THREE.Mesh(geometry, material);
+    this.windInfoMesh.position.set(0, -this.canvasHeight / 2 + textHeight / 2 + 10, 3);
+    this.windInfoMesh.renderOrder = 3;
+    this.windInfoMesh.frustumCulled = false;
+    this.compositionScene.add(this.windInfoMesh);
+    
+    this.windInfoTexture = texture;
+  }
+
+  updateWindInfoText()
+  {
+    if (!this.windInfoCanvas || !this.windInfoContext) return;
+    
+    const ctx = this.windInfoContext;
+    const canvas = this.windInfoCanvas;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Get smoothed wind from mirage effect
+    const spottingSmoothed = this.spottingScope ? this.spottingScope.getSmoothedWindSpeed() : 0;
+    const rifleSmoothed = this.rifleScope ? this.rifleScope.getSmoothedWindSpeed() : 0;
+    
+    // Get wind data for distance info
+    const spottingWind = this.spottingScope ? this.spottingScope.getWindData() : null;
+    const rifleWind = this.rifleScope ? this.rifleScope.getWindData() : null;
+    
+    // Set text style
+    ctx.font = 'bold 24px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    
+    let y = 10;
+    
+    // Spotting scope wind
+    if (spottingWind)
+    {
+      ctx.fillStyle = '#00ff00';
+      const smoothedStr = spottingSmoothed.toFixed(2);
+      const distStr = Math.round(spottingWind.distance);
+      const direction = spottingSmoothed > 0 ? 'R' : 'L';
+      ctx.fillText(`Spotting: ${smoothedStr} mph ${direction} (${distStr} yds)`, 10, y);
+      y += 30;
+    }
+    
+    // Rifle scope wind
+    if (rifleWind)
+    {
+      ctx.fillStyle = '#ffff00';
+      const smoothedStr = rifleSmoothed.toFixed(2);
+      const distStr = Math.round(rifleWind.distance);
+      const direction = rifleSmoothed > 0 ? 'R' : 'L';
+      ctx.fillText(`Rifle: ${smoothedStr} mph ${direction} (${distStr} yds)`, 10, y);
+    }
+    
+    // Update texture
+    if (this.windInfoTexture)
+    {
+      this.windInfoTexture.needsUpdate = true;
+    }
+  }
+
 
 
   // ===== FLAG SYSTEM =====
@@ -374,6 +469,9 @@ class FClassSimulator
     {
       this.flagSystem.addFlag(laneBorder, -yds);
     }
+    
+    // Add flag at target distance for debugging
+    this.flagSystem.addFlag(laneBorder, -this.distance);
   }
 
   // ===== SCENE SETUP =====
@@ -538,6 +636,9 @@ class FClassSimulator
     if (this.spottingScope) this.spottingScope.render(this.windGenerator, scopeTime);
     if (this.rifleScope) this.rifleScope.render(this.windGenerator, scopeTime);
 
+    // Update wind info text
+    this.updateWindInfoText();
+
     // 3) Composite everything to screen
     this.renderer.setRenderTarget(null);
     this.renderer.clear();
@@ -652,6 +753,7 @@ class FClassSimulator
 
     // ===== COMPOSITION SETUP =====
     this.createMainViewQuad();
+    this.createWindInfoText();
     
     // ===== SCOPES =====
     // Spotting scope - wide FOV range for scanning
@@ -1175,6 +1277,26 @@ class FClassSimulator
         this.mainViewQuad.material.dispose();
       }
       this.mainViewQuad = null;
+    }
+    
+    // Dispose wind info text
+    if (this.windInfoMesh)
+    {
+      this.compositionScene.remove(this.windInfoMesh);
+      this.windInfoMesh.geometry.dispose();
+      if (this.windInfoMesh.material)
+      {
+        if (this.windInfoTexture)
+        {
+          this.windInfoTexture.dispose();
+          this.windInfoTexture = null;
+        }
+        this.windInfoMesh.material.map = null;
+        this.windInfoMesh.material.dispose();
+      }
+      this.windInfoMesh = null;
+      this.windInfoCanvas = null;
+      this.windInfoContext = null;
     }
     
     // Dispose render targets

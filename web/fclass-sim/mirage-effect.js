@@ -25,9 +25,10 @@ export class MirageEffect
     this.quad = new THREE.Mesh(geometry, this.material);
     this.scene.add(this.quad);
     
-    // EMA for smoothing wind changes
-    this.smoothedWindX = 0;
-    this.emaAlpha = 0.001; // Smoothing factor at 60 FPS (0.02 = very smooth, 0.1 = faster)
+    // Accumulated horizontal drift (integrated wind speed over time)
+    this.accumulatedDrift = 0;
+    this.lastUpdateTime = 0;
+    this.currentWindX = 0;
   }
   
   createMaterial()
@@ -78,7 +79,8 @@ export class MirageEffect
       uniform sampler2D tDiffuse;
       uniform float time;
       uniform float intensity;
-      uniform float windSpeed;  // Signed: positive = right, negative = left
+      uniform float horizontalDrift;  // Accumulated drift in yards (integrated wind speed)
+      uniform float windSpeed;  // Current wind speed in mph (for wind-dependent effects)
       uniform vec2 worldOffset;  // World-space offset for anchoring mirage
       uniform float worldScale;  // Scale factor for world coordinates
       
@@ -95,53 +97,58 @@ export class MirageEffect
           return;
         }
         
-        // Mirage is constantly boiling upward at a fixed rate
-        // Wind only affects horizontal movement speed
-        
         // Convert UV to world-space coordinates (anchored to landscape)
         vec2 worldPos = (uv - 0.5) * worldScale + worldOffset;
         
-        // Vertical offset for upward boiling (constant speed in yards/sec)
-        // Heat rises at approximately 4 yards/second
-        float verticalRise = time * 4.0;
+        // Vertical convection speed: 1-4 mph typical (use 2 mph = 2.93 yards/sec)
+        // This creates the "boiling" effect
+        float verticalSpeed = 2.93; // yards/second
+        float verticalRise = time * verticalSpeed;
         
-        // Horizontal offset from wind (1:1 with wind speed in mph)
-        // Convert mph to yards/second: 1 mph = 1.467 yards/second
-        // windSpeed is signed: positive = right, negative = left
-        float mphToYardsPerSec = 1.467;
-        float horizontalDrift = time * windSpeed * mphToYardsPerSec;
+        // Wind interaction with mirage:
+        // < 3 mph: vertical boil dominates
+        // 3-6 mph: shimmer leans (mix of vertical and horizontal)
+        // > 8 mph: horizontal flow dominates, boil fades
+        float absWindSpeed = abs(windSpeed);
+        float verticalFactor = smoothstep(8.0, 0.0, absWindSpeed); // 1.0 at calm, 0.0 at 8+ mph
+        float horizontalFactor = smoothstep(0.0, 8.0, absWindSpeed); // 0.0 at calm, 1.0 at 8+ mph
+        
+        // Adjust vertical rise based on wind (strong wind suppresses vertical convection)
+        float effectiveVerticalRise = verticalRise * (0.3 + 0.7 * verticalFactor);
         
         // Create multiple octaves of noise for realistic heat shimmer
-        // All layers move upward at constant rate, horizontally at wind speed
-        // Use world position so mirage is anchored to landscape
-        
         // Layer 1: Large slow waves (scale 0.5)
         float noise1 = snoise(vec2(
           worldPos.x * 0.5 - horizontalDrift * 0.5 * 0.3,
-          worldPos.y * 0.5 + verticalRise * 0.5 * 0.3
+          worldPos.y * 0.5 + effectiveVerticalRise * 0.5 * 0.3
         ));
         
         // Layer 2: Medium waves (scale 1.0)
         float noise2 = snoise(vec2(
           worldPos.x * 1.0 - horizontalDrift * 1.0 * 0.5,
-          worldPos.y * 1.0 + verticalRise * 1.0 * 0.5
+          worldPos.y * 1.0 + effectiveVerticalRise * 1.0 * 0.5
         ));
         
         // Layer 3: Small fast waves (scale 2.0)
         float noise3 = snoise(vec2(
           worldPos.x * 2.0 - horizontalDrift * 2.0 * 0.8,
-          worldPos.y * 2.0 + verticalRise * 2.0 * 0.8
+          worldPos.y * 2.0 + effectiveVerticalRise * 2.0 * 0.8
         ));
         
         // Combine noise layers with different weights
         float noise = noise1 * 0.5 + noise2 * 0.3 + noise3 * 0.2;
         
-        // Calculate distortion vector
-        // The noise pattern itself creates the distortion
-        vec2 distortion = vec2(noise * 0.2, noise * 0.8);
+        // Calculate distortion vector with wind-dependent balance
+        // Low wind: mostly vertical (0.2 horizontal, 0.8 vertical)
+        // High wind: mostly horizontal (0.8 horizontal, 0.2 vertical)
+        float horizontalMag = mix(0.2, 0.8, horizontalFactor);
+        float verticalMag = mix(0.8, 0.2, horizontalFactor);
+        vec2 distortion = vec2(noise * horizontalMag, noise * verticalMag);
         
-        // Apply intensity (zoom-dependent)
-        distortion *= intensity;
+        // Apply intensity (zoom-dependent and wind-dependent)
+        // Strong wind reduces overall mirage intensity
+        float windAttenuation = mix(1.0, 0.3, smoothstep(3.0, 10.0, absWindSpeed));
+        distortion *= intensity * windAttenuation;
         
         // Scale distortion to pixel space
         vec2 distortedUV = uv + distortion * 0.01;
@@ -158,6 +165,7 @@ export class MirageEffect
         tDiffuse: { value: null },
         time: { value: 0 },
         intensity: { value: 0 },
+        horizontalDrift: { value: 0 },
         windSpeed: { value: 0 },
         worldOffset: { value: new THREE.Vector2(0, 0) },
         worldScale: { value: 1.0 }
@@ -181,6 +189,10 @@ export class MirageEffect
     // Update time for animation
     this.material.uniforms.time.value = time;
     
+    // Calculate delta time for integration
+    const dt = this.lastUpdateTime > 0 ? time - this.lastUpdateTime : 0;
+    this.lastUpdateTime = time;
+    
     // Calculate intensity based on FOV (smaller FOV = more zoom = more mirage)
     const baseFOV = 30; // Reference FOV (main camera)
     const zoomFactor = baseFOV / fov;
@@ -203,18 +215,19 @@ export class MirageEffect
     const worldScale = intersection.distance * Math.tan((fov * Math.PI / 180) / 2) * 2;
     this.material.uniforms.worldScale.value = worldScale;
     
-    // Sample wind at random points within the viewing area
+    // Sample wind at fixed intervals along line of sight
+    // Using fixed positions eliminates sampling noise
     const targetDistance = intersection.distance;
-    const numSamples = 10; // Number of random sample points
+    const numSamples = 10; // Number of sample points
     
     let totalWindX = 0;
+    let totalWeight = 0;
     
     for (let i = 0; i < numSamples; i++)
     {
-      // Random distance along line of sight (slight bias toward longer range)
-      // Using square gives more samples at longer distances
-      const randomFactor = Math.pow(Math.random(), 0.7); // 0.7 gives slight bias toward target
-      const sampleDistance = targetDistance * randomFactor;
+      const t = (i + 1) / numSamples; // 0.1, 0.2, ..., 1.0
+      const biasedT = Math.pow(t, 0.5); // bias toward target
+      const sampleDistance = targetDistance * biasedT;
       
       // Calculate position at this distance along the line of sight
       const ratio = sampleDistance / targetDistance;
@@ -229,23 +242,24 @@ export class MirageEffect
         time
       );
       
-      totalWindX += wind.x;
+      // Weight samples by distance (farther = more important)
+      const weight = biasedT;
+      totalWindX += wind.x * weight;
+      totalWeight += weight;
     }
     
-    // Compute average crosswind from random samples
-    const avgWindX = totalWindX / numSamples;
+    // Compute weighted average crosswind
+    this.currentWindX = totalWindX / totalWeight;
     
-    // Apply exponential moving average (EMA) to smooth wind changes
-    // EMA formula: smoothed = alpha * new + (1 - alpha) * smoothed
-    this.smoothedWindX = this.emaAlpha * avgWindX + (1 - this.emaAlpha) * this.smoothedWindX;
+    // Integrate wind speed over time to get accumulated drift
+    // Convert mph to yards/second: 1 mph = 1.467 yards/second
+    const mphToYardsPerSec = 1.467;
+    const driftThisFrame = this.currentWindX * mphToYardsPerSec * dt;
+    this.accumulatedDrift += driftThisFrame;
     
-    // For mirage, we only care about crosswind (X component)
-    // Downrange wind (Z) doesn't affect bullet drift
-    // Positive = left-to-right, negative = right-to-left
-    // Wind speed should move mirage at 1:1 ratio
-    // Sign indicates direction: positive = right, negative = left
-    this.material.uniforms.windSpeed.value = this.smoothedWindX;
-    //console.log('Spotting scope:', this.smoothedWindX);
+    // Pass wind data to shader
+    this.material.uniforms.horizontalDrift.value = this.accumulatedDrift;
+    this.material.uniforms.windSpeed.value = Math.abs(this.currentWindX); // Shader uses absolute value for wind effects
   }
   
   /**
@@ -258,6 +272,15 @@ export class MirageEffect
     this.material.uniforms.tDiffuse.value = inputTexture;
     this.renderer.setRenderTarget(outputTarget);
     this.renderer.render(this.scene, this.camera);
+  }
+  
+  /**
+   * Get current wind speed (crosswind component only)
+   * @returns {number} Current wind speed in mph (positive = right, negative = left)
+   */
+  getSmoothedWindSpeed()
+  {
+    return this.currentWindX;
   }
   
   /**

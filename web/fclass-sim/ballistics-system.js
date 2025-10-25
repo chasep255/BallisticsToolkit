@@ -138,7 +138,7 @@ export class BallisticsSystem
     
     const dt = 0.001;
     const maxIterations = 1000;
-    const tolerance = 0.01; // 0.01 yards (~0.36 inches) tolerance
+    const tolerance = 0.001; // 0.001 yards
     
     for (let iter = 0; iter < maxIterations; iter++)
     {
