@@ -1,0 +1,18 @@
+# GitHub Pages headers file
+# Force cache expiration every hour for all assets
+
+# HTML files - 1 hour cache
+/*.html
+  Cache-Control: public, max-age=3600
+
+# JavaScript files - 1 hour cache  
+/*.js
+  Cache-Control: public, max-age=3600
+
+# WebAssembly files - 1 hour cache
+/*.wasm
+  Cache-Control: public, max-age=3600
+
+# CSS files - 1 hour cache
+/*.css
+  Cache-Control: public, max-age=3600
