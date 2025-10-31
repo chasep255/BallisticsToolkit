@@ -337,7 +337,8 @@ namespace btk::physics
       WindGenerator w;
       w.setAdvectionGain(5.0);
       w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);       // steady base
-      w.addComponent(6.0_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f, 3.0_mph); // gusty bands across the range (2.5 mph threshold)
+      w.addComponent(1.5_mph, 2000.0_yd, 2000.0_yd, 5.0_min, 0.5f);       // local variations
+      w.addComponent(6.0_mph, 1000.0_yd, 1000.0_yd, 0.5_min, 0.5f, 3.0_mph); // gusts
       return w;
     };
 
