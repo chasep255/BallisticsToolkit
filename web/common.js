@@ -6,25 +6,17 @@
 
   if (isProduction)
   {
-    console.log('Google Analytics is enabled');
     const GA_MEASUREMENT_ID = 'G-JWTD9KG6D6';
-
-    // Load gtag.js script dynamically
     const gtagScript = document.createElement('script');
     gtagScript.async = true;
     gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
     document.head.appendChild(gtagScript);
 
-    // Initialize dataLayer and gtag
     window.dataLayer = window.dataLayer || [];
-
-    function gtag()
-    {
-      dataLayer.push(arguments);
-    }
+    function gtag(){ dataLayer.push(arguments); }
     window.gtag = gtag;
     gtag('js', new Date());
-    gtag('config', GA_MEASUREMENT_ID);
+    gtag('config', GA_MEASUREMENT_ID, { 'anonymize_ip': true });
   }
 })();
 
@@ -66,7 +58,6 @@ function generateNavigation(currentPageName)
   const isWindSim = currentPageName === 'wind-sim';
   const isWindGame = currentPageName === 'wind-game';
   const isFClassSim = currentPageName === 'fclass-sim';
-  const isAbout = currentPageName === 'about';
 
   const navHTML = `
         <div class="nav-content">
@@ -80,7 +71,6 @@ function generateNavigation(currentPageName)
                 <a href="${pathPrefix}target-sim/target-sim.html" ${isTargetSim ? 'class="active"' : ''}>Target Simulator</a>
                 <a href="${pathPrefix}wind-sim/wind-sim.html" ${isWindSim ? 'class="active"' : ''}>Wind Simulator</a>
                 <a href="${pathPrefix}fclass-sim/fclass-sim.html" ${isFClassSim ? 'class="active"' : ''}>F-Class Simulator</a>
-                <a href="${pathPrefix}about.html" ${isAbout ? 'class="active"' : ''}>About</a>
             </div>
         </div>
     `;
@@ -109,6 +99,31 @@ function setupCommonPageStructure()
 
   // Generate navigation content
   navHeader.innerHTML = generateNavigation(currentPageName);
+
+  // Add site footer with legal links
+  let footer = document.querySelector('.site-footer');
+  if (!footer)
+  {
+    const pathPrefix = (currentPageName === 'index' || currentPageName === 'about') ? '' : '../';
+    footer = document.createElement('div');
+    footer.className = 'site-footer';
+    footer.style.cssText = 'margin-top:40px;padding:20px 0;border-top:1px solid #e5e5e5;color:#666;font-size:14px;';
+    footer.innerHTML = `
+      <div class="app-container" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+        <span>© ${new Date().getFullYear()} Ballistics Toolkit</span>
+        <span>·</span>
+        <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener">GitHub</a>
+        <span style="flex:1 1 auto"></span>
+        <a href="${pathPrefix}about.html">About</a>
+        <span>·</span>
+        <a href="${pathPrefix}terms.html">Terms</a>
+        <span>·</span>
+        <a href="${pathPrefix}privacy.html">Privacy</a>
+        <span>·</span>
+        <a href="${pathPrefix}cookies.html">Cookies</a>
+      </div>`;
+    document.body.appendChild(footer);
+  }
 }
 
 // Initialize common functionality when DOM is loaded

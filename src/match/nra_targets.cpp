@@ -5,9 +5,9 @@
 namespace btk::match
 {
 
-  std::map<std::string, btk::match::Target> NRATargets::targets_;
+  std::map<std::string, btk::match::Target> Targets::targets_;
 
-  btk::match::Target NRATargets::getTarget(const std::string& name)
+  btk::match::Target Targets::getTarget(const std::string& name)
   {
     if(targets_.empty())
     {
@@ -17,13 +17,13 @@ namespace btk::match
     auto it = targets_.find(name);
     if(it == targets_.end())
     {
-      throw std::invalid_argument("NRA target '" + name + "' not found");
+      throw std::invalid_argument("Target '" + name + "' not found");
     }
 
     return it->second;
   }
 
-  std::vector<std::string> NRATargets::listTargets()
+  std::vector<std::string> Targets::listTargets()
   {
     if(targets_.empty())
     {
@@ -38,7 +38,7 @@ namespace btk::match
     return names;
   }
 
-  bool NRATargets::hasTarget(const std::string& name)
+  bool Targets::hasTarget(const std::string& name)
   {
     if(targets_.empty())
     {
@@ -48,7 +48,7 @@ namespace btk::match
     return targets_.find(name) != targets_.end();
   }
 
-  void NRATargets::initializeTargets()
+  void Targets::initializeTargets()
   {
     // Short Range (SR) Series
     targets_.emplace("SR", btk::match::Target("SR", btk::math::Conversions::inchesToMeters(7.0f), btk::math::Conversions::inchesToMeters(13.0f), btk::math::Conversions::inchesToMeters(19.0f),

@@ -137,7 +137,7 @@ class TargetSimulator
     targetSelect.innerHTML = '';
 
     // Get available targets from C++
-    const availableTargets = btk.NRATargets.listTargets();
+    const availableTargets = btk.Targets.listTargets();
 
     // Add each target as an option directly from C++ vector
     const targetNames = [];
@@ -326,7 +326,7 @@ class TargetSimulator
     this.atmosphere = new btk.Atmosphere(temperature, altitude, humidity, 0.0);
 
     // Get target
-    this.target = btk.NRATargets.getTarget(targetName);
+    this.target = btk.Targets.getTarget(targetName);
     if (!this.target)
     {
       throw new Error(`Unknown target: ${targetName}`);

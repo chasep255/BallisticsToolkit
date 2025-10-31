@@ -9,15 +9,15 @@ namespace btk::match
 {
 
   /**
-   * @brief NRA standard targets for competitive shooting
+   * @brief Standard targets for competitive shooting
    *
-   * Contains all standard NRA targets with exact ring diameters.
+   * Contains all standard competitive targets with exact ring diameters.
    */
-  class NRATargets
+  class Targets
   {
     public:
     /**
-     * @brief Get a specific NRA target by name
+     * @brief Get a specific target by name
      *
      * @param name Target name (e.g., "SR", "MR-1", "LR-1")
      * @return Target object

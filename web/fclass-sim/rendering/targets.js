@@ -30,7 +30,7 @@ export class TargetRenderer
     this.pitsHeight = config.pitsHeight;
     this.pitsDepth = config.pitsDepth;
     this.pitsOffset = config.pitsOffset;
-    this.targetType = config.targetType; // NRA target type (e.g., "MR-1")
+    this.targetType = config.targetType; // Target type (e.g., "MR-1")
 
     // Target configuration with defaults
     this.cfg = {

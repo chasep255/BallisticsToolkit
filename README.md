@@ -1,6 +1,6 @@
 # Ballistics Toolkit
 
-Web-based ballistics calculator and match simulation suite for long-range shooting. Fast, accurate trajectory calculations with atmospheric and wind compensation, plus Monte Carlo match simulation with NRA targets.
+Web-based ballistics calculator and match simulation suite for long-range shooting. Fast, accurate trajectory calculations with atmospheric and wind compensation, plus Monte Carlo match simulation with competitive targets.
 
 **Website:** https://www.ballisticstoolkit.com/
 
@@ -15,10 +15,10 @@ Web-based ballistics calculator and match simulation suite for long-range shooti
 
 ### 🎯 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
-- **NRA Target Library** - 14 NRA targets (10 standard + 4 F-Class variants)
+- **Target Library** - 14 competitive targets (10 standard + 4 F-Class variants)
 - **Realistic Variability** - Muzzle velocity, wind, and rifle accuracy modeling
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
-- **Match Scoring** - Complete NRA scoring with X-counts and group size analysis
+- **Match Scoring** - Complete competitive scoring with X-counts and group size analysis
 
 ### 🌬️ Wind Simulator
 - **Real-time Wind Visualization** - Interactive 2D wind field visualization showing wind speed and direction across the range
@@ -33,7 +33,7 @@ Web-based ballistics calculator and match simulation suite for long-range shooti
 - **Dual Scopes** - Spotting scope for wind reading, rifle scope for precision aiming
 - **Wind Reading** - Heat mirage effect responds to wind speed and direction; reactive 3D wind flags at multiple distances
 - **Advanced Wind Simulation** - Multi‑octave curl noise with per‑component advection and multiple presets
-- **Match-Style Scoring** - Authentic target animation, NRA scoring with X-count, detailed scorecard
+- **Match-Style Scoring** - Authentic target animation, competitive scoring with X-count, detailed scorecard
 - **Immersive Environment** - Procedural terrain, dynamic audio, comprehensive HUD
 - **Debug Mode** - Add `?debug=1` to URL for rapid testing (1-min relays, 2 shots)
 
@@ -57,7 +57,7 @@ Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/
 3. **Variability** - MV standard deviation, wind variability, rifle accuracy
 4. **Environment** - Altitude, temperature, humidity, pressure
 
-Watch realistic shot impacts on NRA targets with detailed logging and statistical analysis.
+Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis.
 
 ### F-Class Simulator
 Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html):
@@ -97,7 +97,7 @@ Opens local server at http://localhost:8001
 - **Units**: SI base units internally with conversion utilities for user-friendly I/O
 - **Performance**: Optimized C++ core with direct vector operations
 - **Wind Module**: `WindGenerator` class (C++) implements a 2D curl field sampled from Simplex noise (x, y, t) with multi‑octave components (strength, spatial/temporal scales, exponent reshaping, optional sigmoid gating). Uses RMS normalization (one-time initialization from 1000 samples) for stable magnitude distribution, global advection (unified pattern movement), and clipping at 2x strength to prevent unrealistic wind speeds
-- **Match Scoring**: Complete NRA scoring system with statistical analysis
+- **Match Scoring**: Complete competitive scoring system with statistical analysis
 - **Deployment**: GitHub Actions auto-deploys to GitHub Pages
 - **Architecture**: Client-side only, no server required
 

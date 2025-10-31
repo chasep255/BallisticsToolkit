@@ -4,22 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Target Simulator - Monte Carlo Match Simulation | Ballistics Toolkit</title>
-    <meta name="description" content="Monte Carlo match simulator with NRA targets. Analyze shooting performance with statistical modeling, realistic variability, and detailed scoring.">
-    <meta name="keywords" content="target simulator, Monte Carlo simulation, NRA targets, match simulation, shooting statistics, score analysis">
+    <meta name="description" content="Monte Carlo match simulator with competitive targets. Analyze shooting performance with statistical modeling, realistic variability, and detailed scoring.">
+    <meta name="keywords" content="target simulator, Monte Carlo simulation, competitive targets, match simulation, shooting statistics, score analysis">
     <link rel="canonical" href="https://www.ballisticstoolkit.com/target-sim/target-sim.html">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://www.ballisticstoolkit.com/target-sim/target-sim.html">
     <meta property="og:title" content="Target Simulator - Monte Carlo Match Simulation">
-    <meta property="og:description" content="Monte Carlo match simulator with NRA targets. Analyze shooting performance with statistical modeling, realistic variability, and detailed scoring.">
+    <meta property="og:description" content="Monte Carlo match simulator with competitive targets. Analyze shooting performance with statistical modeling, realistic variability, and detailed scoring.">
     <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://www.ballisticstoolkit.com/target-sim/target-sim.html">
     <meta property="twitter:title" content="Target Simulator - Monte Carlo Match Simulation">
-    <meta property="twitter:description" content="Monte Carlo match simulator with NRA targets. Analyze shooting performance with statistical modeling, realistic variability, and detailed scoring.">
+    <meta property="twitter:description" content="Monte Carlo match simulator with competitive targets. Analyze shooting performance with statistical modeling, realistic variability, and detailed scoring.">
     <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
     
     <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
@@ -32,7 +32,7 @@
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "Target Simulator",
-      "description": "Monte Carlo match simulator with NRA targets and statistical analysis",
+      "description": "Monte Carlo match simulator with competitive targets and statistical analysis",
       "url": "https://www.ballisticstoolkit.com/target-sim/target-sim.html",
       "applicationCategory": "UtilitiesApplication",
       "operatingSystem": "Web Browser",
@@ -61,7 +61,7 @@
             <div class="param-item"><label for="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">Drag</label><select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data"><option value="G1">G1</option><option value="G7" selected>G7</option></select></div>
             <div class="param-item"><label for="mv" title="Muzzle velocity in feet per second">MV (fps)</label><input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second"></div>
             <div class="param-item"><label for="diameter" title="Bullet diameter in inches (e.g., 0.264 for 6.5mm)">Dia (in)</label><input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches (e.g., 0.264 for 6.5mm)"></div>
-            <div class="param-item"><label for="target" title="NRA target type for scoring">Target</label><select id="target" title="NRA target type for scoring"><option value="Loading...">Loading targets...</option></select></div>
+            <div class="param-item"><label for="target" title="Target type for scoring">Target</label><select id="target" title="Target type for scoring"><option value="Loading...">Loading targets...</option></select></div>
             <div class="param-item"><label for="range" title="Target range in yards">Range (yd)</label><input type="number" id="range" value="600" step="50" min="100" max="1000" title="Target range in yards"></div>
             <div class="param-item"><label for="shots" title="Number of shots per match">Shots/Match</label><input type="number" id="shots" value="60" step="10" min="10" max="200" title="Number of shots per match"></div>
             <div class="param-item"><label for="matches" title="Number of matches to simulate">Matches</label><input type="number" id="matches" value="10" step="1" min="1" max="100" title="Number of matches to simulate"></div>
@@ -137,7 +137,7 @@
                 <div class="help-section">
                     <h3>Target & Match Parameters</h3>
                     <div class="param-help">
-                        <strong>Target Type:</strong> NRA standard targets with specific ring diameters. SR (200-300yd), MR (300-600yd), LR (800-1000yd). FCA variants are custom-designed targets optimized for F-Class shooting with different ring proportions.<br><br>
+                        <strong>Target Type:</strong> Standard competitive targets with specific ring diameters. SR (200-300yd), MR (300-600yd), LR (800-1000yd). FCA variants are custom-designed targets optimized for F-Class shooting with different ring proportions.<br><br>
                         <strong>Range:</strong> Distance to target in yards.<br><br>
                         <strong>Shots/Match:</strong> Number of rounds per match.<br><br>
                         <strong>Matches:</strong> Number of complete matches to simulate. Higher values improve statistical significance but increase computation time.
