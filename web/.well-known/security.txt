@@ -1,0 +1,6 @@
+# Security.txt for Ballistics Toolkit
+Contact: https://github.com/chasep255/BallisticsToolkit/issues
+Preferred-Languages: en
+Policy: https://www.ballisticstoolkit.com/terms.html
+Expires: 2026-10-31T00:00:00Z
+
