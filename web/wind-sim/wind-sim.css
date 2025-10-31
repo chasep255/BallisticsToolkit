@@ -1,0 +1,117 @@
+/* Wind Visualizations Container */
+.wind-visualizations-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin: 20px 0;
+}
+
+/* Individual Wind Field Visualization */
+.wind-field-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.wind-field-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+
+.wind-field-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 50px;  /* Space for X-axis labels */
+  margin-left: 60px;    /* Space for Y-axis labels */
+  position: relative;
+}
+
+.wind-field-canvas {
+  border: 1px solid #ddd;
+  background: #f8f9fa;
+  width: 100%;
+  max-width: 1000px;
+  height: auto;
+  aspect-ratio: 5 / 1;
+}
+
+.axis-labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.x-axis-label {
+  position: absolute;
+  bottom: -25px;
+  font-size: 12px;
+  color: #666;
+}
+
+.x-axis-label.left { left: 0; }
+.x-axis-label.center { left: 50%; transform: translateX(-50%); }
+.x-axis-label.right { right: 0; }
+.x-axis-label.title { 
+  bottom: -40px; 
+  left: 50%; 
+  transform: translateX(-50%); 
+  font-size: 14px; 
+  color: #333; 
+  font-weight: bold; 
+}
+
+.y-axis-label {
+  position: absolute;
+  left: -30px;
+  font-size: 12px;
+  color: #666;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+.y-axis-label.bottom { bottom: 0; }
+.y-axis-label.center { top: 50%; }
+.y-axis-label.top { top: 0; }
+.y-axis-label.title { 
+  left: -50px; 
+  top: 50%; 
+  font-size: 14px; 
+  color: #333; 
+  font-weight: bold; 
+}
+
+.legend {
+  color: #aaa;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+#overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: none;
+  pointer-events: none;
+  width: 100%;
+  height: calc(100vh - 180px);
+}
+
+.legend {
+  color: #aaa;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+
+

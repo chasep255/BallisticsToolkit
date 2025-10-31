@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>F-Class Simulator - Interactive Long-Range Shooting | Ballistics Toolkit</title>
+  <meta name="description" content="Interactive F-Class shooting simulator with realistic ballistics, 3D visualization, and wind effects. Practice long-range precision shooting at 300-1000 yards.">
+  <meta name="keywords" content="F-Class simulator, shooting simulator, long range shooting, 3D shooting game, ballistics simulation, wind reading, mirage effect">
+  <link rel="canonical" href="https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html">
+  <meta property="og:title" content="F-Class Simulator - Interactive Long-Range Shooting">
+  <meta property="og:description" content="Interactive F-Class shooting simulator with realistic ballistics, 3D visualization, and wind effects. Practice long-range precision shooting at 300-1000 yards.">
+  <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html">
+  <meta property="twitter:title" content="F-Class Simulator - Interactive Long-Range Shooting">
+  <meta property="twitter:description" content="Interactive F-Class shooting simulator with realistic ballistics, 3D visualization, and wind effects. Practice long-range precision shooting at 300-1000 yards.">
+  <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
+  
+  <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
+  <link rel="stylesheet" href="../common.css">
+  <link rel="stylesheet" href="fclass-sim.css">
+  
+  <!-- Schema.org structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    "name": "F-Class Simulator",
+    "description": "Interactive F-Class shooting simulator with realistic ballistics and 3D visualization",
+    "url": "https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html",
+    "applicationCategory": "Game",
+    "operatingSystem": "Web Browser",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "gamePlatform": "Web Browser"
+  }
+  </script>
+  
+  <script src="../common.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="simulator.js"></script>
+</head>
+<body data-page="fclass-sim">
+  <div class="nav-header"></div>
+
+  <div class="app-container">
+        <h1>🎮 F-Class Simulator</h1>
+
+    <div class="params-bar">
+      <div class="param-item">
+        <label for="fclassMode" title="F-Class shooting discipline">F-Class Mode</label>
+        <select id="fclassMode" title="F-Class shooting discipline">
+          <option value="fclass-300">F-Class (300 yards)</option>
+          <option value="fclass-500">F-Class (500 yards)</option>
+          <option value="fclass-600">F-Class (600 yards)</option>
+          <option value="fclass-800">F-Class (800 yards)</option>
+          <option value="fclass-900">F-Class (900 yards)</option>
+          <option value="fclass-1000" selected>F-Class (1000 yards)</option>
+        </select>
+      </div>
+      <div class="param-item">
+        <label for="windPreset" title="Wind conditions">Wind</label>
+        <select id="windPreset" title="Wind conditions">
+          <!-- Options will be populated dynamically from C++ -->
+        </select>
+      </div>
+      <div class="param-item">
+        <label for="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom">Reticle</label>
+        <select id="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom">
+          <option value="SFP" selected>SFP (Fixed)</option>
+          <option value="FFP">FFP (Scaling)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Bullet Parameters -->
+    <div class="params-bar">
+      <div class="param-item">
+        <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
+        <input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">
+      </div>
+      <div class="param-item">
+        <label for="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">Drag</label>
+        <select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">
+          <option value="G1">G1</option>
+          <option value="G7" selected>G7</option>
+        </select>
+      </div>
+      <div class="param-item">
+        <label for="mv" title="Muzzle velocity in feet per second">MV (fps)</label>
+        <input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second">
+      </div>
+      <div class="param-item">
+        <label for="diameter" title="Bullet diameter in inches (e.g., 0.264 for 6.5mm)">Dia (in)</label>
+        <input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches (e.g., 0.264 for 6.5mm)">
+      </div>
+      <div class="param-item">
+        <label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label>
+        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps">
+      </div>
+      <div class="param-item">
+        <label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label>
+        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">
+      </div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div style="display: flex; align-items: center; gap: 10px; justify-content: center; margin: 15px 0;">
+      <button id="startBtn" class="btn btn-primary">Start Game</button>
+      <button id="pauseBtn" class="btn btn-secondary" style="display: none;">Pause</button>
+      <button id="restartBtn" class="btn btn-secondary" style="display: none;">Restart</button>
+      <button id="scorecardBtn" class="btn btn-secondary" style="display: none;">Scorecard</button>
+      <button id="goForRecordBtn" class="btn btn-secondary" style="display: none;">Go For Record</button>
+      <button id="helpBtn" class="btn btn-secondary">Help</button>
+    </div>
+
+    <div id="error" class="error" style="display: none;"></div>
+    
+    <div class="canvas-wrap">
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+      
+      <!-- Quick Key Guide -->
+      <div class="quick-keys">
+        <div class="quick-keys-section">
+          <strong>Spotting Scope:</strong><br>
+          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Pan • <kbd>E</kbd><kbd>Q</kbd> Zoom
+        </div>
+        <div class="quick-keys-section">
+          <strong>Rifle Scope:</strong><br>
+          <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Aim<br>
+          <kbd>Shift</kbd>+<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Dial<br>
+          <kbd>+</kbd><kbd>-</kbd> Zoom • <kbd>R</kbd> Reset
+        </div>
+        <div class="quick-keys-section">
+          <strong>Fire:</strong> <kbd>Space</kbd>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="help-modal" style="display: none;">
+    <div class="help-modal-content">
+      <div class="help-modal-header">
+                <h2>F-Class Simulator Help</h2>
+        <span class="help-close">&times;</span>
+      </div>
+      <div class="help-modal-body">
+        <div class="help-section">
+          <h3>Overview</h3>
+          <p>F-Class Simulator is an interactive 3D shooting simulator that recreates the experience of long-range F-Class competition shooting. Practice reading wind, managing ballistics, and making precise shots at standard F-Class distances from 300 to 1000 yards.</p>
+        </div>
+        
+        <div class="help-section">
+          <h3>Controls</h3>
+          <div class="param-help">
+            <strong>Spotting Scope (Bottom-Left):</strong><br>
+            - <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Pan • <kbd>E</kbd>/<kbd>Q</kbd> Zoom<br>
+            - Movement scales with FOV (slower when zoomed in)<br>
+            - Use to read mirage and flags across the range<br><br>
+
+            <strong>Rifle Scope (Bottom-Right):</strong><br><br>
+            
+            <strong>Controls:</strong><br>
+            - <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Aim (holdover)<br>
+            - <kbd>Shift</kbd>+<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Dial scope (1/8 MOA clicks, ±10 MOA limit)<br>
+            - <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out<br>
+            - <kbd>R</kbd> Reset Rifle Scope (zero dial, initial zoom, and center on target)<br><br>
+            
+            <strong>Features:</strong><br>
+            - Dial position displayed in lower right (elevation/windage in MOA)<br>
+            - Configurable SFP/FFP reticle with red crosshair<br>
+            - SFP: reticle stays fixed size, MOA accurate at initial zoom only<br>
+            - FFP: reticle scales with zoom, MOA always accurate<br>
+            - Tick marks at 1 MOA (minor) and 2 MOA (major) intervals<br>
+            - Reticle stays fixed at target base height during pit cycles<br><br>
+
+            <strong>Firing:</strong><br>
+            - <kbd>Space</kbd> Fire shot (blocked while your target is down)<br><br>
+
+            <strong>Buttons:</strong><br>
+            - Start: begin the match
+            - Restart: confirm dialog, restarts the match
+            - Scorecard: open detailed per-relay score view
+            - Go For Record: end sighters early in the current relay
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Wind & Mirage</h3>
+          <div class="param-help">
+            <strong>Wind Flags:</strong><br>
+            - Read angle/flap; watch multiple distances for shear<br><br>
+
+            <strong>Mirage (what you’ll see):</strong><br>
+            - Higher zoom = clearer shimmer; always rises upward<br>
+            - Crosswind pushes the pattern horizontally<br>
+            - &lt; 3 mph: vertical boil • 3–6 mph: leaning • &gt; 8 mph: mostly horizontal flow<br><br>
+
+            <strong>Mirage (how it works here):</strong><br>
+            - World-anchored distortion, not screen-space<br>
+            - Samples wind in the last 25% of distance to target (6 samples at 75%, 80%, 85%, 90%, 95%, 100%)<br>
+            - Drift integrates current crosswind over time (nearly instantaneous direction changes)<br><br>
+
+            <strong>Wind Presets:</strong><br>
+            - Presets include Dead, Calm, Moderate, Strong, Shear
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Match Flow</h3>
+          <div class="param-help">
+            - 3 relays • 20 minutes each • 20 record shots per relay<br>
+            - Relay 1: unlimited sighters • Relays 2–3: 2 sighters<br>
+            - "Go For Record" ends sighters early for the current relay<br>
+            - Relay ends at 20 record shots or when time expires<br>
+            - Acknowledge the relay-complete dialog to proceed<br>
+            - Your rifle is disabled while your target is down<br>
+            - Timer pauses when you tab away (no reset on return)
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Ballistic Parameters</h3>
+          <div class="param-help">
+            <strong>BC (Ballistic Coefficient):</strong> Aerodynamic efficiency (0.001-1.0). Higher = less wind drift and drop<br><br>
+            <strong>Drag Function:</strong> G7 for modern boat-tail bullets, G1 for flat-base or older projectiles<br><br>
+            <strong>MV (Muzzle Velocity):</strong> Initial velocity in fps. Critical for trajectory and time-of-flight<br><br>
+            <strong>Diameter:</strong> Bullet caliber in inches. Affects line-breaking scoring<br><br>
+            <strong>MV σ (Standard Deviation):</strong> Velocity variation in fps. Lower = more consistent. Default: 7 fps<br><br>
+            <strong>Accuracy (MOA):</strong> Rifle+shooter precision. 1 MOA ≈ 1 inch at 100 yards. Default: 0.25 MOA
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>HUD (Top-Right)</h3>
+          <div class="param-help">
+            - Relay and Timer<br>
+            - Sighters: N/∞ (Relay 1) or N/2 (Relays 2–3), shown only during sighters<br>
+            - Shots: N/20 during record phase (green at 20/20)<br>
+            - Score and X-count; Dropped points and X<br>
+            - Last Shot, MV, Impact V, FPS
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Scorecard</h3>
+          <div class="param-help">
+            - Shows match parameters at top (distance, target, wind, bullet specs, rifle accuracy)<br>
+            - Per-relay view with sighters row and two rows of 10 record shots<br>
+            - Relay totals and overall match total at the bottom<br>
+            - Available before first shot (shows parameters immediately)
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Audio</h3>
+          <div class="param-help">
+            - Wind noise volume scales smoothly with wind speed (silent at 0 mph)<br>
+            - Shot sounds with background range activity
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Debug Mode</h3>
+          <div class="param-help">
+            - Add <code>?debug=1</code> to the URL for 1‑minute relays with 2 record shots (rapid testing)<br>
+            - Includes wind overlay and detailed console logging
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Technical Features</h3>
+          <div class="param-help">
+            - Comprehensive logging in browser console (zeroing, shots, wind, scoring)<br>
+            - Clean memory management (no leaks, proper restart)<br>
+            - Multi‑octave curl noise with per‑component advection for natural wind variation<br>
+            - WebAssembly ballistics engine for accurate trajectory calculations
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Tips for Success</h3>
+          <div class="param-help">
+            - Start with calm wind conditions to learn the basics<br>
+            - Use the spotting scope to observe flags, mirage, and shot impacts<br>
+            - Compare mirage and flags at different distances for wind gradients<br>
+            - Watch the red shot marker to see your last impact<br>
+            - Make small adjustments to your aim point (0.1" increments)<br>
+            - Pay attention to wind flag behavior along the entire range<br>
+            - Higher BC bullets drift less in the wind<br>
+            - Lower MV standard deviation = more consistent impacts<br>
+            - Practice at shorter distances before attempting 1000 yards
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Scorecard Modal -->
+  <div id="scorecardModal" class="scorecard-modal" style="display: none;">
+    <div class="scorecard-content">
+      <!-- Content will be dynamically generated by scorecard.js -->
+    </div>
+  </div>
+</body>
+</html>

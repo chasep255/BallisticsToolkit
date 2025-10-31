@@ -1,0 +1,236 @@
+.canvas-wrap {
+  position: relative;
+  max-width: 1600px;
+  margin: 16px auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#gameCanvas {
+  width: 100%;
+  max-width: 1600px;
+  max-height: 85vh;
+  aspect-ratio: 4/3;
+  display: block;
+  border: 1px solid #ddd;
+  background: #f8f9fa;
+  margin: 0 auto;
+}
+
+.game-info {
+  color: #666;
+  font-size: 12px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* Quick Key Guide */
+.quick-keys {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  font-size: 13px;
+  color: #333;
+  flex-wrap: wrap;
+}
+
+.quick-keys-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-keys kbd {
+  display: inline-block;
+  padding: 3px 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: bold;
+  color: #333;
+  background: linear-gradient(to bottom, #f9f9f9 0%, #e8e8e8 100%);
+  border: 1px solid #aaa;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 0 #fff;
+  white-space: nowrap;
+  margin: 0 1px;
+}
+
+@media (max-width: 768px) {
+  .quick-keys {
+    font-size: 11px;
+    gap: 12px;
+    padding: 8px;
+  }
+  
+  .quick-keys kbd {
+    padding: 2px 4px;
+    font-size: 10px;
+  }
+}
+
+/* Scorecard Modal */
+.scorecard-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.scorecard-content {
+  background: #f0f8ff;
+  border: 3px solid #2c5aa0;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.scorecard-header {
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  color: #2c5aa0;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #2c5aa0;
+}
+
+.match-params {
+  background: white;
+  border: 2px solid #2c5aa0;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.match-params-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.param-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.param-label {
+  font-weight: bold;
+  color: #2c5aa0;
+  font-size: 13px;
+}
+
+.param-value {
+  color: #333;
+  font-size: 13px;
+}
+
+.scorecard-relay {
+  margin-bottom: 24px;
+  background: white;
+  border: 2px solid #2c5aa0;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.relay-header {
+  font-size: 18px;
+  font-weight: bold;
+  color: #2c5aa0;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.scorecard-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.row-label {
+  font-weight: bold;
+  min-width: 80px;
+  color: #333;
+  font-size: 14px;
+}
+
+.shot-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+}
+
+.shot-cell {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #666;
+  font-weight: bold;
+  font-size: 14px;
+  border-radius: 3px;
+}
+
+.shot-cell.sighter {
+  background: #ffffcc;
+  color: #333;
+}
+
+.shot-cell.record {
+  background: white;
+  color: #000;
+}
+
+.shot-cell.empty {
+  background: #e0e0e0;
+  color: #999;
+  border-color: #ccc;
+}
+
+.relay-total {
+  font-weight: bold;
+  font-size: 16px;
+  color: #2c5aa0;
+  min-width: 100px;
+  text-align: right;
+  padding-left: 12px;
+}
+
+.relay-total-placeholder {
+  min-width: 100px;
+  padding-left: 12px;
+}
+
+.scorecard-footer {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 3px solid #2c5aa0;
+  text-align: center;
+}
+
+.match-total {
+  font-size: 20px;
+  font-weight: bold;
+  color: #2c5aa0;
+}

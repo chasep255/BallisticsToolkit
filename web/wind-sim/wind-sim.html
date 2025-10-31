@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wind Simulator - Real-Time Wind Visualization | Ballistics Toolkit</title>
+  <meta name="description" content="Real-time wind visualization with multi-octave curl noise and per-component advection. Visualize wind patterns and atmospheric effects for precision shooting.">
+  <meta name="keywords" content="wind simulator, wind visualization, curl noise, simplex noise, turbulence modeling, atmospheric effects, wind flags">
+  <link rel="canonical" href="https://www.ballisticstoolkit.com/wind-sim/wind-sim.html">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.ballisticstoolkit.com/wind-sim/wind-sim.html">
+  <meta property="og:title" content="Wind Simulator - Real-Time Wind Visualization">
+  <meta property="og:description" content="Real-time wind visualization with multi-octave curl noise and per-component advection. Visualize wind patterns and atmospheric effects for precision shooting.">
+  <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://www.ballisticstoolkit.com/wind-sim/wind-sim.html">
+  <meta property="twitter:title" content="Wind Simulator - Real-Time Wind Visualization">
+  <meta property="twitter:description" content="Real-time wind visualization with multi-octave curl noise and per-component advection. Visualize wind patterns and atmospheric effects for precision shooting.">
+  <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
+  
+  <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
+  <link rel="stylesheet" href="../common.css">
+  <link rel="stylesheet" href="wind-sim.css">
+  
+  <!-- Schema.org structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Wind Simulator",
+    "description": "Real-time wind visualization with multi-octave curl noise and per-component advection",
+    "url": "https://www.ballisticstoolkit.com/wind-sim/wind-sim.html",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Web Browser",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+  
+  <script src="../common.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="wind-sim.js"></script>
+</head>
+<body data-page="wind-sim">
+  <div class="nav-header"></div>
+
+  <div class="app-container">
+      <h1>🌬️ Wind Simulator</h1>
+
+    <div class="params-bar">
+      <div class="param-item">
+        <label for="preset" title="Wind preset pattern">Preset</label>
+        <select id="preset" title="Wind preset pattern">
+          <!-- Options will be populated dynamically from C++ -->
+        </select>
+      </div>
+      <div class="param-item">
+        <label for="timeScale" title="Simulation time speed multiplier (0.1x–20x)">Time Speed</label>
+        <input type="range" id="timeScale" min="0.1" max="20" step="0.1" value="1.0" title="Simulation time speed multiplier">
+        <div id="timeScaleVal" style="text-align:center; font-size:12px; color:#666;">1.0x</div>
+      </div>
+      <div class="param-item">
+        <label for="colorThreshold" title="Wind speed threshold for red color (mph)">Color Threshold</label>
+        <input type="range" id="colorThreshold" min="1" max="30" step="0.5" value="7.5" title="Wind speed threshold for red color">
+        <div id="colorThresholdVal" style="text-align:center; font-size:12px; color:#666;">7.5 mph</div>
+      </div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div style="display: flex; align-items: center; gap: 10px; justify-content: center; margin: 15px 0;">
+      <button id="restartBtn" class="btn btn-primary">Restart</button>
+      <button id="helpBtn" class="btn btn-secondary">Help</button>
+    </div>
+
+    <!-- Wind Statistics -->
+    <div class="stats-container" style="display: flex; justify-content: center; gap: 20px; margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+      <div class="stat-item" style="text-align: center;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Min Speed</div>
+        <div id="minSpeed" style="font-size: 18px; font-weight: bold; color: #007bff;">0.0</div>
+        <div style="font-size: 10px; color: #999;">mph</div>
+      </div>
+      <div class="stat-item" style="text-align: center;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Max Speed</div>
+        <div id="maxSpeed" style="font-size: 18px; font-weight: bold; color: #dc3545;">0.0</div>
+        <div style="font-size: 10px; color: #999;">mph</div>
+      </div>
+      <div class="stat-item" style="text-align: center;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Avg Speed</div>
+        <div id="avgSpeed" style="font-size: 18px; font-weight: bold; color: #28a745;">0.0</div>
+        <div style="font-size: 10px; color: #999;">mph</div>
+      </div>
+      <div class="stat-item" style="text-align: center;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Simulation Time</div>
+        <div id="simulationTime" style="font-size: 18px; font-weight: bold; color: #6f42c1;">0.0</div>
+        <div style="font-size: 10px; color: #999;">seconds</div>
+      </div>
+      <div class="stat-item" style="text-align: center;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Active Components</div>
+        <div id="activeComponents" style="font-size: 18px; font-weight: bold; color: #fd7e14;">0</div>
+        <div style="font-size: 10px; color: #999;">octaves</div>
+      </div>
+      <div class="stat-item" style="text-align: center;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Advection Gain</div>
+        <div id="advectionGain" style="font-size: 18px; font-weight: bold; color: #6f42c1;">1.0</div>
+        <div style="font-size: 10px; color: #999;">multiplier</div>
+      </div>
+      <div class="stat-item" style="text-align: center;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Global Advection Offset</div>
+        <div id="globalAdvectionOffset" style="font-size: 18px; font-weight: bold; color: #6f42c1;">(0.0, 0.0)</div>
+        <div style="font-size: 10px; color: #999;">yards</div>
+      </div>
+      <div class="stat-item" style="text-align: center;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Global Advection Speed</div>
+        <div id="globalAdvectionSpeed" style="font-size: 18px; font-weight: bold; color: #6f42c1;">0.0</div>
+        <div style="font-size: 10px; color: #999;">mph</div>
+      </div>
+    </div>
+
+    <div id="error" class="error" style="display: none;"></div>
+    
+    <!-- Wind Field Visualizations Container -->
+    <div id="windVisualizations" class="wind-visualizations-container">
+      <!-- Visualizations will be dynamically created here -->
+    </div>
+
+    <!-- Wind Field Details Table -->
+    <div class="component-details" style="margin: 20px 0;">
+      <h3 style="text-align: center; margin-bottom: 15px; color: #333;">Wind Field Details</h3>
+      <div style="overflow-x: auto;">
+        <table id="windDetailsTable" style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <thead>
+            <tr style="background: #f8f9fa;">
+              <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: bold;">Field</th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Min Speed<br><span style="font-size: 10px; font-weight: normal; color: #666;">(mph)</span></th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Max Speed<br><span style="font-size: 10px; font-weight: normal; color: #666;">(mph)</span></th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Avg Speed<br><span style="font-size: 10px; font-weight: normal; color: #666;">(mph)</span></th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Strength<br><span style="font-size: 10px; font-weight: normal; color: #666;">(mph)</span></th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Downrange Scale<br><span style="font-size: 10px; font-weight: normal; color: #666;">(yards)</span></th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Crossrange Scale<br><span style="font-size: 10px; font-weight: normal; color: #666;">(yards)</span></th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Temporal Scale<br><span style="font-size: 10px; font-weight: normal; color: #666;">(min)</span></th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Exponent</th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Gate (mph)</th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">RMS</th>
+              <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: bold;">Histogram</th>
+            </tr>
+          </thead>
+          <tbody id="windDetailsTableBody">
+            <!-- Rows will be populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="help-modal" style="display: none;">
+    <div class="help-modal-content">
+      <div class="help-modal-header">
+        <h2>🌬️ Wind Simulator Help</h2>
+        <span class="help-close">&times;</span>
+      </div>
+      <div class="help-modal-body">
+        <div class="help-section">
+          <h3>Quick Start</h3>
+          <p>Select a wind preset and watch realistic wind patterns evolve in real-time. Each simulation uses deterministic wind patterns for consistent behavior.</p>
+        </div>
+        
+        <div class="help-section">
+          <h3>Wind Presets</h3>
+          <div class="param-help">
+            <strong>Dead:</strong> Minimal wind with very smooth, gradual variations<br><br>
+            <strong>Calm:</strong> Light winds with smooth, gentle variations<br><br>
+            <strong>Moderate:</strong> Moderate wind speeds with smooth, predictable patterns<br><br>
+            <strong>Strong:</strong> Strong winds with smooth, consistent flow<br><br>
+            <strong>Shear:</strong> Sharp wind gradients with strong local variations
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Controls</h3>
+          <div class="param-help">
+            <strong>Preset:</strong> Select from different wind patterns, each with unique characteristics for different shooting conditions. The preset determines component strengths, spatial/temporal scales, and exponent values.<br><br>
+            <strong>Time Speed:</strong> Simulation speed multiplier (0.1x-20x). Controls how fast time advances in the simulation. 1.0x = real-time, higher values speed up time evolution. Useful for observing long-term patterns quickly.<br><br>
+            <strong>Color Threshold:</strong> Wind speed (mph) at which arrows turn red in the visualization. All arrows below this threshold show as blue/green, above it they transition to red. Adjust to highlight different wind speed ranges.<br><br>
+            <strong>Restart:</strong> Reset the wind simulation to time zero and regenerate the field. Each restart uses the same preset parameters but produces different patterns due to randomized noise seeds.<br><br>
+            <strong>Clock:</strong> Displays elapsed simulation time in seconds. Time advances according to the Time Speed multiplier.
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Visualization</h3>
+          <div class="param-help">
+            <strong>Wind Visualization:</strong> Each grid point shows wind using two elements: colored squares indicate wind speed (blue=calm, red=strong), and white triangles indicate wind direction (point downwind). The squares provide the speed color map while triangles rotate to show instantaneous wind direction.<br><br>
+            <strong>2D Wind Field:</strong> The wind varies continuously across both downrange (0-1000 yards) and crossrange (±100 yards) dimensions. Each component contributes patterns at different spatial scales, creating realistic variation.<br><br>
+            <strong>Speed Scale:</strong> Color gradient represents wind speed: deep blue ≈ 0 mph, transitioning to red at the Color Threshold setting. The gradient transitions smoothly based on wind speed, with faster winds appearing more red.<br><br>
+            <strong>Triangle Direction:</strong> Each white triangle points in the direction the wind is blowing (downwind). Triangle rotation shows instantaneous wind direction at that location.
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Top Stats</h3>
+          <div class="param-help">
+            <strong>Active Components:</strong> Number of wind components in the current preset. Each component adds a layer of variation at different spatial and temporal scales.<br><br>
+            <strong>Min/Max/Avg Speed:</strong> Statistics computed across the entire visible wind field. Updates in real-time as the field evolves. These values help you understand the overall wind conditions.<br><br>
+            <strong>RMS Strength:</strong> Displays the RMS strength of the first component (Component 0) as a reference. Individual component strengths are shown in the detailed table below.<br><br>
+            <strong>Advection Gain:</strong> Multiplier that controls how quickly wind patterns drift across the range. Set by presets (typically 5.0). Higher values make patterns move faster without changing the instantaneous wind speeds. This simulates the transport of wind patterns by larger-scale flows.
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Component Details Table</h3>
+          <div class="param-help">
+            Each row represents one wind component, ordered from largest to smallest spatial scale (Component 0 = largest, highest indices = smallest). Multiple components combine to create realistic, multi-scale wind patterns.<br><br>
+            <strong>Field:</strong> Component name ("Component N") or "Composite" showing the combined effect of all components.<br><br>
+            <strong>Min/Max/Avg Speed (mph):</strong> Wind speed statistics computed for this component alone (or composite) across the visible field. Useful for understanding each component's contribution.<br><br>
+            <strong>Strength (mph):</strong> Wind speed multiplier that scales the final curl field after all processing (RMS normalization, exponent reshaping, and optional sigmoid gating). This is the primary control for component intensity and directly scales the final wind speed contribution.<br><br>
+            <strong>Downrange/Crossrange Scale (yards):</strong> Spatial correlation lengths. Larger values mean the wind changes more slowly across distance. A 10,000-yard scale varies slowly over the entire 1000-yard range, while a 500-yard scale creates noticeable local variation. These control the "wavelength" of spatial patterns.<br><br>
+            <strong>Temporal Scale (min):</strong> How quickly this component evolves over time. Larger values (e.g., 40 min) mean slow, gradual changes. Smaller values (e.g., 1-2 min) create rapid temporal variation. Controls the period of temporal oscillations.<br><br>
+            <strong>Exponent:</strong> Reshapes the normalized magnitude after RMS normalization. The magnitude is first normalized by RMS, then the exponent is applied. Lower values (< 1.0) make the distribution gustier (emphasizes values near 0), while higher values (> 1.0) make it steadier (emphasizes middle values). Typical range: 0.3 (very gusty) to 2.0 (very steady).<br><br>
+            <strong>Gate (mph):</strong> Sigmoid threshold in mph where the gate opens. When threshold > 0, the final magnitude gates itself through a sigmoid function. Below threshold: gate mostly closed (very quiet wind). Above threshold: gate opens and allows wind through. Creates alternating quiet periods and gusts. 0 = no gating (continuous wind).<br><br>
+            <strong>RMS Normalization:</strong> Root Mean Square value used to normalize the curl field magnitude for stable energy levels. Initialized once at startup by sampling 1000 random (x, y, t) locations. This value ensures consistent magnitude distribution across time and between components. Displayed in scientific notation (e.g., 1.23e-02).<br><br>
+            <strong>Global Advection Offset (yards):</strong> Cumulative spatial offset applied to all wind components due to advection. Shows how far the entire wind field has drifted from its origin. Larger values indicate more advection has occurred.<br><br>
+            <strong>Global Advection Speed (mph):</strong> Current drift velocity of the entire wind field. Calculated by sampling random points within the range, averaging the wind, and smoothing with EMA. This is the speed at which the wind patterns move across the range.
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Technical Details</h3>
+          <div class="param-help">
+            <strong>Wind Generation Process:</strong> The wind field is generated using a multi-octave 2D curl field sampled from 3D Simplex noise (x, y, t). Each component independently samples a potential field ψ(x, y, t), then the curl operator computes (∂ψ/∂y, -∂ψ/∂x) to produce a divergence-free 2D vector field. The magnitude is normalized by RMS (Root Mean Square, initialized once from 1000 samples), then an exponent reshapes the distribution to control steady (high exponent) vs. gusty (low exponent) behavior. If sigmoid gating is enabled (threshold > 0), the final magnitude gates itself through a sigmoid function creating threshold-based behavior (quiet below threshold, active above). Wind speed is clipped at 2x component strength to prevent unrealistic values. All components are summed to create the final wind field.<br><br>
+            <strong>Global Advection:</strong> All wind components use the same global advection offset, creating unified movement of the entire wind field. The global advection velocity is calculated by sampling 10 random points within the range, averaging the composite wind field, and smoothing with EMA (exponential moving average) for stability. This creates realistic transport of wind patterns by larger-scale flows.<br><br>
+            <strong>RMS Normalization:</strong> Each component's curl field magnitude RMS is initialized once at startup by sampling 1000 random (x, y, t) locations within a pattern-sized window (1000x the component's spatial and temporal scales). The magnitude is normalized by this RMS value to achieve stable energy levels. This ensures consistent magnitude distribution across time and between components. The normalization value remains fixed after initialization and is displayed in the component details table.<br><br>
+            <strong>Sigmoid Gating:</strong> Optional self-gating function that creates threshold-based wind behavior. When threshold > 0, the final magnitude gates itself through a sigmoid function (fixed slope). Below threshold: gate mostly closed (very quiet wind). Above threshold: gate opens (allows wind through). The gate opens more steeply as magnitude increases. This creates alternating quiet periods and gusts, simulating realistic wind behavior. Wind speed is clipped at 2x component strength to prevent unrealistic values.<br><br>
+            <strong>Random Sampling:</strong> Advection calculations sample 10 random points within the range each frame to provide representative wind field behavior for advection updates.<br><br>
+            <strong>Curl Noise:</strong> The curl operator produces divergence-free (incompressible) 2D vector fields, which naturally look like realistic swirling wind patterns. Simplex noise provides smooth, continuous sampling over space and time without aliasing artifacts common in other noise functions.<br><br>
+            <strong>Components:</strong> Presets use 2 components with different spatial and temporal scales to create layered wind patterns. Component 0 typically provides a large-scale steady base, while Component 1 adds local variation. Each component's strength controls overall magnitude, the exponent parameter reshapes the distribution (high exponent = steady, low exponent = gusty), and some components use sigmoid gating to create threshold-based behavior (quiet below threshold, active above).<br><br>
+            <strong>Rendering:</strong> Uses Three.js with instanced meshes (colored squares for speed, white triangles for direction) for efficient rendering of hundreds of wind indicators at 60 FPS. Squares change color to show wind speed, while triangles rotate to show wind direction.<br><br>
+        <strong>Histogram:</strong> Click the histogram button for any component or the composite wind field to view a cumulative distribution of wind speeds. The histogram accumulates data continuously as the visualization updates (similar to min/max/avg stats), using 0.01 mph bins. The histogram shows all samples collected since the last reset, providing a comprehensive view of the wind speed distribution across the visible range (1000 yards downrange, 200 yards crossrange).
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Limitations</h3>
+          <div class="param-help">
+            <strong>2D Field Only:</strong> The wind field is computed in the horizontal plane only. There is no vertical wind component variation, and the model assumes wind at shooting height is representative of conditions along the bullet path.<br><br>
+            <strong>Divergence-Free (Incompressible):</strong> The curl operator produces incompressible flow fields, which is physically accurate for many wind patterns but may not capture all atmospheric phenomena such as thermal updrafts, downdrafts, or compressible effects.<br><br>
+            <strong>Smooth/Continuous Spatial Field:</strong> The field is spatially smooth and continuous by design. It cannot model sharp spatial wind shear boundaries or discrete spatial gusts that may occur at fixed locations. However, sudden direction changes over time are possible through rapid temporal evolution with shorter temporal scales.<br><br>
+            <strong>No Terrain Interaction:</strong> The model does not account for terrain features (hills, valleys, obstacles) that can dramatically affect local wind patterns. All spatial variation comes from the noise field itself.<br><br>
+            <strong>Deterministic Evolution:</strong> Temporal evolution is based on a deterministic noise function rather than physical turbulence modeling. The field evolves smoothly over time but does not capture true turbulent fluctuations or chaotic dynamics.<br><br>
+            <strong>Fixed Spatial Scales:</strong> Each component has fixed spatial scales that remain constant throughout the simulation. Real wind patterns may have scales that vary based on atmospheric conditions, time of day, or local effects.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Histogram Modal -->
+  <div id="histogramModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div style="position: relative; background-color: #fff; margin: 3% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 1200px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+      <span id="closeHistogramModal" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+      <h2 id="histogramTitle" style="margin-top: 0;">Wind Speed Histogram</h2>
+      <canvas id="histogramCanvas" style="display: block; margin: 0 auto; border: 1px solid #ddd;"></canvas>
+      <div id="histogramStats" style="margin-top: 15px; font-size: 14px; color: #666;"></div>
+    </div>
+  </div>
+</body>
+</html>
+
+
