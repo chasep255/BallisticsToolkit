@@ -3,10 +3,12 @@
 This project includes or references third‑party software. The following notices are provided for attribution and license compliance.
 
 ## Three.js
-- Project: three.js (used via CDN)
+- Project: three.js (used via unpkg CDN)
+- Version: 0.160.0
 - License: MIT
 - Website: https://threejs.org/
 - Source: https://github.com/mrdoob/three.js
+- CDN: https://unpkg.com/three@0.160.0/
 
 ## WebGL Noise (Simplex/Perlin)
 - Authors: Stefan Gustavson; Ashima Arts (Ian McEwan et al.)
