@@ -530,7 +530,7 @@ export class BtkTargetWrapper
 
   static getTarget(targetName)
   {
-    return new BtkTargetWrapper(btk.NRATargets.getTarget(targetName));
+    return new BtkTargetWrapper(btk.Targets.getTarget(targetName));
   }
 
   getRingInnerDiameter(ring)

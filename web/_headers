@@ -16,3 +16,10 @@
 # CSS files - 1 hour cache
 /*.css
   Cache-Control: public, max-age=3600
+
+# Global security headers (applied to all paths)
+/*
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Permissions-Policy: geolocation=(), microphone=(), camera=()

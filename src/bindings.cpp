@@ -190,11 +190,11 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Removed legacy Hit value_object and AccuracyMetrics/legacy scoring bindings
 
-  // NRA Targets
-  class_<btk::match::NRATargets>("NRATargets")
-    .class_function("getTarget", &NRATargets::getTarget)
-    .class_function("listTargets", &NRATargets::listTargets)
-    .class_function("hasTarget", &NRATargets::hasTarget);
+  // Targets
+  class_<btk::match::Targets>("Targets")
+    .class_function("getTarget", &Targets::getTarget)
+    .class_function("listTargets", &Targets::listTargets)
+    .class_function("hasTarget", &Targets::hasTarget);
 
   // SimulatedShot struct
   value_object<SimulatedShot>("SimulatedShot")
