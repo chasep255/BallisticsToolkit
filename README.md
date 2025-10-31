@@ -101,6 +101,10 @@ Opens local server at http://localhost:8001
 - **Deployment**: GitHub Actions auto-deploys to GitHub Pages
 - **Architecture**: Client-side only, no server required
 
+## Contributing
+
+Pull requests are welcome. By submitting a PR that is merged, you agree to the contribution terms in [CONTRIBUTING.md](CONTRIBUTING.md) (copyright assignment + exclusive commercial license).
+
 ## License
 
 This project is licensed under the PolyForm Noncommercial License 1.0.0. See the [LICENSE](LICENSE) file or https://polyformproject.org/licenses/noncommercial/1.0.0/ for details. Commercial use is not permitted without a separate license from the copyright holder.
