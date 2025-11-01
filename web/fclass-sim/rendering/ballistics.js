@@ -126,11 +126,17 @@ export class BallisticsEngine
 
       console.log(`${LOG_PREFIX_ENGINE} Spin rate: ${spinRate.toFixed(1)} rad/s (twist: ${this.twistRate.toFixed(1)} in/turn)`);
 
+      // Time the zeroing computation
+      const zeroStartTime = performance.now();
       // Use C++ zeroing routine (returns raw BTK bullet, wrapper will handle it)
       this.zeroedBullet = new BtkBulletWrapper(
         this.ballisticSimulator.computeZero(mvMps, targetPos.raw, 0.001, 1000, 0.001, spinRate)
       );
+      const zeroEndTime = performance.now();
+      const zeroTimeMs = zeroEndTime - zeroStartTime;
       targetPos.dispose();
+
+      console.log(`${LOG_PREFIX_ENGINE} Zero computation took ${zeroTimeMs.toFixed(1)}ms`);
 
       // Log the zeroed bullet velocity to show elevation and windage
       const zeroVel = this.zeroedBullet.getVelocity();

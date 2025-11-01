@@ -255,9 +255,13 @@
             <strong>BC (Ballistic Coefficient):</strong> Aerodynamic efficiency (0.001-1.0). Higher = less wind drift and drop<br><br>
             <strong>Drag Function:</strong> G7 for modern boat-tail bullets, G1 for flat-base or older projectiles<br><br>
             <strong>MV (Muzzle Velocity):</strong> Initial velocity in fps. Critical for trajectory and time-of-flight<br><br>
-            <strong>Diameter:</strong> Bullet caliber in inches. Affects line-breaking scoring<br><br>
+            <strong>Diameter:</strong> Bullet caliber in inches. Affects line-breaking scoring and spin calculations<br><br>
+            <strong>Weight (gr):</strong> Bullet weight in grains. Required for accurate spin moment of inertia calculations<br><br>
+            <strong>Length (in):</strong> Bullet length in inches. Used for moment of inertia and spin aerodynamics<br><br>
+            <strong>Twist (in/turn):</strong> Barrel twist rate (e.g., 8 for 1:8 twist). Used to calculate bullet spin rate from muzzle velocity<br><br>
             <strong>MV σ (Standard Deviation):</strong> Velocity variation in fps. Lower = more consistent. Default: 7 fps<br><br>
-            <strong>Accuracy (MOA):</strong> Rifle+shooter precision. 1 MOA ≈ 1 inch at 100 yards. Default: 0.25 MOA
+            <strong>Accuracy (MOA):</strong> Rifle+shooter precision. 1 MOA ≈ 1 inch at 100 yards. Default: 0.25 MOA<br><br>
+            <strong>Spin Effects:</strong> Trajectories include crosswind jump (transient vertical/horizontal movement when wind changes). Spin drift is automatically zeroed out during rifle zeroing, so it doesn't affect point of impact. Crosswind jump occurs when wind direction or speed changes, causing a brief jump in trajectory before the bullet stabilizes. Spin rate is calculated from twist rate and muzzle velocity. Uses 4DOF simulation with simplified spin aerodynamics using empirically tuned constants
           </div>
         </div>
         

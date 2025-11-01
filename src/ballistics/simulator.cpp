@@ -223,11 +223,8 @@ namespace btk::ballistics
   // Compute zeroed initial state (instance method)
   const Bullet& Simulator::computeZero(float muzzle_velocity, const btk::math::Vector3D& target_position, float dt, int max_iterations, float tolerance, float spin_rate)
   {
-    float best_pitch = 0.0f; // elevation angle (rad)
+    float best_pitch = 0.01f; // Start with reasonable elevation guess (about 0.57 degrees)
     float best_yaw = 0.0f;   // azimuth/windage (rad)
-
-    // Calculate target distance for simulation and corrections
-    float target_distance = target_position.magnitude();
 
     for(int i = 0; i < max_iterations; ++i)
     {
@@ -245,13 +242,13 @@ namespace btk::ballistics
       Bullet test_state(initial_bullet_, position_init, velocity_init, spin_rate);
 
       // Simulate slightly past target distance to ensure we can interpolate
-      float sim_dist = target_distance * 1.1f;
+      float sim_dist = target_position.x * 1.1f;
       setInitialBullet(test_state);
       current_time_ = 0.0f; // Reset clock for each trial
       Trajectory trajectory = simulate(sim_dist, dt, 5.0f);
 
       // Get state at target distance using interpolation
-      std::optional<TrajectoryPoint> point_at_target = trajectory.atDistance(target_distance);
+      std::optional<TrajectoryPoint> point_at_target = trajectory.atDistance(target_position.x);
 
       // Check if the point is valid
       if(!point_at_target)
@@ -259,22 +256,25 @@ namespace btk::ballistics
         break;
       }
 
-      // Calculate 3D error between bullet position and target position
+      // Calculate error at target plane; ignore downrange (x) interpolation residue
       btk::math::Vector3D error = point_at_target->getState().getPosition() - target_position;
-      float error_magnitude = error.magnitude();
+      float lateral_error = error.y;   // crossrange
+      float vertical_error = error.z;  // vertical
+      float yz_error_magnitude = std::sqrt(lateral_error * lateral_error + vertical_error * vertical_error);
 
       // Check if we're close enough
-      if(error_magnitude < tolerance)
+      if(yz_error_magnitude < tolerance)
       {
         break;
       }
 
-      // Simple gradient steps on angles (small-angle approximation)
-      // error.z is vertical error, error.y is lateral error
-      float pitch_correction = -(error.z / target_distance);
-      float yaw_correction = -(error.y / target_distance);
-      best_pitch = best_pitch + pitch_correction * 0.5f;
-      best_yaw = best_yaw + yaw_correction * 0.5f;
+      // Vertical (pitch) correction from z error; Horizontal (yaw) from y error
+      float pitch_correction = -std::atan2(vertical_error, target_position.x);
+      float yaw_correction   = -std::atan2(lateral_error, target_position.x);
+
+      // Damped updates for stability (matches JS damping = 0.5)
+      best_pitch += 0.5f * pitch_correction;
+      best_yaw   += 0.5f * yaw_correction;
     }
 
     // Create final initial state at bore height (z=0)

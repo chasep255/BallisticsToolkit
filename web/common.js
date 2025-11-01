@@ -111,10 +111,12 @@ function setupCommonPageStructure()
     footer.innerHTML = `
       <div class="app-container" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
         <span>© ${new Date().getFullYear()} Ballistics Toolkit</span>
-        <span>·</span>
-        <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener">GitHub</a>
         <span style="flex:1 1 auto"></span>
+        <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener">GitHub</a>
+        <span>·</span>
         <a href="${pathPrefix}about.html">About</a>
+        <span>·</span>
+        <a href="${pathPrefix}contact.html">Contact</a>
         <span>·</span>
         <a href="${pathPrefix}terms.html">Terms</a>
         <span>·</span>

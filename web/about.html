@@ -45,15 +45,15 @@
             <div class="feature-grid">
                 <div class="feature-box">
                     <h3>Ballistic Calculator</h3>
-                    <p>Complete trajectory calculations with environmental factors, wind conditions, and multiple drag models</p>
+                    <p>Complete trajectory calculations with environmental factors, wind conditions, multiple drag models, and spin effects (spin drift and crosswind jump)</p>
                 </div>
                 <div class="feature-box">
                     <h3>Target Simulator</h3>
-                    <p>Monte Carlo simulation with statistical variability modeling for realistic accuracy assessment</p>
+                    <p>Monte Carlo simulation with statistical variability modeling, spin effects, and realistic accuracy assessment</p>
                 </div>
                 <div class="feature-box">
-                    <h3>Target Formats</h3>
-                    <p>Support for standard competitive target formats including SR, MR, LR, and FCA variants</p>
+                    <h3>Bullet Parameters</h3>
+                    <p>Complete bullet specification including weight, length, diameter, ballistic coefficient, and barrel twist rate for accurate spin calculations</p>
                 </div>
                 <div class="feature-box">
                     <h3>WebAssembly</h3>
@@ -79,6 +79,7 @@
                 <li class="tech-item"><strong>Algorithms:</strong> 2nd-order Runge-Kutta (RK2) integration for trajectory calculations</li>
                 <li class="tech-item"><strong>Drag Models:</strong> G1 and G7 standard drag functions</li>
                 <li class="tech-item"><strong>Atmosphere:</strong> Standard atmosphere with barometric pressure model</li>
+                <li class="tech-item"><strong>Spin Aerodynamics:</strong> 4DOF simulation with simplified aerodynamics using empirically tuned constants. Models spin drift (Magnus effect and gyroscopic precession) and crosswind jump. Calculates bullet spin rate from barrel twist rate and muzzle velocity. Tuned parameters: lift slope (C_Nα ≈ 1.5/rad), restoring moment slope, yaw of repose scaling, jump strength, and beta lag scaling - calibrated to match observed behavior</li>
                 <li class="tech-item"><strong>Wind Modeling:</strong> 2D curl field from Simplex noise with multi-octave components (strength, spatial/temporal scales, exponent reshaping, optional sigmoid gating). Uses RMS normalization (one-time initialization) for stable magnitude distribution, global advection for unified pattern movement, and clipping at 2x strength</li>
             </ul>
         </div>
