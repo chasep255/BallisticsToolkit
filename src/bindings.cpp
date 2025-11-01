@@ -6,7 +6,7 @@
 #include "ballistics/simulator.h"
 #include "ballistics/trajectory.h"
 #include "match/match.h"
-#include "match/nra_targets.h"
+#include "match/targets.h"
 #include "match/simulator.h"
 #include "match/target.h"
 #include "math/conversions.h"
