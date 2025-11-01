@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About - Ballistics Toolkit</title>
-    <meta name="description" content="Learn about Ballistics Toolkit — precision shooting tools built with WebAssembly for accurate ballistic calculations in your browser.">
+    <meta name="description" content="Ballistics Toolkit is a complete, browser‑based suite for precision shooting: ballistic calculator, target simulator, and F‑Class simulator. Accurate, fast, and easy to use.">
     <meta name="keywords" content="ballistics toolkit, WebAssembly, ballistics software, shooting tools">
     <link rel="canonical" href="https://www.ballisticstoolkit.com/about.html">
     
@@ -12,14 +12,14 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://www.ballisticstoolkit.com/about.html">
     <meta property="og:title" content="About - Ballistics Toolkit">
-    <meta property="og:description" content="Learn about Ballistics Toolkit — precision shooting tools built with WebAssembly for accurate ballistic calculations in your browser.">
+    <meta property="og:description" content="Complete, browser‑based suite for precision shooting: ballistic calculator, target simulator, and F‑Class simulator. Accurate, fast, and easy to use.">
     <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://www.ballisticstoolkit.com/about.html">
     <meta property="twitter:title" content="About - Ballistics Toolkit">
-    <meta property="twitter:description" content="Learn about Ballistics Toolkit — precision shooting tools built with WebAssembly for accurate ballistic calculations in your browser.">
+    <meta property="twitter:description" content="Complete, browser‑based suite for precision shooting: ballistic calculator, target simulator, and F‑Class simulator. Accurate, fast, and easy to use.">
     <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
     
     <link rel="icon" type="image/x-icon" href="ballistics-toolkit-favicon.ico">
@@ -36,7 +36,7 @@
         <div class="content-section">
             <h2>Project Overview</h2>
             <div class="highlight-box">
-                <p><strong>The Ballistics Toolkit</strong> is a comprehensive suite of precision shooting tools that brings professional-grade ballistic calculations to your browser. Built with modern web technologies and WebAssembly, it provides accurate trajectory calculations and realistic target simulation without requiring any software installation.</p>
+                <p><strong>The Ballistics Toolkit</strong> is a suite of precision shooting tools — a ballistic calculator, target simulator, and interactive F‑Class simulator — designed to be accurate, fast, and easy to use. Everything runs in your browser with a high‑performance WebAssembly core: plan dope, practice wind, and simulate matches without installing software.</p>
             </div>
         </div>
         
@@ -45,43 +45,48 @@
             <div class="feature-grid">
                 <div class="feature-box">
                     <h3>Ballistic Calculator</h3>
-                    <p>Complete trajectory calculations with environmental factors, wind conditions, multiple drag models, and spin effects (spin drift and crosswind jump)</p>
+                    <p>Complete trajectory calculations with environmental factors, wind conditions, multiple drag models, and spin effects.</p>
                 </div>
                 <div class="feature-box">
                     <h3>Target Simulator</h3>
-                    <p>Monte Carlo simulation with statistical variability modeling, spin effects, and realistic accuracy assessment</p>
+                    <p>Monte Carlo simulation with statistical variability modeling, and realistic accuracy assessment</p>
                 </div>
                 <div class="feature-box">
                     <h3>Bullet Parameters</h3>
-                    <p>Complete bullet specification including weight, length, diameter, ballistic coefficient, and barrel twist rate for accurate spin calculations</p>
+                    <p>Complete bullet specification including weight, length, diameter, ballistic coefficient, and barrel twist rate for accurate calculations</p>
                 </div>
                 <div class="feature-box">
                     <h3>WebAssembly</h3>
-                    <p>High-performance C++ algorithms compiled to WebAssembly for fast, accurate calculations</p>
+                    <p>High-performance C++ algorithms compiled to WebAssembly</p>
                 </div>
                 <div class="feature-box">
                     <h3>Wind Simulator</h3>
-                    <p>Real‑time wind field driven by multi‑octave curl noise (Simplex) with adjustable spatial/temporal scales, optional threshold gating, and global advection. Powers flags, mirage, and drift.</p>
+                    <p>Real‑time wind field driven by multi‑octave curl noise (Simplex) with adjustable spatial/temporal scales, optional threshold gating, and global advection. Powers flags, mirage, and drift in the F-Class Simulator.</p>
                 </div>
                 <div class="feature-box">
                     <h3>F-Class Simulator</h3>
-                    <p>Interactive 3D F‑Class match simulation (300–1000 yards). Real match flow (3× relays with sighters and record fire), unified scopes, world‑anchored heat mirage for wind reading, reactive wind flags, procedural terrain, and a 3D HUD with per‑relay stats and scorecard.</p>
+                    <p>Interactive 3D F‑Class match simulation (300–1000 yards). Real match flow (3× relays with sighters and record fire), mirage effect for wind reading, reactive wind flags, procedural terrain, and a 3D HUD with per‑relay stats and Scorecard.</p>
                 </div>
             </div>
         </div>
         
         <div class="content-section">
-            <h2>Technical Details</h2>
+            <h2>How It Works</h2>
             <ul class="tech-list">
-                <li class="tech-item"><strong>Backend:</strong> C++ with SI base units and conversion utilities</li>
-                <li class="tech-item"><strong>WebAssembly:</strong> Emscripten compilation for browser compatibility</li>
-                <li class="tech-item"><strong>Frontend:</strong> Vanilla JavaScript with modern CSS Grid and Flexbox</li>
+                <li class="tech-item"><strong>WebAssembly:</strong> Emscripten compilation for fast performance</li>
                 <li class="tech-item"><strong>Algorithms:</strong> 2nd-order Runge-Kutta (RK2) integration for trajectory calculations</li>
                 <li class="tech-item"><strong>Drag Models:</strong> G1 and G7 standard drag functions</li>
-                <li class="tech-item"><strong>Atmosphere:</strong> Standard atmosphere with barometric pressure model</li>
-                <li class="tech-item"><strong>Spin Aerodynamics:</strong> 4DOF simulation with simplified aerodynamics using empirically tuned constants. Models spin drift (Magnus effect and gyroscopic precession) and crosswind jump. Calculates bullet spin rate from barrel twist rate and muzzle velocity. Tuned parameters: lift slope (C_Nα ≈ 1.5/rad), restoring moment slope, yaw of repose scaling, jump strength, and beta lag scaling - calibrated to match observed behavior</li>
-                <li class="tech-item"><strong>Wind Modeling:</strong> 2D curl field from Simplex noise with multi-octave components (strength, spatial/temporal scales, exponent reshaping, optional sigmoid gating). Uses RMS normalization (one-time initialization) for stable magnitude distribution, global advection for unified pattern movement, and clipping at 2x strength</li>
+                <li class="tech-item"><strong>Atmosphere:</strong> Uses temperature, humidity, and altitude. Pressure is derived from altitude unless provided by an API source.</li>
+                <li class="tech-item"><strong>Spin Aerodynamics:</strong> 4DOF trajectory with simplified, empirically tuned spin effects.</li>
+                <li class="tech-item"><strong>Wind Modeling:</strong> 2D curl field from Simplex noise with multi-octave components.</li>
             </ul>
+        </div>
+
+        <div class="content-section">
+            <h2>Why Ballistics Toolkit</h2>
+            <div class="highlight-box">
+                <p><strong>Plan & Train:</strong> Build dope cards, visualize wind effects, and practice match flow from 300–1000 yards. <strong>Fast & Portable:</strong> Runs entirely in the browser — no login, no install.</p>
+            </div>
         </div>
         
         <div class="content-section">
@@ -90,7 +95,6 @@
                 <p><strong>Contact:</strong> <a href="mailto:admin@ballisticstoolkit.com">admin@ballisticstoolkit.com</a></p>
                 <p><strong>GitHub Repository:</strong> <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank">github.com/chasep255/BallisticsToolkit</a></p>
                 <p><strong>Issues & Bug Reports:</strong> Please use the GitHub Issues page for bug reports and feature requests</p>
-                <p><strong>Documentation:</strong> Complete API documentation and usage examples are available in the repository</p>
                 <p><strong>License:</strong> PolyForm Noncommercial 1.0.0</p>
             </div>
         </div>
