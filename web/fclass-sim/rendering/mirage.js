@@ -14,6 +14,16 @@ import ResourceManager from '../resources/manager.js';
 
 export class MirageEffect
 {
+  // Constants
+  static BASE_FOV = 30; // Reference FOV for 1x zoom (matches main camera FOV)
+  static BASE_INTENSITY = 0.03; // Base mirage intensity at 1x zoom
+  static MPH_TO_YARDS_PER_SEC = 0.4888889; // Conversion factor: 1 mph = 0.4888889 yd/s
+  static HEAT_RISE_SPEED = 2.0; // Heat rise speed in yards/second
+  static WIND_SMOOTHING_ALPHA = 0.01; // EMA smoothing factor for wind [0..1]
+  static WIND_SAMPLE_COUNT = 6; // Number of wind samples along line of sight
+  static WIND_SAMPLE_START = 0.75; // Start sampling at 75% of distance
+  static WIND_SAMPLE_STEP = 0.05; // Step size between samples (5%)
+
   constructor(renderer)
   {
     this.renderer = renderer;
@@ -35,8 +45,6 @@ export class MirageEffect
     // Accumulated advection (integrated wind over time) in yards: (cross, vertical, head)
     this.accumulatedDriftVec = new THREE.Vector3(0, 0, 0);
     this.smoothedWind = new THREE.Vector3(0, 0, 0); // (cross, vertical, head) in mph
-    // Smooth wind to reduce visible jitter in the mirage pattern
-    this.windSmoothingAlpha = 0.01; // EMA smoothing factor in [0..1]
   }
 
   createMaterial()
@@ -258,47 +266,39 @@ export class MirageEffect
     const dt = ResourceManager.time.getDeltaTime();
 
     // Calculate intensity based on FOV (smaller FOV = more zoom = more mirage)
-    const baseFOV = 30; // Reference FOV (main camera)
-    const zoomFactor = baseFOV / fov;
+    const zoomFactor = MirageEffect.BASE_FOV / fov;
 
-    // Exponential scaling for more pronounced effect at high zoom
-    // At 1x zoom (FOV=30): intensity = 0.04
-    // At 10x zoom (FOV=3): intensity = 0.4
-    // At 100x zoom (FOV=0.3): intensity = 0.8 (clamped)
-    const baseIntensity = 0.03;
-    this.material.uniforms.intensity.value = Math.min(zoomFactor * baseIntensity, 1.0);
+    // Linear scaling for more pronounced effect at high zoom
+    // At 1x zoom (FOV=30): intensity = BASE_INTENSITY
+    // At 10x zoom (FOV=3): intensity = 10 * BASE_INTENSITY
+    // At 100x zoom (FOV=0.3): intensity = 1.0 (clamped)
+    this.material.uniforms.intensity.value = Math.min(zoomFactor * MirageEffect.BASE_INTENSITY, 1.0);
 
     // Use intersection point for world-space anchoring
     // This is where the scope's center ray hits the range box (3D world position)
     // For 3D noise: X = left/right, Y = vertical height, Z = downrange distance
-    const worldOffsetX = intersection.x; // Left-right position
-    const worldOffsetY = intersection.y; // Vertical height above ground
-    const worldOffsetZ = intersection.z; // Downrange distance (negative)
-    this.material.uniforms.worldOffset.value.set(worldOffsetX, worldOffsetY, worldOffsetZ);
+    this.material.uniforms.worldOffset.value.set(intersection.x, intersection.y, intersection.z);
 
     // Calculate world scale based on FOV and distance to intersection
     // Larger FOV = more world space visible = larger scale
     const worldScale = intersection.distance * Math.tan((fov * Math.PI / 180) / 2) * 2;
     this.material.uniforms.worldScale.value = worldScale;
 
-    // Sample wind in the last 25% of distance before intersection (5 samples at 75%, 80%, 85%, 90%, 95%, plus 100%)
+    // Sample wind in the last 25% of distance before intersection
     const targetDistance = intersection.distance;
-    const numSamples = 6;
     let totalCross = 0; // crosswind accumulator (wind.x)
     let totalVertical = 0; // vertical wind accumulator (wind.y)
     let totalHead = 0; // headwind accumulator (wind.z)
-    let totalMag = 0; // horizontal wind magnitude accumulator
 
-    for (let i = 0; i < numSamples; i++)
+    for (let i = 0; i < MirageEffect.WIND_SAMPLE_COUNT; i++)
     {
-      const t = 0.75 + (i * 0.05); // 0.75, 0.80, 0.85, 0.90, 0.95, 1.00
+      const t = MirageEffect.WIND_SAMPLE_START + (i * MirageEffect.WIND_SAMPLE_STEP);
       const sampleDistance = targetDistance * t;
 
       // Calculate position at this distance along the line of sight
-      const ratio = t;
-      const sampleX = intersection.x * ratio;
-      const sampleY = intersection.y * ratio;
-      const sampleZ = intersection.z * ratio;
+      const sampleX = intersection.x * t;
+      const sampleY = intersection.y * t;
+      const sampleZ = intersection.z * t;
 
       const wind = windGenerator.getWindAt(
         sampleX,
@@ -310,40 +310,31 @@ export class MirageEffect
       totalCross += wind.x;
       totalVertical += wind.y;
       totalHead += wind.z;
-      const horizontalMag = Math.sqrt(wind.x * wind.x + wind.z * wind.z); // horizontal wind magnitude
-      totalMag += horizontalMag;
     }
 
     // Use non-weighted average
     // Wind from BTK wrapper is already in mph
-    const avgCross_mph = totalCross / numSamples;
-    const avgVertical_mph = totalVertical / numSamples;
-    const avgHead_mph = totalHead / numSamples;
+    const avgCross_mph = totalCross / MirageEffect.WIND_SAMPLE_COUNT;
+    const avgVertical_mph = totalVertical / MirageEffect.WIND_SAMPLE_COUNT;
+    const avgHead_mph = totalHead / MirageEffect.WIND_SAMPLE_COUNT;
 
     // Apply EMA smoothing to wind vector (cross, vertical, head)
-    const a = this.windSmoothingAlpha;
+    const a = MirageEffect.WIND_SMOOTHING_ALPHA;
     this.smoothedWind.x = this.smoothedWind.x * (1 - a) + avgCross_mph * a;
     this.smoothedWind.y = this.smoothedWind.y * (1 - a) + avgVertical_mph * a;
     this.smoothedWind.z = this.smoothedWind.z * (1 - a) + avgHead_mph * a;
 
     // Integrate wind speed over time to get accumulated 3D advection
-    // Convert mph to yards/second: 1 mph = 0.4888889 yd/s
-    const mphToYardsPerSec = 0.4888889;
     // Heat rise: constant upward advection (hot air rises from ground)
-    const heatRiseSpeed = 2.0; // yards/second
     // Advection vector this frame in yards (cross, vertical + heat rise, head)
-    const advectX = this.smoothedWind.x * mphToYardsPerSec * dt;
-    const advectY = this.smoothedWind.y * mphToYardsPerSec * dt + heatRiseSpeed * dt;
-    const advectZ = this.smoothedWind.z * mphToYardsPerSec * dt;
+    const advectX = this.smoothedWind.x * MirageEffect.MPH_TO_YARDS_PER_SEC * dt;
+    const advectY = this.smoothedWind.y * MirageEffect.MPH_TO_YARDS_PER_SEC * dt + MirageEffect.HEAT_RISE_SPEED * dt;
+    const advectZ = this.smoothedWind.z * MirageEffect.MPH_TO_YARDS_PER_SEC * dt;
     this.accumulatedDriftVec.x += advectX;
     this.accumulatedDriftVec.y += advectY;
     this.accumulatedDriftVec.z += advectZ;
 
-    // Pass wind data to shader (defensive init for hot-reload cases)
-    const uniforms = this.material.uniforms;
-    if (!uniforms.windAdvection) uniforms.windAdvection = {
-      value: new THREE.Vector3(0, 0, 0)
-    };
+    // Pass wind data to shader
     this.material.uniforms.windAdvection.value.set(
       this.accumulatedDriftVec.x,
       this.accumulatedDriftVec.y,
