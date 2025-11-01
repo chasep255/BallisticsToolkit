@@ -62,16 +62,17 @@
   <div class="app-container">
         <h1>🎮 F-Class Simulator</h1>
 
+    <!-- Game Settings & Accuracy -->
     <div class="params-bar">
       <div class="param-item">
-        <label for="fclassMode" title="F-Class shooting discipline">F-Class Mode</label>
-        <select id="fclassMode" title="F-Class shooting discipline">
-          <option value="fclass-300">F-Class (300 yards)</option>
-          <option value="fclass-500">F-Class (500 yards)</option>
-          <option value="fclass-600">F-Class (600 yards)</option>
-          <option value="fclass-800">F-Class (800 yards)</option>
-          <option value="fclass-900">F-Class (900 yards)</option>
-          <option value="fclass-1000" selected>F-Class (1000 yards)</option>
+        <label for="fclassMode" title="Target distance and type">Range</label>
+        <select id="fclassMode" title="Target distance and type">
+          <option value="fclass-300">300 yards</option>
+          <option value="fclass-500">500 yards</option>
+          <option value="fclass-600">600 yards</option>
+          <option value="fclass-800">800 yards</option>
+          <option value="fclass-900">900 yards</option>
+          <option value="fclass-1000" selected>1000 yards</option>
         </select>
       </div>
       <div class="param-item">
@@ -87,9 +88,17 @@
           <option value="FFP">FFP (Scaling)</option>
         </select>
       </div>
+      <div class="param-item">
+        <label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label>
+        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps">
+      </div>
+      <div class="param-item">
+        <label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label>
+        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">
+      </div>
     </div>
 
-    <!-- Bullet Parameters -->
+    <!-- Ballistics Settings -->
     <div class="params-bar">
       <div class="param-item">
         <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
@@ -111,12 +120,16 @@
         <input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches (e.g., 0.264 for 6.5mm)">
       </div>
       <div class="param-item">
-        <label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label>
-        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps">
+        <label for="weight" title="Bullet weight in grains (e.g., 140 for 6.5mm)">Wt (gr)</label>
+        <input type="number" id="weight" value="140" step="1" min="10" max="1000" title="Bullet weight in grains (e.g., 140 for 6.5mm)">
       </div>
       <div class="param-item">
-        <label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label>
-        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">
+        <label for="length" title="Bullet length in inches (e.g., 1.4 for 6.5mm)">Len (in)</label>
+        <input type="number" id="length" value="1.4" step="0.01" min="0.1" max="5.0" title="Bullet length in inches (e.g., 1.4 for 6.5mm)">
+      </div>
+      <div class="param-item">
+        <label for="twist" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)">Twist (in/turn)</label>
+        <input type="number" id="twist" value="8.0" step="0.1" min="1" max="20" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)">
       </div>
     </div>
 

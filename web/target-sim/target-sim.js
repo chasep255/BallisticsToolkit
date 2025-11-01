@@ -301,6 +301,10 @@ class TargetSimulator
     const dragFunction = document.getElementById('dragFunction').value;
     const mv = btk.Conversions.fpsToMps(parseFloat(document.getElementById('mv').value));
     const diameter = btk.Conversions.inchesToMeters(parseFloat(document.getElementById('diameter').value));
+    const weightKg = btk.Conversions.grainsToKg(parseFloat(document.getElementById('weight').value));
+    const length = btk.Conversions.inchesToMeters(parseFloat(document.getElementById('length').value));
+    const twistRate = parseFloat(document.getElementById('twistRate').value);
+    const twistMetersPerTurn = btk.Conversions.inchesToMeters(twistRate);
     const targetName = document.getElementById('target').value;
     const range = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('range').value));
     const shots = parseInt(document.getElementById('shots').value);
@@ -315,9 +319,9 @@ class TargetSimulator
     const humidity = parseFloat(document.getElementById('humidity').value) / 100.0;
     // Create bullet
     this.bullet = new btk.Bullet(
-      btk.Conversions.grainsToKg(0), // Weight not used in 3DOF
+      weightKg,
       diameter,
-      btk.Conversions.inchesToMeters(0), // Length not used
+      length,
       bc,
       dragFunction === 'G1' ? btk.DragFunction.G1 : btk.DragFunction.G7
     );
@@ -345,7 +349,8 @@ class TargetSimulator
       headwindSd,
       updraftSd,
       rifleAccuracyMrad,
-      0.001 // timestep
+      0.001, // timestep
+      twistMetersPerTurn // twist rate
     );
 
     // Store simulation parameters
@@ -372,6 +377,16 @@ class TargetSimulator
     {
       // Fire shot
       const simulatedShot = this.simulator.fireShot();
+      console.log(`Shot ${this.currentShot + 1}/${this.totalShots} (Match ${this.currentMatch}/${this.totalMatches}):`, {
+        impact_x: simulatedShot.impact_x,
+        impact_y: simulatedShot.impact_y,
+        impact_x_inches: btk.Conversions.metersToInches(simulatedShot.impact_x),
+        impact_y_inches: btk.Conversions.metersToInches(simulatedShot.impact_y),
+        score: simulatedShot.score,
+        is_x: simulatedShot.is_x,
+        actual_mv: simulatedShot.actual_mv,
+        wind_crossrange: simulatedShot.wind_crossrange
+      });
       this.perfShotsFired++;
       this.currentShot++;
       this.currentShots.push(simulatedShot);

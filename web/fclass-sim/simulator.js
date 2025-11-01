@@ -286,6 +286,9 @@ function getGameParams()
     bc: parseFloat(document.getElementById('bc').value),
     dragFunction: document.getElementById('dragFunction').value,
     diameter: parseFloat(document.getElementById('diameter').value),
+    weight: parseFloat(document.getElementById('weight').value),
+    length: parseFloat(document.getElementById('length').value),
+    twist: parseFloat(document.getElementById('twist').value),
     mvSd: parseFloat(document.getElementById('mvSd').value),
     rifleAccuracy: parseFloat(document.getElementById('rifleAccuracy').value)
   };
@@ -423,6 +426,9 @@ class FClassSimulator
     this.bc = params.bc;
     this.dragFunction = params.dragFunction;
     this.diameter = params.diameter;
+    this.weight = params.weight;
+    this.length = params.length;
+    this.twist = params.twist;
     this.mvSd = params.mvSd;
     this.rifleAccuracy = params.rifleAccuracy;
 
@@ -1275,6 +1281,9 @@ class FClassSimulator
         bc: this.bc,
         dragFunction: this.dragFunction,
         diameterInches: this.diameter,
+        weightGrains: this.weight,
+        lengthInches: this.length,
+        twistInchesPerTurn: this.twist,
         mvSdFps: this.mvSd,
         rifleAccuracyMoa: this.rifleAccuracy
       });

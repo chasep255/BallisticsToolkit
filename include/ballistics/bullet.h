@@ -41,7 +41,7 @@ namespace btk::ballistics
      */
     constexpr Bullet(float weight, float diameter, float length, float bc, DragFunction drag_function = DragFunction::G7)
       : weight_(weight), diameter_(diameter), length_(length), bc_(bc), drag_function_(drag_function), position_(0.0f, 0.0f, 0.0f), velocity_(0.0f, 0.0f, 0.0f), spin_rate_(0.0f),
-        has_flight_state_(false)
+        beta_eq_right_(0.0f), beta_eq_up_(0.0f), has_flight_state_(false)
     {
     }
 
@@ -55,7 +55,7 @@ namespace btk::ballistics
      */
     constexpr Bullet(const Bullet& bullet, const btk::math::Vector3D& position, const btk::math::Vector3D& velocity, float spin_rate)
       : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_), drag_function_(bullet.drag_function_), position_(position), velocity_(velocity),
-        spin_rate_(spin_rate), has_flight_state_(true)
+        spin_rate_(spin_rate), beta_eq_right_(bullet.beta_eq_right_), beta_eq_up_(bullet.beta_eq_up_), has_flight_state_(true)
     {
     }
 
@@ -73,7 +73,7 @@ namespace btk::ballistics
      */
     constexpr Bullet(const Bullet& bullet, float position_x, float position_y, float position_z, float velocity_x, float velocity_y, float velocity_z, float spin_rate)
       : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_), drag_function_(bullet.drag_function_), position_(position_x, position_y, position_z),
-        velocity_(velocity_x, velocity_y, velocity_z), spin_rate_(spin_rate), has_flight_state_(true)
+        velocity_(velocity_x, velocity_y, velocity_z), spin_rate_(spin_rate), beta_eq_right_(bullet.beta_eq_right_), beta_eq_up_(bullet.beta_eq_up_), has_flight_state_(true)
     {
     }
 
@@ -105,6 +105,12 @@ namespace btk::ballistics
     constexpr float getVelocityY() const { return velocity_.y; } // m/s
     constexpr float getVelocityZ() const { return velocity_.z; } // m/s
     constexpr float getSpinRate() const { return spin_rate_; }   // rad/s
+
+    // Crosswind lag state getters and setters (equilibrium lateral angles)
+    constexpr float getBetaEqRight() const { return beta_eq_right_; } // rad
+    constexpr float getBetaEqUp() const { return beta_eq_up_; }     // rad
+    void setBetaEqRight(float beta) { beta_eq_right_ = beta; }
+    void setBetaEqUp(float beta) { beta_eq_up_ = beta; }
 
     // Compute spin rate from signed twist pitch (meters/turn). RH>0, LH<0
     static constexpr float computeSpinRateFromTwist(float speed_mps, float twist_pitch_m_signed)
@@ -143,6 +149,14 @@ namespace btk::ballistics
       return std::atan2(velocity_.y, velocity_.x); // rad
     }
 
+    constexpr float estimateSpinMomentOfInertia() const
+    {
+      constexpr float K_RG = 0.30f;               // radius-of-gyration factor (×diameter)
+      float r_eff = K_RG * diameter_;
+      return weight_ * r_eff * r_eff;             // m * (k_rg * d)^2
+    }
+    
+
     private:
     float weight_;   // kg
     float diameter_; // m
@@ -154,6 +168,8 @@ namespace btk::ballistics
     btk::math::Vector3D position_; // m
     btk::math::Vector3D velocity_; // m/s
     float spin_rate_;              // rad/s
+    float beta_eq_right_;          // rad - equilibrium lateral angle (right component)
+    float beta_eq_up_;             // rad - equilibrium lateral angle (up-in-plane component)
     bool has_flight_state_;
   };
 

@@ -17,6 +17,7 @@ namespace btk::ballistics
   {
     Bullet initial_state;
     float elevation_angle; // rad
+    float azimuth_angle;   // rad (windage)
   };
 
   /**
@@ -98,18 +99,17 @@ namespace btk::ballistics
 
     // Simulation methods
     /**
-     * @brief Compute zeroed initial state for given muzzle velocity and zero range
+     * @brief Compute zeroed initial state for given muzzle velocity and target position
      *
      * @param muzzle_velocity Muzzle velocity in m/s
-     * @param scope_height Scope height above bore in m
-     * @param zero_range Zero range in m
+     * @param target_position Target position as 3D vector (x=crossrange, y=vertical, z=downrange) in m
      * @param dt Time step for zeroing calculation in s (default: 0.001f)
      * @param max_iterations Maximum iterations for zeroing (default: 50)
      * @param tolerance Convergence tolerance for zeroing in m (default: 0.001f)
      * @param spin_rate Bullet spin rate in rad/s (default: 0.0f)
      * @return Const reference to the zeroed initial bullet
      */
-    const Bullet& computeZero(float muzzle_velocity, float scope_height, float zero_range, float dt = 0.001f, int max_iterations = 20, float tolerance = 0.001f, float spin_rate = 0.0f);
+    const Bullet& computeZero(float muzzle_velocity, const btk::math::Vector3D& target_position, float dt = 0.001f, int max_iterations = 20, float tolerance = 0.001f, float spin_rate = 0.0f);
 
     /**
      * @brief Simulate trajectory from current state to maximum distance
@@ -165,7 +165,8 @@ namespace btk::ballistics
     private:
     // Physics helpers
     float calculateDragRetardationFor(const Bullet& s) const;
-    btk::math::Vector3D calculateAccelerationFor(const Bullet& s) const;
+    btk::math::Vector3D calculateAccelerationFor(Bullet& s, float dt);
+    btk::math::Vector3D computeSpinWindAccel(Bullet& s, const btk::math::Vector3D& gravity, const btk::math::Vector3D& wind, float dt);
 
     // Internal state
     Bullet initial_bullet_;

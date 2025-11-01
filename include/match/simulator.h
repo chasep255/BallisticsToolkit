@@ -66,9 +66,10 @@ namespace btk::match
      * @param updraft_sd Up/down draft speed standard deviation in m/s
      * @param rifle_accuracy Rifle/shooter accuracy in rad (angular dispersion diameter)
      * @param timestep Simulation timestep in seconds
+     * @param twist_rate Twist rate in m/turn (positive for RH, negative for LH). Default 0 (no spin).
      */
     Simulator(const btk::ballistics::Bullet& bullet, float nominal_mv, const btk::match::Target& target, float target_range, const btk::physics::Atmosphere& atmosphere, float mv_sd,
-              float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float timestep = 0.001f);
+              float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float timestep = 0.001f, float twist_rate = 0.0f);
 
     /**
      * @brief Fire a single shot with variability
