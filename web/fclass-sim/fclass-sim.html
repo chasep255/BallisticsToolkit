@@ -221,18 +221,12 @@
             <strong>Wind Flags:</strong><br>
             - Read angle/flap; watch multiple distances for shear<br><br>
 
-            <strong>Mirage (what you’ll see):</strong><br>
-            - Higher zoom = clearer shimmer; always rises upward<br>
-            - Crosswind pushes the pattern horizontally<br>
-            - &lt; 3 mph: vertical boil • 3–6 mph: leaning • &gt; 8 mph: mostly horizontal flow<br><br>
-
-            <strong>Mirage (how it works here):</strong><br>
-            - World-anchored distortion, not screen-space<br>
-            - Samples wind in the last 25% of distance to target (6 samples at 75%, 80%, 85%, 90%, 95%, 100%)<br>
-            - Drift integrates current crosswind over time (nearly instantaneous direction changes)<br><br>
+            <strong>Mirage:</strong><br>
+            - Zoom in to read shimmer; it rises upward and leans with crosswind<br>
+            - Light: vertical boil • Moderate: leaning • Strong: mostly horizontal flow<br><br>
 
             <strong>Wind Presets:</strong><br>
-            - Presets include Dead, Calm, Moderate, Strong, Shear
+            - Dead, Calm, Moderate, Strong, Shear
           </div>
         </div>
         
@@ -261,7 +255,7 @@
             <strong>Twist (in/turn):</strong> Barrel twist rate (e.g., 8 for 1:8 twist). Used to calculate bullet spin rate from muzzle velocity<br><br>
             <strong>MV σ (Standard Deviation):</strong> Velocity variation in fps. Lower = more consistent. Default: 7 fps<br><br>
             <strong>Accuracy (MOA):</strong> Rifle+shooter precision. 1 MOA ≈ 1 inch at 100 yards. Default: 0.25 MOA<br><br>
-            <strong>Spin Effects:</strong> Trajectories include crosswind jump (transient vertical/horizontal movement when wind changes). Spin drift is automatically zeroed out during rifle zeroing, so it doesn't affect point of impact. Crosswind jump occurs when wind direction or speed changes, causing a brief jump in trajectory before the bullet stabilizes. Spin rate is calculated from twist rate and muzzle velocity. Uses 4DOF simulation with simplified spin aerodynamics using empirically tuned constants
+            <strong>Spin Effects:</strong> Spin drift is zeroed during setup. Crosswind jump is simulated when wind direction or speed changes, causing a brief jump in trajectory before the bullet stabilizes.
           </div>
         </div>
         
@@ -305,10 +299,19 @@
         <div class="help-section">
           <h3>Technical Features</h3>
           <div class="param-help">
-            - Comprehensive logging in browser console (zeroing, shots, wind, scoring)<br>
-            - Clean memory management (no leaks, proper restart)<br>
-            - Multi‑octave curl noise with per‑component advection for natural wind variation<br>
-            - WebAssembly ballistics engine for accurate trajectory calculations
+            - WebAssembly ballistics engine (runs entirely in your browser)<br>
+            - Detailed logging in the console (zeroing, shots, wind, scoring)
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Technical Notes</h3>
+          <div class="param-help">
+            <strong>Trajectory:</strong> RK2 integration with a 4DOF state. Spin effects are simplified and empirically tuned; spin drift is removed during zeroing, crosswind jump is modeled as a short transient when wind changes.<br><br>
+            <strong>Zeroing:</strong> Iterative algorithm correcting for y/z error at the target plane. Runs in zero wind for repeatability and converges quickly.<br><br>
+            <strong>Coordinates & Units:</strong> Three.js world in yards (X=right, Y=up, Z=toward camera/−Z downrange). Wrappers convert to the C++ simulation frame (X=downrange, Y=right, Z=up) and meters internally.<br><br>
+            <strong>Wind Model:</strong> 2D curl-noise field with multiple octaves and global advection. RMS-normalized at init for stable magnitudes across presets. Flags and mirage sample this same field over space and time.<br><br>
+            <strong>Mirage:</strong> World-anchored distortion sampling predominantly in the last quarter of the range to emphasize target-area cues; apparent flow aligns with crosswind sign convention.
           </div>
         </div>
         

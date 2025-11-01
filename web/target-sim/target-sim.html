@@ -130,14 +130,14 @@
                 <div class="help-section">
                     <h3>Ballistic Parameters</h3>
                     <div class="param-help">
-                        <strong>BC (Ballistic Coefficient):</strong> Drag coefficient relative to standard projectile. Higher values indicate better aerodynamic efficiency. Range: 0.1-0.8. Modern match bullets: 0.4-0.6, hunting bullets: 0.2-0.4.<br><br>
-                        <strong>Drag Model:</strong> G1 (traditional) vs G7 (modern). G7 more accurate for boat tail bullets, G1 for flat base bullets.<br><br>
-                        <strong>MV (Muzzle Velocity):</strong> Initial bullet velocity in fps. Critical for trajectory calculation and wind drift. Typical: .223 (3000+ fps), .308 (2600-2800 fps), .30-06 (2700-2900 fps).<br><br>
-                        <strong>Weight (grains):</strong> Bullet weight. Required for accurate spin moment of inertia calculations.<br><br>
-                        <strong>Diameter (in):</strong> Bullet caliber in inches. Used for spin aerodynamics, moment of inertia, and line-breaking rule in scoring (determines if shots hitting ring boundaries get the higher score). Common: .224" (.223), .264" (6.5mm), .308" (.308/.30-06).<br><br>
-                        <strong>Length (in):</strong> Bullet length from tip to base. Used for moment of inertia and spin aerodynamics calculations.<br><br>
-                        <strong>Twist (in/turn):</strong> Barrel twist rate (e.g., 8 for 1:8 twist). Used to calculate bullet spin rate from muzzle velocity for spin drift and crosswind jump effects. Uses 4DOF simulation with simplified spin aerodynamics using empirically tuned constants.<br><br>
-                        <strong>Spin Effects:</strong> Trajectories include spin drift (Magnus effect and gyroscopic precession) and crosswind jump. Both effects are automatically included in the trajectory calculations.
+                        <strong>BC (Ballistic Coefficient):</strong> Aerodynamic efficiency. Higher = less drift and drop.<br><br>
+                        <strong>Drag:</strong> G7 for modern boat-tails; G1 for older/flat-base data.<br><br>
+                        <strong>MV (fps):</strong> Muzzle velocity in feet per second.<br><br>
+                        <strong>Weight (gr):</strong> Bullet mass in grains.<br><br>
+                        <strong>Diameter (in):</strong> Bullet caliber in inches (also used for line‑breaking scoring).<br><br>
+                        <strong>Length (in):</strong> Bullet length in inches.<br><br>
+                        <strong>Twist (in/turn):</strong> Barrel twist rate (e.g., 8 for 1:8 twist).<br><br>
+                        <strong>Spin Effects:</strong> Includes spin drift and crosswind jump for realism.
                     </div>
                 </div>
                 
@@ -154,11 +154,11 @@
                 <div class="help-section">
                     <h3>Variability Parameters (Standard Deviations)</h3>
                     <div class="param-help">
-                        <strong>MV σ (Muzzle Velocity SD):</strong> Statistical variation in muzzle velocity. Normal distribution clipped to ±3σ. Typical: 3-15 fps.<br><br>
-                        <strong>Cross Wind σ:</strong> Lateral wind component variation. Normal distribution clipped to ±3σ. Primary cause of horizontal shot dispersion.<br><br>
-                        <strong>H/T Wind σ:</strong> Head/tail wind variation. Normal distribution clipped to ±3σ. Affects bullet velocity and drop slightly.<br><br>
-                        <strong>Vert Wind σ:</strong> Vertical air movement variation. Normal distribution clipped to ±3σ. Minimal effect on most ranges, air normally moves horizontally.<br><br>
-                        <strong>Accuracy (MOA):</strong> Rifle+shooter precision in Minutes of Angle. Uniform distribution within circle of this diameter. 1 MOA ≈ 1 inch at 100 yards. Match rifles: 0.25-0.5 MOA, hunting rifles: 1-2 MOA.
+                        <strong>MV σ (fps):</strong> Spread in muzzle velocity (lower = more consistent).<br><br>
+                        <strong>Cross Wind σ (mph):</strong> Side-to-side wind variability (main driver of horizontal spread).<br><br>
+                        <strong>H/T Wind σ (mph):</strong> Head/tail variability (small influence on drop).<br><br>
+                        <strong>Vert Wind σ (mph):</strong> Up/down air movement (usually minor).<br><br>
+                        <strong>Accuracy (MOA):</strong> Rifle+shooter precision; 1 MOA ≈ 1" at 100 yd.
                     </div>
                 </div>
 
@@ -177,6 +177,16 @@
                         <strong>Estimated Score:</strong> Running average of total points and X-ring hits across all completed matches (based on shots per match setting). This estimate converges to the true average as more iterations are completed. Updates continuously as simulation progresses. Example: "585-27x" = 585 total points with 27 X-ring hits.<br><br>
                         <strong>Progress Display:</strong> Shows "Shots: XXX/YYY" indicating current shots processed vs total shots to simulate.<br><br>
                         <strong>Target Visualization:</strong> Red dots represent bullet impact points. Click on any dot to see detailed hit information (coordinates, score, ring). Use mouse wheel to zoom, drag to pan.<br><br>
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3>Technical Notes</h3>
+                    <div class="param-help">
+                        <strong>Monte Carlo:</strong> Per‑shot draws from statistical distributions (velocity, wind, accuracy). Wind/MV treated as normal with clipping for outliers; accuracy modeled as a uniform circle in MOA for simplicity.<br><br>
+                        <strong>Trajectory Engine:</strong> Same WebAssembly core as the Ballistic Calculator (RK2 integration). 4DOF with simplified spin effects available for realism.
+                        <br><br>
+                        <strong>Scoring:</strong> Competitive target specs with line‑breaking; bullet diameter is used to determine ring breaks on boundaries.
                     </div>
                 </div>
             </div>
