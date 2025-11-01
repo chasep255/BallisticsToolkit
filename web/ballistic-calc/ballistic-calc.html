@@ -242,6 +242,17 @@
                         <strong>Wind Reading:</strong> Wind direction and speed can change rapidly. Use average conditions for planning.
                     </div>
                 </div>
+
+                <div class="help-section">
+                    <h3>Technical Details</h3>
+                    <div class="param-help">
+                        <strong>Model (4DOF):</strong> Trajectory is integrated with a 4DOF model that tracks position (x,y,z) and spin rate. Integration uses RK2 with small time steps for stability and performance.<br><br>
+                        <strong>Drag (G1/G7):</strong> Uses standard empirical drag tables (G1/G7). Air density corrections are applied from temperature, humidity, and altitude to adjust deceleration along the velocity vector.<br><br>
+                        <strong>Spin Effects:</strong> Spin drift and crosswind jump are modeled with simplified, empirically tuned aerodynamics. We compute lateral/vertical accelerations from the local wind, bullet spin, and angle-of-attack dynamics. Tuned constants include lift slope, restoring moment slope, yaw-of-repose scaling, jump strength scaling, and beta lag scaling. Right-hand twist yields rightward spin drift; sign flips for left-hand twist.<br><br>
+                        <strong>Moment of Inertia:</strong> Estimated from bullet weight, length, and diameter. This affects spin decay and the coupling strength of wind to the spinning projectile.<br><br>
+                        <strong>Limitations:</strong> Spin aerodynamics are simplified and tuned to typical match bullets rather than derived from full CFD or 6DOF data. Expect qualitative accuracy for spin drift and crosswind jump trends, not a perfect substitute for live-fire dope.
+                    </div>
+                </div>
             </div>
         </div>
     </div>
