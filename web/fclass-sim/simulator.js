@@ -4,7 +4,8 @@ import * as THREE from 'three';
 // Import BTK wrappers
 import
 {
-  waitForBTK
+  waitForBTK,
+  BtkVector3Wrapper
 }
 from './core/btk.js';
 
@@ -366,6 +367,10 @@ class FClassSimulator
   static SHADOW_CAMERA_HORIZONTAL = 350; // yards
   static SHADOW_CAMERA_TOP = 100; // yards from shooter
   static SHADOW_CAMERA_NEAR = 100; // yards
+
+  // Wind box dimensions
+  static WIND_BOX_HEIGHT = 100; // yards - height for clouds/elevated sampling
+  static WIND_BOX_PADDING = 50.0; // yards - padding on all sides of wind sampling box
 
 
   // === CAMERA SETTINGS ===
@@ -872,9 +877,8 @@ class FClassSimulator
     this.renderer.render(this.scene, this.camera);
 
     // 2) Render all scopes to their textures with mirage effect
-    const scopeTime = ResourceManager.time.getElapsedTime();
-    if (this.spottingScope) this.spottingScope.render(this.windGenerator, scopeTime);
-    if (this.rifleScope) this.rifleScope.render(this.windGenerator, scopeTime);
+    if (this.spottingScope) this.spottingScope.render(this.windGenerator);
+    if (this.rifleScope) this.rifleScope.render(this.windGenerator);
 
     // Update wind info text
     this.updateWindInfoText();
@@ -945,21 +949,19 @@ class FClassSimulator
 
     // ===== WIND & ENVIRONMENT =====
     // Create wind sampling box using simulator world dimensions
-    // BTK coordinates: X=downrange (positive towards target), Y=crossrange (positive left), Z=vertical (up)
-    const rangeMeters = btk.Conversions.yardsToMeters(this.distance);
-    const halfWidth = btk.Conversions.yardsToMeters(FClassSimulator.RANGE_TOTAL_WIDTH / 2);
-    const height = btk.Conversions.yardsToMeters(100); // Height for clouds/elevated sampling
-    const padding = btk.Conversions.yardsToMeters(50.0); // Padding in yards
+    const halfWidth = FClassSimulator.RANGE_TOTAL_WIDTH / 2; // yards
 
     // Wind box extends from behind shooter to past target, with padding on all sides
-    const minCorner = new btk.Vector3D(-padding, -halfWidth - padding, -height);
-    const maxCorner = new btk.Vector3D(rangeMeters + padding, halfWidth + padding, height);
+    // minCorner: behind shooter (positive Z), left edge (-X), at ground level (-Y)
+    // maxCorner: past target (-negative Z), right edge (+X), above ground (+Y)
+    const minCorner = new BtkVector3Wrapper(-halfWidth - FClassSimulator.WIND_BOX_PADDING, 0, FClassSimulator.WIND_BOX_PADDING);
+    const maxCorner = new BtkVector3Wrapper(halfWidth + FClassSimulator.WIND_BOX_PADDING, FClassSimulator.WIND_BOX_HEIGHT, -(this.distance + FClassSimulator.WIND_BOX_PADDING));
 
     this.windGenerator = createWind(this.windPreset, minCorner, maxCorner);
 
     // Clean up temporary vectors
-    minCorner.delete();
-    maxCorner.delete();
+    minCorner.dispose();
+    maxCorner.dispose();
 
     this.flagSystem = new FlagRenderer(
     {
