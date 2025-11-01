@@ -182,7 +182,7 @@
                         <strong>BC (Ballistic Coefficient):</strong> Drag efficiency relative to standard projectile. Range: 0.1-0.8. Higher = better aerodynamics.<br><br>
                         <strong>Diameter (inches):</strong> Bullet diameter. Used for spin aerodynamics and moment of inertia calculations. Typical: .223 (0.224"), .308 (0.308").<br><br>
                         <strong>Length (inches):</strong> Bullet length from tip to base. Used for moment of inertia and spin aerodynamics calculations. Typical: .223 (0.7-1.0"), .308 (1.0-1.4").<br><br>
-                        <strong>Twist (in/turn):</strong> Barrel twist rate. Enter positive for right-hand (RH) twist (e.g., 8 for 1:8 twist), negative for left-hand (LH). Common: .223 (1:7 or 1:8), .308 (1:10 or 1:12). Used to calculate bullet spin rate for spin drift and crosswind jump effects. Uses 4DOF simulation with simplified spin aerodynamics using empirically tuned constants<br><br>
+                        <strong>Twist (in/turn):</strong> Barrel twist rate. Enter positive for right-hand (RH) twist (e.g., 8 for 1:8 twist), negative for left-hand (LH). Common: .223 (1:7 or 1:8), .308 (1:10 or 1:12). Used to calculate bullet spin rate for spin drift and crosswind jump effects.<br><br>
                         <strong>Drag Model:</strong> G1 (traditional) vs G7 (modern). G7 more accurate for boat tail bullets, G1 for flat base bullets.
                     </div>
                 </div>
@@ -227,7 +227,7 @@
                     <div class="param-help">
                         <strong>Range:</strong> Distance in yards from muzzle.<br><br>
                         <strong>Drop:</strong> Vertical bullet drop from line of sight. Positive = below crosshairs, negative = above crosshairs.<br><br>
-                        <strong>Drift:</strong> Horizontal wind deflection including spin drift effects. Spin drift is a rightward drift (for right-hand twist) due to Magnus effect and gyroscopic precession.<br><br>
+                        <strong>Drift:</strong> Horizontal wind deflection including spin drift effects. Spin drift is a rightward drift (for right-hand twist) due to bullet spin.<br><br>
                         <strong>Velocity:</strong> Bullet speed at that range. Decreases due to air resistance.<br><br>
                         <strong>Energy:</strong> Kinetic energy in foot-pounds. Decreases with velocity.<br><br>
                         <strong>Time:</strong> Flight time from muzzle to that range.
@@ -255,8 +255,8 @@
                     <div class="param-help">
                         <strong>Model (4DOF):</strong> Trajectory is integrated with a 4DOF model that tracks position (x,y,z) and spin rate. Integration uses RK2 with small time steps for stability and performance.<br><br>
                         <strong>Drag (G1/G7):</strong> Uses standard empirical drag tables (G1/G7). Air density corrections are applied from temperature, humidity, and altitude to adjust deceleration along the velocity vector.<br><br>
-                        <strong>Spin Effects:</strong> Spin drift and crosswind jump are modeled with simplified, empirically tuned aerodynamics. We compute lateral/vertical accelerations from the local wind, bullet spin, and angle-of-attack dynamics. Tuned constants include lift slope, restoring moment slope, yaw-of-repose scaling, jump strength scaling, and beta lag scaling. Right-hand twist yields rightward spin drift; sign flips for left-hand twist.<br><br>
-                        <strong>Moment of Inertia:</strong> Estimated from bullet weight, length, and diameter. This affects spin decay and the coupling strength of wind to the spinning projectile.<br><br>
+                        <strong>Spin Effects:</strong> Spin drift and crosswind jump are modeled with simplified, empirically tuned aerodynamics. Lateral and vertical accelerations are computed from local wind, bullet spin, and angle-of-attack dynamics. Right-hand twist yields rightward spin drift; sign flips for left-hand twist.<br><br>
+                        <strong>Moment of Inertia:</strong> Estimated from bullet weight, length, and diameter. Affects how the spinning bullet responds to wind.<br><br>
                         <strong>Limitations:</strong> Spin aerodynamics are simplified and tuned to typical match bullets rather than derived from full CFD or 6DOF data. Expect qualitative accuracy for spin drift and crosswind jump trends, not a perfect substitute for live-fire dope.
                     </div>
                 </div>
