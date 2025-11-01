@@ -853,7 +853,6 @@ export class Scope
       };
 
       this.mirageEffect.update(
-        time,
         this.currentFOV,
         windGenerator,
         intersection
