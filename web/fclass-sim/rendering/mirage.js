@@ -10,6 +10,7 @@
  */
 
 import * as THREE from 'three';
+import ResourceManager from '../resources/manager.js';
 
 export class MirageEffect
 {
@@ -33,7 +34,6 @@ export class MirageEffect
 
     // Accumulated advection (integrated wind over time) in yards: (cross, vertical, head)
     this.accumulatedDriftVec = new THREE.Vector3(0, 0, 0);
-    this.lastUpdateTime = 0;
     this.smoothedWind = new THREE.Vector3(0, 0, 0); // (cross, vertical, head) in mph
     // Smooth wind to reduce visible jitter in the mirage pattern
     this.windSmoothingAlpha = 0.01; // EMA smoothing factor in [0..1]
@@ -126,7 +126,6 @@ export class MirageEffect
 
     const fragmentShader = `
       uniform sampler2D tDiffuse;
-      uniform float time;
       uniform float intensity;
       uniform vec3 windAdvection; // Accumulated 3D wind advection (cross, vertical, head) in yards
       uniform float windSpeedTotal; // Total wind speed in mph (for attenuation)
@@ -219,10 +218,6 @@ export class MirageEffect
         {
           value: null
         },
-        time:
-        {
-          value: 0
-        },
         intensity:
         {
           value: 0
@@ -253,20 +248,14 @@ export class MirageEffect
 
   /**
    * Update mirage effect parameters
-   * @param {number} time - Current time in seconds
    * @param {number} fov - Current field of view in degrees
    * @param {Object} windGenerator - Wind generator instance
    * @param {Object} intersection - Range box intersection {x, y, z, distance}
    */
-  update(time, fov, windGenerator, intersection)
+  update(fov, windGenerator, intersection)
   {
-    // Update time for animation
-    this.material.uniforms.time.value = time;
-
-    // Calculate delta time for integration
-    // Clamp dt to [0, 0.05] seconds for stability (prevents large jumps from pause/resume)
-    const dt = time - this.lastUpdateTime
-    this.lastUpdateTime = time;
+    // Get delta time from TimeManager (already clamped to [0.0005, 0.05] and handles pause/resume)
+    const dt = ResourceManager.time.getDeltaTime();
 
     // Calculate intensity based on FOV (smaller FOV = more zoom = more mirage)
     const baseFOV = 30; // Reference FOV (main camera)
