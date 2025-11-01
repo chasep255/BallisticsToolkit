@@ -74,6 +74,9 @@ export class BallisticsEngine
       // Store bullet parameters
       this.nominalMV = bulletParams.mvFps;
       this.bulletDiameter = bulletParams.diameterInches;
+      this.bulletWeight = bulletParams.weightGrains;
+      this.bulletLength = bulletParams.lengthInches;
+      this.twistRate = bulletParams.twistInchesPerTurn;
       this.mvSd = bulletParams.mvSdFps;
       this.rifleAccuracyMoa = bulletParams.rifleAccuracyMoa;
 
@@ -81,7 +84,7 @@ export class BallisticsEngine
       this.btkTarget = this.targetSystem.getBtkTarget();
 
       // Create bullet (wrapper handles unit conversions)
-      this.bullet = new BtkBulletWrapper(0, this.bulletDiameter, 0, bulletParams.bc, bulletParams.dragFunction);
+      this.bullet = new BtkBulletWrapper(this.bulletWeight, this.bulletDiameter, this.bulletLength, bulletParams.bc, bulletParams.dragFunction);
 
       // Create atmosphere (wrapper handles unit conversions)
       const atmosphere = new BtkAtmosphereWrapper(59, 0, 0.5, 0.0);
@@ -99,125 +102,51 @@ export class BallisticsEngine
       this.ballisticSimulator.setWind(zeroWind);
       zeroWind.dispose();
 
-      // Custom zeroing routine to hit target center (accounting for Y offset)
-      this.zeroedBullet = this.computeZeroToTarget(this.nominalMV, this.distance);
+      // Get target center from target system (Three.js coords in yards)
+      const targetCenter = this.targetSystem.getUserTargetCenter();
+      if (!targetCenter)
+      {
+        throw new Error('Cannot compute zero: user target not available');
+      }
+
+      // BtkVector3Wrapper automatically converts Three.js coords (yards) to BTK coords (meters)
+      // Just pass the Three.js coordinates directly
+      const targetPos = new BtkVector3Wrapper(
+        targetCenter.x,   // Three.js X (crossrange)
+        targetCenter.y,   // Three.js Y (vertical)
+        targetCenter.z    // Three.js Z (downrange, negative)
+      );
+
+      console.log(`${LOG_PREFIX_ENGINE} Zeroing: MV=${this.nominalMV.toFixed(1)}fps, Range=${this.distance}yd, Target=(${targetCenter.x.toFixed(3)}, ${targetCenter.y.toFixed(3)}, ${targetCenter.z.toFixed(1)}) yards`);
+
+      // Calculate spin rate from twist rate (BTK expects m/s and m/turn)
+      const mvMps = btk.Conversions.fpsToMps(this.nominalMV);
+      const twistMetersPerTurn = btk.Conversions.inchesToMeters(this.twistRate);
+      const spinRate = btk.Bullet.computeSpinRateFromTwist(mvMps, twistMetersPerTurn);
+
+      console.log(`${LOG_PREFIX_ENGINE} Spin rate: ${spinRate.toFixed(1)} rad/s (twist: ${this.twistRate.toFixed(1)} in/turn)`);
+
+      // Use C++ zeroing routine (returns raw BTK bullet, wrapper will handle it)
+      this.zeroedBullet = new BtkBulletWrapper(
+        this.ballisticSimulator.computeZero(mvMps, targetPos.raw, 0.001, 1000, 0.001, spinRate)
+      );
+      targetPos.dispose();
+
+      // Log the zeroed bullet velocity to show elevation and windage
+      const zeroVel = this.zeroedBullet.getVelocity();
+      const zeroVelMag = zeroVel.magnitude();
+      // Calculate angles from velocity components (Three.js coords: X=right, Y=up, Z=downrange-negative)
+      const elevationRad = Math.asin(zeroVel.y / zeroVelMag);
+      const windageRad = Math.atan2(zeroVel.x, -zeroVel.z);
+      const elevationMoa = btk.Conversions.radiansToMoa(elevationRad);
+      const windageMoa = btk.Conversions.radiansToMoa(windageRad);
+      console.log(`${LOG_PREFIX_ENGINE} Zero complete: Elevation=${elevationMoa.toFixed(2)} MOA (${elevationRad.toFixed(6)} rad), Windage=${windageMoa.toFixed(2)} MOA (${windageRad.toFixed(6)} rad)`);
     }
     catch (error)
     {
       console.error('Failed to setup ballistic system:', error);
       throw error;
     }
-  }
-
-  /**
-   * Custom zeroing routine to hit target center accounting for Y offset
-   * @param {number} mv - Muzzle velocity (fps)
-   * @param {number} range - Range (yards)
-   */
-  computeZeroToTarget(mv, range)
-  {
-    // Get target coordinates from target system
-    const targetCenter = this.targetSystem.getUserTargetCenter();
-    if (!targetCenter)
-    {
-      throw new Error('Cannot compute zero: user target not available');
-    }
-
-    // Target coordinates in yards (Three.js units)
-    const targetX = targetCenter.x; // Three X (crossrange)
-    const targetY = targetCenter.y; // Three Y (up)
-    const targetZ = targetCenter.z; // Three Z (downrange, negative)
-
-    console.log(`${LOG_PREFIX_ENGINE} Zeroing: MV=${mv.toFixed(1)}fps, Range=${range}yd, Target=(${targetX.toFixed(3)}, ${targetY.toFixed(3)}, ${targetZ.toFixed(1)})`);
-
-    // Initial angles - start with reasonable elevation and windage
-    let elevation = 0.01; // Start with 0.01 radian elevation (about 0.57 degrees)
-    let windage = 0.0; // Start with no windage
-
-    const dt = 0.001;
-    const maxIterations = 1000;
-    const tolerance = 0.001; // 0.001 yards
-
-    for (let iter = 0; iter < maxIterations; iter++)
-    {
-      // Create velocity vector from angles in Three.js coordinates (fps)
-      // Three.js: X=right, Y=up, Z=towards camera (negative Z = downrange)
-      // Elevation: angle above horizontal (pitch)
-      // Windage: angle left/right from center (yaw)
-      const velX = mv * Math.sin(windage) * Math.cos(elevation); // Crossrange (right)
-      const velY = mv * Math.sin(elevation); // Vertical (up)
-      const velZ = -mv * Math.cos(windage) * Math.cos(elevation); // Downrange (negative Z)
-
-      // Create velocity and position using wrappers
-      const vel = new BtkVelocityWrapper(velX, velY, velZ);
-      const pos = new BtkVector3Wrapper(0, 0, 0); // Start at muzzle
-
-      // Create bullet using wrapper (accepts wrapped pos and vel)
-      const bullet = new BtkBulletWrapper(this.bullet, pos, vel, 0.0);
-
-      // Dispose temporary wrappers immediately after bullet creation
-      vel.dispose();
-      pos.dispose();
-
-      // Simulate trajectory using wrapper
-      this.ballisticSimulator.setInitialBullet(bullet);
-      this.ballisticSimulator.resetToInitial();
-
-      // Simulate trajectory without wind (zeroing is done in calm conditions)
-      const trajectory = this.ballisticSimulator.simulate(range, dt, 5.0);
-      const pointAtTarget = trajectory.atDistance(range);
-
-      if (!pointAtTarget)
-      {
-        // Clean up before throwing
-        trajectory.dispose();
-        bullet.dispose();
-        throw new Error('Failed to get trajectory point at target distance');
-      }
-
-      // Get bullet position at target (Three.js coords, yards)
-      const bulletState = pointAtTarget.getState();
-      const bulletPos = bulletState.getPosition();
-
-      // Compute errors (yards)
-      const errorX = bulletPos.x - targetX;
-      const errorY = bulletPos.y - targetY;
-      const errorMagnitude = Math.sqrt(errorX * errorX + errorY * errorY);
-
-      // Log every 10th iteration to track progress
-      if (iter % 10 === 0)
-      {
-        console.log(`${LOG_PREFIX_ENGINE} Iteration ${iter}: elevation=${elevation.toFixed(6)}rad, windage=${windage.toFixed(6)}rad, error=${errorMagnitude.toFixed(6)}yd`);
-      }
-
-      // Check convergence
-      if (errorMagnitude < tolerance)
-      {
-        console.log(`${LOG_PREFIX_ENGINE} Zero found: elevation=${elevation.toFixed(6)}rad, windage=${windage.toFixed(6)}rad, ${iter} iterations, error=${errorMagnitude.toFixed(6)}yd`);
-        // Clean up and return the zeroed bullet
-        pointAtTarget.dispose();
-        trajectory.dispose();
-        return bullet; // Return the converged bullet (caller owns it)
-      }
-
-      // Compute angular corrections
-      // Error in yards at range, convert to angular error
-      const angularErrorX = Math.atan2(errorX, Math.abs(targetZ));
-      const angularErrorY = Math.atan2(errorY, Math.abs(targetZ));
-
-      // Apply corrections with damping for stability
-      const damping = 0.5;
-      windage -= angularErrorX * damping;
-      elevation -= angularErrorY * damping;
-
-      // Clean up this iteration's objects before next iteration
-      pointAtTarget.dispose();
-      trajectory.dispose();
-      bullet.dispose();
-    }
-
-    console.error(`${LOG_PREFIX_ENGINE} Zeroing FAILED: Did not converge after ${maxIterations} iterations`);
-    throw new Error('Failed to converge on zero solution');
   }
 
   // ===== SHOT FIRING =====

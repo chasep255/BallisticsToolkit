@@ -312,6 +312,12 @@ namespace btk::physics
   {
     presets_.clear();
 
+    presets_["Zero"] = []()
+    {
+      WindGenerator w;
+      return w;
+    };
+
     presets_["Dead"] = []()
     {
       WindGenerator w;

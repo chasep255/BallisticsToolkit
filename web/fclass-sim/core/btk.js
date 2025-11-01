@@ -459,6 +459,14 @@ export class BtkBallisticsSimulatorWrapper
     this._btk.resetToInitial();
   }
 
+  computeZero(muzzleVelocityMps, targetPosition, dt, maxIterations, tolerance, spinRate)
+  {
+    // targetPosition should be a BtkVector3Wrapper or raw btk.Vector3D
+    const targetPosRaw = targetPosition.raw || targetPosition;
+    const rawBullet = this._btk.computeZero(muzzleVelocityMps, targetPosRaw, dt, maxIterations, tolerance, spinRate);
+    return rawBullet; // Return raw bullet (caller will wrap it)
+  }
+
   simulate(rangeYards, timeStep, maxTime)
   {
     const range_m = btk.Conversions.yardsToMeters(rangeYards);

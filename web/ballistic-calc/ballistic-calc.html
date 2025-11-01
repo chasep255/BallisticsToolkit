@@ -61,6 +61,10 @@
                 <input type="number" id="weight" value="140" step="0.1" title="Bullet weight in grains">
             </div>
             <div class="param-item">
+                <label for="diameter" title="Bullet diameter in inches">Diameter (in)</label>
+                <input type="number" id="diameter" value="0.264" step="0.001" title="Bullet diameter in inches">
+            </div>
+            <div class="param-item">
                 <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
                 <input type="number" id="bc" value="0.311" step="0.001" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">
             </div>
@@ -71,6 +75,14 @@
                         <option value="G1">G1</option>
                     </select>
                 </div>
+            <div class="param-item">
+                <label for="length" title="Bullet length in inches">Length (in)</label>
+                <input type="number" id="length" value="1.4" step="0.01" title="Bullet length in inches">
+            </div>
+            <div class="param-item">
+                <label for="twistRate" title="Barrel twist rate in inches per turn (e.g., 7 for 1:7 twist, positive for RH, negative for LH)">Twist (in/turn)</label>
+                <input type="number" id="twistRate" value="8" step="0.1" title="Barrel twist rate in inches per turn (e.g., 7 for 1:7 twist, positive for RH, negative for LH)">
+            </div>
             <div class="param-item">
                 <label for="muzzleVelocity" title="Muzzle velocity in feet per second">MV (fps)</label>
                 <input type="number" id="muzzleVelocity" value="2750" step="10" title="Muzzle velocity in feet per second">
@@ -167,9 +179,9 @@
                     <h3>Bullet Parameters</h3>
                     <div class="param-help">
                         <strong>Weight (grains):</strong> Bullet weight in grains. Typical: .223 (55-77 gr), .308 (150-180 gr), .30-06 (150-220 gr).<br><br>
-                        <strong>Diameter (inches):</strong> Bullet caliber. Common: .224" (.223), .264" (6.5mm), .308" (.308/.30-06). <em>Not used in trajectory calculations.</em><br><br>
-                        <strong>Length (inches):</strong> Bullet length. Measure from tip to base. <em>Not used in trajectory calculations.</em><br><br>
                         <strong>BC (Ballistic Coefficient):</strong> Drag efficiency relative to standard projectile. Range: 0.1-0.8. Higher = better aerodynamics.<br><br>
+                        <strong>Length (inches):</strong> Bullet length from tip to base. Used for spin drift calculation. Typical: .223 (0.7-1.0"), .308 (1.0-1.4").<br><br>
+                        <strong>Twist (in/turn):</strong> Barrel twist rate. Enter positive for right-hand (RH) twist (e.g., 7 for 1:7 twist), negative for left-hand (LH). Common: .223 (1:7 or 1:8), .308 (1:10 or 1:12). Used for spin drift and crosswind jump calculations.<br><br>
                         <strong>Drag Model:</strong> G1 (traditional) vs G7 (modern). G7 more accurate for boat tail bullets, G1 for flat base bullets.
                     </div>
                 </div>

@@ -19,7 +19,7 @@ namespace btk::match
   }
 
   Simulator::Simulator(const btk::ballistics::Bullet& bullet, float nominal_mv, const btk::match::Target& target, float target_range, const btk::physics::Atmosphere& atmosphere, float mv_sd,
-                       float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float timestep)
+                       float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float timestep, float twist_rate)
     : bullet_(bullet), nominal_mv_(nominal_mv), target_(target), target_range_(target_range), atmosphere_(atmosphere), mv_sd_(mv_sd), wind_speed_sd_(wind_speed_sd), headwind_sd_(headwind_sd),
       updraft_sd_(updraft_sd), rifle_accuracy_(rifle_accuracy), timestep_(timestep), zeroed_bullet_(bullet)
   {
@@ -27,12 +27,20 @@ namespace btk::match
     simulator_.setInitialBullet(bullet);
     simulator_.setAtmosphere(atmosphere);
 
+    // Calculate spin rate from twist rate
+    float spin_rate = 0.0f;
+    if(twist_rate != 0.0f)
+    {
+      spin_rate = btk::ballistics::Bullet::computeSpinRateFromTwist(nominal_mv, twist_rate);
+    }
+
     // Zero the rifle once at initialization
-    // Zero with nominal BC and MV, no wind, scope at bore height
-    float scope_height = 0.0f;
+    // Zero with nominal BC and MV, no wind
+    // Target at (x=0, y=0, z=target_range) - downrange on x-axis
+    btk::math::Vector3D target_position(target_range, 0.0f, 0.0f);
     btk::math::Vector3D calm_wind(0.0f, 0.0f, 0.0f);
     simulator_.setWind(calm_wind);
-    zeroed_bullet_ = simulator_.computeZero(nominal_mv, scope_height, target_range, timestep, 1000, 1e-6);
+    zeroed_bullet_ = simulator_.computeZero(nominal_mv, target_position, timestep, 1000, 1e-6, spin_rate);
   }
 
   SimulatedShot Simulator::fireShot()

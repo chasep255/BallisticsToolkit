@@ -111,7 +111,7 @@ export class Scorecard
     }
 
     // Build HTML
-    let html = '<div class="scorecard-header">F-Class Match Scorecard</div>';
+    let html = '<div class="scorecard-header">Scorecard</div>';
 
     // Add match parameters section if available
     if (this.matchParams)

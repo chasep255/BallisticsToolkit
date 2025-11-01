@@ -34,7 +34,10 @@ function calculateTrajectory()
 
   // Get form values and convert to proper units
   const weight = btk.Conversions.grainsToKg(parseFloat(document.getElementById('weight').value));
+  const diameter = btk.Conversions.inchesToMeters(parseFloat(document.getElementById('diameter').value));
   const bc = parseFloat(document.getElementById('bc').value);
+  const length = btk.Conversions.inchesToMeters(parseFloat(document.getElementById('length').value));
+  const twistRate = parseFloat(document.getElementById('twistRate').value);
   const dragFunction = document.getElementById('dragFunction').value;
   const temperature = btk.Conversions.fahrenheitToKelvin(parseFloat(document.getElementById('temperature').value));
   const humidity = parseFloat(document.getElementById('humidity').value) / 100.0; // Convert percentage to decimal
@@ -47,11 +50,15 @@ function calculateTrajectory()
   const windSpeed = btk.Conversions.mphToMps(parseFloat(document.getElementById('windSpeed').value));
   const windDirection = btk.Conversions.oclockToRadians(parseFloat(document.getElementById('windDirection').value));
 
+  // Calculate spin rate from twist rate
+  const twistMetersPerTurn = btk.Conversions.inchesToMeters(twistRate);
+  const spinRate = btk.Bullet.computeSpinRateFromTwist(muzzleVelocity, twistMetersPerTurn);
+
   // Create bullet
   const bullet = new btk.Bullet(
     weight,
-    btk.Conversions.inchesToMeters(0.264),
-    btk.Conversions.inchesToMeters(0),
+    diameter,
+    length,
     bc,
     dragFunction === 'G1' ? btk.DragFunction.G1 : btk.DragFunction.G7
   );
@@ -68,15 +75,18 @@ function calculateTrajectory()
   const zeroWind = new btk.Vector3D(0, 0, 0);
   simulator.setWind(zeroWind);
   zeroWind.delete(); // Dispose Vector3D to prevent memory leak
+  
+  // Create target position vector (x=downrange, y=crossrange, z=vertical)
+  const targetPos = new btk.Vector3D(zeroRange, 0, scopeHeight);
   simulator.computeZero(
     muzzleVelocity,
-    scopeHeight,
-    zeroRange,
+    targetPos,
     0.001, // dt (time step)
     20, // max_iterations
     0.001, // tolerance
-    0.0 // spin_rate
+    spinRate // spin_rate calculated from twist
   );
+  targetPos.delete(); // Dispose Vector3D to prevent memory leak
 
   const windX = -windSpeed * Math.cos(windDirection); // Downrange component (negative = headwind, positive = tailwind)
   const windY = windSpeed * Math.sin(windDirection); // Crossrange component (positive = from right, negative = from left)

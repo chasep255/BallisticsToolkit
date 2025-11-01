@@ -237,7 +237,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Match Simulator class (in match namespace)
   class_<btk::match::Simulator>("MatchSimulator")
-    .constructor<const btk::ballistics::Bullet&, float, const btk::match::Target&, float, const btk::physics::Atmosphere&, float, float, float, float, float, float>()
+    .constructor<const btk::ballistics::Bullet&, float, const btk::match::Target&, float, const btk::physics::Atmosphere&, float, float, float, float, float, float, float>()
     .function("fireShot", &btk::match::Simulator::fireShot)
     .function("getMatch", &btk::match::Simulator::getMatch)
     .function("clearShots", &btk::match::Simulator::clearShots)
