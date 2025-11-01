@@ -10,13 +10,16 @@ Web-based ballistics calculator and match simulation suite for long-range shooti
 - **G1/G7 Drag Models** - Industry standard ballistic coefficients
 - **Environmental Compensation** - Temperature, pressure, humidity, altitude
 - **Wind Correction** - Full 3D wind modeling with intuitive clock-based direction
+- **Spin Effects** - Spin drift and crosswind jump modeling with bullet spin rate calculation
 - **Client-Side Performance** - WebAssembly for fast calculations, no server needed
 - **Comprehensive Output** - Drop, drift, velocity, energy, and time of flight
+- Note: 4DOF simulation with simplified spin aerodynamics using empirically tuned constants (lift slope, restoring moment, yaw of repose scaling)
 
 ### 🎯 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
 - **Target Library** - 14 competitive targets (10 standard + 4 F-Class variants)
 - **Realistic Variability** - Muzzle velocity, wind, and rifle accuracy modeling
+- **Spin Effects** - Spin drift and crosswind jump included in trajectory calculations
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
 - **Match Scoring** - Complete competitive scoring with X-counts and group size analysis
 
@@ -33,6 +36,7 @@ Web-based ballistics calculator and match simulation suite for long-range shooti
 - **Dual Scopes** - Spotting scope for wind reading, rifle scope for precision aiming
 - **Wind Reading** - Heat mirage effect responds to wind speed and direction; reactive 3D wind flags at multiple distances
 - **Advanced Wind Simulation** - Multi‑octave curl noise with per‑component advection and multiple presets
+- **Spin Effects** - Spin drift and crosswind jump included in trajectory calculations
 - **Match-Style Scoring** - Authentic target animation, competitive scoring with X-count, detailed scorecard
 - **Immersive Environment** - Procedural terrain, dynamic audio, comprehensive HUD
 - **Debug Mode** - Add `?debug=1` to URL for rapid testing (1-min relays, 2 shots)
@@ -42,33 +46,33 @@ Web-based ballistics calculator and match simulation suite for long-range shooti
 ### Ballistic Calculator
 Visit the [Ballistic Calculator](https://www.ballisticstoolkit.com/ballistic-calc/ballistic-calc.html) and enter your:
 
-1. **Bullet specs** - Weight, diameter, BC, drag function
+1. **Bullet specs** - Weight (grains), diameter (inches), length (inches), BC, drag function, twist rate (inches per turn)
 2. **Conditions** - Temperature, pressure, humidity, altitude  
 3. **Wind** - Speed and direction using 12-hour clock (12=tailwind, 3=right crosswind, 6=headwind, 9=left crosswind)
 4. **Shot data** - Muzzle velocity, zero range, scope height
 
-Results display drop and drift corrections in your choice of milliradians or MOA for precise long-range adjustments.
+Results display drop and drift corrections (including spin drift) in your choice of milliradians or MOA for precise long-range adjustments.
 
 ### Target Simulator
 Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/target-sim.html) for match simulation:
 
-1. **Bullet Parameters** - BC, muzzle velocity, diameter, drag function
+1. **Bullet Parameters** - Weight (grains), length (inches), diameter (inches), BC, muzzle velocity, twist rate (inches per turn), drag function
 2. **Match Setup** - Target selection, range, shots per match, number of matches
 3. **Variability** - MV standard deviation, wind variability, rifle accuracy
 4. **Environment** - Altitude, temperature, humidity, pressure
 
-Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis.
+Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis. Trajectories include spin drift and crosswind jump effects.
 
 ### F-Class Simulator
 Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html):
 
 1. **Pick Distance** (300–1000 yds) and wind preset (default: Vortex)
-2. **Set Ballistics** (BC, MV, diameter, accuracy; G7 recommended)
+2. **Set Ballistics** (BC, MV, diameter, weight, length, twist rate, accuracy; G7 recommended)
 3. **Scopes** (spotting: WASD/EQ; rifle: arrows/±)
-4. **Match Flow** (Relay 1 sighters until “Go For Record”; Relays 2–3: 2 sighters)
+4. **Match Flow** (Relay 1 sighters until "Go For Record"; Relays 2–3: 2 sighters)
 5. **Shoot & Score** (per‑relay HUD, scorecard modal)
 
-Tip: Use mirage + flags together. Mirage leans with crosswind and increases with zoom.
+Tip: Use mirage + flags together. Mirage leans with crosswind and increases with zoom. Spin drift is automatically included in trajectory calculations.
 
 ## Building from Source
 
@@ -91,11 +95,12 @@ Opens local server at http://localhost:8001
 
 ## Technical Details
 
-- **Engine**: 3DOF ballistics simulation with 2nd-order Runge-Kutta (RK2) midpoint method
+- **Engine**: Trajectory simulation with 2nd-order Runge-Kutta (RK2) midpoint method, including spin aerodynamics effects
 - **Language**: C++17 compiled to WebAssembly with Emscripten
 - **Frontend**: Vanilla JavaScript with modern CSS, no frameworks
 - **Units**: SI base units internally with conversion utilities for user-friendly I/O
 - **Performance**: Optimized C++ core with direct vector operations
+- **Spin Aerodynamics**: 4DOF simulation with simplified aerodynamics using empirically tuned constants. Models spin drift (Magnus effect and gyroscopic precession) and crosswind jump. Calculates bullet spin rate from barrel twist rate and muzzle velocity. Tuned parameters: lift slope (C_Nα ≈ 1.5/rad), restoring moment slope, yaw of repose scaling, jump strength, and beta lag scaling - calibrated to match observed spin drift and crosswind jump behavior
 - **Wind Module**: `WindGenerator` class (C++) implements a 2D curl field sampled from Simplex noise (x, y, t) with multi‑octave components (strength, spatial/temporal scales, exponent reshaping, optional sigmoid gating). Uses RMS normalization (one-time initialization from 1000 samples) for stable magnitude distribution, global advection (unified pattern movement), and clipping at 2x strength to prevent unrealistic wind speeds
 - **Match Scoring**: Complete competitive scoring system with statistical analysis
 - **Deployment**: GitHub Actions auto-deploys to GitHub Pages
