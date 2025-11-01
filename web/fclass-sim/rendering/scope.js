@@ -20,7 +20,6 @@ export class Scope
     this.compositionScene = config.compositionScene;
     this.canvasWidth = config.canvasWidth;
     this.canvasHeight = config.canvasHeight;
-    this.cameraPosition = config.cameraPosition;
     this.rangeDistance = config.rangeDistance;
     this.reticle = config.reticle || false;
     this.focalPlane = config.focalPlane || 'SFP'; // 'FFP' or 'SFP'
@@ -67,7 +66,7 @@ export class Scope
 
     // Create Three.js resources
     this.createRenderTarget(renderSize);
-    this.createCamera();
+    this.createCamera(config.cameraPosition);
     this.createViewMesh();
     this.createCrosshair();
 
@@ -105,14 +104,10 @@ export class Scope
   /**
    * Create perspective camera for this scope
    */
-  createCamera()
+  createCamera(cameraPosition)
   {
     this.camera = new THREE.PerspectiveCamera(this.currentFOV, 1.0, 0.5, 2500);
-    this.camera.position.set(
-      this.cameraPosition.x,
-      this.cameraPosition.y,
-      this.cameraPosition.z
-    );
+    this.camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
     this.camera.up.set(0, 1, 0);
     this.updateCamera();
   }
@@ -500,22 +495,11 @@ export class Scope
     this.camera.updateProjectionMatrix();
 
     // Update reticle shader uniforms
-    if (this.crosshairMesh && this.crosshairMesh.material.uniforms)
+    if (this.crosshairMesh?.material?.uniforms)
     {
-      // Always update current FOV
-      if (this.crosshairMesh.material.uniforms.fov)
-      {
-        this.crosshairMesh.material.uniforms.fov.value = this.currentFOV;
-      }
-
-      // Update reticleFOV based on focal plane mode
-      // FFP: use current FOV (reticle scales with zoom)
-      // SFP: use initial FOV (reticle stays fixed)
-      if (this.crosshairMesh.material.uniforms.reticleFOV)
-      {
-        this.crosshairMesh.material.uniforms.reticleFOV.value =
-          this.focalPlane === 'FFP' ? this.currentFOV : this.initialFOV;
-      }
+      const uniforms = this.crosshairMesh.material.uniforms;
+      uniforms.fov.value = this.currentFOV;
+      uniforms.reticleFOV.value = this.focalPlane === 'FFP' ? this.currentFOV : this.initialFOV;
     }
 
     // Calculate look-at target with yaw/pitch offsets + zero offset
@@ -824,9 +808,8 @@ export class Scope
   /**
    * Render scope to its render target with mirage effect
    * @param {Object} windGenerator - Wind generator for mirage effect
-   * @param {number} time - Current time in seconds for animation
    */
-  render(windGenerator, time)
+  render(windGenerator)
   {
     this.updateCamera();
 
@@ -836,7 +819,7 @@ export class Scope
     this.renderer.render(this.scene, this.camera);
 
     // Step 2: Apply mirage effect from mirageTarget to final renderTarget
-    if (windGenerator && time !== undefined)
+    if (windGenerator)
     {
       // Calculate where scope's center ray intersects the range bounding box
       // Range box: X from -rangeWidth/2 to +rangeWidth/2, Y from 0 to maxHeight, Z from 0 to -rangeDistance
@@ -872,22 +855,6 @@ export class Scope
   }
 
   /**
-   * Get render target texture
-   */
-  getTexture()
-  {
-    return this.renderTarget.texture;
-  }
-
-  /**
-   * Get view mesh for composition
-   */
-  getMesh()
-  {
-    return this.viewMesh;
-  }
-
-  /**
    * Get current aim (yaw, pitch in radians)
    */
   getAim()
@@ -897,7 +864,6 @@ export class Scope
       pitch: this.pitch
     };
   }
-
 
   /**
    * Get current FOV in degrees
@@ -1011,11 +977,6 @@ export class Scope
     {
       this.maskTexture.dispose();
       this.maskTexture = null;
-    }
-    if (this.crosshairTexture)
-    {
-      this.crosshairTexture.dispose();
-      this.crosshairTexture = null;
     }
 
     // Dispose render target (this also disposes the texture)
