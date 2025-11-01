@@ -2,7 +2,8 @@
 
 Web-based ballistics calculator and match simulation suite for long-range shooting. Fast, accurate trajectory calculations with atmospheric and wind compensation, plus Monte Carlo match simulation with competitive targets.
 
-**Website:** https://www.ballisticstoolkit.com/
+**Website:** https://www.ballisticstoolkit.com/  
+**Contact:** admin@ballisticstoolkit.com
 
 ## Features
 
@@ -13,7 +14,6 @@ Web-based ballistics calculator and match simulation suite for long-range shooti
 - **Spin Effects** - Spin drift and crosswind jump modeling with bullet spin rate calculation
 - **Client-Side Performance** - WebAssembly for fast calculations, no server needed
 - **Comprehensive Output** - Drop, drift, velocity, energy, and time of flight
-- Note: 4DOF simulation with simplified spin aerodynamics using empirically tuned constants (lift slope, restoring moment, yaw of repose scaling)
 
 ### 🎯 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
