@@ -1,6 +1,6 @@
 # Ballistics Toolkit
 
-Web-based ballistics calculator and match simulation suite for long-range shooting. Fast, accurate trajectory calculations with atmospheric and wind compensation, plus Monte Carlo match simulation with competitive targets.
+Client-side web-based ballistics calculator and simulation suite for long-range shooting. Fast, accurate trajectory calculations with atmospheric and wind compensation, spin effects (spin drift and crosswind jump), Monte Carlo target simulation, and interactive F-Class match simulator with wind visualization.
 
 **Website:** https://www.ballisticstoolkit.com/  
 **Contact:** admin@ballisticstoolkit.com
@@ -8,36 +8,32 @@ Web-based ballistics calculator and match simulation suite for long-range shooti
 ## Features
 
 ### 📊 Ballistic Calculator
-- **G1/G7 Drag Models** - Industry standard ballistic coefficients
-- **Environmental Compensation** - Temperature, humidity, altitude (pressure derived)
-- **Wind Correction** - Full 3D wind modeling with intuitive clock-based direction
+- **G1/G7 Drag Models** - Industry standard drag functions with ballistic coefficients
+- **Environmental Compensation** - Temperature, humidity, and altitude (atmospheric pressure calculated automatically)
 - **Spin Effects** - Spin drift and crosswind jump modeling with bullet spin rate calculation
 - **Client-Side Performance** - WebAssembly for fast calculations, no server needed
-- **Comprehensive Output** - Drop, drift, velocity, energy, and time of flight
 
 ### 🎯 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
-- **Target Library** - 14 competitive targets (10 standard + 4 F-Class variants)
+- **Target Library** - 14 competitive targets to choose from
 - **Realistic Variability** - Muzzle velocity, wind, and rifle accuracy modeling
-- **Spin Effects** - Spin drift and crosswind jump included in trajectory calculations
+- **Spin Effects** - Crosswind jump included in analysis
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
-- **Match Scoring** - Complete competitive scoring with X-counts and group size analysis
+- **Match Scoring** - Complete competitive scoring with X-counts, line breaking, and group size analysis
 
 ### 🌬️ Wind Simulator
 - **Real-time Wind Visualization** - Interactive 2D wind field visualization showing wind speed and direction across the range
 - **Realistic Wind Patterns** - Multi-octave curl noise generates natural swirling wind patterns that evolve over time
 - **Multiple Presets** - Pre-configured wind patterns for different conditions
-- **Threshold Gating** - Optional sigmoid gating creates realistic alternating quiet periods and gusts above a threshold
 - **Adjustable Time Speed** - Speed up or slow down simulation time to observe wind patterns
-- Note: This feature is experimental and evolving
 
 ### 🎮 F-Class Simulator
 - **Authentic Match Experience** - 3 relays, 20 minutes each, 20 shots per relay with realistic F-Class rules
-- **Dual Scopes** - Spotting scope for wind reading, rifle scope for precision aiming
+- **Dual Scopes** - Spotting scope for wind reading, rifle scope for aiming
 - **Wind Reading** - Heat mirage effect responds to wind speed and direction; reactive 3D wind flags at multiple distances
-- **Advanced Wind Simulation** - Multi‑octave curl noise with per‑component advection and multiple presets
-- **Spin Effects** - Spin drift and crosswind jump included in trajectory calculations
-- **Match-Style Scoring** - Authentic target animation, competitive scoring with X-count, detailed scorecard
+- **Advanced Wind Simulation** - Multi‑octave curl noise with advection and multiple presets (see Wind Simulator)
+- **Spin Effects** - Spin drift and crosswind jump included in trajectory calculations and trace visualizations
+- **Match-Style Scoring** - Authentic target animation, detailed scorecard
 - **Immersive Environment** - Procedural terrain, dynamic audio, comprehensive HUD
 - **Debug Mode** - Add `?debug=1` to URL for rapid testing (1-min relays, 2 shots)
 
@@ -61,18 +57,17 @@ Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/
 3. **Variability** - MV standard deviation, wind variability, rifle accuracy
 4. **Environment** - Altitude, temperature, humidity (pressure derived)
 
-Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis. Trajectories include spin drift and crosswind jump effects.
+Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis. Trajectories include crosswind jump effects.
 
 ### F-Class Simulator
-Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html):
+Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html) for an interactive match experience:
 
-1. **Pick Distance** (300–1000 yds) and wind preset (default: Vortex)
-2. **Set Ballistics** (BC, MV, diameter, weight, length, twist rate, accuracy; G7 recommended)
-3. **Scopes** (spotting: WASD/EQ; rifle: arrows/±)
-4. **Match Flow** (Relay 1 sighters until "Go For Record"; Relays 2–3: 2 sighters)
-5. **Shoot & Score** (per‑relay HUD, scorecard modal)
+1. **Match Setup** - Select distance (300–1000 yds) and wind preset
+2. **Bullet Parameters** - BC (G7 recommended), muzzle velocity, diameter (inches), weight (grains), length (inches), twist rate (inches per turn), rifle accuracy
+3. **Controls** - Spotting scope: WASD/EQ keys; rifle scope: arrow keys/±; shoot with spacebar
+4. **Match Format** - Three 20-minute relays, 20 shots each; Relay 1: unlimited sighters until "Go For Record"; Relays 2–3: 2 sighters each
 
-Tip: Use mirage + flags together. Mirage leans with crosswind and increases with zoom. Spin drift is automatically included in trajectory calculations.
+Experience authentic F-Class matches with wind reading (heat mirage and reactive flags), realistic wind simulation, and detailed scoring. Spin drift and crosswind jump are automatically included in trajectory calculations. Use mirage and flags together—mirage leans with crosswind and increases with zoom.
 
 ## Building from Source
 
@@ -97,8 +92,8 @@ Opens local server at http://localhost:8001
 
 - **Engine**: Trajectory simulation with 2nd‑order Runge‑Kutta (RK2) midpoint method
 - **Language**: C++17 compiled to WebAssembly with Emscripten
-- **Frontend**: Vanilla JavaScript with modern CSS, no frameworks
-- **Performance**: Optimized C++ core with direct vector operations
+- **Frontend**: Vanilla JavaScript with modern CSS
+- **Performance**: Optimized C++ core with WebGL graphics
 - **Spin Aerodynamics**: 4DOF trajectory with simplified, empirically tuned spin effects (spin drift and crosswind jump); spin rate from twist and muzzle velocity
 - **Wind Module**: 2D curl‑noise wind field with presets; realistic, evolving patterns
 - **Match Scoring**: Competitive scoring system with statistics
