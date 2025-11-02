@@ -4,22 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>F-Class Simulator - Interactive Long-Range Shooting | Ballistics Toolkit</title>
-  <meta name="description" content="Interactive F-Class shooting simulator with realistic ballistics, 3D visualization, and wind effects. Practice long-range precision shooting at 300-1000 yards.">
-  <meta name="keywords" content="F-Class simulator, shooting simulator, long range shooting, 3D shooting game, ballistics simulation, wind reading, mirage effect">
+  <meta name="description" content="Interactive F-Class shooting simulator with realistic ballistics including spin effects, wind reading (mirage and flags), 3D visualization, and authentic match scoring. Practice long-range precision shooting at standard F-Class distances (300-1000 yards) with correct targets and scoring.">
+  <meta name="keywords" content="F-Class simulator, shooting simulator, long range shooting, 3D shooting game, ballistics simulation, wind reading, mirage effect, spin drift, crosswind jump, match scoring">
   <link rel="canonical" href="https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html">
   <meta property="og:title" content="F-Class Simulator - Interactive Long-Range Shooting">
-  <meta property="og:description" content="Interactive F-Class shooting simulator with realistic ballistics, 3D visualization, and wind effects. Practice long-range precision shooting at 300-1000 yards.">
+  <meta property="og:description" content="Interactive F-Class shooting simulator with realistic ballistics including spin effects, wind reading (mirage and flags), 3D visualization, and authentic match scoring. Practice long-range precision shooting at standard F-Class distances (300-1000 yards).">
   <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html">
   <meta property="twitter:title" content="F-Class Simulator - Interactive Long-Range Shooting">
-  <meta property="twitter:description" content="Interactive F-Class shooting simulator with realistic ballistics, 3D visualization, and wind effects. Practice long-range precision shooting at 300-1000 yards.">
+  <meta property="twitter:description" content="Interactive F-Class shooting simulator with realistic ballistics including spin effects, wind reading (mirage and flags), 3D visualization, and authentic match scoring. Practice long-range precision shooting at standard F-Class distances (300-1000 yards).">
   <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
@@ -32,7 +32,7 @@
     "@context": "https://schema.org",
     "@type": "VideoGame",
     "name": "F-Class Simulator",
-    "description": "Interactive F-Class shooting simulator with realistic ballistics and 3D visualization",
+    "description": "Interactive F-Class shooting simulator with realistic ballistics including spin effects, wind reading, 3D visualization, and authentic match scoring",
     "url": "https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html",
     "applicationCategory": "Game",
     "operatingSystem": "Web Browser",
@@ -177,7 +177,7 @@
       <div class="help-modal-body">
         <div class="help-section">
           <h3>Overview</h3>
-          <p>F-Class Simulator is an interactive 3D shooting simulator that recreates the experience of long-range F-Class competition shooting. Practice reading wind, managing ballistics, and making precise shots at standard F-Class distances from 300 to 1000 yards.</p>
+          <p>F-Class Simulator is an interactive 3D shooting simulator that recreates the experience of long-range F-Class competition shooting. Practice reading wind (mirage and flags), managing ballistics with spin effects, and making precise shots at standard F-Class distances from 300 to 1000 yards with correct targets and authentic match scoring.</p>
         </div>
         
         <div class="help-section">
@@ -199,10 +199,9 @@
             <strong>Features:</strong><br>
             - Dial position displayed in lower right (elevation/windage in MOA)<br>
             - Configurable SFP/FFP reticle with red crosshair<br>
-            - SFP: reticle stays fixed size, MOA accurate at initial zoom only<br>
-            - FFP: reticle scales with zoom, MOA always accurate<br>
-            - Tick marks at 1 MOA (minor) and 2 MOA (major) intervals<br>
-            - Reticle stays fixed at target base height during pit cycles<br><br>
+            - SFP: reticle stays fixed size, MOA hash marks are accurate at initial zoom only<br>
+            - FFP: reticle scales with zoom, MOA hash marks are always accurate<br>
+            - Hash marks at 1 MOA (minor) and 2 MOA (major) intervals<br>
 
             <strong>Firing:</strong><br>
             - <kbd>Space</kbd> Fire shot (blocked while your target is down)<br><br>
@@ -222,11 +221,9 @@
             - Read angle/flap; watch multiple distances for shear<br><br>
 
             <strong>Mirage:</strong><br>
-            - Zoom in to read shimmer; it rises upward and leans with crosswind<br>
+            - Zoom in to read the shimmer; it rises upward and drifts with the prevailing wind direction<br>
             - Light: vertical boil • Moderate: leaning • Strong: mostly horizontal flow<br><br>
-
-            <strong>Wind Presets:</strong><br>
-            - Dead, Calm, Moderate, Strong, Shear
+            - Mirage is based on wind conditions over the final 25% of the distance to the spot where the scope is aimed within the range box.
           </div>
         </div>
         
@@ -239,14 +236,13 @@
             - Relay ends at 20 record shots or when time expires<br>
             - Acknowledge the relay-complete dialog to proceed<br>
             - Your rifle is disabled while your target is down<br>
-            - Timer pauses when you tab away (no reset on return)
           </div>
         </div>
         
         <div class="help-section">
           <h3>Ballistic Parameters</h3>
           <div class="param-help">
-            <strong>BC (Ballistic Coefficient):</strong> Aerodynamic efficiency (0.001-1.0). Higher = less wind drift and drop<br><br>
+            <strong>BC (Ballistic Coefficient):</strong> Aerodynamic efficiency. Higher = less wind drift and drop<br><br>
             <strong>Drag Function:</strong> G7 for modern boat-tail bullets, G1 for flat-base or older projectiles<br><br>
             <strong>MV (Muzzle Velocity):</strong> Initial velocity in fps. Critical for trajectory and time-of-flight<br><br>
             <strong>Diameter:</strong> Bullet caliber in inches. Affects line-breaking scoring and spin calculations<br><br>
@@ -262,11 +258,16 @@
         <div class="help-section">
           <h3>HUD (Top-Right)</h3>
           <div class="param-help">
-            - Relay and Timer<br>
-            - Sighters: N/∞ (Relay 1) or N/2 (Relays 2–3), shown only during sighters<br>
-            - Shots: N/20 during record phase (green at 20/20)<br>
-            - Score and X-count; Dropped points and X<br>
-            - Last Shot, MV, Impact V, FPS
+            <strong>Relay:</strong> Current relay number (1/3, 2/3, 3/3)<br><br>
+            <strong>Timer:</strong> Remaining time for current relay (minutes:seconds)<br><br>
+            <strong>Target:</strong> Your target number<br><br>
+            <strong>Sighters:</strong> Sighter count N/∞ (Relay 1) or N/2 (Relays 2–3), shown only during sighters phase<br><br>
+            <strong>Shots:</strong> Record shots N/20 during record phase (turns green when at 20/20)<br><br>
+            <strong>Score:</strong> Total score and X-count for current relay<br><br>
+            <strong>Dropped:</strong> Dropped points and dropped X-count for current relay<br><br>
+            <strong>Last Shot:</strong> Score value with X indicator (e.g., "10x" for a perfect X, "9" for a nine)<br><br>
+            <strong>MV:</strong> Muzzle velocity in fps for the last shot fired<br><br>
+            <strong>Impact V:</strong> Impact velocity in fps for the last shot fired
           </div>
         </div>
 
@@ -311,7 +312,7 @@
             <strong>Zeroing:</strong> Iterative algorithm correcting for y/z error at the target plane. Runs in zero wind for repeatability and converges quickly.<br><br>
             <strong>Coordinates & Units:</strong> Three.js world in yards (X=right, Y=up, Z=toward camera/−Z downrange). Wrappers convert to the C++ simulation frame (X=downrange, Y=right, Z=up) and meters internally.<br><br>
             <strong>Wind Model:</strong> 2D curl-noise field with multiple octaves and global advection. RMS-normalized at init for stable magnitudes across presets. Flags and mirage sample this same field over space and time.<br><br>
-            <strong>Mirage:</strong> World-anchored distortion sampling predominantly in the last quarter of the range to emphasize target-area cues; apparent flow aligns with crosswind sign convention.
+            <strong>Mirage:</strong> World-anchored distortion sampling predominantly in the last quarter of the range to emphasize target-area cues; apparent flow aligns with crosswind direction.
           </div>
         </div>
         
