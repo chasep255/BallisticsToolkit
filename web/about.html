@@ -36,7 +36,7 @@
         <div class="content-section">
             <h2>Project Overview</h2>
             <div class="highlight-box">
-                <p><strong>The Ballistics Toolkit</strong> is a suite of precision shooting tools — a ballistic calculator, target simulator, and interactive F‑Class simulator — designed to be accurate, fast, and easy to use. Everything runs in your browser with a high‑performance WebAssembly core: plan dope, practice wind, and simulate matches without installing software.</p>
+                <p><strong>The Ballistics Toolkit</strong> is a client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides fast, accurate trajectory calculations with atmospheric and wind compensation, spin effects (spin drift and crosswind jump), Monte Carlo target simulation, and an interactive F-Class match simulator with wind visualization. Everything runs in your browser with a high-performance WebAssembly core: plan dope, practice wind, and simulate matches without installing software.</p>
             </div>
         </div>
         
@@ -49,7 +49,7 @@
                 </div>
                 <div class="feature-box">
                     <h3>Target Simulator</h3>
-                    <p>Monte Carlo simulation with statistical variability modeling, and realistic accuracy assessment</p>
+                    <p>Monte Carlo simulation with statistical variability modeling and realistic accuracy assessment</p>
                 </div>
                 <div class="feature-box">
                     <h3>Bullet Parameters</h3>
@@ -61,7 +61,7 @@
                 </div>
                 <div class="feature-box">
                     <h3>Wind Simulator</h3>
-                    <p>Real‑time wind field driven by multi‑octave curl noise (Simplex) with adjustable spatial/temporal scales, optional threshold gating, and global advection. Powers flags, mirage, and drift in the F-Class Simulator.</p>
+                    <p>Real‑time wind field powered by multi‑octave curl noise (Simplex). Powers the F-Class Simulator's wind flags, mirage effect, and feeds directly into the ballistic calculator used on each shot.</p>
                 </div>
                 <div class="feature-box">
                     <h3>F-Class Simulator</h3>
@@ -76,7 +76,7 @@
                 <li class="tech-item"><strong>WebAssembly:</strong> Emscripten compilation for fast performance</li>
                 <li class="tech-item"><strong>Algorithms:</strong> 2nd-order Runge-Kutta (RK2) integration for trajectory calculations</li>
                 <li class="tech-item"><strong>Drag Models:</strong> G1 and G7 standard drag functions</li>
-                <li class="tech-item"><strong>Atmosphere:</strong> Uses temperature, humidity, and altitude. Pressure is derived from altitude unless provided by an API source.</li>
+                <li class="tech-item"><strong>Atmosphere:</strong> Uses temperature, humidity, and altitude. Atmospheric pressure is calculated automatically from altitude.</li>
                 <li class="tech-item"><strong>Spin Aerodynamics:</strong> 4DOF trajectory with simplified, empirically tuned spin effects.</li>
                 <li class="tech-item"><strong>Wind Modeling:</strong> 2D curl field from Simplex noise with multi-octave components.</li>
             </ul>
