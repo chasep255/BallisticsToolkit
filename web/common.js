@@ -1,24 +1,177 @@
-// Google Analytics - only load on production domain
-(function()
-{
-  const hostname = window.location.hostname;
-  const isProduction = hostname === 'ballisticstoolkit.com' || hostname === 'www.ballisticstoolkit.com';
-
-  if (isProduction)
+// Cookie consent management
+const CookieConsent = {
+  STORAGE_KEY: 'btk_cookie_consent',
+  
+  // Get current consent status
+  getConsent: function()
   {
+    const stored = localStorage.getItem(this.STORAGE_KEY);
+    if (stored === 'accepted') return true;
+    return null; // No decision yet (rejections are not saved)
+  },
+  
+  // Set consent status
+  setConsent: function(accepted)
+  {
+    if (accepted)
+    {
+      // Only save preference if accepted
+      localStorage.setItem(this.STORAGE_KEY, 'accepted');
+      this.loadGoogleAnalytics();
+    }
+    else
+    {
+      // Don't save rejection - remove any existing preference so banner shows again
+      localStorage.removeItem(this.STORAGE_KEY);
+      this.removeGoogleAnalytics();
+    }
+  },
+  
+  // Load Google Analytics (only on production)
+  loadGoogleAnalytics: function()
+  {
+    const hostname = window.location.hostname;
+    const isProduction = hostname === 'ballisticstoolkit.com' || hostname === 'www.ballisticstoolkit.com';
+    
+    if (!isProduction || window.gtag) return; // Already loaded or not production
+    
     const GA_MEASUREMENT_ID = 'G-JWTD9KG6D6';
     const gtagScript = document.createElement('script');
     gtagScript.async = true;
     gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
     document.head.appendChild(gtagScript);
-
+    
     window.dataLayer = window.dataLayer || [];
     function gtag(){ dataLayer.push(arguments); }
     window.gtag = gtag;
     gtag('js', new Date());
     gtag('config', GA_MEASUREMENT_ID, { 'anonymize_ip': true });
+  },
+  
+  // Remove Google Analytics cookies (if user revokes consent)
+  removeGoogleAnalytics: function()
+  {
+    // Clear GA cookies
+    const cookies = document.cookie.split(';');
+    cookies.forEach(cookie =>
+    {
+      const eqPos = cookie.indexOf('=');
+      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+      if (name.startsWith('_ga') || name.startsWith('_gid') || name.startsWith('_gat'))
+      {
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;domain=.${window.location.hostname};`;
+      }
+    });
+  },
+  
+  // Clear all cookies for this domain
+  clearAllCookies: function()
+  {
+    const cookies = document.cookie.split(';');
+    cookies.forEach(cookie =>
+    {
+      const eqPos = cookie.indexOf('=');
+      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+      // Clear cookie for current path and root path
+      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;domain=.${window.location.hostname};`;
+      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;domain=${window.location.hostname};`;
+    });
+  },
+  
+  // Show cookie banner
+  showBanner: function()
+  {
+    // Check if banner already exists
+    if (document.getElementById('cookie-banner')) return;
+    
+    // Determine path prefix based on current page
+    const body = document.body;
+    const currentPageName = body ? (body.dataset.page || 'index') : 'index';
+    const isRootPage = currentPageName === 'index' || currentPageName === 'about';
+    const pathPrefix = isRootPage ? '' : '../';
+    
+    const banner = document.createElement('div');
+    banner.id = 'cookie-banner';
+    banner.className = 'cookie-banner';
+    banner.innerHTML = `
+      <div class="cookie-banner-content">
+        <p>We use analytics cookies to improve our site. <a href="${pathPrefix}privacy.html#cookies">Learn more</a></p>
+        <div class="cookie-banner-buttons">
+          <button id="cookie-accept" class="cookie-btn cookie-btn-accept">Accept</button>
+          <button id="cookie-reject" class="cookie-btn cookie-btn-reject">Reject</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(banner);
+    
+    // Button handlers
+    document.getElementById('cookie-accept').addEventListener('click', () =>
+    {
+      this.setConsent(true);
+      this.hideBanner();
+    });
+    
+    document.getElementById('cookie-reject').addEventListener('click', () =>
+    {
+      this.setConsent(false);
+      this.hideBanner();
+    });
+    
+    // Show banner with animation
+    setTimeout(() => banner.classList.add('show'), 100);
+  },
+  
+  // Hide cookie banner
+  hideBanner: function()
+  {
+    const banner = document.getElementById('cookie-banner');
+    if (banner)
+    {
+      banner.classList.remove('show');
+      setTimeout(() => banner.remove(), 300);
+    }
+  },
+  
+  // Reset cookie preferences (clear consent and all cookies, show banner)
+  resetCookiePreferences: function()
+  {
+    // Clear consent preference
+    localStorage.removeItem(this.STORAGE_KEY);
+    
+    // Clear all cookies
+    this.clearAllCookies();
+    this.removeGoogleAnalytics();
+    
+    // Show banner again
+    this.showBanner();
+  },
+  
+  // Initialize (check consent and load GA or show banner)
+  init: function()
+  {
+    const consent = this.getConsent();
+    if (consent === true)
+    {
+      this.loadGoogleAnalytics();
+    }
+    else if (consent === null)
+    {
+      this.showBanner();
+    }
+    // If rejected, do nothing (GA not loaded)
   }
-})();
+};
+
+// Initialize cookie consent on page load
+document.addEventListener('DOMContentLoaded', function()
+{
+  CookieConsent.init();
+});
+
+// Export for global access
+window.CookieConsent = CookieConsent;
 
 /**
  * Common JavaScript functionality for BallisticsToolkit
@@ -137,8 +290,6 @@ function setupCommonPageStructure()
         <a href="${pathPrefix}terms.html">Terms</a>
         <span>·</span>
         <a href="${pathPrefix}privacy.html">Privacy</a>
-        <span>·</span>
-        <a href="${pathPrefix}cookies.html">Cookies</a>
       </div>`;
     document.body.appendChild(footer);
   }
