@@ -27,13 +27,29 @@
 // Navigation helper
 function setActiveNavLink()
 {
-  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  const body = document.body;
+  if (!body) return;
+  
+  const currentPageName = body.dataset.page || 'index';
   const navLinks = document.querySelectorAll('.nav-links a');
+
+  // Map page names to their corresponding nav links
+  const pageNavMap = {
+    'index': 'index.html',
+    'ballistic-calc': 'ballistic-calc/ballistic-calc.html',
+    'target-sim': 'target-sim/target-sim.html',
+    'wind-sim': 'wind-sim/wind-sim.html',
+    'fclass-sim': 'fclass-sim/fclass-sim.html'
+  };
 
   navLinks.forEach(link =>
   {
     const href = link.getAttribute('href');
-    if (href === currentPage || (currentPage === '' && href === 'index.html'))
+    // Remove path prefix for comparison (../ or empty)
+    const cleanHref = href.replace(/^\.\.\//, '');
+    const expectedHref = pageNavMap[currentPageName];
+    
+    if (expectedHref && cleanHref === expectedHref)
     {
       link.classList.add('active');
     }
