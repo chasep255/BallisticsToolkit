@@ -10,6 +10,13 @@
 namespace btk::ballistics
 {
 
+
+  constexpr float DEFAULT_LIFT_SLOPE_PER_RAD = 1.27169f;
+  constexpr float DEFAULT_RESTORING_MOMENT_SLOPE_PER_RAD = -0.124862f;
+  constexpr float DEFAULT_YAW_OF_REPOSE_SCALE = 0.426516f;
+  constexpr float DEFAULT_BETA_LAG_SCALE = 0.670554f;
+
+
   /**
    * @brief Result of zeroing calculation
    */
@@ -38,7 +45,12 @@ namespace btk::ballistics
      * - Wind: zero (0, 0, 0) m/s
      * - Time: 0.0f seconds
      */
-    Simulator() : initial_bullet_(0.0f, 0.0f, 0.0f, 0.0f), current_bullet_(0.0f, 0.0f, 0.0f, 0.0f), atmosphere_(), wind_(0.0f, 0.0f, 0.0f), current_time_(0.0f), trajectory_() {}
+    Simulator()
+      : initial_bullet_(0.0f, 0.0f, 0.0f, 0.0f), current_bullet_(0.0f, 0.0f, 0.0f, 0.0f), atmosphere_(), wind_(0.0f, 0.0f, 0.0f), current_time_(0.0f), trajectory_(),
+        lift_slope_per_rad_(DEFAULT_LIFT_SLOPE_PER_RAD), restoring_moment_slope_per_rad_(DEFAULT_RESTORING_MOMENT_SLOPE_PER_RAD), 
+        yaw_of_repose_scale_(DEFAULT_YAW_OF_REPOSE_SCALE), beta_lag_scale_(DEFAULT_BETA_LAG_SCALE)
+    {
+    }
 
     // Setters (individual)
     /**
@@ -162,6 +174,18 @@ namespace btk::ballistics
      */
     const Trajectory& getTrajectory() const;
 
+    // Aerodynamic parameter setters
+    void setLiftSlopePerRad(float value) { lift_slope_per_rad_ = value; }
+    void setRestoringMomentSlopePerRad(float value) { restoring_moment_slope_per_rad_ = value; }
+    void setYawOfReposeScale(float value) { yaw_of_repose_scale_ = value; }
+    void setBetaLagScale(float value) { beta_lag_scale_ = value; }
+
+    // Aerodynamic parameter getters
+    float getLiftSlopePerRad() const { return lift_slope_per_rad_; }
+    float getRestoringMomentSlopePerRad() const { return restoring_moment_slope_per_rad_; }
+    float getYawOfReposeScale() const { return yaw_of_repose_scale_; }
+    float getBetaLagScale() const { return beta_lag_scale_; }
+
     private:
     // Physics helpers
     float calculateDragRetardationFor(const Bullet& s) const;
@@ -175,6 +199,12 @@ namespace btk::ballistics
     btk::math::Vector3D wind_;
     float current_time_;
     Trajectory trajectory_;
+
+    // Tunable aerodynamic parameters
+    float lift_slope_per_rad_;
+    float restoring_moment_slope_per_rad_;
+    float yaw_of_repose_scale_;
+    float beta_lag_scale_;
   };
 
 } // namespace btk::ballistics

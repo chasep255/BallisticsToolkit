@@ -13,13 +13,6 @@
 namespace btk::ballistics
 {
 
-  constexpr float LIFT_SLOPE_PER_RAD = 1.5f;              // C_Nα  ~ 1.5 per rad
-  constexpr float RESTORING_MOMENT_SLOPE_PER_RAD = -0.07f; // |C_Mα| stronger trim (from 0.05)
-  constexpr float YAW_OF_REPOSE_SCALE = 0.2f;            // empirical scale to match observed spin drift
-  constexpr float JUMP_STRENGTH_SCALE = YAW_OF_REPOSE_SCALE; // match SD scaling so jump shares constants
-  constexpr float BETA_LAG_SCALE = 0.5f;               // slows β_eq filter vs trim rate
-  constexpr float MAX_YAW_OF_REPOSE_RAD = 0.003f;       // clamp ~ 3 mrad
-
   // G7 drag function data: (velocity_fps, acceleration, mass)
   constexpr std::array<std::tuple<float, float, float>, 9> G7_DRAG_DATA = {{{4200.0f, 1.29081656775919e-09f, 3.24121295355962f},
                                                                             {3000.0f, 0.0171422231434847f, 1.27907168025204f},
@@ -130,19 +123,19 @@ namespace btk::ballistics
     // Use a representative aerodynamic moment arm: max(diameter, length)
     float refLen = std::max(s.getDiameter(), s.getLength());
     float denom = s.estimateSpinMomentOfInertia() * std::fabs(s.getSpinRate()) + 1e-12f;
-    float alignRate = (qDyn * Sref * refLen * std::fabs(RESTORING_MOMENT_SLOPE_PER_RAD)) / denom;
+    float alignRate = (qDyn * Sref * refLen * std::fabs(restoring_moment_slope_per_rad_)) / denom;
     // Stable low-pass factor for the lag state (use slower β_eq dynamics)
-    float betaAlignRate = BETA_LAG_SCALE * alignRate;
+    float betaAlignRate = beta_lag_scale_ * alignRate;
     float aLP = 1.0f - std::exp(-betaAlignRate * dt);
 
     // --- Spin drift (yaw-of-repose from gravity)
     btk::math::Vector3D gPerp = gravity - tHat * gravity.dot(tHat);
     btk::math::Vector3D tXg = tHat.cross(gPerp); // direction in plane
-    float yor = (alignRate > 1e-6f) ? YAW_OF_REPOSE_SCALE * (tXg.magnitude() / (V * alignRate)) : 0.0f;
+    float yor = (alignRate > 1e-6f) ? yaw_of_repose_scale_ * (tXg.magnitude() / (V * alignRate)) : 0.0f;
     // use the component along "right", signed by twist hand
     int hand = (s.getSpinRate() >= 0.0f) ? +1 : -1;
     float yorRight = hand * safe_norm(tXg, right).dot(right) * yor;
-    yorRight = std::clamp(yorRight, -MAX_YAW_OF_REPOSE_RAD, MAX_YAW_OF_REPOSE_RAD);
+    // Remove MAX_YAW_OF_REPOSE_RAD clamp as requested
 
     // --- Crosswind jump via high-pass of lateral sideslip β = u_perp / V
     btk::math::Vector3D u_perp = u - tHat * u.dot(tHat);
@@ -162,11 +155,11 @@ namespace btk::ballistics
     float hpU = betaU - betaEqUp;
 
     // 90° rotation around tHat; sign by twist hand
-    float jumpR = JUMP_STRENGTH_SCALE * (hand * (-hpU));
-    float jumpU = JUMP_STRENGTH_SCALE * (hand * (hpR));
+    float jumpR = yaw_of_repose_scale_ * (hand * (-hpU));
+    float jumpU = yaw_of_repose_scale_ * (hand * (hpR));
 
     // Convert tiny angles -> acceleration with lift slope
-    float gain = (qDyn * Sref * LIFT_SLOPE_PER_RAD) / s.getWeight();
+    float gain = (qDyn * Sref * lift_slope_per_rad_) / s.getWeight();
 
     btk::math::Vector3D extra = right * (gain * (yorRight + jumpR)) + upInPl * (gain * jumpU);
 
