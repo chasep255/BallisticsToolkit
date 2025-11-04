@@ -50,9 +50,9 @@ function calculateTrajectory()
   const windSpeed = btk.Conversions.mphToMps(parseFloat(document.getElementById('windSpeed').value));
   const windDirection = btk.Conversions.oclockToRadians(parseFloat(document.getElementById('windDirection').value));
 
-  // Calculate spin rate from twist rate
-  const twistMetersPerTurn = btk.Conversions.inchesToMeters(twistRate);
-  const spinRate = btk.Bullet.computeSpinRateFromTwist(muzzleVelocity, twistMetersPerTurn);
+  // Calculate spin rate from twist rate (or 0 if spin effects disabled)
+  const enableSpinEffects = document.getElementById('enableSpinEffects').checked;
+  const spinRate = enableSpinEffects ? btk.Bullet.computeSpinRateFromTwist(muzzleVelocity, btk.Conversions.inchesToMeters(twistRate)) : 0.0;
 
   // Create bullet
   const bullet = new btk.Bullet(

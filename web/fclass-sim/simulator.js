@@ -288,7 +288,7 @@ function getGameParams()
     diameter: parseFloat(document.getElementById('diameter').value),
     weight: parseFloat(document.getElementById('weight').value),
     length: parseFloat(document.getElementById('length').value),
-    twist: parseFloat(document.getElementById('twist').value),
+    twist: document.getElementById('enableSpinEffects').checked ? parseFloat(document.getElementById('twist').value) : 0.0,
     mvSd: parseFloat(document.getElementById('mvSd').value),
     rifleAccuracy: parseFloat(document.getElementById('rifleAccuracy').value)
   };

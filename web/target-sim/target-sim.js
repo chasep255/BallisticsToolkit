@@ -304,7 +304,8 @@ class TargetSimulator
     const weightKg = btk.Conversions.grainsToKg(parseFloat(document.getElementById('weight').value));
     const length = btk.Conversions.inchesToMeters(parseFloat(document.getElementById('length').value));
     const twistRate = parseFloat(document.getElementById('twistRate').value);
-    const twistMetersPerTurn = btk.Conversions.inchesToMeters(twistRate);
+    const enableSpinEffects = document.getElementById('enableSpinEffects').checked;
+    const twistMetersPerTurn = enableSpinEffects ? btk.Conversions.inchesToMeters(twistRate) : 0.0;
     const targetName = document.getElementById('target').value;
     const range = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('range').value));
     const shots = parseInt(document.getElementById('shots').value);

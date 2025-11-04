@@ -83,6 +83,10 @@
                 <label for="twistRate" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate bullet spin rate for spin drift and crosswind jump effects. Uses 4DOF simulation with simplified spin aerodynamics">Twist (in/turn)</label>
                 <input type="number" id="twistRate" value="8" step="0.1" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate bullet spin rate for spin drift and crosswind jump effects. Uses 4DOF simulation with simplified spin aerodynamics">
             </div>
+            <div class="param-item" style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="enableSpinEffects" checked style="width: auto; margin: 0;">
+                <label for="enableSpinEffects" style="margin: 0; font-weight: normal;" title="Enable spin drift and crosswind jump effects. Uncheck to disable experimental spin effects.">Enable Spin Effects</label>
+            </div>
             <div class="param-item">
                 <label for="muzzleVelocity" title="Muzzle velocity in feet per second">MV (fps)</label>
                 <input type="number" id="muzzleVelocity" value="2750" step="10" title="Muzzle velocity in feet per second">
