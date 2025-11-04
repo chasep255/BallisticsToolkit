@@ -9,6 +9,7 @@ import
   MirageEffect
 }
 from './mirage.js';
+import { sampleWindAtThreeJsPosition } from '../core/btk.js';
 
 export class Scope
 {
@@ -826,7 +827,7 @@ export class Scope
       const intersection = this.calculateRangeIntersection();
 
       // Store current wind data for display
-      const wind = windGenerator.getWindAt(intersection.x, intersection.y, intersection.z);
+      const wind = sampleWindAtThreeJsPosition(windGenerator, intersection.x, intersection.y, intersection.z);
       const windSpeed = Math.sqrt(wind.x * wind.x + wind.z * wind.z);
       const windAngle = Math.atan2(wind.x, -wind.z) * 180 / Math.PI;
       this.currentWind = {

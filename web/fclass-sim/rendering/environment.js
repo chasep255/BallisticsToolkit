@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
+import { sampleWindAtThreeJsPosition } from '../core/btk.js';
 
 export class EnvironmentRenderer
 {
@@ -612,17 +613,10 @@ export class EnvironmentRenderer
     for (const cloud of this.clouds)
     {
       // Sample wind at cloud's position
-      // Three.js coords: X=crossrange, Y=up, Z=downrange (negative towards target)
-      // BTK coords: X=downrange, Y=crossrange (positive left), Z=up
-      const cloudWind = windGenerator.getWindAt(
-        cloud.mesh.position.x, // Three X (crossrange) 
-        cloud.mesh.position.y, // Three Y (up)
-        cloud.mesh.position.z // Three Z (downrange)
-      );
-
+      const wind = sampleWindAtThreeJsPosition(windGenerator, cloud.mesh.position.x, cloud.mesh.position.y, cloud.mesh.position.z);
       // Convert wind velocity from mph to yards/s: mph * 0.4889
-      const velX_yds = cloudWind.x * 0.4889; // BTK Y (crossrange) → Three X
-      const velZ_yds = -cloudWind.z * 0.4889; // BTK X (downrange) → Three Z (negative)
+      const velX_yds = wind.x * 0.4889; // crossrange
+      const velZ_yds = wind.z * 0.4889; // downrange (negative)
 
       // Move cloud with wind velocity
       cloud.mesh.position.x += velX_yds * deltaTime * cloud.randomnessFactor;

@@ -1,20 +1,10 @@
 // Import Three.js
 import * as THREE from 'three';
 
-// Import BTK wrappers
-import
-{
-  waitForBTK,
-  BtkVector3Wrapper
-}
-from './core/btk.js';
+// Import BTK
+import { waitForBTK, sampleWindAtThreeJsPosition } from './core/btk.js';
 
-// Import core logic
-import
-{
-  createWind
-}
-from './core/wind.js';
+// Import core logic (no wind module - use BTK directly)
 
 // Import ResourceManager (triggers auto-loading)
 import ResourceManager from './resources/manager.js';
@@ -588,8 +578,8 @@ class FClassSimulator
     try
     {
       // Get wind at shooter position (0, 0, 0)
-      const windData = this.windGenerator.getWindAt(0, 0, 0);
-      const windSpeed = Math.sqrt(windData.x * windData.x + windData.y * windData.y + windData.z * windData.z);
+      const wind = sampleWindAtThreeJsPosition(this.windGenerator, 0, 0, 0);
+      const windSpeed = Math.sqrt(wind.x * wind.x + wind.y * wind.y + wind.z * wind.z);
 
       // Calculate volume: 0 at 0mph, ramps up to 1.0 at 40+ mph
       const volume = Math.max(0, Math.min(windSpeed / 40, 1.0));
@@ -798,7 +788,9 @@ class FClassSimulator
   {
     // Update time at the start of each frame
     ResourceManager.time.update();
-    this.windGenerator.advanceTime(ResourceManager.time.getElapsedTime());
+    if (this.windGenerator) {
+      this.windGenerator.advanceTime(ResourceManager.time.getElapsedTime());
+    }
 
     // Calculate FPS by sampling over 1 second
     const currentTime = performance.now();
@@ -958,16 +950,34 @@ class FClassSimulator
     const halfWidth = FClassSimulator.RANGE_TOTAL_WIDTH / 2; // yards
 
     // Wind box extends from behind shooter to past target, with padding on all sides
-    // minCorner: behind shooter (positive Z), left edge (-X), at ground level (-Y)
-    // maxCorner: past target (-negative Z), right edge (+X), above ground (+Y)
-    const minCorner = new BtkVector3Wrapper(-halfWidth - FClassSimulator.WIND_BOX_PADDING, 0, FClassSimulator.WIND_BOX_PADDING);
-    const maxCorner = new BtkVector3Wrapper(halfWidth + FClassSimulator.WIND_BOX_PADDING, FClassSimulator.WIND_BOX_HEIGHT, -(this.distance + FClassSimulator.WIND_BOX_PADDING));
+    // Three.js coords: minCorner: behind shooter (positive Z), left edge (-X), at ground level (-Y)
+    // Three.js coords: maxCorner: past target (-negative Z), right edge (+X), above ground (+Y)
+    // Convert to BTK coordinates (meters, BTK coords)
+    const btk = await waitForBTK();
+    const minCornerX_yd = -halfWidth - FClassSimulator.WIND_BOX_PADDING;
+    const minCornerY_yd = 0;
+    const minCornerZ_yd = FClassSimulator.WIND_BOX_PADDING;
+    const maxCornerX_yd = halfWidth + FClassSimulator.WIND_BOX_PADDING;
+    const maxCornerY_yd = FClassSimulator.WIND_BOX_HEIGHT;
+    const maxCornerZ_yd = -(this.distance + FClassSimulator.WIND_BOX_PADDING);
+    
+    const minCorner = new btk.Vector3D(
+      btk.Conversions.yardsToMeters(-minCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
+      btk.Conversions.yardsToMeters(minCornerX_yd),   // Three X (crossrange) → BTK Y (crossrange)
+      btk.Conversions.yardsToMeters(minCornerY_yd)    // Three Y (up) → BTK Z (up)
+    );
+    const maxCorner = new btk.Vector3D(
+      btk.Conversions.yardsToMeters(-maxCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
+      btk.Conversions.yardsToMeters(maxCornerX_yd),   // Three X (crossrange) → BTK Y (crossrange)
+      btk.Conversions.yardsToMeters(maxCornerY_yd)    // Three Y (up) → BTK Z (up)
+    );
 
-    this.windGenerator = createWind(this.windPreset, minCorner, maxCorner);
+    console.log(`[Wind] Creating wind generator: ${this.windPreset}`);
+    this.windGenerator = btk.WindPresets.getPreset(this.windPreset, minCorner, maxCorner);
 
     // Clean up temporary vectors
-    minCorner.dispose();
-    maxCorner.dispose();
+    minCorner.delete();
+    maxCorner.delete();
 
     this.flagSystem = new FlagRenderer(
     {
@@ -1773,7 +1783,7 @@ class FClassSimulator
     // Dispose wind generator
     if (this.windGenerator)
     {
-      this.windGenerator.dispose();
+      this.windGenerator.delete();
     }
 
     // Dispose main view quad

@@ -2,21 +2,14 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
-
-// Import BTK wrappers
-import
-{
-  BtkVector3Wrapper,
-  BtkVelocityWrapper,
-  BtkBulletWrapper,
-  BtkBallisticsSimulatorWrapper,
-  BtkAtmosphereWrapper,
-  BtkMatchWrapper
-}
-from '../core/btk.js';
+import { waitForBTK, btkToThreeJsPosition, threeJsToBtkPosition, btkToThreeJsVelocity, threeJsToBtkVelocity, sampleWindAtThreeJsPosition } from '../core/btk.js';
 
 const LOG_PREFIX_ENGINE = '[BallisticsEngine]';
 const LOG_PREFIX_SHOT = '[Shot]';
+
+// BTK module (loaded asynchronously)
+let btk = null;
+waitForBTK().then(module => { btk = module; });
 
 export class BallisticsEngine
 {
@@ -80,27 +73,41 @@ export class BallisticsEngine
       this.mvSd = bulletParams.mvSdFps;
       this.rifleAccuracyMoa = bulletParams.rifleAccuracyMoa;
 
+      // Ensure BTK is loaded
+      if (!btk) btk = await waitForBTK();
+
       // Get BTK target from target system
       this.btkTarget = this.targetSystem.getBtkTarget();
 
-      // Create bullet (wrapper handles unit conversions)
-      this.bullet = new BtkBulletWrapper(this.bulletWeight, this.bulletDiameter, this.bulletLength, bulletParams.bc, bulletParams.dragFunction);
+      // Create bullet with explicit unit conversions
+      this.bullet = new btk.Bullet(
+        btk.Conversions.grainsToKg(this.bulletWeight),
+        btk.Conversions.inchesToMeters(this.bulletDiameter),
+        btk.Conversions.inchesToMeters(this.bulletLength),
+        bulletParams.bc,
+        bulletParams.dragFunction === 'G1' ? btk.DragFunction.G1 : btk.DragFunction.G7
+      );
 
-      // Create atmosphere (wrapper handles unit conversions)
-      const atmosphere = new BtkAtmosphereWrapper(59, 0, 0.5, 0.0);
+      // Create atmosphere with explicit unit conversions
+      const atmosphere = new btk.Atmosphere(
+        btk.Conversions.fahrenheitToKelvin(59),
+        btk.Conversions.feetToMeters(0),
+        0.5,
+        0.0
+      );
 
-      // Create ballistic simulator (wrapped for transparent coordinate conversion)
-      this.ballisticSimulator = new BtkBallisticsSimulatorWrapper();
+      // Create ballistic simulator
+      this.ballisticSimulator = new btk.BallisticsSimulator();
       this.ballisticSimulator.setInitialBullet(this.bullet);
       this.ballisticSimulator.setAtmosphere(atmosphere);
 
       // Dispose atmosphere immediately after use
-      atmosphere.dispose();
+      atmosphere.delete();
 
       // Set wind to zero for zeroing (dispose immediately after use)
-      const zeroWind = new BtkVector3Wrapper(0, 0, 0);
+      const zeroWind = threeJsToBtkPosition(0, 0, 0);
       this.ballisticSimulator.setWind(zeroWind);
-      zeroWind.dispose();
+      zeroWind.delete();
 
       // Get target center from target system (Three.js coords in yards)
       const targetCenter = this.targetSystem.getUserTargetCenter();
@@ -109,9 +116,8 @@ export class BallisticsEngine
         throw new Error('Cannot compute zero: user target not available');
       }
 
-      // BtkVector3Wrapper automatically converts Three.js coords (yards) to BTK coords (meters)
-      // Just pass the Three.js coordinates directly
-      const targetPos = new BtkVector3Wrapper(
+      // Convert Three.js coordinates to BTK coordinates
+      const targetPos = threeJsToBtkPosition(
         targetCenter.x,   // Three.js X (crossrange)
         targetCenter.y,   // Three.js Y (vertical)
         targetCenter.z    // Three.js Z (downrange, negative)
@@ -128,25 +134,25 @@ export class BallisticsEngine
 
       // Time the zeroing computation
       const zeroStartTime = performance.now();
-      // Use C++ zeroing routine (returns raw BTK bullet, wrapper will handle it)
-      this.zeroedBullet = new BtkBulletWrapper(
-        this.ballisticSimulator.computeZero(mvMps, targetPos.raw, 0.001, 1000, 0.001, spinRate)
-      );
+      // Use C++ zeroing routine (returns raw BTK bullet)
+      this.zeroedBullet = this.ballisticSimulator.computeZero(mvMps, targetPos, 0.001, 1000, 0.001, spinRate);
       const zeroEndTime = performance.now();
       const zeroTimeMs = zeroEndTime - zeroStartTime;
-      targetPos.dispose();
+      targetPos.delete();
 
       console.log(`${LOG_PREFIX_ENGINE} Zero computation took ${zeroTimeMs.toFixed(1)}ms`);
 
       // Log the zeroed bullet velocity to show elevation and windage
-      const zeroVel = this.zeroedBullet.getVelocity();
-      const zeroVelMag = zeroVel.magnitude();
+      const zeroVelBtk = this.zeroedBullet.getVelocity();
+      const zeroVel = btkToThreeJsVelocity(zeroVelBtk);
+      const zeroVelMag = Math.sqrt(zeroVel.x * zeroVel.x + zeroVel.y * zeroVel.y + zeroVel.z * zeroVel.z);
       // Calculate angles from velocity components (Three.js coords: X=right, Y=up, Z=downrange-negative)
       const elevationRad = Math.asin(zeroVel.y / zeroVelMag);
       const windageRad = Math.atan2(zeroVel.x, -zeroVel.z);
       const elevationMoa = btk.Conversions.radiansToMoa(elevationRad);
       const windageMoa = btk.Conversions.radiansToMoa(windageRad);
       console.log(`${LOG_PREFIX_ENGINE} Zero complete: Elevation=${elevationMoa.toFixed(2)} MOA (${elevationRad.toFixed(6)} rad), Windage=${windageMoa.toFixed(2)} MOA (${windageRad.toFixed(6)} rad)`);
+      zeroVelBtk.delete(); // Dispose Vector3D to prevent memory leak
     }
     catch (error)
     {
@@ -201,8 +207,10 @@ export class BallisticsEngine
       const accuracyErrorV = accuracyY * accuracyRadius; // radians
 
       // Apply scope aim and accuracy errors to the zeroed velocity
-      const zeroVel = this.zeroedBullet.getVelocity();
-      const zeroVelMag = zeroVel.magnitude();
+      const zeroVelBtk = this.zeroedBullet.getVelocity();
+      const zeroVel = btkToThreeJsVelocity(zeroVelBtk);
+      const zeroVelMag = Math.sqrt(zeroVel.x * zeroVel.x + zeroVel.y * zeroVel.y + zeroVel.z * zeroVel.z);
+      // Note: zeroVelBtk will be deleted after we're done using zeroVel
       // Compute true unit direction in fps space
       const zx = zeroVel.x,
         zy = zeroVel.y,
@@ -229,49 +237,53 @@ export class BallisticsEngine
       const uy = ry * cosPitch + rz * sinPitch;
       const uz = -ry * sinPitch + rz * cosPitch;
 
-      // Scale by actual MV (fps)
-      const variedVel = new BtkVelocityWrapper(
+      // Dispose zeroVelBtk now that we're done with zeroVel
+      zeroVelBtk.delete();
+
+      // Scale by actual MV (fps) and convert to BTK velocity
+      const variedVel = threeJsToBtkVelocity(
         ux * actualMVFps,
         uy * actualMVFps,
         uz * actualMVFps
       );
 
       // Create bullet with varied initial state - start from muzzle (z=0)
-      const bulletStartPos = new BtkVector3Wrapper(0, 0, 0);
+      const bulletStartPos = threeJsToBtkPosition(0, 0, 0);
 
-      const variedBullet = new BtkBulletWrapper(
+      const variedBullet = new btk.Bullet(
         this.zeroedBullet,
         bulletStartPos,
         variedVel,
         this.zeroedBullet.getSpinRate()
       );
 
-      // Dispose temporary wrappers immediately after bullet creation
-      variedVel.dispose();
-      bulletStartPos.dispose();
+      // Dispose temporary vectors immediately after bullet creation
+      variedVel.delete();
+      bulletStartPos.delete();
 
       // Reset simulator with varied bullet
       this.ballisticSimulator.setInitialBullet(variedBullet);
       this.ballisticSimulator.resetToInitial();
 
       // Dispose varied bullet immediately - simulator has copied the data
-      variedBullet.dispose();
+      variedBullet.delete();
 
       // Dispose previous trajectory before creating new one
       if (this.lastTrajectory)
       {
-        this.lastTrajectory.dispose();
+        this.lastTrajectory.delete();
       }
 
       // Sample wind at shooter position for logging
-      const windAtShooter = this.windGenerator.getWindAt(0, 0, 0); // At muzzle
-      const windSpeedMph = Math.sqrt(windAtShooter.x ** 2 + windAtShooter.y ** 2 + windAtShooter.z ** 2);
-      const windDirDeg = Math.atan2(windAtShooter.x, -windAtShooter.z) * 180 / Math.PI; // Angle from downrange
+      const wind = sampleWindAtThreeJsPosition(this.windGenerator, 0, 0, 0);
+      const windSpeedMph = Math.sqrt(wind.x ** 2 + wind.y ** 2 + wind.z ** 2);
+      const windDirDeg = Math.atan2(wind.x, -wind.z) * 180 / Math.PI; // Angle from downrange
       console.log(`${LOG_PREFIX_SHOT} Wind at shooter: ${windSpeedMph.toFixed(1)}mph @ ${windDirDeg.toFixed(0)}°`);
 
-      // Simulate with wind generator (wrapper handles unit conversion)
-      this.lastTrajectory = this.ballisticSimulator.simulateWithWind(range, dt, 5.0, this.windGenerator);
-      const pointAtTarget = this.lastTrajectory.atDistance(range); // distance in yards
+      // Simulate with wind generator
+      const range_m = btk.Conversions.yardsToMeters(range);
+      this.lastTrajectory = this.ballisticSimulator.simulateWithWind(range_m, dt, 5.0, this.windGenerator);
+      const pointAtTarget = this.lastTrajectory.atDistance(range_m); // distance in meters
 
       if (!pointAtTarget)
       {
@@ -279,11 +291,17 @@ export class BallisticsEngine
         return null;
       }
 
-      // Get bullet position and velocity at target (now in Three.js coords, yards)
+      // Get bullet position and velocity at target (convert to Three.js coords, yards)
       const bulletState = pointAtTarget.getState();
-      const bulletPos = bulletState.getPosition(); // Three.js coords in yards
-      const bulletVel = bulletState.getVelocity(); // Three.js coords in fps
+      const bulletPosBtk = bulletState.getPosition();
+      const bulletVelBtk = bulletState.getVelocity();
+      const bulletPos = btkToThreeJsPosition(bulletPosBtk); // Three.js coords in yards
+      const bulletVel = btkToThreeJsVelocity(bulletVelBtk); // Three.js coords in fps
       const impactVelocityFps = Math.sqrt(bulletVel.x ** 2 + bulletVel.y ** 2 + bulletVel.z ** 2); // fps
+      
+      // Dispose BTK vectors
+      bulletPosBtk.delete();
+      bulletVelBtk.delete();
 
       // Get target coordinates from target system (Three.js coords, yards)
       const targetCenter = this.targetSystem.getUserTargetCenter();
@@ -310,7 +328,7 @@ export class BallisticsEngine
         impactVelocityFps: impactVelocityFps
       };
 
-      pointAtTarget.dispose(); // Dispose TrajectoryPoint to prevent memory leak
+      pointAtTarget.delete(); // Dispose TrajectoryPoint to prevent memory leak
 
       return this.pendingShotData;
     }
@@ -436,9 +454,11 @@ export class BallisticsEngine
     const optPoint0 = this.lastTrajectory.atTime(0);
     if (optPoint0 !== undefined)
     {
-      const pos = optPoint0.getState().getPosition(); // Already Three.js coords, yards!
+      const posBtk = optPoint0.getState().getPosition();
+      const pos = btkToThreeJsPosition(posBtk); // Convert to Three.js coords, yards
       this.bulletMesh.position.set(pos.x, pos.y, pos.z);
-      optPoint0.dispose(); // Dispose TrajectoryPoint to prevent memory leak
+      posBtk.delete();
+      optPoint0.delete(); // Dispose TrajectoryPoint to prevent memory leak
     }
 
   }
@@ -467,10 +487,12 @@ export class BallisticsEngine
     const optPoint = this.lastTrajectory.atTime(t);
     if (optPoint !== undefined)
     {
-      const pos = optPoint.getState().getPosition(); // Already Three.js coords, yards!
+      const posBtk = optPoint.getState().getPosition();
+      const pos = btkToThreeJsPosition(posBtk); // Convert to Three.js coords, yards
       this.bulletMesh.position.set(pos.x, pos.y, pos.z);
       this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
-      optPoint.dispose(); // Dispose TrajectoryPoint to prevent memory leak
+      posBtk.delete();
+      optPoint.delete(); // Dispose TrajectoryPoint to prevent memory leak
     }
 
     // Check if animation is complete
@@ -487,14 +509,18 @@ export class BallisticsEngine
 
         // Score the hit using BTK target scoring
         // Create a temporary match just for scoring this one shot
-        const tempMatch = new BtkMatchWrapper();
-        const hit = tempMatch.addHit(data.relativeX, data.relativeY, this.btkTarget, this.bulletDiameter);
+        const tempMatch = new btk.Match();
+        // Convert yards to meters for BTK
+        const relativeX_m = btk.Conversions.yardsToMeters(data.relativeX);
+        const relativeY_m = btk.Conversions.yardsToMeters(data.relativeY);
+        const bulletDiameterMeters = btk.Conversions.inchesToMeters(this.bulletDiameter);
+        const hit = tempMatch.addHit(relativeX_m, relativeY_m, this.btkTarget, bulletDiameterMeters);
 
         // Extract data from Hit before disposing
         const score = hit.getScore();
         const isX = hit.isX();
         hit.delete(); // Dispose Hit object to prevent memory leak
-        tempMatch.dispose(); // Dispose temporary match
+        tempMatch.delete(); // Dispose temporary match
 
         // Call completion callback with shot data
         if (this.onShotComplete)
@@ -578,19 +604,19 @@ export class BallisticsEngine
     // Dispose BTK objects
     if (this.bullet)
     {
-      this.bullet.dispose();
+      this.bullet.delete();
     }
     if (this.zeroedBullet)
     {
-      this.zeroedBullet.dispose();
+      this.zeroedBullet.delete();
     }
     if (this.ballisticSimulator)
     {
-      this.ballisticSimulator.dispose();
+      this.ballisticSimulator.delete();
     }
     if (this.lastTrajectory)
     {
-      this.lastTrajectory.dispose();
+      this.lastTrajectory.delete();
     }
 
     // Clear references

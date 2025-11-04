@@ -2,11 +2,6 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
-import
-{
-  BtkTargetWrapper
-}
-from '../core/btk.js';
 
 const LOG_PREFIX_SCORING = '[Scoring]';
 const LOG_PREFIX_TARGET = '[Target]';
@@ -206,7 +201,8 @@ export class TargetRenderer
 
     for (const spec of ringSpecs)
     {
-      const ringDiameterYards = this.btkTarget.getRingInnerDiameter(spec.ring);
+      const ringDiameterMeters = this.btkTarget.getRingInnerDiameter(spec.ring);
+      const ringDiameterYards = btk.Conversions.metersToYards(ringDiameterMeters);
       const radiusPixels = (ringDiameterYards / 2) * pixelsPerYard;
 
       // Draw filled circle
@@ -222,7 +218,8 @@ export class TargetRenderer
     }
 
     // Draw X-ring
-    const xRingDiameterYards = this.btkTarget.getXRingDiameter();
+    const xRingDiameterMeters = this.btkTarget.getXRingDiameter();
+    const xRingDiameterYards = btk.Conversions.metersToYards(xRingDiameterMeters);
     const xRingRadius = (xRingDiameterYards / 2) * pixelsPerYard;
 
     context.beginPath();
@@ -283,7 +280,7 @@ export class TargetRenderer
     }
 
     // Create BTK target for dimensions
-    this.btkTarget = BtkTargetWrapper.getTarget(String(this.targetType));
+    this.btkTarget = btk.Targets.getTarget(String(this.targetType));
 
     // Create shared target texture
     this.targetTexture = this.createTargetTexture();

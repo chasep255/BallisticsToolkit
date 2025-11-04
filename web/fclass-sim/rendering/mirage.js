@@ -11,6 +11,7 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
+import { sampleWindAtThreeJsPosition } from '../core/btk.js';
 
 export class MirageEffect
 {
@@ -300,13 +301,7 @@ export class MirageEffect
       const sampleY = intersection.y * t;
       const sampleZ = intersection.z * t;
 
-      const wind = windGenerator.getWindAt(
-        sampleX,
-        sampleY,
-        sampleZ
-      );
-
-      // BTK wrapper: wind.x = crosswind, wind.y = vertical, wind.z = headwind
+      const wind = sampleWindAtThreeJsPosition(windGenerator, sampleX, sampleY, sampleZ);
       totalCross += wind.x;
       totalVertical += wind.y;
       totalHead += wind.z;

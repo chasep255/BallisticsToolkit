@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
+import { sampleWindAtThreeJsPosition } from '../core/btk.js';
 
 export class FlagRenderer
 {
@@ -346,11 +347,9 @@ export class FlagRenderer
       const pos = flag.position;
 
       // Get wind at flag position
-      const windVector = windGenerator.getWindAt(pos.x, pos.y, pos.z);
-
-      // Wind vector is in mph (use horizontal components only)
-      const windX_mph = windVector.x; // cross
-      const windZ_mph = windVector.z; // head/tail
+      const wind = sampleWindAtThreeJsPosition(windGenerator, pos.x, pos.y, pos.z);
+      const windX_mph = wind.x; // cross
+      const windZ_mph = wind.z; // head/tail
       const windHoriz_mph = Math.hypot(windX_mph, windZ_mph);
 
       // Nonlinear angle response: angle = min + span * (1 - exp(-K * v_h^2))
