@@ -4,6 +4,10 @@ build-*/
 *.o
 *.a
 
+# Build logs
+build.log
+*.log
+
 # CMake
 CMakeCache.txt
 CMakeFiles/
