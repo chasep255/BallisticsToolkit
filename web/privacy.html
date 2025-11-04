@@ -54,12 +54,6 @@
             <p><strong>Analytics cookies:</strong> Set by Google Analytics to measure site usage and performance.</p>
             <p><strong>Advertising cookies:</strong> None. We do not serve ads.</p>
             <p>You can disable or delete cookies via your browser settings. For Google Analytics, you can also install the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics Opt‑out Browser Add‑on</a>.</p>
-            
-            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #007bff;">
-                <p style="margin-bottom: 10px;"><strong>Manage Cookie Preferences</strong></p>
-                <p style="margin-bottom: 15px; font-size: 0.95em;">You can change your cookie preferences at any time:</p>
-                <button id="manage-cookies-btn" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600;">Change Cookie Preferences</button>
-            </div>
         </div>
 
         <div class="content-section">
@@ -109,16 +103,5 @@
         </div>
     </div>
     <script src="common.js"></script>
-    <script>
-        // Handle cookie preferences button on privacy page
-        document.addEventListener('DOMContentLoaded', function() {
-            const manageBtn = document.getElementById('manage-cookies-btn');
-            if (manageBtn && window.CookieConsent) {
-                manageBtn.addEventListener('click', function() {
-                    window.CookieConsent.resetCookiePreferences();
-                });
-            }
-        });
-    </script>
 </body>
 </html>
