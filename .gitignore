@@ -32,3 +32,10 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Document files (shouldn't be committed)
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+
