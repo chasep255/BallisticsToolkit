@@ -591,7 +591,7 @@ class FClassSimulator
   createWindFlags()
   {
     // Initialize flag system
-    this.flagSystem.initialize();
+    this.flags.initialize();
 
     // Calculate flag positions and add them
     const leftBorder = -FClassSimulator.RANGE_LANE_WIDTH / 2;
@@ -599,13 +599,13 @@ class FClassSimulator
 
     for (let yds = FClassSimulator.POLE_INTERVAL; yds < this.distance; yds += FClassSimulator.POLE_INTERVAL)
     {
-      this.flagSystem.addFlag(leftBorder, -yds); // Left side
-      this.flagSystem.addFlag(rightBorder, -yds); // Right side
+      this.flags.addFlag(leftBorder, -yds); // Left side
+      this.flags.addFlag(rightBorder, -yds); // Right side
     }
 
     // Add flags at target distance
-    this.flagSystem.addFlag(leftBorder, -this.distance); // Left side
-    this.flagSystem.addFlag(rightBorder, -this.distance); // Right side
+    this.flags.addFlag(leftBorder, -this.distance); // Left side
+    this.flags.addFlag(rightBorder, -this.distance); // Right side
   }
 
   // ===== SCENE SETUP =====
@@ -788,23 +788,23 @@ class FClassSimulator
     }
 
     // Update bullet animation (if any)
-    if (this.ballisticsSystem)
+    if (this.ballistics)
     {
-      this.ballisticsSystem.updateBulletAnimation();
+      this.ballistics.updateBulletAnimation();
     }
 
     // Update and render flags
-    this.flagSystem.updateFlags(this.windGenerator);
+    this.flags.updateFlags(this.windGenerator);
 
     // Update clouds
-    this.environmentSystem.updateClouds(ResourceManager.time.getDeltaTime(), this.windGenerator, ResourceManager.time.getElapsedTime());
+    this.environment.updateClouds(ResourceManager.time.getDeltaTime(), this.windGenerator, ResourceManager.time.getElapsedTime());
 
     // Update target frame animations
-    if (this.targetSystem)
+    if (this.targets)
     {
       // Only animate other targets when relay clock is running
       const relayClockRunning = this.matchState.isRunning;
-      this.targetSystem.updateAnimations(ResourceManager.time.getDeltaTime(), relayClockRunning);
+      this.targets.updateAnimations(ResourceManager.time.getDeltaTime(), relayClockRunning);
     }
 
     // Update wind noise volume based on current wind speed
@@ -815,7 +815,7 @@ class FClassSimulator
     if (this.matchState.justEnded())
     {
       // Only show notification if target is ready (not animating)
-      if (this.targetSystem.isTargetReady())
+      if (this.targets.isTargetReady())
       {
         this.showRelayCompleteNotification();
         this.pendingRelayEndNotification = false;
@@ -828,17 +828,17 @@ class FClassSimulator
     }
 
     // Check for pending relay end notification when target becomes ready
-    if (this.pendingRelayEndNotification && this.targetSystem.isTargetReady())
+    if (this.pendingRelayEndNotification && this.targets.isTargetReady())
     {
       this.showRelayCompleteNotification();
       this.pendingRelayEndNotification = false;
     }
 
     // Update HUD with relay and timer
-    if (this.hudSystem)
+    if (this.hud)
     {
-      this.hudSystem.updateRelay(this.matchState.getRelayDisplay());
-      this.hudSystem.updateTimer(this.matchState.getTimeFormatted());
+      this.hud.updateRelay(this.matchState.getRelayDisplay());
+      this.hud.updateTimer(this.matchState.getTimeFormatted());
     }
 
     // Update scope camera orientations
@@ -956,7 +956,7 @@ class FClassSimulator
     minCorner.delete();
     maxCorner.delete();
 
-    this.flagSystem = new FlagRenderer(
+    this.flags = new FlagRenderer(
     {
       scene: this.scene,
       renderer: this.renderer
@@ -965,7 +965,7 @@ class FClassSimulator
     this.createWindFlags();
 
     // ===== TARGETS =====
-    this.targetSystem = new TargetRenderer(
+    this.targets = new TargetRenderer(
     {
       scene: this.scene,
       rangeDistance: this.distance,
@@ -977,7 +977,7 @@ class FClassSimulator
     });
 
     // ===== ENVIRONMENT =====
-    this.environmentSystem = new EnvironmentRenderer(
+    this.environment = new EnvironmentRenderer(
     {
       scene: this.scene,
       renderer: this.renderer,
@@ -988,7 +988,7 @@ class FClassSimulator
     });
 
     // ===== HUD =====
-    this.hudSystem = new HudOverlay(
+    this.hud = new HudOverlay(
     {
       compositionScene: this.compositionScene,
       canvasWidth: this.canvasWidth,
@@ -999,7 +999,7 @@ class FClassSimulator
     this.setupCamera();
 
     // ===== ENVIRONMENT =====
-    this.environmentSystem.createEnvironment();
+    this.environment.createEnvironment();
 
     // ===== COMPOSITION SETUP =====
     this.createMainViewQuad();
@@ -1074,7 +1074,7 @@ class FClassSimulator
     // Create targets (requires BTK to be loaded)
     try
     {
-      this.targetSystem.createTargets();
+      this.targets.createTargets();
     }
     catch (error)
     {
@@ -1085,16 +1085,16 @@ class FClassSimulator
     // Create and setup ballistic system
     try
     {
-      this.ballisticsSystem = new BallisticsEngine(
+      this.ballistics = new BallisticsEngine(
       {
         scene: this.scene,
-        targetSystem: this.targetSystem,
+        targets: this.targets,
         windGenerator: this.windGenerator,
         distance: this.distance,
         onShotComplete: (shotData) => this.onShotComplete(shotData)
       });
 
-      await this.setupBallisticSystem();
+      await this.setupBallistics();
     }
     catch (error)
     {
@@ -1126,9 +1126,9 @@ class FClassSimulator
     ResourceManager.audio.startLoop('wind', 0.0); // Start at 0, will be updated by wind speed
 
     // Show HUD
-    if (this.hudSystem)
+    if (this.hud)
     {
-      this.hudSystem.show();
+      this.hud.show();
     }
     this.updateHUD();
 
@@ -1164,9 +1164,9 @@ class FClassSimulator
     ResourceManager.audio.stopLoop('wind');
 
     // Hide HUD
-    if (this.hudSystem)
+    if (this.hud)
     {
-      this.hudSystem.hide();
+      this.hud.hide();
     }
   }
 
@@ -1217,7 +1217,7 @@ class FClassSimulator
     if (!this.rifleScope) return;
 
     // Check if target system and user target exist
-    if (!this.targetSystem || !this.targetSystem.userTarget)
+    if (!this.targets || !this.targets.userTarget)
     {
       return; // Silently skip if targets not created yet
     }
@@ -1247,7 +1247,7 @@ class FClassSimulator
     }
 
     // Update rifle scope to look at user's target (always at base height, not animated position)
-    const userTarget = this.targetSystem.userTarget;
+    const userTarget = this.targets.userTarget;
     this.rifleScope.lookAt(userTarget.mesh.position.x, userTarget.baseHeight, userTarget.mesh.position.z);
   }
 
@@ -1255,14 +1255,14 @@ class FClassSimulator
   // ===== BALLISTICS & SHOOTING =====
 
   /**
-   * Setup ballistic system with zeroing
+   * Setup ballistics with zeroing
    */
-  async setupBallisticSystem()
+  async setupBallistics()
   {
     try
     {
       // Use bullet parameters from constructor (passed via params)
-      await this.ballisticsSystem.setupBallisticSystem(
+      await this.ballistics.setup(
       {
         mvFps: this.mv,
         bc: this.bc,
@@ -1290,7 +1290,7 @@ class FClassSimulator
    */
   updateHUD()
   {
-    if (!this.hudSystem) return;
+    if (!this.hud) return;
 
     // Get current relay shots only
     const currentRelay = this.matchState.relayIndex;
@@ -1303,9 +1303,9 @@ class FClassSimulator
     const xCount = recordShots.filter(shot => shot.isX).length;
 
     // Update target number
-    if (this.targetSystem && this.targetSystem.userTarget)
+    if (this.targets && this.targets.userTarget)
     {
-      this.hudSystem.updateTarget(this.targetSystem.userTarget.targetNumber);
+      this.hud.updateTarget(this.targets.userTarget.targetNumber);
     }
 
     // Update shot count/sighters based on phase
@@ -1317,27 +1317,27 @@ class FClassSimulator
       // Show sighters count during sighters phase
       const sightersRemaining = this.matchState.getSightersRemaining();
       const sightersLimit = sightersRemaining === Infinity ? '∞' : this.matchState.sightersAllowed[currentRelay];
-      this.hudSystem.updateSighters(sighterShots.length, sightersLimit);
+      this.hud.updateSighters(sighterShots.length, sightersLimit);
     }
     else
     {
       // Show record shots during record phase
-      this.hudSystem.updateShots(shotCount, maxShots, isComplete);
+      this.hud.updateShots(shotCount, maxShots, isComplete);
     }
 
-    this.hudSystem.updateScore(totalScore, xCount);
+    this.hud.updateScore(totalScore, xCount);
 
     // Calculate dropped points for current relay
     const maxPossibleScore = shotCount * 10;
     const maxPossibleX = shotCount;
     const droppedPoints = maxPossibleScore - totalScore;
     const droppedX = maxPossibleX - xCount;
-    this.hudSystem.updateDropped(droppedPoints, droppedX);
+    this.hud.updateDropped(droppedPoints, droppedX);
 
     // Update last shot data
     if (this.lastShotData)
     {
-      this.hudSystem.updateLastShot(
+      this.hud.updateLastShot(
         this.lastShotData.score,
         this.lastShotData.isX,
         this.lastShotData.mvFps,
@@ -1346,7 +1346,7 @@ class FClassSimulator
     }
     else
     {
-      this.hudSystem.updateLastShot('--', false, null, null);
+      this.hud.updateLastShot('--', false, null, null);
     }
   }
 
@@ -1520,7 +1520,7 @@ class FClassSimulator
    */
   fireShot()
   {
-    if (!this.ballisticsSystem)
+    if (!this.ballistics)
     {
       console.error('Ballistics system not initialized');
       return;
@@ -1540,7 +1540,7 @@ class FClassSimulator
     }
 
     // Check if target is ready (not animating)
-    if (!this.targetSystem.isTargetReady())
+    if (!this.targets.isTargetReady())
     {
       console.log('Target not ready - wait for target to raise');
       return;
@@ -1561,13 +1561,13 @@ class FClassSimulator
     const aim = this.rifleScope.getAim();
 
     // Update ballistics system with current rifle scope aim
-    this.ballisticsSystem.setRifleScopeAim(aim.yaw, aim.pitch);
+    this.ballistics.setRifleScopeAim(aim.yaw, aim.pitch);
 
     // Fire shot through ballistics system (handles audio internally)
-    this.ballisticsSystem.fireShot();
+    this.ballistics.fireShot();
 
     // Start bullet animation
-    this.ballisticsSystem.startBulletAnimation();
+    this.ballistics.startBulletAnimation();
   }
 
   /**
@@ -1615,7 +1615,7 @@ class FClassSimulator
     };
 
     // Start match-style target animation with shot marker and scoring disc
-    this.targetSystem.markShotWithAnimation(
+    this.targets.markShotWithAnimation(
       shotData.relativeX,
       shotData.relativeY,
       this.distance,
@@ -1682,14 +1682,14 @@ class FClassSimulator
     {
       if (event.code === 'Space')
       {
-        if (this.ballisticsSystem && this.ballisticsSystem.isBulletAnimating())
+        if (this.ballistics && this.ballistics.isBulletAnimating())
         {
           // Bullet animation in progress - ignore spacebar completely
           event.preventDefault();
           return;
         }
 
-        if (this.isRunning && this.ballisticsSystem)
+        if (this.isRunning && this.ballistics)
         {
           event.preventDefault();
           this.fireShot();
@@ -1723,21 +1723,21 @@ class FClassSimulator
     }
 
     // Dispose all renderer modules
-    if (this.flagSystem)
+    if (this.flags)
     {
-      this.flagSystem.dispose();
+      this.flags.dispose();
     }
-    if (this.targetSystem)
+    if (this.targets)
     {
-      this.targetSystem.dispose();
+      this.targets.dispose();
     }
-    if (this.environmentSystem)
+    if (this.environment)
     {
-      this.environmentSystem.dispose();
+      this.environment.dispose();
     }
-    if (this.ballisticsSystem)
+    if (this.ballistics)
     {
-      this.ballisticsSystem.dispose();
+      this.ballistics.dispose();
     }
 
     if (this.spottingScope)
@@ -1748,9 +1748,9 @@ class FClassSimulator
     {
       this.rifleScope.dispose();
     }
-    if (this.hudSystem)
+    if (this.hud)
     {
-      this.hudSystem.dispose();
+      this.hud.dispose();
     }
     if (this.scorecard)
     {

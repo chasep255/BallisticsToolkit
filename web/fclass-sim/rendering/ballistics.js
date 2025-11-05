@@ -13,7 +13,7 @@ export class BallisticsEngine
   {
     // Required config
     this.scene = config.scene;
-    this.targetSystem = config.targetSystem;
+    this.targets = config.targets;
     this.windGenerator = config.windGenerator;
 
     // Ballistic parameters
@@ -54,9 +54,9 @@ export class BallisticsEngine
   }
 
   /**
-   * Setup ballistic system with zeroing
+   * Setup with zeroing
    */
-  async setupBallisticSystem(bulletParams)
+  async setup(bulletParams)
   {
     try
     {
@@ -74,7 +74,7 @@ export class BallisticsEngine
       if (!btk) throw new Error('BTK module not loaded');
 
       // Get BTK target from target system
-      this.btkTarget = this.targetSystem.getBtkTarget();
+      this.btkTarget = this.targets.getBtkTarget();
 
       // Create bullet with explicit unit conversions
       this.bullet = new btk.Bullet(
@@ -107,7 +107,7 @@ export class BallisticsEngine
       zeroWind.delete();
 
       // Get target center from target system (Three.js coords in yards)
-      const targetCenter = this.targetSystem.getUserTargetCenter();
+      const targetCenter = this.targets.getUserTargetCenter();
       if (!targetCenter)
       {
         throw new Error('Cannot compute zero: user target not available');
@@ -165,7 +165,7 @@ export class BallisticsEngine
    */
   fireShot()
   {
-    if (!this.ballisticSimulator || !this.targetSystem || !this.targetSystem.userTarget)
+    if (!this.ballisticSimulator || !this.targets || !this.targets.userTarget)
     {
       console.error('Ballistic simulator or targets not initialized');
       return null;
@@ -305,7 +305,7 @@ export class BallisticsEngine
       bulletVelBtk.delete();
 
       // Get target coordinates from target system (Three.js coords, yards)
-      const targetCenter = this.targetSystem.getUserTargetCenter();
+      const targetCenter = this.targets.getUserTargetCenter();
       const targetX = targetCenter.x;
       const targetY = targetCenter.y;
 
