@@ -292,8 +292,8 @@ namespace btk::ballistics
   // Simulate trajectory using stored state
   const Trajectory& Simulator::simulate(float max_distance, float dt, float max_time)
   {
-    // Add initial point
-    trajectory_.addPoint(current_time_, current_bullet_);
+    // Add initial point with current wind
+    trajectory_.addPoint(current_time_, current_bullet_, wind_);
 
     float start_time = current_time_;
     float max_sim_time = start_time + max_time;
@@ -311,21 +311,27 @@ namespace btk::ballistics
   // Simulate trajectory with wind generator sampling
   const Trajectory& Simulator::simulate(float max_distance, float dt, float max_time, const btk::physics::WindGenerator& wind_gen)
   {
-    // Add initial point
-    trajectory_.addPoint(current_time_, current_bullet_);
+    // Sample wind at initial position
+    float x = current_bullet_.getPositionX();
+    float y = current_bullet_.getPositionY();
+    float z = current_bullet_.getPositionZ();
+    wind_ = wind_gen(x, y, z);
+    
+    // Add initial point with wind
+    trajectory_.addPoint(current_time_, current_bullet_, wind_);
 
     float start_time = current_time_;
     float max_sim_time = start_time + max_time;
 
     while(current_time_ < max_sim_time)
     {
-      // Sample wind at current position
+      // Sample wind at current position (before stepping)
       float x = current_bullet_.getPositionX();
       float y = current_bullet_.getPositionY();
       float z = current_bullet_.getPositionZ();
       wind_ = wind_gen(x, y, z);
-
-      // Step forward
+      
+      // Step forward (uses wind_ for acceleration calculation)
       timeStep(dt);
 
       if(current_bullet_.getPositionX() > max_distance)
@@ -354,8 +360,8 @@ namespace btk::ballistics
     current_bullet_ = Bullet(sHalf, x1, v1, s0.getSpinRate());
     current_time_ += dt;
 
-    // Add point to trajectory
-    trajectory_.addPoint(current_time_, current_bullet_);
+    // Add point to trajectory with current wind
+    trajectory_.addPoint(current_time_, current_bullet_, wind_);
 
     // Return reference to the updated current bullet
     return current_bullet_;

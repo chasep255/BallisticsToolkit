@@ -12,26 +12,10 @@ namespace btk
   namespace ballistics
   {
 
-    // TrajectoryPoint implementation
-    TrajectoryPoint::TrajectoryPoint(float time, const Bullet& state) : time_(time), state_(state) {}
-
-    float TrajectoryPoint::getDistance() const { return state_.getPositionX(); }
-
-    float TrajectoryPoint::getVelocity() const { return state_.getTotalVelocity(); }
-
-    float TrajectoryPoint::getKineticEnergy() const
-    {
-      // KE = 0.5f * m * v^2
-      float mass_kg = state_.getWeight();
-      float velocity_mps = state_.getTotalVelocity();
-      float energy_joules = 0.5f * mass_kg * velocity_mps * velocity_mps;
-      return energy_joules;
-    }
-
     // Trajectory implementation
     Trajectory::Trajectory() {}
 
-    void Trajectory::addPoint(float time, const Bullet& state) { points_.emplace_back(time, state); }
+    void Trajectory::addPoint(float time, const Bullet& state, const btk::math::Vector3D& wind) { points_.emplace_back(time, state, wind); }
 
     const TrajectoryPoint& Trajectory::getPoint(size_t index) const
     {
@@ -92,7 +76,10 @@ namespace btk
       // Interpolate state
       Bullet interp_state = interpolate(points_[left], points_[right], distance);
 
-      return TrajectoryPoint(interp_time, interp_state);
+      // Interpolate wind
+      btk::math::Vector3D wind = points_[left].getWind().lerp(points_[right].getWind(), t);
+
+      return TrajectoryPoint(interp_time, interp_state, wind);
     }
 
     std::optional<TrajectoryPoint> Trajectory::atTime(float time) const
@@ -145,9 +132,12 @@ namespace btk
       // Interpolate spin rate
       float spin = state1.getSpinRate() + t * (state2.getSpinRate() - state1.getSpinRate());
 
+      // Interpolate wind
+      btk::math::Vector3D wind = points_[left].getWind().lerp(points_[right].getWind(), t);
+
       Bullet interp_state(state1, pos, vel, spin);
 
-      return TrajectoryPoint(time, interp_state);
+      return TrajectoryPoint(time, interp_state, wind);
     }
 
     float Trajectory::getTotalDistance() const
@@ -204,6 +194,46 @@ namespace btk
       // Impact angle is the angle below horizontal
       float angle_rad = std::atan2(-vz, vx); // Negative vz because it's downward
       return angle_rad;
+    }
+
+    std::optional<btk::math::Vector3D> Trajectory::getPosition(float time) const
+    {
+      auto point = atTime(time);
+      if(point.has_value())
+      {
+        return point->getPosition();
+      }
+      return std::nullopt;
+    }
+
+    std::optional<btk::math::Vector3D> Trajectory::getPositionAtDistance(float distance) const
+    {
+      auto point = atDistance(distance);
+      if(point.has_value())
+      {
+        return point->getPosition();
+      }
+      return std::nullopt;
+    }
+
+    std::optional<btk::math::Vector3D> Trajectory::getWind(float time) const
+    {
+      auto point = atTime(time);
+      if(point.has_value())
+      {
+        return point->getWind();
+      }
+      return std::nullopt;
+    }
+
+    std::optional<btk::math::Vector3D> Trajectory::getWindAtDistance(float distance) const
+    {
+      auto point = atDistance(distance);
+      if(point.has_value())
+      {
+        return point->getWind();
+      }
+      return std::nullopt;
     }
 
     void Trajectory::clear() { points_.clear(); }

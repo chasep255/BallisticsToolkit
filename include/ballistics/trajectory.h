@@ -20,8 +20,9 @@ namespace btk::ballistics
      *
      * @param time Time at this point in s
      * @param state Flying bullet state at this point
+     * @param wind Wind vector at this point in m/s
      */
-    TrajectoryPoint(float time, const Bullet& state);
+    TrajectoryPoint(float time, const Bullet& state, const btk::math::Vector3D& wind = btk::math::Vector3D()) : time_(time), state_(state), wind_(wind) {}
 
     // Getters (all return SI base units)
     float getTime() const { return time_; } // s
@@ -30,21 +31,39 @@ namespace btk::ballistics
     /**
      * @brief Get distance traveled at this point
      */
-    float getDistance() const; // m
+    float getDistance() const { return state_.getPositionX(); } // m
+
+    /**
+     * @brief Get position at this point
+     */
+    const btk::math::Vector3D& getPosition() const { return state_.getPosition(); } // m
+
+    /**
+     * @brief Get wind at this point
+     */
+    const btk::math::Vector3D& getWind() const { return wind_; } // m/s
 
     /**
      * @brief Get velocity at this point
      */
-    float getVelocity() const; // m/s
+    float getVelocity() const { return state_.getTotalVelocity(); } // m/s
 
     /**
      * @brief Get kinetic energy at this point
      */
-    float getKineticEnergy() const; // J
+    float getKineticEnergy() const
+    {
+      // KE = 0.5f * m * v^2
+      float mass_kg = state_.getWeight();
+      float velocity_mps = state_.getTotalVelocity();
+      float energy_joules = 0.5f * mass_kg * velocity_mps * velocity_mps;
+      return energy_joules;
+    } // J
 
     private:
     float time_; // s
     Bullet state_;
+    btk::math::Vector3D wind_;
   };
 
   /**
@@ -63,8 +82,9 @@ namespace btk::ballistics
      *
      * @param time Time at this point in s
      * @param state Flying bullet state at this point
+     * @param wind Wind vector at this point in m/s
      */
-    void addPoint(float time, const Bullet& state);
+    void addPoint(float time, const Bullet& state, const btk::math::Vector3D& wind = btk::math::Vector3D());
 
     /**
      * @brief Get the number of points in the trajectory
@@ -125,6 +145,38 @@ namespace btk::ballistics
      * @brief Get the impact angle (angle below horizontal)
      */
     float getImpactAngle() const; // rad
+
+    /**
+     * @brief Get position at a specific time
+     *
+     * @param time Time along trajectory in s
+     * @return Position vector at the given time, or std::nullopt if not found
+     */
+    std::optional<btk::math::Vector3D> getPosition(float time) const; // m
+
+    /**
+     * @brief Get position at a specific distance
+     *
+     * @param distance Distance along trajectory in m
+     * @return Position vector at the given distance, or std::nullopt if not found
+     */
+    std::optional<btk::math::Vector3D> getPositionAtDistance(float distance) const; // m
+
+    /**
+     * @brief Get wind at a specific time
+     *
+     * @param time Time along trajectory in s
+     * @return Wind vector at the given time, or std::nullopt if not found
+     */
+    std::optional<btk::math::Vector3D> getWind(float time) const; // m/s
+
+    /**
+     * @brief Get wind at a specific distance
+     *
+     * @param distance Distance along trajectory in m
+     * @return Wind vector at the given distance, or std::nullopt if not found
+     */
+    std::optional<btk::math::Vector3D> getWindAtDistance(float distance) const; // m/s
 
     /**
      * @brief Clear all points from the trajectory
