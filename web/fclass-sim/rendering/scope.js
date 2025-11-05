@@ -51,7 +51,7 @@ export class Scope
     const availableHeight = this.canvasHeight - 20;
     const maxScopeSize = Math.min(availableWidth, availableHeight);
     this.scopeSize = Math.floor(maxScopeSize * config.sizeFraction);
-    const renderSize = this.scopeSize * 2;
+    const renderSize = this.scopeSize; // Render at 1x resolution for performance
 
     // Position based on config
     if (config.position === 'bottom-left')

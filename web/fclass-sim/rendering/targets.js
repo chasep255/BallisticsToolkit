@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
+import { getBTK } from '../core/btk.js';
 
 const LOG_PREFIX_SCORING = '[Scoring]';
 const LOG_PREFIX_TARGET = '[Target]';
@@ -120,7 +121,7 @@ export class TargetRenderer
     // Dispose BTK target
     if (this.btkTarget)
     {
-      this.btkTarget.dispose();
+      this.btkTarget.delete();
       this.btkTarget = null;
     }
 
@@ -191,12 +192,11 @@ export class TargetRenderer
       fill: 'black'
     }];
 
-    // Access BTK module from global
-    const btk = window.btk;
+    // Access BTK module
+    const btk = getBTK();
     if (!btk)
     {
-      console.error('BTK module not available');
-      return null;
+      throw new Error('BTK module not available');
     }
 
     for (const spec of ringSpecs)
@@ -272,8 +272,8 @@ export class TargetRenderer
 
   createTargets()
   {
-    // Access BTK module from global
-    const btk = window.btk;
+    // Access BTK module
+    const btk = getBTK();
     if (!btk)
     {
       throw new Error('BTK module not available - cannot create targets');

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 
 // Import BTK
-import { waitForBTK, sampleWindAtThreeJsPosition } from './core/btk.js';
+import { waitForBTK, getBTK, sampleWindAtThreeJsPosition } from './core/btk.js';
 
 // Import core logic (no wind module - use BTK directly)
 
@@ -287,9 +287,8 @@ function getGameParams()
 function populateWindPresetDropdown()
 {
   const windSelect = document.getElementById('windPreset');
-  if (!windSelect || !window.btk) return;
-
-  const btk = window.btk;
+  const btk = getBTK();
+  if (!windSelect || !btk) return;
 
   windSelect.innerHTML = '';
 
@@ -421,11 +420,6 @@ class FClassSimulator
     this.twist = params.twist;
     this.mvSd = params.mvSd;
     this.rifleAccuracy = params.rifleAccuracy;
-
-    // FPS tracking
-    this.lastTime = 0;
-    this.frameCount = 0;
-    this.fps = 0;
 
     // Check for debug mode from URL parameter
     const urlParams = new URLSearchParams(window.location.search);
@@ -788,26 +782,9 @@ class FClassSimulator
   {
     // Update time at the start of each frame
     ResourceManager.time.update();
+    
     if (this.windGenerator) {
       this.windGenerator.advanceTime(ResourceManager.time.getElapsedTime());
-    }
-
-    // Calculate FPS by sampling over 1 second
-    const currentTime = performance.now();
-    this.frameCount++;
-
-    if (!this.fpsStartTime)
-    {
-      this.fpsStartTime = currentTime;
-    }
-
-    // Update FPS every second
-    if (currentTime - this.fpsStartTime >= 1000)
-    {
-      this.fps = Math.round(this.frameCount * 1000 / (currentTime - this.fpsStartTime));
-      this.frameCount = 0;
-      this.fpsStartTime = currentTime;
-      console.log(`FPS: ${this.fps}`);
     }
 
     // Update bullet animation (if any)
@@ -907,7 +884,7 @@ class FClassSimulator
     {
       canvas: this.canvas,
       antialias: true,
-      logarithmicDepthBuffer: false // Required for proper shadow rendering
+      logarithmicDepthBuffer: true
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;

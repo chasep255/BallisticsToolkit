@@ -2,14 +2,10 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
-import { waitForBTK, btkToThreeJsPosition, threeJsToBtkPosition, btkToThreeJsVelocity, threeJsToBtkVelocity, sampleWindAtThreeJsPosition } from '../core/btk.js';
+import { waitForBTK, getBTK, btkToThreeJsPosition, threeJsToBtkPosition, btkToThreeJsVelocity, threeJsToBtkVelocity, sampleWindAtThreeJsPosition } from '../core/btk.js';
 
 const LOG_PREFIX_ENGINE = '[BallisticsEngine]';
 const LOG_PREFIX_SHOT = '[Shot]';
-
-// BTK module (loaded asynchronously)
-let btk = null;
-waitForBTK().then(module => { btk = module; });
 
 export class BallisticsEngine
 {
@@ -74,7 +70,8 @@ export class BallisticsEngine
       this.rifleAccuracyMoa = bulletParams.rifleAccuracyMoa;
 
       // Ensure BTK is loaded
-      if (!btk) btk = await waitForBTK();
+      const btk = getBTK();
+      if (!btk) throw new Error('BTK module not loaded');
 
       // Get BTK target from target system
       this.btkTarget = this.targetSystem.getBtkTarget();
@@ -198,6 +195,10 @@ export class BallisticsEngine
         accuracyX = (Math.random() - 0.5) * 2.0; // -1 to 1
         accuracyY = (Math.random() - 0.5) * 2.0; // -1 to 1
       } while (accuracyX * accuracyX + accuracyY * accuracyY > 1.0);
+
+      // Get BTK module
+      const btk = getBTK();
+      if (!btk) throw new Error('BTK module not loaded');
 
       // Rifle accuracy in MOA, convert to radians for angular error
       const accuracyMoa = this.rifleAccuracyMoa;
@@ -406,6 +407,10 @@ export class BallisticsEngine
       });
     }
 
+    // Get BTK module
+    const btk = getBTK();
+    if (!btk) throw new Error('BTK module not loaded');
+
     if (!this.bulletGeometry)
     {
       // Use actual bullet diameter from UI parameters
@@ -506,6 +511,10 @@ export class BallisticsEngine
       if (this.pendingShotData && this.onShotComplete)
       {
         const data = this.pendingShotData;
+
+        // Get BTK module
+        const btk = getBTK();
+        if (!btk) throw new Error('BTK module not loaded');
 
         // Score the hit using BTK target scoring
         // Create a temporary match just for scoring this one shot

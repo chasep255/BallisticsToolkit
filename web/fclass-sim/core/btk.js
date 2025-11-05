@@ -1,5 +1,4 @@
 import BallisticsToolkit from '../../ballistics_toolkit_wasm.js';
-import * as THREE from 'three';
 
 // Load BTK module at module level (promise-based, non-blocking)
 let btk = null;
@@ -30,18 +29,19 @@ export function getBTK()
 // ===== COORDINATE CONVERSION UTILITIES =====
 
 /**
- * Convert BTK Vector3D (meters, BTK coords) to Three.js Vector3 (yards, Three.js coords)
+ * Convert BTK Vector3D (meters, BTK coords) to plain object (yards, Three.js coords)
  * BTK: X=downrange, Y=crossrange-right, Z=up
  * Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
+ * @returns {Object} Position object {x, y, z} in yards (Three.js coords)
  */
 export function btkToThreeJsPosition(btkVec)
 {
   if (!btk) throw new Error('BTK not loaded yet');
-  return new THREE.Vector3(
-    btk.Conversions.metersToYards(btkVec.y),  // BTK Y (crossrange) → Three X (right)
-    btk.Conversions.metersToYards(btkVec.z),  // BTK Z (up) → Three Y (up)
-    -btk.Conversions.metersToYards(btkVec.x)  // BTK -X (downrange) → Three Z (downrange)
-  );
+  return {
+    x: btk.Conversions.metersToYards(btkVec.y),  // BTK Y (crossrange) → Three X (right)
+    y: btk.Conversions.metersToYards(btkVec.z),  // BTK Z (up) → Three Y (up)
+    z: -btk.Conversions.metersToYards(btkVec.x)  // BTK -X (downrange) → Three Z (downrange)
+  };
 }
 
 /**
