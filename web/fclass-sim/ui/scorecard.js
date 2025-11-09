@@ -118,14 +118,28 @@ export class Scorecard
     {
       html += '<div class="match-params">';
       html += '<div class="match-params-grid">';
+      
+      // Range and target info
       html += `<div class="param-item"><span class="param-label">Distance:</span> <span class="param-value">${this.matchParams.distance} yards</span></div>`;
       html += `<div class="param-item"><span class="param-label">Target:</span> <span class="param-value">${this.matchParams.target}</span></div>`;
       html += `<div class="param-item"><span class="param-label">Wind:</span> <span class="param-value">${this.matchParams.windPreset}</span></div>`;
-      html += `<div class="param-item"><span class="param-label">Bullet BC:</span> <span class="param-value">${this.matchParams.bc}</span></div>`;
+      html += `<div class="param-item"><span class="param-label">Focal Plane:</span> <span class="param-value">${this.matchParams.focalPlane}</span></div>`;
+      
+      // Ballistics info
+      html += `<div class="param-item"><span class="param-label">BC:</span> <span class="param-value">${this.matchParams.bc} ${this.matchParams.dragFunction}</span></div>`;
       html += `<div class="param-item"><span class="param-label">Muzzle Velocity:</span> <span class="param-value">${this.matchParams.mv} fps</span></div>`;
       html += `<div class="param-item"><span class="param-label">MV SD:</span> <span class="param-value">${this.matchParams.mvSd} fps</span></div>`;
       html += `<div class="param-item"><span class="param-label">Rifle Accuracy:</span> <span class="param-value">${this.matchParams.rifleAccuracy} MOA</span></div>`;
-      html += `<div class="param-item"><span class="param-label">Bullet Diameter:</span> <span class="param-value">${this.matchParams.diameter}"</span></div>`;
+      
+      // Bullet specs
+      html += `<div class="param-item"><span class="param-label">Bullet:</span> <span class="param-value">${this.matchParams.diameter}" / ${this.matchParams.weight}gr / ${this.matchParams.length}"</span></div>`;
+      
+      // Twist rate (only show if spin effects enabled)
+      if (this.matchParams.twist > 0)
+      {
+        html += `<div class="param-item"><span class="param-label">Twist:</span> <span class="param-value">1:${this.matchParams.twist}"</span></div>`;
+      }
+      
       html += '</div>';
       html += '</div>';
     }

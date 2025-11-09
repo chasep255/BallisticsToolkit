@@ -43,6 +43,11 @@ import
 from './ui/hud.js';
 import
 {
+  WindFieldHUD
+}
+from './rendering/wind-field-hud.js';
+import
+{
   MatchState
 }
 from './core/match.js';
@@ -190,6 +195,34 @@ function setupUI()
       webglGame.updateHUD(); // Update HUD to show shots instead of sighters
     }
   });
+
+  // Wind HUD toggle button
+  document.getElementById('windHUDBtn').addEventListener('click', () =>
+  {
+    if (webglGame && webglGame.windFieldHUD)
+    {
+      webglGame.windFieldHUDVisible = !webglGame.windFieldHUDVisible;
+      webglGame.windFieldHUD.setVisible(webglGame.windFieldHUDVisible);
+      const btn = document.getElementById('windHUDBtn');
+      btn.textContent = webglGame.windFieldHUDVisible ? 'Hide Wind HUD' : 'Show Wind HUD';
+    }
+  });
+
+  // Pause/Resume button
+  document.getElementById('pauseBtn').addEventListener('click', () =>
+  {
+    if (webglGame)
+    {
+      if (webglGame.isPaused)
+      {
+        webglGame.resume();
+      }
+      else
+      {
+        webglGame.pause();
+      }
+    }
+  });
 }
 
 function startGame()
@@ -212,8 +245,12 @@ function startGame()
 
     // Update UI
     document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('pauseBtn').style.display = 'inline-block';
+    document.getElementById('pauseBtn').textContent = 'Pause';
     document.getElementById('restartBtn').style.display = 'inline-block';
     document.getElementById('scorecardBtn').style.display = 'inline-block';
+    document.getElementById('windHUDBtn').style.display = 'inline-block';
+    document.getElementById('windHUDBtn').textContent = 'Show Wind HUD';
 
   }
   catch (error)
@@ -236,6 +273,12 @@ function restartGame()
     // Clean up previous game if exists
     if (webglGame)
     {
+      // If game was paused, resume audio/time before destroying
+      if (webglGame.isPaused)
+      {
+        ResourceManager.time.resume();
+        ResourceManager.audio.resume();
+      }
       webglGame.destroy();
     }
 
@@ -243,6 +286,10 @@ function restartGame()
     const canvas = document.getElementById('gameCanvas');
     webglGame = new FClassSimulator(canvas, params);
     webglGame.start();
+
+    // Reset button states
+    document.getElementById('pauseBtn').textContent = 'Pause';
+    document.getElementById('windHUDBtn').textContent = 'Show Wind HUD';
 
   }
   catch (error)
@@ -864,6 +911,12 @@ class FClassSimulator
     // Update wind info text
     this.updateWindInfoText();
 
+    // Update wind field HUD if visible
+    if (this.windFieldHUD && this.windFieldHUDVisible)
+    {
+      this.windFieldHUD.update();
+    }
+
     // 3) Composite everything to screen
     this.renderer.setRenderTarget(null);
     this.renderer.clear();
@@ -1012,6 +1065,17 @@ class FClassSimulator
     this.createMainViewQuad();
     this.createWindInfoText();
 
+    // ===== WIND FIELD HUD =====
+    this.windFieldHUD = new WindFieldHUD({
+      compositionScene: this.compositionScene,
+      windGenerator: this.windGenerator,
+      targetDistance: this.distance,
+      rangeWidth: FClassSimulator.RANGE_LANE_WIDTH,
+      targetHeight: FClassSimulator.TARGET_CENTER_HEIGHT
+    });
+    this.windFieldHUDVisible = false; // Start hidden
+    this.windFieldHUD.setVisible(false);
+
     // ===== SCOPES =====
     // Spotting scope - wide FOV range for scanning
     this.spottingScope = new Scope(
@@ -1116,11 +1180,16 @@ class FClassSimulator
       distance: this.distance,
       target: this.targetType,
       windPreset: this.windPreset,
+      focalPlane: this.focalPlane,
       bc: this.bc,
+      dragFunction: this.dragFunction,
       mv: this.mv,
       mvSd: this.mvSd,
       rifleAccuracy: this.rifleAccuracy,
-      diameter: this.diameter
+      diameter: this.diameter,
+      weight: this.weight,
+      length: this.length,
+      twist: this.twist
     });
     // Update scorecard with empty shot log to display parameters
     this.scorecard.update(this.shotLog);
@@ -1155,6 +1224,36 @@ class FClassSimulator
 
     // Start relay timer immediately (for relay 1, or when restarting)
     this.matchState.startIfNeeded(ResourceManager.time.getElapsedTime());
+  }
+
+  pause()
+  {
+    if (!this.isRunning || this.isPaused) return;
+    
+    this.isPaused = true;
+    ResourceManager.time.pause();
+    ResourceManager.audio.pause();
+    
+    // Update button text
+    const btn = document.getElementById('pauseBtn');
+    if (btn) btn.textContent = 'Resume';
+    
+    console.log('[Game] Paused');
+  }
+
+  resume()
+  {
+    if (!this.isRunning || !this.isPaused) return;
+    
+    this.isPaused = false;
+    ResourceManager.time.resume();
+    ResourceManager.audio.resume();
+    
+    // Update button text
+    const btn = document.getElementById('pauseBtn');
+    if (btn) btn.textContent = 'Pause';
+    
+    console.log('[Game] Resumed');
   }
 
   stop()
@@ -1745,6 +1844,10 @@ class FClassSimulator
     if (this.ballistics)
     {
       this.ballistics.dispose();
+    }
+    if (this.windFieldHUD)
+    {
+      this.windFieldHUD.dispose();
     }
 
     if (this.spottingScope)

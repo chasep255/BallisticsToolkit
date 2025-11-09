@@ -419,8 +419,8 @@ export class Scope
 
     // Create mesh for dial display using virtual coordinates
     // Position in lower right corner of viewport
-    const displayWidth = 20; // Virtual units
-    const displayHeight = 8; // Virtual units
+    const displayWidth = 25; // Virtual units (increased from 20)
+    const displayHeight = 10; // Virtual units (increased from 8)
     const geometry = new THREE.PlaneGeometry(displayWidth, displayHeight);
     const material = new THREE.MeshBasicMaterial(
     {

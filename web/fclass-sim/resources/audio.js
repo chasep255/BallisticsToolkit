@@ -302,6 +302,30 @@ export class AudioManager
   }
 
   /**
+   * Pause all audio (suspends audio context)
+   */
+  pause()
+  {
+    if (this.audioContext && this.audioContext.state === 'running')
+    {
+      this.audioContext.suspend();
+      console.log(`${LOG_PREFIX} Paused`);
+    }
+  }
+
+  /**
+   * Resume all audio (resumes audio context)
+   */
+  resume()
+  {
+    if (this.audioContext && this.audioContext.state === 'suspended')
+    {
+      this.audioContext.resume();
+      console.log(`${LOG_PREFIX} Resumed`);
+    }
+  }
+
+  /**
    * Dispose all audio resources
    */
   dispose()

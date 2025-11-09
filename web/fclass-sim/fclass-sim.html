@@ -144,6 +144,7 @@
       <button id="restartBtn" class="btn btn-secondary" style="display: none;">Restart</button>
       <button id="scorecardBtn" class="btn btn-secondary" style="display: none;">Scorecard</button>
       <button id="goForRecordBtn" class="btn btn-secondary" style="display: none;">Go For Record</button>
+      <button id="windHUDBtn" class="btn btn-secondary" style="display: none;">Wind HUD</button>
       <button id="helpBtn" class="btn btn-secondary">Help</button>
     </div>
 
@@ -211,10 +212,12 @@
             - <kbd>Space</kbd> Fire shot (blocked while your target is down)<br><br>
 
             <strong>Buttons:</strong><br>
-            - Start: begin the match
-            - Restart: confirm dialog, restarts the match
-            - Scorecard: open detailed per-relay score view
-            - Go For Record: end sighters early in the current relay
+            - Start: begin the match<br>
+            - Pause/Resume: pause/resume the match<br>
+            - Restart: confirm dialog, restarts the match<br>
+            - Scorecard: open detailed per-relay score view<br>
+            - Go For Record: end sighters early in the current relay<br>
+            - Wind HUD: toggle graphical wind field overlay (top-left, shows wind at all downrange distances)
           </div>
         </div>
         
@@ -276,9 +279,21 @@
         </div>
 
         <div class="help-section">
+          <h3>Wind HUD</h3>
+          <div class="param-help">
+            - Toggle on/off with the "Wind HUD" button (top-left vertical strip)<br>
+            - Shows wind conditions from shooter (bottom) to target (top)<br>
+            - Color-coded: blue = calm, red = strong (7.5+ mph)<br>
+            - White arrows show wind direction<br>
+            - Samples across full range width at target height<br>
+            - Updates in real-time as wind changes
+          </div>
+        </div>
+
+        <div class="help-section">
           <h3>Scorecard</h3>
           <div class="param-help">
-            - Shows match parameters at top (distance, target, wind, bullet specs, rifle accuracy)<br>
+            - Shows all match parameters at top (distance, target, wind, reticle, bullet specs, rifle accuracy, twist rate)<br>
             - Per-relay view with sighters row and two rows of 10 record shots<br>
             - Relay totals and overall match total at the bottom<br>
             - Available before first shot (shows parameters immediately)
