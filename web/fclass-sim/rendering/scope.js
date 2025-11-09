@@ -10,6 +10,7 @@ import
 }
 from './mirage.js';
 import { sampleWindAtThreeJsPosition } from '../core/btk.js';
+import { VirtualCoordinates as VC } from '../core/virtual-coords.js';
 
 export class Scope
 {
@@ -46,23 +47,28 @@ export class Scope
     this.zeroOffsetYaw = 0; // Horizontal dial (L/R)
     this.zeroOffsetPitch = 0; // Vertical dial (U/D)
 
-    // Calculate scope size and position
-    const availableWidth = this.canvasWidth - 20;
-    const availableHeight = this.canvasHeight - 20;
+    // Calculate scope size and position in virtual coordinates
+    // Scope size is based on available virtual space minus margins
+    const availableWidth = VC.WIDTH - (VC.MARGIN_SMALL * 2);
+    const availableHeight = VC.HEIGHT - (VC.MARGIN_SMALL * 2);
     const maxScopeSize = Math.min(availableWidth, availableHeight);
-    this.scopeSize = Math.floor(maxScopeSize * config.sizeFraction);
-    const renderSize = this.scopeSize; // Render at 1x resolution for performance
+    this.scopeSizeVirtual = maxScopeSize * config.sizeFraction; // Size in virtual units
+    
+    // Calculate render target size in pixels based on canvas dimensions
+    // Use canvas height to determine pixel density
+    const pixelsPerVirtualUnit = this.canvasHeight / VC.HEIGHT;
+    const renderSize = Math.floor(this.scopeSizeVirtual * pixelsPerVirtualUnit);
 
-    // Position based on config
+    // Position in virtual coordinates based on config
     if (config.position === 'bottom-left')
     {
-      this.scopeX = 10;
-      this.scopeY = this.canvasHeight - this.scopeSize - 10;
+      this.scopeX = VC.fromLeft(VC.MARGIN_SMALL + this.scopeSizeVirtual / 2);
+      this.scopeY = VC.fromBottom(VC.MARGIN_SMALL + this.scopeSizeVirtual / 2);
     }
     else if (config.position === 'bottom-right')
     {
-      this.scopeX = this.canvasWidth - this.scopeSize - 10;
-      this.scopeY = this.canvasHeight - this.scopeSize - 10;
+      this.scopeX = VC.fromRight(VC.MARGIN_SMALL + this.scopeSizeVirtual / 2);
+      this.scopeY = VC.fromBottom(VC.MARGIN_SMALL + this.scopeSizeVirtual / 2);
     }
 
     // Create Three.js resources
@@ -143,18 +149,17 @@ export class Scope
    */
   createViewMesh()
   {
-    const size = this.scopeSize;
+    // Use virtual size and position
+    const size = this.scopeSizeVirtual;
     const x = this.scopeX;
     const y = this.scopeY;
 
-    // Convert screen coordinates to composition camera coordinates
-    const compX = x + size / 2 - this.canvasWidth / 2;
-    const compY = this.canvasHeight / 2 - (y + size / 2);
+    // Create circular mask texture (still uses pixel size for texture resolution)
+    const pixelsPerVirtualUnit = this.canvasHeight / VC.HEIGHT;
+    const maskSizePixels = Math.floor(size * pixelsPerVirtualUnit);
+    this.maskTexture = this.createCircularMaskTexture(maskSizePixels);
 
-    // Create circular mask texture
-    this.maskTexture = this.createCircularMaskTexture(size);
-
-    // Create scope view mesh
+    // Create scope view mesh using virtual coordinates
     const geometry = new THREE.PlaneGeometry(size, size);
     const material = new THREE.MeshBasicMaterial(
     {
@@ -167,7 +172,8 @@ export class Scope
     });
 
     this.viewMesh = new THREE.Mesh(geometry, material);
-    this.viewMesh.position.set(compX, compY, 1);
+    // Position already in virtual coordinates (centered on scope)
+    this.viewMesh.position.set(x, y, 1);
     this.viewMesh.renderOrder = 1;
     this.viewMesh.frustumCulled = false;
 
@@ -179,11 +185,10 @@ export class Scope
    */
   createCrosshair()
   {
-    const scopeSize = this.scopeSize;
+    // Use virtual size and position
+    const scopeSize = this.scopeSizeVirtual;
     const x = this.scopeX;
     const y = this.scopeY;
-    const compX = x + scopeSize / 2 - this.canvasWidth / 2;
-    const compY = this.canvasHeight / 2 - (y + scopeSize / 2);
 
     const geometry = new THREE.PlaneGeometry(scopeSize, scopeSize);
 
@@ -382,7 +387,8 @@ export class Scope
     });
 
     this.crosshairMesh = new THREE.Mesh(geometry, material);
-    this.crosshairMesh.position.set(compX, compY, 2);
+    // Position already in virtual coordinates (centered on scope)
+    this.crosshairMesh.position.set(x, y, 2);
     this.crosshairMesh.renderOrder = 2;
     this.crosshairMesh.frustumCulled = false;
 
@@ -394,11 +400,10 @@ export class Scope
    */
   createScopeDialDisplay()
   {
-    const scopeSize = this.scopeSize;
+    // Use virtual size and position
+    const scopeSize = this.scopeSizeVirtual;
     const x = this.scopeX;
     const y = this.scopeY;
-    const compX = x + scopeSize / 2 - this.canvasWidth / 2;
-    const compY = this.canvasHeight / 2 - (y + scopeSize / 2);
 
     // Create canvas for text rendering
     const canvas = document.createElement('canvas');
@@ -412,10 +417,10 @@ export class Scope
     texture.magFilter = THREE.LinearFilter;
     this.scopeDialTexture = texture;
 
-    // Create mesh for dial display
-    // Position in lower right corner, inside the scope circle
-    const displayWidth = 150;
-    const displayHeight = 60;
+    // Create mesh for dial display using virtual coordinates
+    // Position in lower right corner of viewport
+    const displayWidth = 20; // Virtual units
+    const displayHeight = 8; // Virtual units
     const geometry = new THREE.PlaneGeometry(displayWidth, displayHeight);
     const material = new THREE.MeshBasicMaterial(
     {
@@ -427,12 +432,9 @@ export class Scope
     });
 
     this.scopeDialMesh = new THREE.Mesh(geometry, material);
-    // Position in absolute lower right corner of the canvas
-    // Anchor from bottom-right edge with padding
-    const canvasRight = this.canvasWidth / 2;
-    const canvasBottom = -this.canvasHeight / 2;
-    const offsetX = canvasRight - displayWidth / 2 - 10; // 10px padding from right edge
-    const offsetY = canvasBottom + displayHeight / 2 + 10; // 10px padding from bottom edge
+    // Position in absolute lower right corner of the viewport using virtual coords
+    const offsetX = VC.fromRight(displayWidth / 2 + VC.MARGIN_SMALL);
+    const offsetY = VC.fromBottom(displayHeight / 2 + VC.MARGIN_SMALL);
     this.scopeDialMesh.position.set(offsetX, offsetY, 2);
     this.scopeDialMesh.renderOrder = 3; // Render after crosshair (2)
     this.scopeDialMesh.frustumCulled = false;

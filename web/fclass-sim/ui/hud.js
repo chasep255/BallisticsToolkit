@@ -1,14 +1,13 @@
 // hud-system.js - HUD system using canvas textures for F-Class simulator
 
 import * as THREE from 'three';
+import { VirtualCoordinates as VC } from '../core/virtual-coords.js';
 
 export class HudOverlay
 {
   constructor(config)
   {
     this.compositionScene = config.compositionScene;
-    this.canvasWidth = config.canvasWidth;
-    this.canvasHeight = config.canvasHeight;
 
     // HUD state
     this.visible = false;
@@ -22,58 +21,65 @@ export class HudOverlay
 
   createHudElements()
   {
-    const margin = 20;
-    const startX = this.canvasWidth / 2 - margin; // Right side
-    const startY = this.canvasHeight / 2 - margin;
-    const lineHeight = 26;
-    const canvasWidth = 180;
-    const canvasHeight = 28;
+    // Use virtual coordinates for positioning
+    const margin = VC.MARGIN_MEDIUM;
+    const startX = VC.fromRight(margin);
+    const startY = VC.fromTop(margin);
+    const lineHeight = 4.5; // Virtual units between lines
+    
+    // Canvas texture dimensions (pixels - internal resolution)
+    const textureCanvasWidth = 180;
+    const textureCanvasHeight = 28;
+    
+    // Display dimensions (virtual units - how big they appear on screen)
+    const displayWidth = 30; // Increased from 24
+    const displayHeight = 4.5; // Increased from 3.5
 
     let currentY = startY;
 
     // Relay
-    this.relayCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
-    this.relayMesh = this.createHudMesh(this.relayCanvas, canvasWidth, canvasHeight, startX, currentY);
+    this.relayCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.relayMesh = this.createHudMesh(this.relayCanvas, displayWidth, displayHeight, startX, currentY);
     currentY -= lineHeight;
 
     // Timer
-    this.timerCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
-    this.timerMesh = this.createHudMesh(this.timerCanvas, canvasWidth, canvasHeight, startX, currentY);
+    this.timerCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.timerMesh = this.createHudMesh(this.timerCanvas, displayWidth, displayHeight, startX, currentY);
     currentY -= lineHeight;
 
     // Target
-    this.targetCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
-    this.targetMesh = this.createHudMesh(this.targetCanvas, canvasWidth, canvasHeight, startX, currentY);
+    this.targetCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.targetMesh = this.createHudMesh(this.targetCanvas, displayWidth, displayHeight, startX, currentY);
     currentY -= lineHeight;
 
     // Shots
-    this.shotsCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
-    this.shotsMesh = this.createHudMesh(this.shotsCanvas, canvasWidth, canvasHeight, startX, currentY);
+    this.shotsCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.shotsMesh = this.createHudMesh(this.shotsCanvas, displayWidth, displayHeight, startX, currentY);
     currentY -= lineHeight;
 
     // Score
-    this.scoreCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
-    this.scoreMesh = this.createHudMesh(this.scoreCanvas, canvasWidth, canvasHeight, startX, currentY);
+    this.scoreCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.scoreMesh = this.createHudMesh(this.scoreCanvas, displayWidth, displayHeight, startX, currentY);
     currentY -= lineHeight;
 
     // Dropped
-    this.droppedCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
-    this.droppedMesh = this.createHudMesh(this.droppedCanvas, canvasWidth, canvasHeight, startX, currentY);
+    this.droppedCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.droppedMesh = this.createHudMesh(this.droppedCanvas, displayWidth, displayHeight, startX, currentY);
     currentY -= lineHeight;
 
     // Last Shot
-    this.lastShotCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
-    this.lastShotMesh = this.createHudMesh(this.lastShotCanvas, canvasWidth, canvasHeight, startX, currentY);
+    this.lastShotCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.lastShotMesh = this.createHudMesh(this.lastShotCanvas, displayWidth, displayHeight, startX, currentY);
     currentY -= lineHeight;
 
     // MV
-    this.mvCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
-    this.mvMesh = this.createHudMesh(this.mvCanvas, canvasWidth, canvasHeight, startX, currentY);
+    this.mvCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.mvMesh = this.createHudMesh(this.mvCanvas, displayWidth, displayHeight, startX, currentY);
     currentY -= lineHeight;
 
     // Impact V
-    this.impactVCanvas = this.createHudCanvas(canvasWidth, canvasHeight);
-    this.impactVMesh = this.createHudMesh(this.impactVCanvas, canvasWidth, canvasHeight, startX, currentY);
+    this.impactVCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.impactVMesh = this.createHudMesh(this.impactVCanvas, displayWidth, displayHeight, startX, currentY);
     currentY -= lineHeight;
 
 
@@ -99,14 +105,15 @@ export class HudOverlay
     return canvas;
   }
 
-  createHudMesh(canvas, width, height, x, y)
+  createHudMesh(canvas, virtualWidth, virtualHeight, x, y)
   {
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
     this.hudTextures.push(texture);
 
-    const geometry = new THREE.PlaneGeometry(width, height);
+    // Geometry uses virtual units for display size
+    const geometry = new THREE.PlaneGeometry(virtualWidth, virtualHeight);
     const material = new THREE.MeshBasicMaterial(
     {
       map: texture,
@@ -118,7 +125,8 @@ export class HudOverlay
 
     const mesh = new THREE.Mesh(geometry, material);
     // Position mesh aligned to right edge (x is right edge, subtract width/2 to center mesh)
-    mesh.position.set(x - width / 2, y - height / 2, 3);
+    // Y position is from top, subtract height/2 to center mesh
+    mesh.position.set(x - virtualWidth / 2, y, 3);
     mesh.renderOrder = 3;
     mesh.frustumCulled = false;
     this.compositionScene.add(mesh);

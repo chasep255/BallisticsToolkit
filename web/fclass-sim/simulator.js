@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { waitForBTK, getBTK, sampleWindAtThreeJsPosition } from './core/btk.js';
 
 // Import core logic (no wind module - use BTK directly)
+import { VirtualCoordinates as VC } from './core/virtual-coords.js';
 
 // Import ResourceManager (triggers auto-loading)
 import ResourceManager from './resources/manager.js';
@@ -441,7 +442,11 @@ class FClassSimulator
   createMainViewQuad()
   {
     // Create full-screen quad showing the main scene
-    const geometry = new THREE.PlaneGeometry(this.canvasWidth, this.canvasHeight);
+    // Uses virtual coordinates to fill entire viewport
+    const geometry = new THREE.PlaneGeometry(
+      VC.WIDTH,
+      VC.HEIGHT
+    );
     const material = new THREE.MeshBasicMaterial(
     {
       map: this.mainSceneRenderTarget.texture,
@@ -475,10 +480,10 @@ class FClassSimulator
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
 
-    // Create mesh for text display at bottom of screen
-    const textWidth = 400;
-    const textHeight = 100;
-    const geometry = new THREE.PlaneGeometry(textWidth, textHeight);
+    // Create mesh for text display at bottom of screen using virtual coordinates
+    const displayWidth = 66; // Virtual units (about 1/3 of screen width)
+    const displayHeight = 16; // Virtual units
+    const geometry = new THREE.PlaneGeometry(displayWidth, displayHeight);
     const material = new THREE.MeshBasicMaterial(
     {
       map: texture,
@@ -489,7 +494,8 @@ class FClassSimulator
     });
 
     this.windInfoMesh = new THREE.Mesh(geometry, material);
-    this.windInfoMesh.position.set(0, -this.canvasHeight / 2 + textHeight / 2 + 10, 3);
+    // Position at bottom center with margin
+    this.windInfoMesh.position.set(0, -VC.HEIGHT / 2 + displayHeight / 2 + 8, 3);
     this.windInfoMesh.renderOrder = 3;
     this.windInfoMesh.frustumCulled = false;
     this.compositionScene.add(this.windInfoMesh);
@@ -914,10 +920,11 @@ class FClassSimulator
 
     // ===== COMPOSITION SYSTEM =====
     // 2D orthographic scene for compositing all views
+    // Uses virtual coordinate system (-100 to +100, -75 to +75) for resolution-independent UI
     this.compositionScene = new THREE.Scene();
     this.compositionCamera = new THREE.OrthographicCamera(
-      -this.canvasWidth / 2, this.canvasWidth / 2,
-      this.canvasHeight / 2, -this.canvasHeight / 2,
+      -VC.WIDTH / 2, VC.WIDTH / 2,
+      VC.HEIGHT / 2, -VC.HEIGHT / 2,
       0, 10
     );
     this.compositionCamera.position.z = 5; // Position camera at z=5 to see layers 0-3
