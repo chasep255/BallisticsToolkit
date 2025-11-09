@@ -189,149 +189,154 @@
           <h3>Controls</h3>
           <div class="param-help">
             <strong>Spotting Scope (Bottom-Left):</strong><br>
-            - <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Pan • <kbd>E</kbd>/<kbd>Q</kbd> Zoom<br>
+            - <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Pan camera<br>
+            - <kbd>E</kbd>/<kbd>Q</kbd> Zoom in/out<br>
             - Movement scales with FOV (slower when zoomed in)<br>
-            - Use to read mirage and flags across the range<br><br>
+            - Use to read mirage, flags, and observe shot impacts<br><br>
 
-            <strong>Rifle Scope (Bottom-Right):</strong><br><br>
-            
-            <strong>Controls:</strong><br>
+            <strong>Rifle Scope (Bottom-Right):</strong><br>
             - <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Aim (holdover)<br>
-            - <kbd>Shift</kbd>+<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Dial scope (1/8 MOA clicks, ±10 MOA limit)<br>
+            - <kbd>Shift</kbd>+<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Dial adjustments (1/8 MOA clicks, ±10 MOA limit)<br>
             - <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out<br>
-            - <kbd>R</kbd> Reset Rifle Scope (zero dial, initial zoom, and center on target)<br><br>
-            
-            <strong>Features:</strong><br>
-            - Dial position displayed in lower right (elevation/windage in MOA)<br>
-            - Configurable SFP/FFP reticle with red crosshair<br>
-            - SFP: reticle stays fixed size, MOA hash marks are accurate at initial zoom only<br>
-            - FFP: reticle scales with zoom, MOA hash marks are always accurate<br>
-            - Hash marks at 1 MOA (minor) and 2 MOA (major) intervals<br>
+            - <kbd>R</kbd> Reset (zero dial, initial zoom, center on target)<br>
+            - Dial position shown in lower right (elevation/windage in MOA)<br>
+            - SFP: reticle fixed size, hash marks accurate at initial zoom only<br>
+            - FFP: reticle scales with zoom, hash marks always accurate<br><br>
 
             <strong>Firing:</strong><br>
-            - <kbd>Space</kbd> Fire shot (blocked while your target is down)<br><br>
-
-            <strong>Buttons:</strong><br>
-            - Start: begin the match<br>
-            - Pause/Resume: pause/resume the match<br>
-            - Restart: confirm dialog, restarts the match<br>
-            - Scorecard: open detailed per-relay score view<br>
-            - Go For Record: end sighters early in the current relay<br>
-            - Wind HUD: toggle graphical wind field overlay (top-left, shows wind at all downrange distances)
+            - <kbd>Space</kbd> Fire shot (disabled while target is down)
           </div>
         </div>
         
         <div class="help-section">
-          <h3>Wind & Mirage</h3>
+          <h3>Buttons</h3>
+          <div class="param-help">
+            - <strong>Start:</strong> Begin the match<br>
+            - <strong>Pause/Resume:</strong> Pause/resume match timer and audio<br>
+            - <strong>Restart:</strong> Restart match (with confirmation)<br>
+            - <strong>Scorecard:</strong> View detailed per-relay scores and parameters<br>
+            - <strong>Go For Record:</strong> End sighters phase early in current relay<br>
+            - <strong>Wind HUD:</strong> Toggle wind field visualization on/off
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Wind Reading</h3>
           <div class="param-help">
             <strong>Wind Flags:</strong><br>
-            - Read angle/flap; watch multiple distances for shear<br><br>
+            - Read flag angle and flap intensity<br>
+            - Watch multiple distances for wind shear and gradients<br><br>
 
             <strong>Mirage:</strong><br>
-            - Zoom in to read the shimmer; it rises upward and drifts with the prevailing wind direction<br>
-            - Light: vertical boil • Moderate: leaning • Strong: mostly horizontal flow<br><br>
-            - Mirage is based on wind conditions over the final 25% of the distance to the spot where the scope is aimed within the range box.
+            - Zoom in with spotting scope to read heat shimmer<br>
+            - Light wind: vertical boil<br>
+            - Moderate wind: leaning shimmer<br>
+            - Strong wind: mostly horizontal flow<br>
+            - Mirage samples wind over final 25% of distance to aim point<br><br>
+
+            <strong>Wind HUD (Optional):</strong><br>
+            - Toggle on/off with button during match<br>
+            - Vertical strip at top-left showing downrange wind progression<br>
+            - Bottom = shooter position (0 yards), Top = target position<br>
+            - Color-coded: blue (calm) → red (strong, 7.5+ mph)<br>
+            - White arrows show wind direction<br>
+            - Samples 25 downrange positions × 10 crossrange positions<br>
+            - Updates in real-time as wind changes
           </div>
         </div>
         
         <div class="help-section">
-          <h3>Match Flow</h3>
+          <h3>Match Structure</h3>
           <div class="param-help">
-            - 3 relays • 20 minutes each • 20 record shots per relay<br>
-            - Relay 1: unlimited sighters • Relays 2–3: 2 sighters<br>
-            - "Go For Record" ends sighters early for the current relay<br>
-            - Relay ends at 20 record shots or when time expires<br>
-            - Acknowledge the relay-complete dialog to proceed<br>
-            - Your rifle is disabled while your target is down<br>
+            <strong>Format:</strong><br>
+            - 3 relays, 20 minutes each<br>
+            - 20 record shots per relay (60 total)<br>
+            - Relay 1: unlimited sighters<br>
+            - Relays 2-3: 2 sighters each<br><br>
+            
+            <strong>Flow:</strong><br>
+            - Use "Go For Record" button to end sighters phase early<br>
+            - Relay ends at 20 record shots OR time expires<br>
+            - Acknowledge relay-complete dialog to proceed to next relay<br>
+            - Rifle disabled while target is down (changing/marking)<br>
           </div>
         </div>
         
         <div class="help-section">
           <h3>Ballistic Parameters</h3>
           <div class="param-help">
-            <strong>BC (Ballistic Coefficient):</strong> Aerodynamic efficiency. Higher = less wind drift and drop<br><br>
-            <strong>Drag Function:</strong> G7 for modern boat-tail bullets, G1 for flat-base or older projectiles<br><br>
-            <strong>MV (Muzzle Velocity):</strong> Initial velocity in fps. Critical for trajectory and time-of-flight<br><br>
-            <strong>Diameter:</strong> Bullet caliber in inches. Affects line-breaking scoring and spin calculations<br><br>
-            <strong>Weight (gr):</strong> Bullet weight in grains. Required for accurate spin moment of inertia calculations<br><br>
-            <strong>Length (in):</strong> Bullet length in inches. Used for moment of inertia and spin aerodynamics<br><br>
-            <strong>Twist (in/turn):</strong> Barrel twist rate (e.g., 8 for 1:8 twist). Used to calculate bullet spin rate from muzzle velocity<br><br>
-            <strong>MV σ (Standard Deviation):</strong> Velocity variation in fps. Lower = more consistent. Default: 7 fps<br><br>
-            <strong>Accuracy (MOA):</strong> Rifle+shooter precision. 1 MOA ≈ 1 inch at 100 yards. Default: 0.25 MOA<br><br>
-            <strong>Spin Effects:</strong> Spin drift is zeroed during setup. Crosswind jump is simulated when wind direction or speed changes, causing a brief jump in trajectory before the bullet stabilizes.
+            <strong>Bullet:</strong><br>
+            - <strong>BC:</strong> Ballistic coefficient (aerodynamic efficiency, higher = less drift/drop)<br>
+            - <strong>Drag Function:</strong> G7 (modern boat-tail) or G1 (flat-base/older)<br>
+            - <strong>Diameter:</strong> Caliber in inches (affects scoring and spin)<br>
+            - <strong>Weight:</strong> Bullet weight in grains (for spin moment of inertia)<br>
+            - <strong>Length:</strong> Bullet length in inches (for spin calculations)<br><br>
+
+            <strong>Rifle:</strong><br>
+            - <strong>MV:</strong> Muzzle velocity in fps (critical for trajectory/time-of-flight)<br>
+            - <strong>MV σ:</strong> Velocity standard deviation in fps (lower = more consistent)<br>
+            - <strong>Accuracy:</strong> Rifle+shooter precision in MOA (1 MOA ≈ 1" at 100 yards)<br>
+            - <strong>Twist:</strong> Barrel twist rate (e.g., 8 for 1:8 twist, calculates spin rate)<br>
+            - <strong>Reticle:</strong> SFP (fixed size) or FFP (scales with zoom)<br><br>
+
+            <strong>Spin Effects (When Enabled):</strong><br>
+            - Spin drift is zeroed during setup<br>
+            - Crosswind jump simulated when wind changes<br>
+            - Brief trajectory jump before bullet stabilizes
           </div>
         </div>
         
         <div class="help-section">
-          <h3>HUD (Top-Right)</h3>
+          <h3>HUD Display (Top-Right)</h3>
           <div class="param-help">
-            <strong>Relay:</strong> Current relay number (1/3, 2/3, 3/3)<br><br>
-            <strong>Timer:</strong> Remaining time for current relay (minutes:seconds)<br><br>
-            <strong>Target:</strong> Your target number<br><br>
-            <strong>Sighters:</strong> Sighter count N/∞ (Relay 1) or N/2 (Relays 2–3), shown only during sighters phase<br><br>
-            <strong>Shots:</strong> Record shots N/20 during record phase (turns green when at 20/20)<br><br>
-            <strong>Score:</strong> Total score and X-count for current relay<br><br>
-            <strong>Dropped:</strong> Dropped points and dropped X-count for current relay<br><br>
-            <strong>Last Shot:</strong> Score value with X indicator (e.g., "10x" for a perfect X, "9" for a nine)<br><br>
-            <strong>MV:</strong> Muzzle velocity in fps for the last shot fired<br><br>
-            <strong>Impact V:</strong> Impact velocity in fps for the last shot fired
-          </div>
-        </div>
-
-        <div class="help-section">
-          <h3>Wind HUD</h3>
-          <div class="param-help">
-            - Toggle on/off with the "Wind HUD" button (top-left vertical strip)<br>
-            - Shows wind conditions from shooter (bottom) to target (top)<br>
-            - Color-coded: blue = calm, red = strong (7.5+ mph)<br>
-            - White arrows show wind direction<br>
-            - Samples across full range width at target height<br>
-            - Updates in real-time as wind changes
+            - <strong>Relay:</strong> Current relay (1/3, 2/3, 3/3)<br>
+            - <strong>Timer:</strong> Remaining time (minutes:seconds)<br>
+            - <strong>Target:</strong> Your target number<br>
+            - <strong>Sighters:</strong> Count N/∞ (Relay 1) or N/2 (Relays 2-3), only shown during sighters<br>
+            - <strong>Shots:</strong> Record shots N/20 (turns green at 20/20)<br>
+            - <strong>Score:</strong> Total score and X-count for current relay<br>
+            - <strong>Dropped:</strong> Points and X-count dropped in current relay<br>
+            - <strong>Last Shot:</strong> Score value (e.g., "10x" or "9")<br>
+            - <strong>MV:</strong> Muzzle velocity for last shot (fps)<br>
+            - <strong>Impact V:</strong> Impact velocity for last shot (fps)
           </div>
         </div>
 
         <div class="help-section">
           <h3>Scorecard</h3>
           <div class="param-help">
-            - Shows all match parameters at top (distance, target, wind, reticle, bullet specs, rifle accuracy, twist rate)<br>
-            - Per-relay view with sighters row and two rows of 10 record shots<br>
-            - Relay totals and overall match total at the bottom<br>
-            - Available before first shot (shows parameters immediately)
-          </div>
-        </div>
-
-        <div class="help-section">
-          <h3>Audio</h3>
-          <div class="param-help">
-            - Wind noise volume scales smoothly with wind speed (silent at 0 mph)<br>
-            - Shot sounds with background range activity
-          </div>
-        </div>
-
-        <div class="help-section">
-          <h3>Debug Mode</h3>
-          <div class="param-help">
-            - Add <code>?debug=1</code> to the URL for 1‑minute relays with 2 record shots (rapid testing)<br>
-            - Includes wind overlay and detailed console logging
+            - Click "Scorecard" button to view detailed match information<br>
+            - Shows all match parameters (distance, target, wind, ballistics, rifle specs)<br>
+            - Per-relay breakdown with sighters and two rows of 10 record shots<br>
+            - Relay totals and overall match total<br>
+            - Available anytime (shows parameters even before first shot)
           </div>
         </div>
         
         <div class="help-section">
-          <h3>Technical Features</h3>
+          <h3>Technical Details</h3>
           <div class="param-help">
-            - WebAssembly ballistics engine (runs entirely in your browser)<br>
-            - Detailed logging in the console (zeroing, shots, wind, scoring)
-          </div>
-        </div>
+            <strong>Ballistics Engine:</strong><br>
+            - WebAssembly-powered physics simulation (runs in browser)<br>
+            - RK2 integration with 4DOF state<br>
+            - Iterative zeroing in calm wind conditions<br>
+            - Spin effects: drift zeroed, crosswind jump modeled as transient<br><br>
 
-        <div class="help-section">
-          <h3>Technical Notes</h3>
-          <div class="param-help">
-            <strong>Trajectory:</strong> RK2 integration with a 4DOF state. Spin effects are simplified and empirically tuned; spin drift is removed during zeroing, crosswind jump is modeled as a short transient when wind changes.<br><br>
-            <strong>Zeroing:</strong> Iterative algorithm correcting for y/z error at the target plane. Runs in zero wind for repeatability and converges quickly.<br><br>
-            <strong>Coordinates & Units:</strong> Three.js world in yards (X=right, Y=up, Z=toward camera/−Z downrange). Wrappers convert to the C++ simulation frame (X=downrange, Y=right, Z=up) and meters internally.<br><br>
-            <strong>Wind Model:</strong> 2D curl-noise field with multiple octaves and global advection. RMS-normalized at init for stable magnitudes across presets. Flags and mirage sample this same field over space and time.<br><br>
-            <strong>Mirage:</strong> World-anchored distortion sampling predominantly in the last quarter of the range to emphasize target-area cues; apparent flow aligns with crosswind direction.
+            <strong>Wind Simulation:</strong><br>
+            - 2D curl-noise field with multiple octaves and advection<br>
+            - RMS-normalized for consistent magnitude across presets<br>
+            - Flags, mirage, and wind HUD sample same unified field<br>
+            - Mirage emphasizes wind in final 25% of distance to aim point<br><br>
+
+            <strong>Coordinates:</strong><br>
+            - Three.js: X=right, Y=up, Z=towards camera (yards)<br>
+            - Ballistics engine: X=downrange, Y=right, Z=up (meters)<br>
+            - Automatic conversion between coordinate systems<br><br>
+
+            <strong>Debug Mode:</strong><br>
+            - Add <code>?debug=1</code> to URL for rapid testing mode<br>
+            - 1-minute relays with 2 record shots<br>
+            - Console logging for zeroing, shots, wind, and scoring
           </div>
         </div>
         
