@@ -482,6 +482,13 @@ class FClassSimulator
 
     // Pending relay end notification (waiting for target to be ready)
     this.pendingRelayEndNotification = false;
+
+    // FPS tracking
+    this.fpsFrameCount = 0;
+    this.fpsStartTime = null;
+    this.fpsLastLogTime = null;
+    this.fpsLogInterval = 10.0; // Log every 10 seconds
+    this.fpsTotalFrameTime = 0; // Sum of all frame times for theoretical FPS
   }
 
   // ===== SCENE SETUP =====
@@ -833,6 +840,8 @@ class FClassSimulator
   // ===== RENDERING =====
   render()
   {
+    const frameStartTime = performance.now();
+
     // Update time at the start of each frame
     ResourceManager.time.update();
     
@@ -921,6 +930,38 @@ class FClassSimulator
     this.renderer.setRenderTarget(null);
     this.renderer.clear();
     this.renderer.render(this.compositionScene, this.compositionCamera);
+
+    // Track FPS
+    const frameEndTime = performance.now();
+    const frameTime = frameEndTime - frameStartTime;
+    this.fpsTotalFrameTime += frameTime;
+    this.fpsFrameCount++;
+
+    // Initialize timing on first frame
+    if (this.fpsStartTime === null)
+    {
+      this.fpsStartTime = frameStartTime;
+      this.fpsLastLogTime = frameStartTime;
+    }
+
+    // Log FPS every 10 seconds
+    const timeSinceLastLog = (frameEndTime - this.fpsLastLogTime) / 1000.0;
+    if (timeSinceLastLog >= this.fpsLogInterval)
+    {
+      // Calculate actual FPS (frames rendered over wall clock time)
+      const actualFps = this.fpsFrameCount / timeSinceLastLog;
+
+      // Calculate theoretical FPS (if we rendered as fast as possible)
+      const avgFrameTime = this.fpsTotalFrameTime / this.fpsFrameCount;
+      const theoreticalFps = 1000.0 / avgFrameTime;
+
+      console.log(`FPS: Actual=${actualFps.toFixed(1)} (limited by requestAnimationFrame), Theoretical=${theoreticalFps.toFixed(1)} (if unlimited)`);
+
+      // Reset counters
+      this.fpsFrameCount = 0;
+      this.fpsLastLogTime = frameEndTime;
+      this.fpsTotalFrameTime = 0;
+    }
   }
 
   async start()
@@ -933,7 +974,7 @@ class FClassSimulator
 
     // ===== THREE.JS CORE =====
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87ceeb);
+    this.scene.background = new THREE.Color(0x87ceeb); // Fallback color
 
     // Renderer setup
     this.canvasWidth = parseInt(this.canvas.dataset.lockedWidth) || this.canvas.clientWidth;
@@ -1969,6 +2010,7 @@ function setupHelpMenu()
       }
     });
   }
+
 }
 
 // Initialize when DOM is loaded
