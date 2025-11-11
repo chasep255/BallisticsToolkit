@@ -26,6 +26,7 @@ export class Scope
     this.reticle = config.reticle || false;
     this.focalPlane = config.focalPlane || 'SFP'; // 'FFP' or 'SFP'
     this.maxDialMOA = config.maxDialMOA || 10; // Maximum dial adjustment in MOA (±10 MOA default)
+    this.msaaSamples = config.msaaSamples ?? 4;
 
     // FOV limits
     this.minFOV = config.minFOV;
@@ -90,7 +91,7 @@ export class Scope
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
-      samples: 4
+      samples: this.msaaSamples
     });
   }
 
@@ -104,7 +105,7 @@ export class Scope
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
-      samples: 4
+      samples: this.msaaSamples
     });
   }
 

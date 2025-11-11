@@ -63,7 +63,11 @@ export class EnvironmentRenderer
 
       shadowCameraHorizontal: config.shadowCameraHorizontal ?? EnvironmentRenderer.SHADOW_CAMERA_HORIZONTAL,
       shadowCameraTop: config.shadowCameraTop ?? EnvironmentRenderer.SHADOW_CAMERA_TOP,
-      shadowCameraNear: config.shadowCameraNear ?? EnvironmentRenderer.SHADOW_CAMERA_NEAR
+      shadowCameraNear: config.shadowCameraNear ?? EnvironmentRenderer.SHADOW_CAMERA_NEAR,
+      shadowsEnabled: config.shadowsEnabled ?? true,
+      shadowMapWidth: config.shadowMapWidth ?? 4096,
+      shadowMapHeight: config.shadowMapHeight ?? 8192,
+      shadowRadius: config.shadowRadius ?? 3
     };
 
     // Environment objects
@@ -211,7 +215,7 @@ export class EnvironmentRenderer
     // Directional light (sun) for depth and shadows
     this.sun = new THREE.DirectionalLight(0xffffff, 2.0);
     this.sun.position.set(300, 600, 0); // Higher above and in front of shooter for cloud shadows on range
-    this.sun.castShadow = true;
+    this.sun.castShadow = this.cfg.shadowsEnabled;
 
     // Aim the light toward the middle of the range
     this.sun.target.position.set(0, 0, -this.rangeDistance);
@@ -219,8 +223,8 @@ export class EnvironmentRenderer
     this.scene.add(this.sun);
 
     // Shadow map quality - optimized for long range (more resolution along length)
-    this.sun.shadow.mapSize.width = 4096; // Width (left-right across range)
-    this.sun.shadow.mapSize.height = 8192; // Height (downrange length)
+    this.sun.shadow.mapSize.width = this.cfg.shadowMapWidth; // Width (left-right across range)
+    this.sun.shadow.mapSize.height = this.cfg.shadowMapHeight; // Height (downrange length)
 
     // Shadow camera bounds - cover only range area, not mountains
     this.sun.shadow.camera.left = -this.cfg.shadowCameraHorizontal;
@@ -236,7 +240,7 @@ export class EnvironmentRenderer
     // Shadow quality settings
     this.sun.shadow.bias = -0.0002; // Reduce shadow acne
     this.sun.shadow.normalBias = 0.02; // Reduce shadow acne on angled surfaces
-    this.sun.shadow.radius = 3; // Softer shadows with moderate blur
+    this.sun.shadow.radius = this.cfg.shadowRadius; // Shadow blur radius
     // Renderer shadow settings are handled by main simulator
   }
 
@@ -292,8 +296,8 @@ export class EnvironmentRenderer
       const mountain = new THREE.Mesh(geometry, material);
       // Position slightly below ground to ensure no gap (cone center is at geometric center)
       mountain.position.set(data.x, data.height / 2 - 5, data.z);
-      mountain.castShadow = true;
-      mountain.receiveShadow = true;
+      mountain.castShadow = this.cfg.shadowsEnabled;
+      mountain.receiveShadow = this.cfg.shadowsEnabled;
 
       this.scene.add(mountain);
       this.mountains.push(mountain);
@@ -372,7 +376,7 @@ export class EnvironmentRenderer
       const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
 
       // Enable shadow casting for clouds
-      cloud.castShadow = true;
+      cloud.castShadow = this.cfg.shadowsEnabled;
       cloud.receiveShadow = false; // Clouds don't receive shadows from other clouds
 
       // Position clouds at varying heights over the range (matching original exactly)
@@ -490,16 +494,16 @@ export class EnvironmentRenderer
       // Create trunk - positioned so bottom is at ground (Y=0)
       const trunk = new THREE.Mesh(trunkGeo, trunkMaterial);
       trunk.position.set(x, actualTrunkHeight / 2, z);
-      trunk.castShadow = true;
-      trunk.receiveShadow = true;
+      trunk.castShadow = this.cfg.shadowsEnabled;
+      trunk.receiveShadow = this.cfg.shadowsEnabled;
       this.scene.add(trunk);
       this.trees.push(trunk);
 
       // Create foliage - positioned so base overlaps with top of trunk
       const foliage = new THREE.Mesh(foliageGeo, foliageMaterial);
       foliage.position.set(x, actualTrunkHeight + actualFoliageHeight / 2 - actualFoliageHeight * 0.25, z);
-      foliage.castShadow = true;
-      foliage.receiveShadow = true;
+      foliage.castShadow = this.cfg.shadowsEnabled;
+      foliage.receiveShadow = this.cfg.shadowsEnabled;
       this.scene.add(foliage);
       this.trees.push(foliage);
     }
@@ -540,7 +544,7 @@ export class EnvironmentRenderer
     this.brownGround = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
     this.brownGround.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
     this.brownGround.position.set(0, -0.1, -groundLength / 2); // Center downrange (negative Z), slightly below ground
-    this.brownGround.receiveShadow = true; // Enable shadow receiving on ground
+    this.brownGround.receiveShadow = this.cfg.shadowsEnabled; // Enable shadow receiving on ground
     this.scene.add(this.brownGround);
 
     // Add a range plane - just the shooting lanes with grass texture
@@ -603,7 +607,7 @@ export class EnvironmentRenderer
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
     this.ground.rotation.x = -Math.PI / 2; // Rotate to lie in XZ plane (horizontal)
     this.ground.position.set(0, 0, -rangeLength / 2); // Center downrange (negative Z)
-    this.ground.receiveShadow = true; // Enable shadow receiving on grass
+    this.ground.receiveShadow = this.cfg.shadowsEnabled; // Enable shadow receiving on grass
     this.scene.add(this.ground);
   }
 
@@ -685,8 +689,8 @@ export class EnvironmentRenderer
           Math.random() * Math.PI * 2,
           Math.random() * Math.PI
         );
-        rock.castShadow = true;
-        rock.receiveShadow = true;
+        rock.castShadow = this.cfg.shadowsEnabled;
+        rock.receiveShadow = this.cfg.shadowsEnabled;
 
         this.scene.add(rock);
         this.rangeObjects.push(rock);
@@ -707,8 +711,8 @@ export class EnvironmentRenderer
         const bush = new THREE.Mesh(geometry, bushMaterial);
         bush.position.set(x, terrainHeight + bushSize * 0.5, z);
         bush.scale.set(1, 0.8, 1); // Squash vertically
-        bush.castShadow = true;
-        bush.receiveShadow = true;
+        bush.castShadow = this.cfg.shadowsEnabled;
+        bush.receiveShadow = this.cfg.shadowsEnabled;
 
         this.scene.add(bush);
         this.rangeObjects.push(bush);
@@ -729,8 +733,8 @@ export class EnvironmentRenderer
 
         const post = new THREE.Mesh(geometry, postMaterial);
         post.position.set(x, terrainHeight + postHeight / 2, z);
-        post.castShadow = true;
-        post.receiveShadow = true;
+        post.castShadow = this.cfg.shadowsEnabled;
+        post.receiveShadow = this.cfg.shadowsEnabled;
 
         this.scene.add(post);
         this.rangeObjects.push(post);

@@ -32,6 +32,7 @@ export class FlagRenderer
     // Required config
     this.scene = config.scene;
     this.renderer = config.renderer;
+    this.shadowsEnabled = config.shadowsEnabled ?? true;
 
     // Flag configuration with defaults from static constants
     this.cfg = {
@@ -300,16 +301,16 @@ export class FlagRenderer
   {
     // Create pole (reuse shared geometry and material)
     const pole = new THREE.Mesh(this.poleGeometry, this.sharedMaterials.pole);
-    pole.castShadow = true;
-    pole.receiveShadow = true;
+    pole.castShadow = this.shadowsEnabled;
+    pole.receiveShadow = this.shadowsEnabled;
     pole.position.set(xPosition, this.cfg.poleHeight / 2, zPosition);
     this.scene.add(pole);
 
     // Create flag (unique geometry per flag for animation, share material)
     const flagGeometry = this.createFlagGeometry();
     const flagMesh = new THREE.Mesh(flagGeometry, this.sharedMaterials.flag);
-    flagMesh.castShadow = true;
-    flagMesh.receiveShadow = true;
+    flagMesh.castShadow = this.shadowsEnabled;
+    flagMesh.receiveShadow = this.shadowsEnabled;
 
     const flagY = this.cfg.poleHeight - this.cfg.flagBaseWidth / 2;
     flagMesh.position.set(xPosition, flagY, zPosition);

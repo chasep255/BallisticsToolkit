@@ -65,6 +65,14 @@
     <!-- Game Settings & Accuracy -->
     <div class="params-bar">
       <div class="param-item">
+        <label for="graphicsPreset" title="Graphics quality preset">Graphics</label>
+        <select id="graphicsPreset" title="Graphics quality preset">
+          <option value="Low">Low</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="High">High</option>
+        </select>
+      </div>
+      <div class="param-item">
         <label for="fclassMode" title="Target distance and type">Range</label>
         <select id="fclassMode" title="Target distance and type">
           <option value="fclass-300">300 yards</option>
@@ -225,6 +233,24 @@
             - <strong>Scorecard:</strong> View detailed per-relay scores and parameters<br>
             - <strong>Go For Record:</strong> End sighters phase early in current relay<br>
             - <strong>Wind HUD:</strong> Toggle wind field visualization on/off
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Graphics Quality</h3>
+          <div class="param-help">
+            <strong>Presets:</strong><br>
+            - <strong>Low:</strong> Best performance - shadows disabled, reduced object counts, no antialiasing<br>
+            - <strong>Medium:</strong> Balanced quality/performance - soft shadows, full object counts, antialiasing enabled<br>
+            - <strong>High:</strong> Best quality - variance shadow maps, maximum detail, highest quality shadows<br><br>
+            
+            <strong>Settings Controlled:</strong><br>
+            - Shadow quality (resolution, type, enabled/disabled)<br>
+            - Antialiasing (MSAA samples, renderer antialiasing)<br>
+            - Pixel ratio (rendering resolution multiplier)<br>
+            - Object counts (clouds, trees, mountains, flag segments)<br><br>
+            
+            <strong>Note:</strong> Changes require restarting the game to take effect. Settings are automatically saved and restored on page reload.
           </div>
         </div>
         

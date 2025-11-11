@@ -6,6 +6,8 @@ import { waitForBTK, getBTK, sampleWindAtThreeJsPosition } from './core/btk.js';
 
 // Import core logic (no wind module - use BTK directly)
 import { VirtualCoordinates as VC } from './core/virtual-coords.js';
+import { GraphicsPresets } from './core/graphics-presets.js';
+import { SettingsCookies } from './core/settings-cookies.js';
 
 // Import ResourceManager (triggers auto-loading)
 import ResourceManager from './resources/manager.js';
@@ -317,6 +319,7 @@ function getGameParams()
     distance: distanceYards,
     target: targetType,
     windPreset: document.getElementById('windPreset').value,
+    graphicsPreset: document.getElementById('graphicsPreset').value,
     focalPlane: document.getElementById('focalPlane').value,
     fclassMode: fclassMode,
     // Bullet parameters
@@ -456,6 +459,8 @@ class FClassSimulator
     this.distance = params.distance;
     this.targetType = params.target;
     this.windPreset = params.windPreset;
+    this.graphicsPreset = params.graphicsPreset || 'Medium';
+    this.graphicsConfig = GraphicsPresets.getPreset(this.graphicsPreset);
     this.focalPlane = params.focalPlane || 'SFP';
 
     // Bullet parameters
@@ -983,17 +988,17 @@ class FClassSimulator
     this.renderer = new THREE.WebGLRenderer(
     {
       canvas: this.canvas,
-      antialias: true,
+      antialias: this.graphicsConfig.antialiasing,
       logarithmicDepthBuffer: true
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft antialiased shadows
+    this.renderer.shadowMap.enabled = this.graphicsConfig.shadowsEnabled;
+    this.renderer.shadowMap.type = this.graphicsConfig.shadowType;
     this.renderer.shadowMap.autoUpdate = true;
     this.renderer.shadowMap.needsUpdate = true;
     this.renderer.setSize(this.canvasWidth, this.canvasHeight);
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+    this.renderer.setPixelRatio(Math.min(this.graphicsConfig.pixelRatio, window.devicePixelRatio));
     this.renderer.autoClear = false;
 
     // Update texture anisotropy now that renderer is available
@@ -1008,7 +1013,7 @@ class FClassSimulator
         minFilter: THREE.LinearFilter,
         magFilter: THREE.LinearFilter,
         format: THREE.RGBAFormat,
-        samples: 4
+        samples: this.graphicsConfig.msaaSamples
       }
     );
 
@@ -1060,7 +1065,9 @@ class FClassSimulator
     this.flags = new FlagRenderer(
     {
       scene: this.scene,
-      renderer: this.renderer
+      renderer: this.renderer,
+      shadowsEnabled: this.graphicsConfig.shadowsEnabled,
+      flagSegments: this.graphicsConfig.flagSegments
       // Uses FlagRenderer defaults for all flag parameters
     });
     this.createWindFlags();
@@ -1074,7 +1081,8 @@ class FClassSimulator
       pitsHeight: FClassSimulator.PITS_HEIGHT,
       pitsDepth: FClassSimulator.PITS_DEPTH,
       pitsOffset: FClassSimulator.PITS_OFFSET,
-      targetType: this.targetType
+      targetType: this.targetType,
+      shadowsEnabled: this.graphicsConfig.shadowsEnabled
     });
 
     // ===== ENVIRONMENT =====
@@ -1085,7 +1093,15 @@ class FClassSimulator
       rangeDistance: this.distance,
       rangeWidth: FClassSimulator.RANGE_LANE_WIDTH,
       rangeTotalWidth: FClassSimulator.RANGE_TOTAL_WIDTH,
-      groundExtension: FClassSimulator.GROUND_EXTENSION_BEYOND_TARGETS
+      groundExtension: FClassSimulator.GROUND_EXTENSION_BEYOND_TARGETS,
+      shadowsEnabled: this.graphicsConfig.shadowsEnabled,
+      shadowMapWidth: this.graphicsConfig.shadowMapSize.width,
+      shadowMapHeight: this.graphicsConfig.shadowMapSize.height,
+      shadowRadius: this.graphicsConfig.shadowRadius,
+      cloudCount: this.graphicsConfig.cloudCount,
+      treeCountSides: this.graphicsConfig.treeCountSides,
+      treeCountBehind: this.graphicsConfig.treeCountBehind,
+      mountainCount: this.graphicsConfig.mountainCount
     });
 
     // ===== HUD =====
@@ -1144,7 +1160,8 @@ class FClassSimulator
         y: FClassSimulator.TARGET_CENTER_HEIGHT,
         z: -this.distance
       },
-      reticle: false
+      reticle: false,
+      msaaSamples: this.graphicsConfig.msaaSamples
     });
 
     // Rifle scope - narrower FOV for precision aiming
@@ -1175,7 +1192,8 @@ class FClassSimulator
       },
       reticle: true,
       focalPlane: this.focalPlane, // SFP: reticle stays fixed size, FFP: reticle scales with zoom
-      maxDialMOA: FClassSimulator.RIFLE_SCOPE_MAX_DIAL_MOA // Maximum dial adjustment
+      maxDialMOA: FClassSimulator.RIFLE_SCOPE_MAX_DIAL_MOA, // Maximum dial adjustment
+      msaaSamples: this.graphicsConfig.msaaSamples
     });
 
     // ===== INPUT =====
@@ -1203,6 +1221,7 @@ class FClassSimulator
         targets: this.targets,
         windGenerator: this.windGenerator,
         distance: this.distance,
+        shadowsEnabled: this.graphicsConfig.shadowsEnabled,
         onShotComplete: (shotData) => this.onShotComplete(shotData)
       });
 
@@ -1221,6 +1240,7 @@ class FClassSimulator
       distance: this.distance,
       target: this.targetType,
       windPreset: this.windPreset,
+      graphicsPreset: this.graphicsPreset,
       focalPlane: this.focalPlane,
       bc: this.bc,
       dragFunction: this.dragFunction,
@@ -2024,6 +2044,13 @@ async function initializeApp()
     setupUI();
     lockCanvasSize(); // Lock canvas size once on page load
     populateWindPresetDropdown();
+    
+    // Load saved settings from cookies (after wind presets are populated)
+    SettingsCookies.loadAll();
+    
+    // Attach auto-save listeners to all settings inputs
+    SettingsCookies.attachAutoSave();
+    
     setupHelpMenu();
 
     // Show loading message if resources aren't ready yet

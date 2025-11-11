@@ -18,6 +18,7 @@ export class BallisticsEngine
 
     // Ballistic parameters
     this.distance = config.distance;
+    this.shadowsEnabled = config.shadowsEnabled ?? true;
 
     // Ballistic state
     this.ballisticSimulator = null;
@@ -421,7 +422,7 @@ export class BallisticsEngine
     if (!this.bulletMesh)
     {
       this.bulletMesh = new THREE.Mesh(this.bulletGeometry, this.bulletMaterial);
-      this.bulletMesh.castShadow = true;
+      this.bulletMesh.castShadow = this.shadowsEnabled;
       this.bulletMesh.receiveShadow = false;
       this.scene.add(this.bulletMesh);
     }

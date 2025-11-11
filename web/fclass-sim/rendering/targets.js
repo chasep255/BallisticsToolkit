@@ -27,6 +27,7 @@ export class TargetRenderer
     this.pitsDepth = config.pitsDepth;
     this.pitsOffset = config.pitsOffset;
     this.targetType = config.targetType; // Target type (e.g., "MR-1")
+    this.shadowsEnabled = config.shadowsEnabled ?? true;
 
     // Target configuration with defaults
     this.cfg = {
@@ -314,8 +315,8 @@ export class TargetRenderer
 
     this.pits = new THREE.Mesh(pitsGeometry, pitsMaterial);
 
-    this.pits.castShadow = true;
-    this.pits.receiveShadow = true;
+    this.pits.castShadow = this.shadowsEnabled;
+    this.pits.receiveShadow = this.shadowsEnabled;
 
     // Position pits in front of targets (closer to shooter)
     this.pits.position.set(0, this.pitsHeight / 2, -(this.rangeDistance - this.pitsOffset));
@@ -348,8 +349,8 @@ export class TargetRenderer
         envMapIntensity: 0.8
       });
       const target = new THREE.Mesh(this.targetGeometry, targetMaterial);
-      target.castShadow = true;
-      target.receiveShadow = true;
+      target.castShadow = this.shadowsEnabled;
+      target.receiveShadow = this.shadowsEnabled;
       target.position.set(xPos, this.targetCenterHeight, -this.rangeDistance);
       target.matrixAutoUpdate = false;
       this.scene.add(target);
@@ -363,8 +364,8 @@ export class TargetRenderer
         transparent: true
       });
       const numberBox = new THREE.Mesh(this.targetGeometry, numberMaterial);
-      numberBox.castShadow = true;
-      numberBox.receiveShadow = true;
+      numberBox.castShadow = this.shadowsEnabled;
+      numberBox.receiveShadow = this.shadowsEnabled;
       numberBox.position.set(xPos, this.targetCenterHeight + targetSize + 0.2, -this.rangeDistance);
       numberBox.matrixAutoUpdate = false;
       this.scene.add(numberBox);
@@ -511,8 +512,8 @@ export class TargetRenderer
     });
 
     this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-    this.lastShotMarker.castShadow = true;
-    this.lastShotMarker.receiveShadow = true;
+    this.lastShotMarker.castShadow = this.shadowsEnabled;
+    this.lastShotMarker.receiveShadow = this.shadowsEnabled;
 
     // Get user target center
     const targetCenter = this.getUserTargetCenter();
@@ -617,8 +618,8 @@ export class TargetRenderer
               });
 
               this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-              this.lastShotMarker.castShadow = true;
-              this.lastShotMarker.receiveShadow = true;
+              this.lastShotMarker.castShadow = this.shadowsEnabled;
+              this.lastShotMarker.receiveShadow = this.shadowsEnabled;
               this.scene.add(this.lastShotMarker);
 
               // Position will be updated in updateSpotterPosition()
@@ -805,8 +806,8 @@ export class TargetRenderer
     });
 
     this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-    this.lastShotMarker.castShadow = true;
-    this.lastShotMarker.receiveShadow = true;
+    this.lastShotMarker.castShadow = this.shadowsEnabled;
+    this.lastShotMarker.receiveShadow = this.shadowsEnabled;
 
     // Get user target center
     const targetCenter = this.getUserTargetCenter();
