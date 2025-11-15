@@ -1,0 +1,21 @@
+CompileFlags:
+  Add:
+    - -std=c++17
+    - -Wall
+    - -Wextra
+  Remove:
+    # Remove Emscripten-specific flags that clangd doesn't understand
+    - -fwasm-exceptions
+    - --target=wasm32-unknown-emscripten
+    
+  CompilationDatabase: ""  # Ignore compile_commands.json (it's for Emscripten)
+
+# Manually specify include paths
+Index:
+  Background: Build
+
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
+
+
