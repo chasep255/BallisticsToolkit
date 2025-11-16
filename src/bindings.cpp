@@ -330,21 +330,19 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   register_optional<btk::match::SteelTarget::IntersectionResult>();
 
   // Register vectors for SteelTarget
+  register_vector<btk::match::SteelTarget::ChainAnchor>("ChainAnchorVector");
   register_vector<btk::match::SteelTarget::Impact>("ImpactVector");
 
   // Steel Target class
   class_<btk::match::SteelTarget>("SteelTarget")
-    .constructor<float, float>()
-    .function("addRectangle", &btk::match::SteelTarget::addRectangle)
-    .function("addCircle", &btk::match::SteelTarget::addCircle)
-    .function("addOval", &btk::match::SteelTarget::addOval)
-    .function("addTriangle", &btk::match::SteelTarget::addTriangle)
+    .constructor<float, float, float, bool>()
     .function("addChainAnchor", &btk::match::SteelTarget::addChainAnchor)
     .function("setDamping", &btk::match::SteelTarget::setDamping)
     .function("hit", select_overload<bool(const btk::ballistics::Trajectory&)>(&btk::match::SteelTarget::hit))
     .function("hitBullet", select_overload<void(const btk::ballistics::Bullet&)>(&btk::match::SteelTarget::hit))
     .function("timeStep", &btk::match::SteelTarget::timeStep)
     .function("getImpacts", &btk::match::SteelTarget::getImpacts)
+    .function("getAnchors", &btk::match::SteelTarget::getAnchors)
     .function("getCenterOfMass", &btk::match::SteelTarget::getCenterOfMass)
     .function("getNormal", &btk::match::SteelTarget::getNormal)
     .function("getVelocity", &btk::match::SteelTarget::getVelocity)

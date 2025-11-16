@@ -7,38 +7,20 @@
 namespace btk::match
 {
 
-  SteelTarget::SteelTarget(float thickness, float density)
-    : thickness_(thickness),
-      steel_density_(density),
+  SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval)
+    : width_(width),
+      height_(height),
+      thickness_(thickness),
+      is_oval_(is_oval),
       position_(0.0f, 0.0f, 0.0f),
       normal_(1.0f, 0.0f, 0.0f),
+      orientation_(btk::math::Quaternion()), // Identity orientation (no rotation)
       velocity_ms_(0.0f, 0.0f, 0.0f),
       angular_velocity_(0.0f, 0.0f, 0.0f),
       mass_kg_(0.0f),
       inertia_tensor_(0.0f, 0.0f, 0.0f),
-      linear_damping_(0.99f),
-      angular_damping_(0.98f) {
-  }
-
-  void SteelTarget::addRectangle(const btk::math::Vector3D& position, float width, float height) {
-    components_.push_back(RectangleComponent(position, width, height));
-    calculateMassAndInertia();
-  }
-
-  void SteelTarget::addCircle(const btk::math::Vector3D& position, float radius) {
-    float diameter = radius * 2.0f;
-    components_.push_back(OvalComponent(position, diameter, diameter));
-    calculateMassAndInertia();
-  }
-
-  void SteelTarget::addOval(const btk::math::Vector3D& position, float width, float height) {
-    components_.push_back(OvalComponent(position, width, height));
-    calculateMassAndInertia();
-  }
-
-  void SteelTarget::addTriangle(const btk::math::Vector3D& v0, const btk::math::Vector3D& v1, const btk::math::Vector3D& v2) {
-    btk::math::Vector3D center = (v0 + v1 + v2) / 3.0f;
-    components_.push_back(TriangleComponent(center, v0, v1, v2));
+      linear_damping_(0.95f),
+      angular_damping_(0.95f) {
     calculateMassAndInertia();
   }
 
@@ -52,20 +34,13 @@ namespace btk::match
   }
 
   void SteelTarget::translate(const btk::math::Vector3D& offset) {
-    // Translate all components
-    for (auto& component : components_) {
-      std::visit([&](auto& shape) {
-        shape.position_ += offset;
-      }, component);
-    }
+    // Update center of mass
+    position_ += offset;
     
     // Translate all chain attachments
     for (auto& anchor : anchors_) {
       anchor.attachment_ += offset;
     }
-    
-    // Update center of mass
-    position_ += offset;
   }
 
   void SteelTarget::rotate(const btk::math::Vector3D& normal) {
@@ -82,61 +57,29 @@ namespace btk::match
       return;
     }
     
-    // Get center of mass before rotation (for rotating around it)
-    btk::math::Vector3D com = position_;
-    
+    btk::math::Quaternion rotation;
     if (dot < -0.9999f) {
       // Opposite direction, rotate 180 degrees around Z axis to keep target upright
       btk::math::Vector3D axis(0.0f, 0.0f, 1.0f);
-      btk::math::Quaternion rotation = btk::math::Quaternion::fromAxisAngle(axis, 3.14159265359f);
-      
-      // Rotate all components around center of mass
-      for (auto& component : components_) {
-        std::visit([&](auto& shape) {
-          btk::math::Vector3D offset = shape.position_ - com;
-          offset = rotation.rotate(offset);
-          shape.position_ = com + offset;
-        }, component);
-      }
-      
-      // Rotate all chain attachments around center of mass
-      for (auto& anchor : anchors_) {
-        btk::math::Vector3D offset = anchor.attachment_ - com;
-        offset = rotation.rotate(offset);
-        anchor.attachment_ = com + offset;
-      }
-      
-      normal_ = target_normal;
-      calculateMassAndInertia();
-      return;
-    }
-    
-    // General case: rotate from current normal to target normal
-    btk::math::Vector3D axis = current_normal.cross(target_normal).normalized();
-    float angle = std::acos(dot);
-    btk::math::Quaternion rotation = btk::math::Quaternion::fromAxisAngle(axis, angle);
-    
-    // Rotate all components around center of mass
-    for (auto& component : components_) {
-      std::visit([&](auto& shape) {
-        btk::math::Vector3D offset = shape.position_ - com;
-        offset = rotation.rotate(offset);
-        shape.position_ = com + offset;
-      }, component);
+      rotation = btk::math::Quaternion::fromAxisAngle(axis, 3.14159265359f);
+    } else {
+      // General case: rotate from current normal to target normal
+      btk::math::Vector3D axis = current_normal.cross(target_normal).normalized();
+      float angle = std::acos(dot);
+      rotation = btk::math::Quaternion::fromAxisAngle(axis, angle);
     }
     
     // Rotate all chain attachments around center of mass
     for (auto& anchor : anchors_) {
-      btk::math::Vector3D offset = anchor.attachment_ - com;
+      btk::math::Vector3D offset = anchor.attachment_ - position_;
       offset = rotation.rotate(offset);
-      anchor.attachment_ = com + offset;
+      anchor.attachment_ = position_ + offset;
     }
     
-    // Update normal
-    normal_ = target_normal;
-    
-    // Recalculate center of mass and inertia
-    calculateMassAndInertia();
+    // Update orientation and normal
+    orientation_ = rotation * orientation_;
+    orientation_.normalize();
+    normal_ = orientation_.rotate(btk::math::Vector3D(1.0f, 0.0f, 0.0f));
   }
 
   bool SteelTarget::hit(const btk::ballistics::Trajectory& trajectory) {
@@ -176,62 +119,51 @@ namespace btk::match
   }
 
   void SteelTarget::calculateMassAndInertia() {
-    if (components_.empty()) {
-      mass_kg_ = 0.0f;
-      inertia_tensor_ = btk::math::Vector3D(0.0f, 0.0f, 0.0f);
-      return;
+    // Calculate area based on shape
+    float area;
+    if (is_oval_) {
+      // Oval (ellipse) area
+      float a = width_ / 2.0f;
+      float b = height_ / 2.0f;
+      area = 3.14159265359f * a * b;
+    } else {
+      // Rectangle area
+      area = width_ * height_;
     }
 
-    float total_area = 0.0f;
-    btk::math::Vector3D weighted_center(0.0f, 0.0f, 0.0f);
-    btk::math::Vector3D total_inertia(0.0f, 0.0f, 0.0f);
+    // Calculate mass
+    mass_kg_ = area * thickness_ * STEEL_DENSITY;
 
-    // Process each component
-    for (const auto& component : components_) {
-      std::visit([&](const auto& shape) {
-        // Calculate area and mass for this component
-        float area = shape.area();
-        float component_mass = area * thickness_ * steel_density_;
-
-        total_area += area;
-        weighted_center += shape.position_ * area;
-
-        // Get local inertia for this component
-        btk::math::Vector3D local_inertia = shape.inertiaLocal(component_mass);
-
-        // Apply parallel axis theorem to move inertia to target center
-        // I_total = I_local + m * d^2
-        float dx = shape.position_.x;
-        float dy = shape.position_.y;
-        float dz = shape.position_.z;
-
-        local_inertia.x += component_mass * (dy * dy + dz * dz);
-        local_inertia.y += component_mass * (dx * dx + dz * dz);
-        local_inertia.z += component_mass * (dx * dx + dy * dy);
-
-        total_inertia += local_inertia;
-      }, component);
+    // Calculate moment of inertia (shape is in YZ plane, centered at origin)
+    if (is_oval_) {
+      // Oval inertia
+      float a = width_ / 2.0f;
+      float b = height_ / 2.0f;
+      inertia_tensor_.x = 0.25f * mass_kg_ * b * b;
+      inertia_tensor_.y = 0.25f * mass_kg_ * a * a;
+      inertia_tensor_.z = 0.25f * mass_kg_ * (a * a + b * b);
+    } else {
+      // Rectangle inertia
+      inertia_tensor_.x = mass_kg_ * height_ * height_ / 12.0f;
+      inertia_tensor_.y = mass_kg_ * width_ * width_ / 12.0f;
+      inertia_tensor_.z = mass_kg_ * (width_ * width_ + height_ * height_) / 12.0f;
     }
-
-    // Calculate total mass
-    mass_kg_ = total_area * thickness_ * steel_density_;
-
-    // Store inertia tensor
-    inertia_tensor_ = total_inertia;
   }
 
   bool SteelTarget::isPointInTarget(const btk::math::Vector3D& point) const {
-    // Check if point is inside any component
-    for (const auto& component : components_) {
-      bool inside = std::visit([&](const auto& shape) {
-        return shape.contains(point);
-      }, component);
-
-      if (inside) {
-        return true;
-      }
+    // Shape is in YZ plane, centered at position_
+    float dy = point.y - position_.y;
+    float dz = point.z - position_.z;
+    
+    if (is_oval_) {
+      // Oval (ellipse) test
+      float a = width_ / 2.0f;
+      float b = height_ / 2.0f;
+      return (dy * dy) / (a * a) + (dz * dz) / (b * b) <= 1.0f;
+    } else {
+      // Rectangle test
+      return std::abs(dy) <= width_ / 2.0f && std::abs(dz) <= height_ / 2.0f;
     }
-    return false;
   }
 
   std::optional<SteelTarget::IntersectionResult> SteelTarget::checkTrajectoryIntersection(const btk::ballistics::Trajectory& trajectory) const {
@@ -311,18 +243,18 @@ namespace btk::match
   void SteelTarget::applyImpulse(const btk::math::Vector3D& impulse, const btk::math::Vector3D& world_position) {
     // Linear impulse
     velocity_ms_ += impulse / mass_kg_;
-    
+
     // Angular impulse (torque = r × F)
     btk::math::Vector3D r = world_position - position_;
     btk::math::Vector3D angular_impulse = r.cross(impulse);
-    
-    // Apply to angular velocity (omega += I^-1 * L)
+
+    // Apply to angular velocity (omega += I^-1 * L) using full 3D inertia
     btk::math::Vector3D angular_accel(
       angular_impulse.x / inertia_tensor_.x,
       angular_impulse.y / inertia_tensor_.y,
       angular_impulse.z / inertia_tensor_.z
     );
-    
+
     angular_velocity_ += angular_accel;
   }
 
@@ -343,40 +275,28 @@ namespace btk::match
     // Apply damping
     velocity_ms_ = velocity_ms_ * linear_damping_;
     angular_velocity_ = angular_velocity_ * angular_damping_;
-    
+
     // Semi-implicit Euler integration for stability
     btk::math::Vector3D position_delta = velocity_ms_ * dt;
     position_ += position_delta;
-    
-    // Move all components and attachments with the center of mass
-    for (auto& component : components_) {
-      std::visit([&](auto& shape) {
-        shape.position_ += position_delta;
-      }, component);
-    }
-    
+
+    // Move all chain attachments with the center of mass
     for (auto& anchor : anchors_) {
       anchor.attachment_ += position_delta;
     }
-    
-    // Angular velocity integration: rotate normal and all components
+
+    // Angular velocity integration: allow X and Y axis rotation (twisting and swinging)
+    // Z-axis is constrained (angular_velocity_.z was zeroed above) to reduce unphysical vertical spinning
     if (angular_velocity_.magnitude() > 1e-6f) {
       float angle = angular_velocity_.magnitude() * dt;
       btk::math::Vector3D axis = angular_velocity_.normalized();
       btk::math::Quaternion rotation = btk::math::Quaternion::fromAxisAngle(axis, angle);
-      
-      // Rotate normal
-      normal_ = rotation.rotate(normal_);
-      
-      // Rotate all components around center of mass
-      for (auto& component : components_) {
-        std::visit([&](auto& shape) {
-          btk::math::Vector3D offset = shape.position_ - position_;
-          offset = rotation.rotate(offset);
-          shape.position_ = position_ + offset;
-        }, component);
-      }
-      
+
+      // Update orientation and normal from accumulated rotation
+      orientation_ = rotation * orientation_;
+      orientation_.normalize();
+      normal_ = orientation_.rotate(btk::math::Vector3D(1.0f, 0.0f, 0.0f));
+
       // Rotate all chain attachments around center of mass
       for (auto& anchor : anchors_) {
         btk::math::Vector3D offset = anchor.attachment_ - position_;
@@ -418,125 +338,129 @@ namespace btk::match
     std::vector<btk::math::Vector3D> vertices;
     float halfThickness = thickness_ / 2.0f;
 
-    for (const auto& component : components_) {
-      std::visit([&](const auto& shape) {
-        using T = std::decay_t<decltype(shape)>;
+    // Use full orientation quaternion to rotate from local (+X-normal) frame to world
+    btk::math::Quaternion rotation_quat = orientation_;
+
+    if (is_oval_) {
+      // Oval with thickness: front face, back face, and edge
+      // Shape is in YZ plane with normal in +X direction (before rotation)
+      float rx = width_ / 2.0f;
+      float ry = height_ / 2.0f;
+      
+      // Generate front and back faces
+      for (int i = 0; i < segments_per_circle; ++i) {
+        float angle1 = (2.0f * M_PI_F * i) / segments_per_circle;
+        float angle2 = (2.0f * M_PI_F * (i + 1)) / segments_per_circle;
         
-        if constexpr (std::is_same_v<T, RectangleComponent>) {
-          // Rectangle with thickness: front face, back face, and 4 edge faces
-          // Components are in YZ plane with normal in +X direction
-          float hw = shape.width_ / 2.0f;
-          float hh = shape.height_ / 2.0f;
-          
-          // Corners relative to component center (normal in +X)
-          btk::math::Vector3D v0(shape.position_.x - halfThickness, shape.position_.y - hw, shape.position_.z - hh);
-          btk::math::Vector3D v1(shape.position_.x - halfThickness, shape.position_.y + hw, shape.position_.z - hh);
-          btk::math::Vector3D v2(shape.position_.x - halfThickness, shape.position_.y + hw, shape.position_.z + hh);
-          btk::math::Vector3D v3(shape.position_.x - halfThickness, shape.position_.y - hw, shape.position_.z + hh);
-          btk::math::Vector3D v4(shape.position_.x + halfThickness, shape.position_.y - hw, shape.position_.z - hh);
-          btk::math::Vector3D v5(shape.position_.x + halfThickness, shape.position_.y + hw, shape.position_.z - hh);
-          btk::math::Vector3D v6(shape.position_.x + halfThickness, shape.position_.y + hw, shape.position_.z + hh);
-          btk::math::Vector3D v7(shape.position_.x + halfThickness, shape.position_.y - hw, shape.position_.z + hh);
-          
-          // Front face (X = +halfThickness)
-          vertices.push_back(v4);
-          vertices.push_back(v5);
-          vertices.push_back(v6);
-          vertices.push_back(v4);
-          vertices.push_back(v6);
-          vertices.push_back(v7);
-          
-          // Back face (X = -halfThickness)
-          vertices.push_back(v0);
-          vertices.push_back(v2);
-          vertices.push_back(v1);
-          vertices.push_back(v0);
-          vertices.push_back(v3);
-          vertices.push_back(v2);
-          
-          // Edge faces (4 sides)
-          // Bottom edge
-          vertices.push_back(v0);
-          vertices.push_back(v1);
-          vertices.push_back(v5);
-          vertices.push_back(v0);
-          vertices.push_back(v5);
-          vertices.push_back(v4);
-          // Top edge
-          vertices.push_back(v2);
-          vertices.push_back(v6);
-          vertices.push_back(v3);
-          vertices.push_back(v3);
-          vertices.push_back(v6);
-          vertices.push_back(v7);
-          // Left edge
-          vertices.push_back(v0);
-          vertices.push_back(v4);
-          vertices.push_back(v7);
-          vertices.push_back(v0);
-          vertices.push_back(v7);
-          vertices.push_back(v3);
-          // Right edge
-          vertices.push_back(v1);
-          vertices.push_back(v5);
-          vertices.push_back(v6);
-          vertices.push_back(v1);
-          vertices.push_back(v6);
-          vertices.push_back(v2);
-          
-        } else if constexpr (std::is_same_v<T, OvalComponent>) {
-          // Oval with thickness: front face, back face, and edge
-          // Components are in YZ plane with normal in +X direction
-          float rx = shape.width_ / 2.0f;
-          float ry = shape.height_ / 2.0f;
-          btk::math::Vector3D pos = shape.position_;
-          
-          // Generate front and back faces
-          for (int i = 0; i < segments_per_circle; ++i) {
-            float angle1 = (2.0f * M_PI_F * i) / segments_per_circle;
-            float angle2 = (2.0f * M_PI_F * (i + 1)) / segments_per_circle;
-            
-            float cos1 = std::cos(angle1), sin1 = std::sin(angle1);
-            float cos2 = std::cos(angle2), sin2 = std::sin(angle2);
-            
-            // Front face (X = +halfThickness)
-            btk::math::Vector3D centerFront(pos.x + halfThickness, pos.y, pos.z);
-            btk::math::Vector3D v1Front(pos.x + halfThickness, pos.y + rx * cos1, pos.z + ry * sin1);
-            btk::math::Vector3D v2Front(pos.x + halfThickness, pos.y + rx * cos2, pos.z + ry * sin2);
-            vertices.push_back(centerFront);
-            vertices.push_back(v1Front);
-            vertices.push_back(v2Front);
-            
-            // Back face (X = -halfThickness)
-            btk::math::Vector3D centerBack(pos.x - halfThickness, pos.y, pos.z);
-            btk::math::Vector3D v1Back(pos.x - halfThickness, pos.y + rx * cos1, pos.z + ry * sin1);
-            btk::math::Vector3D v2Back(pos.x - halfThickness, pos.y + rx * cos2, pos.z + ry * sin2);
-            vertices.push_back(centerBack);
-            vertices.push_back(v2Back);
-            vertices.push_back(v1Back);
-            
-            // Edge face (quad connecting front and back)
-            btk::math::Vector3D v1f(pos.x + halfThickness, pos.y + rx * cos1, pos.z + ry * sin1);
-            btk::math::Vector3D v2f(pos.x + halfThickness, pos.y + rx * cos2, pos.z + ry * sin2);
-            btk::math::Vector3D v1b(pos.x - halfThickness, pos.y + rx * cos1, pos.z + ry * sin1);
-            btk::math::Vector3D v2b(pos.x - halfThickness, pos.y + rx * cos2, pos.z + ry * sin2);
-            // First triangle of quad
-            vertices.push_back(v1f);
-            vertices.push_back(v1b);
-            vertices.push_back(v2f);
-            // Second triangle of quad
-            vertices.push_back(v2f);
-            vertices.push_back(v1b);
-            vertices.push_back(v2b);
-          }
-          
-        } else if constexpr (std::is_same_v<T, TriangleComponent>) {
-          // Triangle: vertices are already in final positions
-          vertices.push_back(shape.v0_);
-          vertices.push_back(shape.v1_);
-          vertices.push_back(shape.v2_);
-        }
-      }, component);
+        float cos1 = std::cos(angle1), sin1 = std::sin(angle1);
+        float cos2 = std::cos(angle2), sin2 = std::sin(angle2);
+        
+        // Generate vertices in local space (relative to position_, normal in +X)
+        btk::math::Vector3D centerFront_local(halfThickness, 0.0f, 0.0f);
+        btk::math::Vector3D v1Front_local(halfThickness, rx * cos1, ry * sin1);
+        btk::math::Vector3D v2Front_local(halfThickness, rx * cos2, ry * sin2);
+        
+        btk::math::Vector3D centerBack_local(-halfThickness, 0.0f, 0.0f);
+        btk::math::Vector3D v1Back_local(-halfThickness, rx * cos1, ry * sin1);
+        btk::math::Vector3D v2Back_local(-halfThickness, rx * cos2, ry * sin2);
+        
+        // Rotate vertices by current orientation
+        btk::math::Vector3D centerFront = position_ + rotation_quat.rotate(centerFront_local);
+        btk::math::Vector3D v1Front = position_ + rotation_quat.rotate(v1Front_local);
+        btk::math::Vector3D v2Front = position_ + rotation_quat.rotate(v2Front_local);
+        btk::math::Vector3D centerBack = position_ + rotation_quat.rotate(centerBack_local);
+        btk::math::Vector3D v1Back = position_ + rotation_quat.rotate(v1Back_local);
+        btk::math::Vector3D v2Back = position_ + rotation_quat.rotate(v2Back_local);
+        
+        // Front face
+        vertices.push_back(centerFront);
+        vertices.push_back(v1Front);
+        vertices.push_back(v2Front);
+        
+        // Back face
+        vertices.push_back(centerBack);
+        vertices.push_back(v2Back);
+        vertices.push_back(v1Back);
+        
+        // Edge face (quad connecting front and back)
+        vertices.push_back(v1Front);
+        vertices.push_back(v1Back);
+        vertices.push_back(v2Front);
+        vertices.push_back(v2Front);
+        vertices.push_back(v1Back);
+        vertices.push_back(v2Back);
+      }
+    } else {
+      // Rectangle with thickness: front face, back face, and 4 edge faces
+      // Shape is in YZ plane with normal in +X direction (before rotation)
+      float hw = width_ / 2.0f;
+      float hh = height_ / 2.0f;
+      
+      // Generate corners in local space (relative to position_, normal in +X)
+      btk::math::Vector3D v0_local(-halfThickness, -hw, -hh);
+      btk::math::Vector3D v1_local(-halfThickness, +hw, -hh);
+      btk::math::Vector3D v2_local(-halfThickness, +hw, +hh);
+      btk::math::Vector3D v3_local(-halfThickness, -hw, +hh);
+      btk::math::Vector3D v4_local(+halfThickness, -hw, -hh);
+      btk::math::Vector3D v5_local(+halfThickness, +hw, -hh);
+      btk::math::Vector3D v6_local(+halfThickness, +hw, +hh);
+      btk::math::Vector3D v7_local(+halfThickness, -hw, +hh);
+      
+      // Rotate to world space using full orientation
+      btk::math::Vector3D v0 = position_ + rotation_quat.rotate(v0_local);
+      btk::math::Vector3D v1 = position_ + rotation_quat.rotate(v1_local);
+      btk::math::Vector3D v2 = position_ + rotation_quat.rotate(v2_local);
+      btk::math::Vector3D v3 = position_ + rotation_quat.rotate(v3_local);
+      btk::math::Vector3D v4 = position_ + rotation_quat.rotate(v4_local);
+      btk::math::Vector3D v5 = position_ + rotation_quat.rotate(v5_local);
+      btk::math::Vector3D v6 = position_ + rotation_quat.rotate(v6_local);
+      btk::math::Vector3D v7 = position_ + rotation_quat.rotate(v7_local);
+      
+      // Front face (X = +halfThickness)
+      vertices.push_back(v4);
+      vertices.push_back(v5);
+      vertices.push_back(v6);
+      vertices.push_back(v4);
+      vertices.push_back(v6);
+      vertices.push_back(v7);
+      
+      // Back face (X = -halfThickness)
+      vertices.push_back(v0);
+      vertices.push_back(v2);
+      vertices.push_back(v1);
+      vertices.push_back(v0);
+      vertices.push_back(v3);
+      vertices.push_back(v2);
+      
+      // Edge faces (4 sides)
+      // Bottom edge
+      vertices.push_back(v0);
+      vertices.push_back(v1);
+      vertices.push_back(v5);
+      vertices.push_back(v0);
+      vertices.push_back(v5);
+      vertices.push_back(v4);
+      // Top edge
+      vertices.push_back(v2);
+      vertices.push_back(v6);
+      vertices.push_back(v3);
+      vertices.push_back(v3);
+      vertices.push_back(v6);
+      vertices.push_back(v7);
+      // Left edge
+      vertices.push_back(v0);
+      vertices.push_back(v4);
+      vertices.push_back(v7);
+      vertices.push_back(v0);
+      vertices.push_back(v7);
+      vertices.push_back(v3);
+      // Right edge
+      vertices.push_back(v1);
+      vertices.push_back(v5);
+      vertices.push_back(v6);
+      vertices.push_back(v1);
+      vertices.push_back(v6);
+      vertices.push_back(v2);
     }
 
     return vertices;

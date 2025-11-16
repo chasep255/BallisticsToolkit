@@ -2,23 +2,13 @@ import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 import * as THREE from 'three';
 
 let btk = null;
-let steelTarget = null;
 let scene, camera, renderer;
-let targetMesh = null;
-let chainLines = [];
-let impactMarkers = []; // Array of impact marker meshes
 let raycaster, mouse;
 let animationId = null;
 let lastTime = performance.now();
 
-// Store target configuration
-let targetConfig = {
-  position: null,
-  bodyWidth: null,
-  bodyHeight: null,
-  leftAnchor: null,
-  rightAnchor: null
-};
+// Array of targets, each with its own physics object, mesh, chains, and impacts
+let targets = [];
 
 // ===== COORDINATE CONVERSION UTILITIES =====
 // BTK: X=downrange, Y=crossrange-right, Z=up
@@ -40,19 +30,15 @@ function threeJsToBtk(threeVec) {
   );
 }
 
-// Simple function to create a steel target with manual positioning
-// Parameters: position in yards, dimensions in inches, chainLength in feet
-// All converted to meters using BTK conversions inside the function
+// Create a single target and add it to the targets array
 function createTarget(
   position = { x: 0, y: 1, z: -10/3 }, // yards (y=1 yard up, z=-10/3 yards downrange)
-  bodyWidth = 18,  // inches
-  bodyHeight = 30, // inches
-  headWidth = 6,   // inches
-  headHeight = 9,  // inches
+  width = 18,  // inches
+  height = 30, // inches
   thickness = 0.5, // inches
-  density = 7850,  // kg/m³
+  isOval = false, // true for oval shape, false for rectangle
   chainLength = 1, // feet
-  springConstant = 5000, // N/m
+  springConstant = 500, // N/m
   leftAnchor = null,  // Three.js coords in meters (or null to auto-calculate)
   rightAnchor = null  // Three.js coords in meters (or null to auto-calculate)
 ) {
@@ -62,63 +48,54 @@ function createTarget(
     y: btk.Conversions.yardsToMeters(position.y),
     z: btk.Conversions.yardsToMeters(position.z)
   };
-  const bodyWidth_m = btk.Conversions.inchesToMeters(bodyWidth);
-  const bodyHeight_m = btk.Conversions.inchesToMeters(bodyHeight);
-  const headWidth_m = btk.Conversions.inchesToMeters(headWidth);
-  const headHeight_m = btk.Conversions.inchesToMeters(headHeight);
+  const width_m = btk.Conversions.inchesToMeters(width);
+  const height_m = btk.Conversions.inchesToMeters(height);
   const thickness_m = btk.Conversions.inchesToMeters(thickness);
   const chainLength_m = btk.Conversions.yardsToMeters(chainLength / 3); // feet to yards to meters
   
   // Calculate chain offsets (45 degree angle)
   const chainVert = chainLength_m / Math.sqrt(2);
   const chainHoriz = chainLength_m / Math.sqrt(2);
-  const shoulderOffset = bodyWidth_m / 2;
+  
+  // Attach chains with some lateral separation for ALL shapes so they can resist twisting
+  // Use 1/3 of the width as lateral offset on the plate, and keep anchors roughly at 45°
+  const attachmentY = width_m / 3;
+  const anchorOffsetX = attachmentY + chainHoriz;
   
   // Calculate anchor positions if not provided (in Three.js coordinates, meters)
-  // Anchors should be above the target's shoulders
-  // Target will be at position_m, with shoulders at top of body (bodyHeight_m/2)
+  // Anchors should be above the target's top
+  // Target will be at position_m, with top at +height_m/2
   if (!leftAnchor) {
     leftAnchor = {
-      x: position_m.x - (shoulderOffset + chainHoriz),
-      y: position_m.y + bodyHeight_m / 2 + chainVert,  // Above the top of the body
+      x: position_m.x - anchorOffsetX,
+      y: position_m.y + height_m / 2 + chainVert,  // Above the top
       z: position_m.z
     };
   }
   if (!rightAnchor) {
     rightAnchor = {
-      x: position_m.x + (shoulderOffset + chainHoriz),
-      y: position_m.y + bodyHeight_m / 2 + chainVert,  // Above the top of the body
+      x: position_m.x + anchorOffsetX,
+      y: position_m.y + height_m / 2 + chainVert,  // Above the top
       z: position_m.z
     };
   }
   
-  // Create BTK steel target
-  steelTarget = new btk.SteelTarget(thickness_m, density);
+  // Create BTK steel target with single shape
+  const steelTarget = new btk.SteelTarget(width_m, height_m, thickness_m, isOval);
   
-  // Add body rectangle (components default to normal in +X direction, so shape is in YZ plane)
-  const bodyPos = new btk.Vector3D(0, 0, 0);
-  steelTarget.addRectangle(bodyPos, bodyWidth_m, bodyHeight_m);
-  bodyPos.delete();
-  
-  // Add head as oval (positioned above body along Z axis)
-  // Note: In BTK, Z is up, so positive Z is above
-  const headOffset = bodyHeight_m / 2 + headHeight_m / 2;
-  const headPos = new btk.Vector3D(0, 0, headOffset);
-  steelTarget.addOval(headPos, headWidth_m, headHeight_m);
-  headPos.delete();
-  
-  // Add chain anchors (swapped: left anchor connects to right shoulder, right anchor to left shoulder)
+  // Add chain anchors
   // Fixed anchor positions (convert from Three.js to BTK) - these stay fixed in world space
   const leftAnchorThree = new THREE.Vector3(leftAnchor.x, leftAnchor.y, leftAnchor.z);
   const leftAnchorFixed = threeJsToBtk(leftAnchorThree);
-  // Attachment points on target (swapped connections) - these move with the target
-  // Body is centered at origin, so top is at +bodyHeight_m/2 in Z direction
-  const leftAttach = new btk.Vector3D(0, shoulderOffset, bodyHeight_m / 2);
+  // Attachment points on target - these move with the target
+  // Target is centered at origin, so top is at +height_m/2 in Z direction
+  // For ovals, attach at top center edge (y=0). For rectangles, attach at top corners
+  const leftAttach = new btk.Vector3D(0, attachmentY, height_m / 2);
   steelTarget.addChainAnchor(leftAnchorFixed, leftAttach, chainLength_m, springConstant);
   
   const rightAnchorThree = new THREE.Vector3(rightAnchor.x, rightAnchor.y, rightAnchor.z);
   const rightAnchorFixed = threeJsToBtk(rightAnchorThree);
-  const rightAttach = new btk.Vector3D(0, -shoulderOffset, bodyHeight_m / 2);
+  const rightAttach = new btk.Vector3D(0, -attachmentY, height_m / 2);
   steelTarget.addChainAnchor(rightAnchorFixed, rightAttach, chainLength_m, springConstant);
   
   // Rotate to face shooter (normal should be -X in BTK, which is towards shooter)
@@ -138,25 +115,93 @@ function createTarget(
   leftAnchorFixed.delete();
   rightAnchorFixed.delete();
   
-  // Set damping and ensure zero initial velocity
-  steelTarget.setDamping(0.98, 0.95);
+  // Set damping
+  steelTarget.setDamping(0.95, 0.92);
   
-  // Reset velocities to zero after setup (in case any forces were applied during setup)
-  // Note: We can't directly set velocity, but we can ensure it starts at rest
+  // Create Three.js mesh and chain lines
+  const targetMesh = createTargetMesh(steelTarget);
+  const chainLines = createChainLines(steelTarget);
   
-  // Store configuration for later use (in meters for Three.js)
-  targetConfig.position = position_m;
-  targetConfig.bodyWidth = bodyWidth_m;
-  targetConfig.bodyHeight = bodyHeight_m;
-  targetConfig.leftAnchor = leftAnchor;
-  targetConfig.rightAnchor = rightAnchor;
-  
-  // Create Three.js mesh
-  createTargetMesh();
-  createChainLines();
-  updateImpactMarkers(); // Initialize impact markers (should be empty initially)
+  // Add to targets array
+  targets.push({
+    steelTarget: steelTarget,
+    mesh: targetMesh,
+    chainLines: chainLines,
+    impactMarkers: [],
+    position: position_m,
+    width: width_m,
+    height: height_m
+  });
   
   return steelTarget;
+}
+
+// Create a rack of 4 different targets
+function createTargetRack() {
+  // Clear any existing targets
+  clearAllTargets();
+  
+  // Target spacing in yards (side by side)
+  const spacing = 2; // 2 yards between targets
+  const baseY = 1; // 1 yard up
+  const baseZ = -10/3; // -10/3 yards downrange
+  
+  // Target 1: 6" Circle (oval)
+  createTarget(
+    { x: -spacing * 1.5, y: baseY, z: baseZ },
+    6, 6, 0.5, true, // 6" circle
+    1, 500 // 1 foot chain, 500 N/m spring
+  );
+  
+  // Target 2: Large Rectangle (18" × 30")
+  createTarget(
+    { x: -spacing * 0.5, y: baseY, z: baseZ },
+    18, 30, 0.5, false, // 18" × 30" rectangle
+    1.5, 500 // 1.5 foot chain (longer for large rectangle), 500 N/m spring
+  );
+  
+  // Target 3: 12" Circle with closer chains (allows more rotation)
+  createTarget(
+    { x: spacing * 0.5, y: baseY, z: baseZ },
+    12, 12, 0.5, true, // 12" circle
+    0.5, 500 // 0.5 foot chain (closer), 500 N/m spring
+  );
+  
+  // Target 4: 12" × 18" Rectangle
+  createTarget(
+    { x: spacing * 1.5, y: baseY, z: baseZ },
+    12, 18, 0.5, false, // 12" × 18" rectangle
+    1.2, 500 // 1.2 foot chain (slightly longer for rectangle), 500 N/m spring
+  );
+}
+
+function clearAllTargets() {
+  for (const target of targets) {
+    // Clean up physics object
+    if (target.steelTarget) target.steelTarget.delete();
+    
+    // Clean up mesh
+    if (target.mesh) {
+      scene.remove(target.mesh);
+      if (target.mesh.geometry) target.mesh.geometry.dispose();
+      if (target.mesh.material) target.mesh.material.dispose();
+    }
+    
+    // Clean up chain lines
+    for (const line of target.chainLines) {
+      scene.remove(line);
+      if (line.geometry) line.geometry.dispose();
+      if (line.material) line.material.dispose();
+    }
+    
+    // Clean up impact markers
+    for (const marker of target.impactMarkers) {
+      scene.remove(marker);
+      if (marker.geometry) marker.geometry.dispose();
+      if (marker.material) marker.material.dispose();
+    }
+  }
+  targets = [];
 }
 
 async function init() {
@@ -167,8 +212,8 @@ async function init() {
     // Setup Three.js scene
     setupScene();
     
-    // Create steel target with default configuration
-    createTarget();
+    // Create rack of 4 targets
+    createTargetRack();
     
     // Setup UI event listeners
     setupUI();
@@ -195,15 +240,19 @@ function setupScene() {
     1000
   );
   
-  // Position camera at origin looking at target
-  // Target is at BTK (3.048, 0, 0) = Three.js (0, 0, -3.048)
-  camera.position.set(0, 1, 0);
+  // Position camera to view all targets in the rack
+  // Targets are spaced 2 yards apart, centered around x=0
+  // Position camera back and up to see all 4 targets
+  camera.position.set(0, 1.5, 2);
   camera.lookAt(0, 1, -3);
   
   // Setup renderer
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setSize(canvas.clientWidth, canvas.clientHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x87ceeb, 1.0); // Sky blue background, fully opaque
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   
   // Add lighting
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -211,15 +260,34 @@ function setupScene() {
   
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
   directionalLight.position.set(5, 5, 5);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.mapSize.width = 2048;
+  directionalLight.shadow.mapSize.height = 2048;
+  directionalLight.shadow.camera.near = 0.5;
+  directionalLight.shadow.camera.far = 50;
+  directionalLight.shadow.camera.left = -10;
+  directionalLight.shadow.camera.right = 10;
+  directionalLight.shadow.camera.top = 10;
+  directionalLight.shadow.camera.bottom = -10;
+  directionalLight.shadow.bias = -0.0001;
   scene.add(directionalLight);
+  
+  // Add ground plane that receives shadows
+  const groundGeometry = new THREE.PlaneGeometry(20, 20);
+  const groundMaterial = new THREE.MeshStandardMaterial({
+    color: 0x888888,
+    roughness: 0.8,
+    metalness: 0.2
+  });
+  const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.5;
+  ground.receiveShadow = true;
+  scene.add(ground);
   
   // Add grid for reference (ground plane)
   const gridHelper = new THREE.GridHelper(10, 20, 0x444444, 0x222222);
   scene.add(gridHelper);
-  
-  // Add axes helper for debugging
-  const axesHelper = new THREE.AxesHelper(2);
-  scene.add(axesHelper);
   
   // Setup raycaster for mouse interaction
   raycaster = new THREE.Raycaster();
@@ -233,14 +301,7 @@ function setupScene() {
 }
 
 
-function createTargetMesh() {
-  // Remove old mesh if it exists
-  if (targetMesh) {
-    scene.remove(targetMesh);
-    targetMesh.geometry.dispose();
-    targetMesh.material.dispose();
-  }
-  
+function createTargetMesh(steelTarget) {
   // Get vertices from BTK (world space, BTK coords)
   const btkVertices = steelTarget.getVertices(32);
   
@@ -263,6 +324,8 @@ function createTargetMesh() {
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
   geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
   
   // Create material (metallic steel)
   const material = new THREE.MeshStandardMaterial({
@@ -273,18 +336,22 @@ function createTargetMesh() {
   });
   
   // Create mesh
-  targetMesh = new THREE.Mesh(geometry, material);
+  const targetMesh = new THREE.Mesh(geometry, material);
+  targetMesh.castShadow = true;
+  targetMesh.receiveShadow = true;
   scene.add(targetMesh);
+  
+  return targetMesh;
 }
 
-function updateTargetMesh() {
-  if (!targetMesh || !steelTarget) return;
+function updateTargetMesh(target) {
+  if (!target || !target.mesh || !target.steelTarget) return;
   
   // Get updated vertices from BTK (world space, BTK coords)
-  const btkVertices = steelTarget.getVertices(32);
+  const btkVertices = target.steelTarget.getVertices(32);
   
   // Update position buffer in-place, converting BTK → Three.js coords
-  const positions = targetMesh.geometry.attributes.position.array;
+  const positions = target.mesh.geometry.attributes.position.array;
   for (let i = 0; i < btkVertices.size(); i++) {
     const btkVec = btkVertices.get(i);
     const threeVec = btkToThreeJs(btkVec);
@@ -298,19 +365,13 @@ function updateTargetMesh() {
   btkVertices.delete();
   
   // Mark buffer as needing update
-  targetMesh.geometry.attributes.position.needsUpdate = true;
-  targetMesh.geometry.computeVertexNormals();
+  target.mesh.geometry.attributes.position.needsUpdate = true;
+  target.mesh.geometry.computeVertexNormals();
+  target.mesh.geometry.computeBoundingBox();
+  target.mesh.geometry.computeBoundingSphere();
 }
 
-function createChainLines() {
-  // Remove old chain lines
-  for (const line of chainLines) {
-    scene.remove(line);
-    if (line.geometry) line.geometry.dispose();
-    if (line.material) line.material.dispose();
-  }
-  chainLines = [];
-  
+function createChainLines(steelTarget) {
   // Create line material
   const material = new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 2 });
   
@@ -320,7 +381,6 @@ function createChainLines() {
   leftGeometry.setAttribute('position', new THREE.BufferAttribute(leftPositions, 3));
   const leftLine = new THREE.Line(leftGeometry, material);
   scene.add(leftLine);
-  chainLines.push(leftLine);
   
   // Right chain
   const rightGeometry = new THREE.BufferGeometry();
@@ -328,148 +388,87 @@ function createChainLines() {
   rightGeometry.setAttribute('position', new THREE.BufferAttribute(rightPositions, 3));
   const rightLine = new THREE.Line(rightGeometry, material);
   scene.add(rightLine);
-  chainLines.push(rightLine);
   
-  updateChainLines();
+  return [leftLine, rightLine];
 }
 
-function updateImpactMarkers() {
-  if (!steelTarget) return;
+
+function updateChainLines(target) {
+  if (!target || target.chainLines.length !== 2 || !target.steelTarget) return;
+  
+  // Get actual anchor data from C++ physics engine (already updated by simulation)
+  const anchors = target.steelTarget.getAnchors();
+  if (anchors.size() < 2) return;
+  
+  // Get the two anchors (left=0, right=1 based on creation order)
+  const leftAnchor = anchors.get(0);
+  const rightAnchor = anchors.get(1);
+  
+  // Convert BTK positions to Three.js for rendering
+  const leftFixed = btkToThreeJs(leftAnchor.fixed);
+  const leftAttach = btkToThreeJs(leftAnchor.attachment);
+  const rightFixed = btkToThreeJs(rightAnchor.fixed);
+  const rightAttach = btkToThreeJs(rightAnchor.attachment);
+  
+  // Update left chain line: connects leftAnchor.fixed to leftAnchor.attachment
+  const leftPositions = target.chainLines[0].geometry.attributes.position.array;
+  leftPositions[0] = leftFixed.x;
+  leftPositions[1] = leftFixed.y;
+  leftPositions[2] = leftFixed.z;
+  leftPositions[3] = leftAttach.x;
+  leftPositions[4] = leftAttach.y;
+  leftPositions[5] = leftAttach.z;
+  target.chainLines[0].geometry.attributes.position.needsUpdate = true;
+  
+  // Update right chain line: connects rightAnchor.fixed to rightAnchor.attachment
+  const rightPositions = target.chainLines[1].geometry.attributes.position.array;
+  rightPositions[0] = rightFixed.x;
+  rightPositions[1] = rightFixed.y;
+  rightPositions[2] = rightFixed.z;
+  rightPositions[3] = rightAttach.x;
+  rightPositions[4] = rightAttach.y;
+  rightPositions[5] = rightAttach.z;
+  target.chainLines[1].geometry.attributes.position.needsUpdate = true;
+  
+  // Cleanup
+  anchors.delete();
+}
+
+function updateImpactMarkers(target) {
+  if (!target || !target.steelTarget) return;
   
   // Get impacts from target
-  const impacts = steelTarget.getImpacts();
+  const impacts = target.steelTarget.getImpacts();
   const currentCount = impacts.size();
   
   // Remove excess markers if impacts were cleared
-  while (impactMarkers.length > currentCount) {
-    const marker = impactMarkers.pop();
+  while (target.impactMarkers.length > currentCount) {
+    const marker = target.impactMarkers.pop();
     scene.remove(marker);
     if (marker.geometry) marker.geometry.dispose();
     if (marker.material) marker.material.dispose();
   }
   
   // Add new markers for new impacts
-  while (impactMarkers.length < currentCount) {
+  while (target.impactMarkers.length < currentCount) {
     const geometry = new THREE.SphereGeometry(0.01, 8, 8); // 1cm radius sphere
-    const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Red impact marker
+    const material = new THREE.MeshStandardMaterial({ color: 0xff0000 }); // Red impact marker
     const marker = new THREE.Mesh(geometry, material);
+    marker.castShadow = true;
     scene.add(marker);
-    impactMarkers.push(marker);
+    target.impactMarkers.push(marker);
   }
   
   // Update marker positions
   for (let i = 0; i < currentCount; i++) {
     const impact = impacts.get(i);
     const impactPos = btkToThreeJs(impact.position);
-    impactMarkers[i].position.set(impactPos.x, impactPos.y, impactPos.z);
+    target.impactMarkers[i].position.set(impactPos.x, impactPos.y, impactPos.z);
     // Scale marker based on bullet diameter
     const scale = impact.bulletDiameter * 10; // Scale up for visibility
-    impactMarkers[i].scale.set(scale, scale, scale);
-    // Note: impact is a value object, not a pointer, so no delete() needed
+    target.impactMarkers[i].scale.set(scale, scale, scale);
   }
   impacts.delete();
-}
-
-function updateChainLines() {
-  if (chainLines.length !== 2 || !steelTarget || !targetConfig.bodyWidth || !targetConfig.bodyHeight) return;
-  
-  // Get target's current center of mass and normal
-  const centerOfMass = steelTarget.getCenterOfMass();
-  const normal = steelTarget.getNormal();
-  
-  // Calculate attachment positions relative to center of mass
-  // Original positions were: left=(0, shoulderOffset, bodyHeight/2), right=(0, -shoulderOffset, bodyHeight/2)
-  // These are in the target's local frame (normal in +X, shape in YZ plane)
-  // After rotation, we need to transform these positions
-  const shoulderOffset = targetConfig.bodyWidth / 2;
-  const shoulderHeight = targetConfig.bodyHeight / 2;
-  
-  // Original attachment positions in local frame (before rotation)
-  const leftAttachLocal = new btk.Vector3D(0, shoulderOffset, shoulderHeight);
-  const rightAttachLocal = new btk.Vector3D(0, -shoulderOffset, shoulderHeight);
-  
-  // Rotate from +X normal to current normal
-  const defaultNormal = new btk.Vector3D(1, 0, 0);
-  const dot = normal.dot(defaultNormal);
-  
-  let leftAttach, rightAttach;
-  let axis = null;
-  let rotation = null;
-  
-  if (dot > 0.9999 || dot < -0.9999) {
-    // Already aligned or opposite - no rotation needed (or 180 deg)
-    leftAttach = new btk.Vector3D(
-      centerOfMass.x + leftAttachLocal.x,
-      centerOfMass.y + leftAttachLocal.y,
-      centerOfMass.z + leftAttachLocal.z
-    );
-    rightAttach = new btk.Vector3D(
-      centerOfMass.x + rightAttachLocal.x,
-      centerOfMass.y + rightAttachLocal.y,
-      centerOfMass.z + rightAttachLocal.z
-    );
-  } else {
-    // Calculate rotation axis and angle
-    axis = defaultNormal.cross(normal).normalized();
-    const angle = Math.acos(dot);
-    rotation = btk.Quaternion.fromAxisAngle(axis, angle);
-    
-    // Rotate attachment positions
-    leftAttach = rotation.rotate(leftAttachLocal);
-    rightAttach = rotation.rotate(rightAttachLocal);
-    
-    // Translate to center of mass
-    leftAttach.x += centerOfMass.x;
-    leftAttach.y += centerOfMass.y;
-    leftAttach.z += centerOfMass.z;
-    rightAttach.x += centerOfMass.x;
-    rightAttach.y += centerOfMass.y;
-    rightAttach.z += centerOfMass.z;
-  }
-  
-  // Fixed anchor positions (convert from Three.js to BTK)
-  const leftAnchorThree = new THREE.Vector3(targetConfig.leftAnchor.x, targetConfig.leftAnchor.y, targetConfig.leftAnchor.z);
-  const leftAnchorFixed = threeJsToBtk(leftAnchorThree);
-  
-  const rightAnchorThree = new THREE.Vector3(targetConfig.rightAnchor.x, targetConfig.rightAnchor.y, targetConfig.rightAnchor.z);
-  const rightAnchorFixed = threeJsToBtk(rightAnchorThree);
-  
-  // Convert to Three.js for rendering
-  const leftAttachThree = btkToThreeJs(leftAttach);
-  const rightAttachThree = btkToThreeJs(rightAttach);
-  const leftAnchorFixedThree = btkToThreeJs(leftAnchorFixed);
-  const rightAnchorFixedThree = btkToThreeJs(rightAnchorFixed);
-  
-  // Update left chain line (connect left fixed anchor to right attachment)
-  const leftPositions = chainLines[0].geometry.attributes.position.array;
-  leftPositions[0] = leftAnchorFixedThree.x;
-  leftPositions[1] = leftAnchorFixedThree.y;
-  leftPositions[2] = leftAnchorFixedThree.z;
-  leftPositions[3] = rightAttachThree.x;
-  leftPositions[4] = rightAttachThree.y;
-  leftPositions[5] = rightAttachThree.z;
-  chainLines[0].geometry.attributes.position.needsUpdate = true;
-  
-  // Update right chain line (connect right fixed anchor to left attachment)
-  const rightPositions = chainLines[1].geometry.attributes.position.array;
-  rightPositions[0] = rightAnchorFixedThree.x;
-  rightPositions[1] = rightAnchorFixedThree.y;
-  rightPositions[2] = rightAnchorFixedThree.z;
-  rightPositions[3] = leftAttachThree.x;
-  rightPositions[4] = leftAttachThree.y;
-  rightPositions[5] = leftAttachThree.z;
-  chainLines[1].geometry.attributes.position.needsUpdate = true;
-  
-  // Cleanup
-  leftAttachLocal.delete();
-  rightAttachLocal.delete();
-  leftAttach.delete();
-  rightAttach.delete();
-  leftAnchorFixed.delete();
-  rightAnchorFixed.delete();
-  defaultNormal.delete();
-  if (axis) axis.delete();
-  if (rotation) rotation.delete();
 }
 
 function setupUI() {
@@ -512,7 +511,7 @@ function onWindowResize() {
 }
 
 function onCanvasClick(event) {
-  if (!targetMesh || !steelTarget) return;
+  if (targets.length === 0) return;
   
   const canvas = document.getElementById('steelCanvas');
   const rect = canvas.getBoundingClientRect();
@@ -524,12 +523,29 @@ function onCanvasClick(event) {
   // Cast ray from camera through mouse position
   raycaster.setFromCamera(mouse, camera);
   
-  // Check for intersections with target mesh
-  const intersects = raycaster.intersectObject(targetMesh);
+  // Check intersections with all targets, find closest
+  let closestIntersection = null;
+  let hitTarget = null;
   
-  if (intersects.length > 0) {
-    const intersection = intersects[0];
-    const impactPoint = intersection.point; // Three.js coords
+  for (const target of targets) {
+    if (!target.mesh || !target.steelTarget) continue;
+    
+    // Update bounding volumes
+    target.mesh.geometry.computeBoundingBox();
+    target.mesh.geometry.computeBoundingSphere();
+    
+    const intersects = raycaster.intersectObject(target.mesh);
+    if (intersects.length > 0) {
+      const intersection = intersects[0];
+      if (!closestIntersection || intersection.distance < closestIntersection.distance) {
+        closestIntersection = intersection;
+        hitTarget = target;
+      }
+    }
+  }
+  
+  if (closestIntersection && hitTarget) {
+    const impactPoint = closestIntersection.point; // Three.js coords
     
     // Get camera position (shooter position) in Three.js coords
     const shooterPos = camera.position.clone();
@@ -542,11 +558,10 @@ function onCanvasClick(event) {
     const bulletVelThree = direction.multiplyScalar(bulletSpeed);
     
     // Convert impact point and velocity to BTK coordinates
-    const bulletPos = threeJsToBtk(impactPoint); // Bullet is at impact point
-    const bulletVel = threeJsToBtk(bulletVelThree); // Velocity points from shooter to target
+    const bulletPos = threeJsToBtk(impactPoint);
+    const bulletVel = threeJsToBtk(bulletVelThree);
     
     // Create bullet with realistic parameters
-    // 140gr .308 bullet (~0.01 kg) at 800 m/s
     const bulletMass = 0.00907; // 140 grains = 0.00907 kg
     const bulletDiameter = 0.00762; // .308 = 7.62mm
     const bulletLength = 0.0305; // ~30mm typical
@@ -569,8 +584,8 @@ function onCanvasClick(event) {
       0 // spin rate
     );
     
-    // Apply hit to target (direct impact - bullet is at impact point)
-    steelTarget.hitBullet(bullet);
+    // Apply hit to target
+    hitTarget.steelTarget.hitBullet(bullet);
     
     // Cleanup
     baseBullet.delete();
@@ -581,46 +596,23 @@ function onCanvasClick(event) {
 }
 
 function resetTarget() {
-  if (!targetConfig.position) return;
-  
-  // Clean up old target
-  if (steelTarget) {
-    steelTarget.delete();
-    steelTarget = null;
+  // Clear all impacts and reset all targets
+  for (const target of targets) {
+    if (target.steelTarget) {
+      target.steelTarget.clearImpacts();
+    }
+    
+    // Remove impact markers
+    for (const marker of target.impactMarkers) {
+      scene.remove(marker);
+      if (marker.geometry) marker.geometry.dispose();
+      if (marker.material) marker.material.dispose();
+    }
+    target.impactMarkers = [];
   }
   
-  // Remove old mesh
-  if (targetMesh) {
-    scene.remove(targetMesh);
-    targetMesh.geometry.dispose();
-    targetMesh.material.dispose();
-    targetMesh = null;
-  }
-  
-  // Remove old chain lines
-  for (const line of chainLines) {
-    scene.remove(line);
-    if (line.geometry) line.geometry.dispose();
-    if (line.material) line.material.dispose();
-  }
-  chainLines = [];
-  
-  // Remove old impact markers
-  for (const marker of impactMarkers) {
-    scene.remove(marker);
-    if (marker.geometry) marker.geometry.dispose();
-    if (marker.material) marker.material.dispose();
-  }
-  impactMarkers = [];
-  
-  // Recreate target (simplest way to reset everything)
-  createTarget();
-  
-  // Update visuals
-  updateTargetMesh();
-  updateChainLines();
-  updateImpactMarkers();
-  updateStats();
+  // Recreate the rack
+  createTargetRack();
 }
 
 function animate() {
@@ -630,20 +622,26 @@ function animate() {
   const dt = Math.min((currentTime - lastTime) / 1000, 1/30); // Cap at 30 FPS
   lastTime = currentTime;
   
-  // Update physics
-  if (steelTarget) {
-    steelTarget.timeStep(dt);
-    updateTargetMesh();
-    updateChainLines();
-    updateImpactMarkers();
-    updateStats();
+  // Update physics for all targets
+  for (const target of targets) {
+    if (target.steelTarget) {
+      target.steelTarget.timeStep(dt);
+      updateTargetMesh(target);
+      updateChainLines(target);
+      updateImpactMarkers(target);
+    }
+  }
+  
+  // Update stats (show first target's stats)
+  if (targets.length > 0 && targets[0].steelTarget) {
+    updateStats(targets[0].steelTarget);
   }
   
   // Render
   renderer.render(scene, camera);
 }
 
-function updateStats() {
+function updateStats(steelTarget) {
   if (!steelTarget) return;
   
   // Get velocity

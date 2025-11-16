@@ -39,6 +39,32 @@
   margin: 20px 0;
 }
 
+.control-label {
+  font-weight: 500;
+  color: #333;
+  margin-right: 5px;
+}
+
+.target-select {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.target-select:hover {
+  border-color: #007bff;
+}
+
+.target-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
 .canvas-container {
   display: flex;
   flex-direction: column;

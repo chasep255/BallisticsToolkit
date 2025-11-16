@@ -15,7 +15,7 @@ namespace btk::match
    * @brief 3D rigid body steel target with physics simulation
    *
    * Simulates a steel target with:
-   * - Composite shape (rectangle, circle, oval components)
+   * - Single shape (rectangle or oval)
    * - Full 3D rigid body physics
    * - Chain anchor constraints
    * - Bullet impact momentum transfer
@@ -23,133 +23,6 @@ namespace btk::match
    */
   class SteelTarget
   {
-    private:
-    /**
-     * @brief Rectangle shape component
-     */
-    struct RectangleComponent
-    {
-      btk::math::Vector3D position_;
-      float width_;
-      float height_;
-
-      RectangleComponent(const btk::math::Vector3D& pos, float width, float height)
-        : position_(pos), width_(width), height_(height) {}
-
-      float area() const { return width_ * height_; }
-
-      btk::math::Vector3D inertiaLocal(float mass) const {
-        float Ixx = mass * height_ * height_ / 12.0f;
-        float Iyy = mass * width_ * width_ / 12.0f;
-        float Izz = mass * (width_ * width_ + height_ * height_) / 12.0f;
-        return btk::math::Vector3D(Ixx, Iyy, Izz);
-      }
-
-      bool contains(const btk::math::Vector3D& point) const {
-        // Component is in YZ plane (width in Y, height in Z, normal in X)
-        float dy = std::abs(point.y - position_.y);
-        float dz = std::abs(point.z - position_.z);
-        return dy <= width_ / 2.0f && dz <= height_ / 2.0f;
-      }
-    };
-
-    /**
-     * @brief Oval (ellipse) shape component
-     */
-    struct OvalComponent
-    {
-      btk::math::Vector3D position_;
-      float width_;
-      float height_;
-
-      OvalComponent(const btk::math::Vector3D& pos, float width, float height)
-        : position_(pos), width_(width), height_(height) {}
-
-      float area() const {
-        float a = width_ / 2.0f;
-        float b = height_ / 2.0f;
-        return 3.14159265359f * a * b;
-      }
-
-      btk::math::Vector3D inertiaLocal(float mass) const {
-        float a = width_ / 2.0f;
-        float b = height_ / 2.0f;
-        float Ixx = 0.25f * mass * b * b;
-        float Iyy = 0.25f * mass * a * a;
-        float Izz = 0.25f * mass * (a * a + b * b);
-        return btk::math::Vector3D(Ixx, Iyy, Izz);
-      }
-
-      bool contains(const btk::math::Vector3D& point) const {
-        // Component is in YZ plane (width in Y, height in Z, normal in X)
-        float dy = point.y - position_.y;
-        float dz = point.z - position_.z;
-        float a = width_ / 2.0f;
-        float b = height_ / 2.0f;
-        return (dy * dy) / (a * a) + (dz * dz) / (b * b) <= 1.0f;
-      }
-    };
-
-    /**
-     * @brief Triangle shape component
-     */
-    struct TriangleComponent
-    {
-      btk::math::Vector3D position_; ///< Center of triangle
-      btk::math::Vector3D v0_;       ///< First vertex (relative to center)
-      btk::math::Vector3D v1_;       ///< Second vertex (relative to center)
-      btk::math::Vector3D v2_;       ///< Third vertex (relative to center)
-
-      TriangleComponent(const btk::math::Vector3D& center, const btk::math::Vector3D& v0, const btk::math::Vector3D& v1, const btk::math::Vector3D& v2)
-        : position_(center), v0_(v0), v1_(v1), v2_(v2) {}
-
-      float area() const {
-        btk::math::Vector3D edge1 = v1_ - v0_;
-        btk::math::Vector3D edge2 = v2_ - v0_;
-        return 0.5f * edge1.cross(edge2).magnitude();
-      }
-
-      btk::math::Vector3D inertiaLocal(float mass) const {
-        // Simplified: treat as three point masses at vertices
-        float point_mass = mass / 3.0f;
-        float Ixx = 0.0f, Iyy = 0.0f, Izz = 0.0f;
-        
-        for (const auto& v : {v0_, v1_, v2_}) {
-          Ixx += point_mass * (v.y * v.y + v.z * v.z);
-          Iyy += point_mass * (v.x * v.x + v.z * v.z);
-          Izz += point_mass * (v.x * v.x + v.y * v.y);
-        }
-        
-        return btk::math::Vector3D(Ixx, Iyy, Izz);
-      }
-
-      bool contains(const btk::math::Vector3D& point) const {
-        btk::math::Vector3D p = point - position_;
-        
-        // Barycentric coordinate test
-        btk::math::Vector3D v0 = v1_ - v0_;
-        btk::math::Vector3D v1 = v2_ - v0_;
-        btk::math::Vector3D v2 = p - v0_;
-        
-        float dot00 = v0.dot(v0);
-        float dot01 = v0.dot(v1);
-        float dot02 = v0.dot(v2);
-        float dot11 = v1.dot(v1);
-        float dot12 = v1.dot(v2);
-        
-        float inv_denom = 1.0f / (dot00 * dot11 - dot01 * dot01);
-        float u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
-        float v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
-        
-        return (u >= 0.0f) && (v >= 0.0f) && (u + v <= 1.0f);
-      }
-    };
-
-    /**
-     * @brief Variant type holding any shape component
-     */
-    using ShapeComponent = std::variant<RectangleComponent, OvalComponent, TriangleComponent>;
-
     public:
     /**
      * @brief Represents a chain anchor point
@@ -196,37 +69,24 @@ namespace btk::match
     };
 
     /**
-     * @brief Initialize empty steel target
+     * @brief Initialize steel target with single shape
      *
+     * @param width Target width (bounding box)
+     * @param height Target height (bounding box)
      * @param thickness Target thickness
-     * @param density Steel density (default ~7850)
+     * @param is_oval True for oval shape, false for rectangle
      */
-    SteelTarget(float thickness, float density = 7850.0f);
-
-    /**
-     * @brief Add a rectangle component
-     */
-    void addRectangle(const btk::math::Vector3D& position, float width, float height);
-
-    /**
-     * @brief Add a circle component (oval with equal dimensions)
-     */
-    void addCircle(const btk::math::Vector3D& position, float radius);
-
-    /**
-     * @brief Add an oval component
-     */
-    void addOval(const btk::math::Vector3D& position, float width, float height);
-
-    /**
-     * @brief Add a triangle component
-     */
-    void addTriangle(const btk::math::Vector3D& v0, const btk::math::Vector3D& v1, const btk::math::Vector3D& v2);
+    SteelTarget(float width, float height, float thickness, bool is_oval = false);
 
     /**
      * @brief Add a chain anchor constraint
+     *
+     * @param fixed Fixed anchor point (does not move with target)
+     * @param attachment Attachment point on target (moves with target)
+     * @param rest_length Rest length of chain
+     * @param spring_constant Spring constant (N/m), defaults to 500 N/m
      */
-    void addChainAnchor(const btk::math::Vector3D& fixed, const btk::math::Vector3D& attachment, float rest_length, float spring_constant);
+    void addChainAnchor(const btk::math::Vector3D& fixed, const btk::math::Vector3D& attachment, float rest_length, float spring_constant = DEFAULT_SPRING_CONSTANT);
 
     /**
      * @brief Set damping coefficients
@@ -265,11 +125,11 @@ namespace btk::match
      * @brief Get all recorded impacts
      */
     const std::vector<Impact>& getImpacts() const { return impacts_; }
-
+    
     /**
-     * @brief Get target shape components (for rendering/debugging)
+     * @brief Get all chain anchors
      */
-    const std::vector<ShapeComponent>& getComponents() const { return components_; }
+    const std::vector<ChainAnchor>& getAnchors() const { return anchors_; }
 
     /**
      * @brief Get center of mass position
@@ -324,14 +184,22 @@ namespace btk::match
     void clearImpacts() { impacts_.clear(); }
 
     private:
-    // Shape definition (components are in their natural coordinates, normal in X direction)
-    std::vector<ShapeComponent> components_;
+    // Steel density constant (kg/m³)
+    static constexpr float STEEL_DENSITY = 7850.0f;
+    
+    // Default spring constant for chain anchors (N/m)
+    static constexpr float DEFAULT_SPRING_CONSTANT = 500.0f;
+
+    // Shape definition (in YZ plane, normal in +X direction)
+    float width_;
+    float height_;
     float thickness_;
-    float steel_density_;
+    bool is_oval_;
 
     // Physics state
     btk::math::Vector3D position_;         // Center of mass position
-    btk::math::Vector3D normal_;           // Current normal direction
+    btk::math::Vector3D normal_;           // Current surface normal direction
+    btk::math::Quaternion orientation_;    // Full 3D orientation (from local +X-normal frame to world)
     btk::math::Vector3D velocity_ms_;      // Linear velocity
     btk::math::Vector3D angular_velocity_; // Angular velocity (rad/s)
 
@@ -348,7 +216,7 @@ namespace btk::match
     float angular_damping_;
 
     /**
-     * @brief Calculate mass and moment of inertia from shape components
+     * @brief Calculate mass and moment of inertia from shape
      */
     void calculateMassAndInertia();
 
