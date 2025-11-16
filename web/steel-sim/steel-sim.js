@@ -6,6 +6,7 @@ let steelTarget = null;
 let scene, camera, renderer;
 let targetMesh = null;
 let chainLines = [];
+let impactMarkers = []; // Array of impact marker meshes
 let raycaster, mouse;
 let animationId = null;
 let lastTime = performance.now();
@@ -153,6 +154,7 @@ function createTarget(
   // Create Three.js mesh
   createTargetMesh();
   createChainLines();
+  updateImpactMarkers(); // Initialize impact markers (should be empty initially)
   
   return steelTarget;
 }
@@ -331,6 +333,43 @@ function createChainLines() {
   updateChainLines();
 }
 
+function updateImpactMarkers() {
+  if (!steelTarget) return;
+  
+  // Get impacts from target
+  const impacts = steelTarget.getImpacts();
+  const currentCount = impacts.size();
+  
+  // Remove excess markers if impacts were cleared
+  while (impactMarkers.length > currentCount) {
+    const marker = impactMarkers.pop();
+    scene.remove(marker);
+    if (marker.geometry) marker.geometry.dispose();
+    if (marker.material) marker.material.dispose();
+  }
+  
+  // Add new markers for new impacts
+  while (impactMarkers.length < currentCount) {
+    const geometry = new THREE.SphereGeometry(0.01, 8, 8); // 1cm radius sphere
+    const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Red impact marker
+    const marker = new THREE.Mesh(geometry, material);
+    scene.add(marker);
+    impactMarkers.push(marker);
+  }
+  
+  // Update marker positions
+  for (let i = 0; i < currentCount; i++) {
+    const impact = impacts.get(i);
+    const impactPos = btkToThreeJs(impact.position);
+    impactMarkers[i].position.set(impactPos.x, impactPos.y, impactPos.z);
+    // Scale marker based on bullet diameter
+    const scale = impact.bulletDiameter * 10; // Scale up for visibility
+    impactMarkers[i].scale.set(scale, scale, scale);
+    // Note: impact is a value object, not a pointer, so no delete() needed
+  }
+  impacts.delete();
+}
+
 function updateChainLines() {
   if (chainLines.length !== 2 || !steelTarget || !targetConfig.bodyWidth || !targetConfig.bodyHeight) return;
   
@@ -354,6 +393,9 @@ function updateChainLines() {
   const dot = normal.dot(defaultNormal);
   
   let leftAttach, rightAttach;
+  let axis = null;
+  let rotation = null;
+  
   if (dot > 0.9999 || dot < -0.9999) {
     // Already aligned or opposite - no rotation needed (or 180 deg)
     leftAttach = new btk.Vector3D(
@@ -368,9 +410,9 @@ function updateChainLines() {
     );
   } else {
     // Calculate rotation axis and angle
-    const axis = defaultNormal.cross(normal).normalized();
+    axis = defaultNormal.cross(normal).normalized();
     const angle = Math.acos(dot);
-    const rotation = btk.Quaternion.fromAxisAngle(axis, angle);
+    rotation = btk.Quaternion.fromAxisAngle(axis, angle);
     
     // Rotate attachment positions
     leftAttach = rotation.rotate(leftAttachLocal);
@@ -425,11 +467,9 @@ function updateChainLines() {
   rightAttach.delete();
   leftAnchorFixed.delete();
   rightAnchorFixed.delete();
-  if (dot <= 0.9999 && dot >= -0.9999) {
-    defaultNormal.delete();
-    axis.delete();
-    rotation.delete();
-  }
+  defaultNormal.delete();
+  if (axis) axis.delete();
+  if (rotation) rotation.delete();
 }
 
 function setupUI() {
@@ -491,8 +531,19 @@ function onCanvasClick(event) {
     const intersection = intersects[0];
     const impactPoint = intersection.point; // Three.js coords
     
-    // Convert Three.js impact point to BTK coordinates
-    const bulletPos = threeJsToBtk(impactPoint);
+    // Get camera position (shooter position) in Three.js coords
+    const shooterPos = camera.position.clone();
+    
+    // Calculate direction from shooter to impact point (for velocity calculation)
+    const direction = impactPoint.clone().sub(shooterPos).normalize();
+    
+    // Bullet velocity: 800 m/s towards impact point (from shooter)
+    const bulletSpeed = 800; // m/s
+    const bulletVelThree = direction.multiplyScalar(bulletSpeed);
+    
+    // Convert impact point and velocity to BTK coordinates
+    const bulletPos = threeJsToBtk(impactPoint); // Bullet is at impact point
+    const bulletVel = threeJsToBtk(bulletVelThree); // Velocity points from shooter to target
     
     // Create bullet with realistic parameters
     // 140gr .308 bullet (~0.01 kg) at 800 m/s
@@ -501,26 +552,28 @@ function onCanvasClick(event) {
     const bulletLength = 0.0305; // ~30mm typical
     const bulletBC = 0.3; // Typical
     
-    // Create bullet velocity (800 m/s downrange in Three.js: negative Z)
-    // Convert from Three.js to BTK coordinates
-    const bulletVelThree = new THREE.Vector3(0, 0, -800); // downrange = negative Z
-    const bulletVel = threeJsToBtk(bulletVelThree);
-    
-    const bullet = new btk.Bullet(
+    // Create base bullet (static properties only)
+    const baseBullet = new btk.Bullet(
       bulletMass,
       bulletDiameter,
       bulletLength,
       bulletBC,
-      'G7',
+      btk.DragFunction.G7
+    );
+    
+    // Create flying bullet with position and velocity
+    const bullet = new btk.Bullet(
+      baseBullet,
       bulletPos,
       bulletVel,
       0 // spin rate
     );
     
-    // Apply hit to target
-    steelTarget.hit(bullet);
+    // Apply hit to target (direct impact - bullet is at impact point)
+    steelTarget.hitBullet(bullet);
     
     // Cleanup
+    baseBullet.delete();
     bullet.delete();
     bulletPos.delete();
     bulletVel.delete();
@@ -552,12 +605,21 @@ function resetTarget() {
   }
   chainLines = [];
   
+  // Remove old impact markers
+  for (const marker of impactMarkers) {
+    scene.remove(marker);
+    if (marker.geometry) marker.geometry.dispose();
+    if (marker.material) marker.material.dispose();
+  }
+  impactMarkers = [];
+  
   // Recreate target (simplest way to reset everything)
   createTarget();
   
   // Update visuals
   updateTargetMesh();
   updateChainLines();
+  updateImpactMarkers();
   updateStats();
 }
 
@@ -573,6 +635,7 @@ function animate() {
     steelTarget.timeStep(dt);
     updateTargetMesh();
     updateChainLines();
+    updateImpactMarkers();
     updateStats();
   }
   
