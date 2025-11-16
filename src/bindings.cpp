@@ -6,10 +6,12 @@
 #include "ballistics/simulator.h"
 #include "ballistics/trajectory.h"
 #include "match/match.h"
+#include "match/steel_target.h"
 #include "match/targets.h"
 #include "match/simulator.h"
 #include "match/target.h"
 #include "math/conversions.h"
+#include "math/quaternion.h"
 #include "math/vector.h"
 #include "physics/atmosphere.h"
 #include "physics/wind_generator.h"
@@ -98,6 +100,23 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("normalized", &Vector2D::normalized)
     .function("dot", &Vector2D::dot)
     .function("lerp", &Vector2D::lerp);
+
+  // Quaternion class
+  class_<btk::math::Quaternion>("Quaternion")
+    .constructor<>()
+    .constructor<float, float, float, float>()
+    .property("w", &btk::math::Quaternion::w)
+    .property("x", &btk::math::Quaternion::x)
+    .property("y", &btk::math::Quaternion::y)
+    .property("z", &btk::math::Quaternion::z)
+    .function("magnitude", &btk::math::Quaternion::magnitude)
+    .function("normalize", &btk::math::Quaternion::normalize)
+    .function("normalized", &btk::math::Quaternion::normalized)
+    .function("conjugate", &btk::math::Quaternion::conjugate)
+    .function("rotate", &btk::math::Quaternion::rotate)
+    .function("slerp", &btk::math::Quaternion::slerp)
+    .class_function("fromAxisAngle", &btk::math::Quaternion::fromAxisAngle)
+    .class_function("identity", &btk::math::Quaternion::identity);
 
   // Bullet class
   enum_<DragFunction>("DragFunction").value("G1", DragFunction::G1).value("G7", DragFunction::G7);
@@ -253,6 +272,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   register_vector<Hit>("HitVector");
   register_vector<SimulatedShot>("SimulatedShotVector");
   register_vector<std::string>("StringVector");
+  register_vector<Vector3D>("Vector3DVector");
 
   // No RingInfo struct needed - direct methods are cleaner
 
@@ -275,11 +295,65 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getComponentRMS", &WindGenerator::getComponentRMS)
     .function("getGlobalAdvectionOffset", &WindGenerator::getGlobalAdvectionOffset)
     .function("getGlobalAdvectionVelocity", &WindGenerator::getGlobalAdvectionVelocity)
-    .function("getCurrentTime", &WindGenerator::getCurrentTime),
+    .function("getCurrentTime", &WindGenerator::getCurrentTime);
 
-    // Wind presets factory
-    class_<btk::physics::WindPresets>("WindPresets")
-      .class_function("getPreset", &WindPresets::getPreset)
-      .class_function("listPresets", &WindPresets::listPresets)
-      .class_function("hasPreset", &WindPresets::hasPreset);
+  // Wind presets factory
+  class_<btk::physics::WindPresets>("WindPresets")
+    .class_function("getPreset", &WindPresets::getPreset)
+    .class_function("listPresets", &WindPresets::listPresets)
+    .class_function("hasPreset", &WindPresets::hasPreset);
+
+  // Steel Target - Chain Anchor
+  value_object<btk::match::SteelTarget::ChainAnchor>("ChainAnchor")
+    .field("worldPosition", &btk::match::SteelTarget::ChainAnchor::world_position_m_)
+    .field("localAttachment", &btk::match::SteelTarget::ChainAnchor::local_attachment_m_)
+    .field("restLength", &btk::match::SteelTarget::ChainAnchor::rest_length_m_)
+    .field("springConstant", &btk::match::SteelTarget::ChainAnchor::spring_constant_);
+
+  // Steel Target - Impact
+  value_object<btk::match::SteelTarget::Impact>("SteelTargetImpact")
+    .field("localPosition", &btk::match::SteelTarget::Impact::local_position_m_)
+    .field("bulletDiameter", &btk::match::SteelTarget::Impact::bullet_diameter_m_)
+    .field("timestamp", &btk::match::SteelTarget::Impact::timestamp_s_);
+
+  // Steel Target - Intersection Result
+  value_object<btk::match::SteelTarget::IntersectionResult>("IntersectionResult")
+    .field("hit", &btk::match::SteelTarget::IntersectionResult::hit)
+    .field("impactPoint", &btk::match::SteelTarget::IntersectionResult::impact_point_m_)
+    .field("impactVelocity", &btk::match::SteelTarget::IntersectionResult::impact_velocity_)
+    .field("surfaceNormal", &btk::match::SteelTarget::IntersectionResult::surface_normal_)
+    .field("impactTime", &btk::match::SteelTarget::IntersectionResult::impact_time_s_)
+    .field("bulletMass", &btk::match::SteelTarget::IntersectionResult::bullet_mass_kg_)
+    .field("bulletDiameter", &btk::match::SteelTarget::IntersectionResult::bullet_diameter_m_);
+
+  // Register optional<IntersectionResult>
+  register_optional<btk::match::SteelTarget::IntersectionResult>();
+
+  // Register vectors for SteelTarget
+  register_vector<btk::match::SteelTarget::Impact>("ImpactVector");
+
+  // Steel Target class
+  class_<btk::match::SteelTarget>("SteelTarget")
+    .constructor<float, float>()
+    .function("addRectangle", &btk::match::SteelTarget::addRectangle)
+    .function("addCircle", &btk::match::SteelTarget::addCircle)
+    .function("addOval", &btk::match::SteelTarget::addOval)
+    .function("addTriangle", &btk::match::SteelTarget::addTriangle)
+    .function("addChainAnchor", &btk::match::SteelTarget::addChainAnchor)
+    .function("setDamping", &btk::match::SteelTarget::setDamping)
+    .function("hit", select_overload<bool(const btk::ballistics::Trajectory&)>(&btk::match::SteelTarget::hit))
+    .function("hitBullet", select_overload<void(const btk::ballistics::Bullet&)>(&btk::match::SteelTarget::hit))
+    .function("timeStep", &btk::match::SteelTarget::timeStep)
+    .function("getImpacts", &btk::match::SteelTarget::getImpacts)
+    .function("worldToLocal", &btk::match::SteelTarget::worldToLocal)
+    .function("localToWorld", &btk::match::SteelTarget::localToWorld)
+    .function("getCenterOfMass", &btk::match::SteelTarget::getCenterOfMass)
+    .function("getOrientation", &btk::match::SteelTarget::getOrientation)
+    .function("getVelocity", &btk::match::SteelTarget::getVelocity)
+    .function("getAngularVelocity", &btk::match::SteelTarget::getAngularVelocity)
+    .function("getMass", &btk::match::SteelTarget::getMass)
+    .function("setPosition", &btk::match::SteelTarget::setPosition)
+    .function("setOrientation", &btk::match::SteelTarget::setOrientation)
+    .function("clearImpacts", &btk::match::SteelTarget::clearImpacts)
+    .function("getVertices", &btk::match::SteelTarget::getVertices);
 }

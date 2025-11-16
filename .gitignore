@@ -17,6 +17,7 @@ compile_commands.json
 
 # IDEs
 .vscode/
+.clangd
 .idea/
 *.swp
 *.swo

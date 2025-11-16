@@ -30,6 +30,21 @@ namespace btk::math
      */
     constexpr Vector2D(float x_val, float y_val) : x(x_val), y(y_val) {}
 
+    /**
+     * @brief Copy constructor
+     *
+     * @param other Vector to copy
+     */
+    constexpr Vector2D(const Vector2D&) = default;
+
+    /**
+     * @brief Copy assignment operator
+     *
+     * @param other Vector to copy
+     * @return Reference to this vector
+     */
+    constexpr Vector2D& operator=(const Vector2D&) = default;
+
     // Basic operators
     /**
      * @brief Vector addition
@@ -203,6 +218,9 @@ namespace btk::math
      * @param z_val Z component
      */
     constexpr Vector3D(float x_val, float y_val, float z_val) : x(x_val), y(y_val), z(z_val) {}
+
+    constexpr Vector3D(const Vector3D&) = default;
+    constexpr Vector3D& operator=(const Vector3D&) = default;
 
     // Basic operators
     /**

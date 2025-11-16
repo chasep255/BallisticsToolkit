@@ -3,6 +3,14 @@ CompileFlags:
     - -std=c++17
     - -Wall
     - -Wextra
+    # Project includes
+    - -I${workspaceFolder}/include
+    # Emscripten includes (C++ stdlib MUST come before C stdlib)
+    - -isystem/home/chase/emsdk/upstream/emscripten/system/lib/libcxx/include
+    - -isystem/home/chase/emsdk/upstream/emscripten/system/include
+    - -isystem/home/chase/emsdk/upstream/emscripten/cache/sysroot/include
+    # Emscripten preprocessor define
+    - -DEMSCRIPTEN
   Remove:
     # Remove Emscripten-specific flags that clangd doesn't understand
     - -fwasm-exceptions
@@ -15,7 +23,24 @@ Index:
   Background: Build
 
 Diagnostics:
-  UnusedIncludes: Strict
-  MissingIncludes: Strict
+  UnusedIncludes: None
+  MissingIncludes: None
+  Suppress:
+    - "__GLIBC_PREREQ"
+    - "Too many errors"
+    - "is_copy_constructible"
+    - "matching constructor"
+    - "matching function"
+    - "matching member function"
+    - "member named 'value'"
+    - "Out-of-line definition"
+    - "viable conversion"
+    - "IntersectionResult"
+    - "unresolved using declaration"
+    - "didn't find libc"
+  ClangTidy:
+    Remove:
+      - misc-*
+      - modernize-*
 
 

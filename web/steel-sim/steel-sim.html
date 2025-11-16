@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Steel Target Simulator - Physics Testing | Ballistics Toolkit</title>
+  <meta name="description" content="Interactive steel target physics simulator. Test realistic target physics with chain constraints, damping, and bullet impacts.">
+  <meta name="keywords" content="steel target, physics simulation, target dynamics, shooting simulator, ballistics">
+  <link rel="canonical" href="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
+  <meta property="og:title" content="Steel Target Simulator - Physics Testing">
+  <meta property="og:description" content="Interactive steel target physics simulator with realistic chain dynamics and bullet impacts.">
+  <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
+  <meta property="twitter:title" content="Steel Target Simulator - Physics Testing">
+  <meta property="twitter:description" content="Interactive steel target physics simulator with realistic chain dynamics and bullet impacts.">
+  <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
+  
+  <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
+  <link rel="stylesheet" href="../common.css">
+  <link rel="stylesheet" href="steel-sim.css">
+  
+  <!-- Schema.org structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Steel Target Simulator",
+    "description": "Interactive steel target physics simulator with realistic dynamics",
+    "url": "https://www.ballisticstoolkit.com/steel-sim/steel-sim.html",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Web Browser",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+  
+  <script src="../common.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="steel-sim.js"></script>
+</head>
+<body data-page="steel-sim">
+  <div class="nav-header"></div>
+
+  <div class="app-container">
+    <h1>🎯 Steel Target Simulator</h1>
+
+    <!-- Stats Bar -->
+    <div class="stats-container">
+      <div class="stat-item">
+        <div class="stat-label">Linear Velocity</div>
+        <div id="linearVelocity" class="stat-value">0.0 m/s</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Angular Velocity</div>
+        <div id="angularVelocity" class="stat-value">0.0 rad/s</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Position X</div>
+        <div id="positionX" class="stat-value">0.0 m</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Position Z</div>
+        <div id="positionZ" class="stat-value">0.0 m</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Target Mass</div>
+        <div id="targetMass" class="stat-value">0.0 kg</div>
+      </div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div class="controls">
+      <button id="resetBtn" class="btn btn-primary">Reset Target</button>
+      <button id="helpBtn" class="btn btn-secondary">Help</button>
+    </div>
+
+    <div id="error" class="error" style="display: none;"></div>
+    
+    <!-- Canvas Container -->
+    <div class="canvas-container">
+      <canvas id="steelCanvas"></canvas>
+      <div class="canvas-instructions">Click on the target to simulate bullet impact</div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="help-modal" style="display: none;">
+    <div class="help-modal-content">
+      <div class="help-modal-header">
+        <h2>🎯 Steel Target Simulator Help</h2>
+        <span class="help-close">&times;</span>
+      </div>
+      <div class="help-modal-body">
+        <div class="help-section">
+          <h3>Quick Start</h3>
+          <p>Click anywhere on the steel target to simulate a bullet impact. Watch the realistic physics simulation as the target swings and rotates based on where you hit it.</p>
+        </div>
+        
+        <div class="help-section">
+          <h3>Controls</h3>
+          <div class="param-help">
+            <strong>Left Click:</strong> Simulate a bullet impact at the clicked location. The target will respond with realistic physics based on the impact point, including both linear motion and rotation.<br><br>
+            <strong>Reset Target:</strong> Returns the target to its initial resting position and clears all velocities and impact history.
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Physics Simulation</h3>
+          <div class="param-help">
+            <strong>Target Configuration:</strong> IPSC-style steel target with rectangular body (18" × 30") and head (6" × 9"), made of 0.5" thick steel.<br><br>
+            <strong>Chain Mounting:</strong> Two chains attached at 45-degree angles from the shoulders to overhead anchor points. Chains act as springs with realistic tension forces.<br><br>
+            <strong>Impact Physics:</strong> Bullet impacts transfer momentum to the target, causing both linear motion and rotation. The exact response depends on where you hit the target relative to its center of mass.<br><br>
+            <strong>Damping:</strong> Air resistance and internal friction gradually slow down the target motion, causing it to eventually return to rest.<br><br>
+            <strong>Constraints:</strong> The chain springs pull the target back toward its resting position, creating realistic swinging behavior.
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>What to Observe</h3>
+          <div class="param-help">
+            <strong>Center Hits:</strong> Hitting near the center of mass causes mostly linear motion with minimal rotation.<br><br>
+            <strong>Edge Hits:</strong> Hitting near the edges causes significant rotation as well as linear motion.<br><br>
+            <strong>Head vs Body:</strong> The head is lighter and offset, so hits there create different dynamics than body hits.<br><br>
+            <strong>Chain Dynamics:</strong> Watch how the chains stretch and pull the target back, creating oscillating motion.
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Statistics Display</h3>
+          <div class="param-help">
+            <strong>Linear Velocity:</strong> Overall speed of the target's center of mass (m/s).<br><br>
+            <strong>Angular Velocity:</strong> Rotation speed around the target's center of mass (rad/s).<br><br>
+            <strong>Position X/Z:</strong> Current position of the target's center of mass. X is downrange, Z is vertical.<br><br>
+            <strong>Target Mass:</strong> Total mass of the steel target in kilograms.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+

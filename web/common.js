@@ -39,6 +39,7 @@ function setActiveNavLink()
     'ballistic-calc': 'ballistic-calc/ballistic-calc.html',
     'target-sim': 'target-sim/target-sim.html',
     'wind-sim': 'wind-sim/wind-sim.html',
+    'steel-sim': 'steel-sim/steel-sim.html',
     'fclass-sim': 'fclass-sim/fclass-sim.html'
   };
 
@@ -72,6 +73,7 @@ function generateNavigation(currentPageName)
   const isBallisticCalc = currentPageName === 'ballistic-calc';
   const isTargetSim = currentPageName === 'target-sim';
   const isWindSim = currentPageName === 'wind-sim';
+  const isSteelSim = currentPageName === 'steel-sim';
   const isWindGame = currentPageName === 'wind-game';
   const isFClassSim = currentPageName === 'fclass-sim';
 
@@ -82,11 +84,11 @@ function generateNavigation(currentPageName)
                 <span class="nav-logo-text">Ballistics Toolkit</span>
             </a>
             <div class="nav-links">
-                <a href="${pathPrefix}index.html" ${isHome ? 'class="active"' : ''}>Home</a>
-                <a href="${pathPrefix}ballistic-calc/ballistic-calc.html" ${isBallisticCalc ? 'class="active"' : ''}>Ballistic Calculator</a>
-                <a href="${pathPrefix}target-sim/target-sim.html" ${isTargetSim ? 'class="active"' : ''}>Target Simulator</a>
-                <a href="${pathPrefix}wind-sim/wind-sim.html" ${isWindSim ? 'class="active"' : ''}>Wind Simulator</a>
-                <a href="${pathPrefix}fclass-sim/fclass-sim.html" ${isFClassSim ? 'class="active"' : ''}>F-Class Simulator</a>
+                <a href="${pathPrefix}ballistic-calc/ballistic-calc.html" ${isBallisticCalc ? 'class="active"' : ''}>Ballistic Calc</a>
+                <a href="${pathPrefix}target-sim/target-sim.html" ${isTargetSim ? 'class="active"' : ''}>Target Sim</a>
+                <a href="${pathPrefix}wind-sim/wind-sim.html" ${isWindSim ? 'class="active"' : ''}>Wind Sim</a>
+                <a href="${pathPrefix}steel-sim/steel-sim.html" ${isSteelSim ? 'class="active"' : ''}>Steel Sim</a>
+                <a href="${pathPrefix}fclass-sim/fclass-sim.html" ${isFClassSim ? 'class="active"' : ''}>F-Class Sim</a>
             </div>
         </div>
     `;
