@@ -305,26 +305,26 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Steel Target - Chain Anchor
   value_object<btk::match::SteelTarget::ChainAnchor>("ChainAnchor")
-    .field("worldPosition", &btk::match::SteelTarget::ChainAnchor::world_position_m_)
-    .field("localAttachment", &btk::match::SteelTarget::ChainAnchor::local_attachment_m_)
-    .field("restLength", &btk::match::SteelTarget::ChainAnchor::rest_length_m_)
+    .field("fixed", &btk::match::SteelTarget::ChainAnchor::fixed_)
+    .field("attachment", &btk::match::SteelTarget::ChainAnchor::attachment_)
+    .field("restLength", &btk::match::SteelTarget::ChainAnchor::rest_length_)
     .field("springConstant", &btk::match::SteelTarget::ChainAnchor::spring_constant_);
 
   // Steel Target - Impact
   value_object<btk::match::SteelTarget::Impact>("SteelTargetImpact")
-    .field("localPosition", &btk::match::SteelTarget::Impact::local_position_m_)
-    .field("bulletDiameter", &btk::match::SteelTarget::Impact::bullet_diameter_m_)
+    .field("position", &btk::match::SteelTarget::Impact::position_)
+    .field("bulletDiameter", &btk::match::SteelTarget::Impact::bullet_diameter_)
     .field("timestamp", &btk::match::SteelTarget::Impact::timestamp_s_);
 
   // Steel Target - Intersection Result
   value_object<btk::match::SteelTarget::IntersectionResult>("IntersectionResult")
     .field("hit", &btk::match::SteelTarget::IntersectionResult::hit)
-    .field("impactPoint", &btk::match::SteelTarget::IntersectionResult::impact_point_m_)
+    .field("impactPoint", &btk::match::SteelTarget::IntersectionResult::impact_point_)
     .field("impactVelocity", &btk::match::SteelTarget::IntersectionResult::impact_velocity_)
     .field("surfaceNormal", &btk::match::SteelTarget::IntersectionResult::surface_normal_)
     .field("impactTime", &btk::match::SteelTarget::IntersectionResult::impact_time_s_)
     .field("bulletMass", &btk::match::SteelTarget::IntersectionResult::bullet_mass_kg_)
-    .field("bulletDiameter", &btk::match::SteelTarget::IntersectionResult::bullet_diameter_m_);
+    .field("bulletDiameter", &btk::match::SteelTarget::IntersectionResult::bullet_diameter_);
 
   // Register optional<IntersectionResult>
   register_optional<btk::match::SteelTarget::IntersectionResult>();
@@ -345,15 +345,13 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("hitBullet", select_overload<void(const btk::ballistics::Bullet&)>(&btk::match::SteelTarget::hit))
     .function("timeStep", &btk::match::SteelTarget::timeStep)
     .function("getImpacts", &btk::match::SteelTarget::getImpacts)
-    .function("worldToLocal", &btk::match::SteelTarget::worldToLocal)
-    .function("localToWorld", &btk::match::SteelTarget::localToWorld)
     .function("getCenterOfMass", &btk::match::SteelTarget::getCenterOfMass)
-    .function("getOrientation", &btk::match::SteelTarget::getOrientation)
+    .function("getNormal", &btk::match::SteelTarget::getNormal)
     .function("getVelocity", &btk::match::SteelTarget::getVelocity)
     .function("getAngularVelocity", &btk::match::SteelTarget::getAngularVelocity)
     .function("getMass", &btk::match::SteelTarget::getMass)
-    .function("setPosition", &btk::match::SteelTarget::setPosition)
-    .function("setOrientation", &btk::match::SteelTarget::setOrientation)
+    .function("translate", &btk::match::SteelTarget::translate)
+    .function("rotate", &btk::match::SteelTarget::rotate)
     .function("clearImpacts", &btk::match::SteelTarget::clearImpacts)
     .function("getVertices", &btk::match::SteelTarget::getVertices);
 }

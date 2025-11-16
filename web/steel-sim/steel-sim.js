@@ -51,7 +51,7 @@ function createTarget(
   thickness = 0.5, // inches
   density = 7850,  // kg/m³
   chainLength = 1, // feet
-  springConstant = 500, // N/m
+  springConstant = 5000, // N/m
   leftAnchor = null,  // Three.js coords in meters (or null to auto-calculate)
   rightAnchor = null  // Three.js coords in meters (or null to auto-calculate)
 ) {
@@ -74,17 +74,19 @@ function createTarget(
   const shoulderOffset = bodyWidth_m / 2;
   
   // Calculate anchor positions if not provided (in Three.js coordinates, meters)
+  // Anchors should be above the target's shoulders
+  // Target will be at position_m, with shoulders at top of body (bodyHeight_m/2)
   if (!leftAnchor) {
     leftAnchor = {
-      x: -(shoulderOffset + chainHoriz),
-      y: bodyHeight_m / 2 + chainVert,
+      x: position_m.x - (shoulderOffset + chainHoriz),
+      y: position_m.y + bodyHeight_m / 2 + chainVert,  // Above the top of the body
       z: position_m.z
     };
   }
   if (!rightAnchor) {
     rightAnchor = {
-      x: (shoulderOffset + chainHoriz),
-      y: bodyHeight_m / 2 + chainVert,
+      x: position_m.x + (shoulderOffset + chainHoriz),
+      y: position_m.y + bodyHeight_m / 2 + chainVert,  // Above the top of the body
       z: position_m.z
     };
   }
@@ -92,56 +94,54 @@ function createTarget(
   // Create BTK steel target
   steelTarget = new btk.SteelTarget(thickness_m, density);
   
-  // Add body rectangle (centered at origin in local space)
-  // In BTK local space: X=width, Y=height, Z=normal (components are in XY plane)
+  // Add body rectangle (components default to normal in +X direction, so shape is in YZ plane)
   const bodyPos = new btk.Vector3D(0, 0, 0);
   steelTarget.addRectangle(bodyPos, bodyWidth_m, bodyHeight_m);
   bodyPos.delete();
   
-  // Add head as oval (positioned above body)
-  // Head is offset along Y axis (height dimension) in BTK local space
+  // Add head as oval (positioned above body along Z axis)
+  // Note: In BTK, Z is up, so positive Z is above
   const headOffset = bodyHeight_m / 2 + headHeight_m / 2;
-  const headPos = new btk.Vector3D(0, headOffset, 0);
+  const headPos = new btk.Vector3D(0, 0, headOffset);
   steelTarget.addOval(headPos, headWidth_m, headHeight_m);
   headPos.delete();
   
-  // Set position (convert from Three.js to BTK)
-  const initialPosThree = new THREE.Vector3(position_m.x, position_m.y, position_m.z);
-  const initialPos = threeJsToBtk(initialPosThree);
-  steelTarget.setPosition(initialPos);
-  initialPos.delete();
-  
-  // Set orientation: vertical target facing shooter
-  // Direction: -X (normal points towards shooter, face is perpendicular to this)
-  // Up: +Z (vertical direction)
-  // This should give us YZ plane (vertical) with normal -X
-  const directionBtk = new btk.Vector3D(-1, 0, 0);
-  const upBtk = new btk.Vector3D(0, 0, 1);
-  steelTarget.setOrientation(directionBtk, upBtk);
-  directionBtk.delete();
-  upBtk.delete();
-  
   // Add chain anchors (swapped: left anchor connects to right shoulder, right anchor to left shoulder)
-  // World anchor positions (convert from Three.js to BTK)
+  // Fixed anchor positions (convert from Three.js to BTK) - these stay fixed in world space
   const leftAnchorThree = new THREE.Vector3(leftAnchor.x, leftAnchor.y, leftAnchor.z);
-  const leftAnchorWorld = threeJsToBtk(leftAnchorThree);
-  // Local attachment points in BTK local space: X=width, Y=height, Z=normal
-  // Left anchor connects to right shoulder
-  const leftAttachLocal = new btk.Vector3D(shoulderOffset, bodyHeight_m / 2, 0);
-  steelTarget.addChainAnchor(leftAnchorWorld, leftAttachLocal, chainLength_m, springConstant);
-  leftAnchorWorld.delete();
-  leftAttachLocal.delete();
+  const leftAnchorFixed = threeJsToBtk(leftAnchorThree);
+  // Attachment points on target (swapped connections) - these move with the target
+  // Body is centered at origin, so top is at +bodyHeight_m/2 in Z direction
+  const leftAttach = new btk.Vector3D(0, shoulderOffset, bodyHeight_m / 2);
+  steelTarget.addChainAnchor(leftAnchorFixed, leftAttach, chainLength_m, springConstant);
   
   const rightAnchorThree = new THREE.Vector3(rightAnchor.x, rightAnchor.y, rightAnchor.z);
-  const rightAnchorWorld = threeJsToBtk(rightAnchorThree);
-  // Right anchor connects to left shoulder
-  const rightAttachLocal = new btk.Vector3D(-shoulderOffset, bodyHeight_m / 2, 0);
-  steelTarget.addChainAnchor(rightAnchorWorld, rightAttachLocal, chainLength_m, springConstant);
-  rightAnchorWorld.delete();
-  rightAttachLocal.delete();
+  const rightAnchorFixed = threeJsToBtk(rightAnchorThree);
+  const rightAttach = new btk.Vector3D(0, -shoulderOffset, bodyHeight_m / 2);
+  steelTarget.addChainAnchor(rightAnchorFixed, rightAttach, chainLength_m, springConstant);
   
-  // Set damping
+  // Rotate to face shooter (normal should be -X in BTK, which is towards shooter)
+  // This will rotate the attachment points, but anchors stay fixed
+  const normalBtk = new btk.Vector3D(-1, 0, 0);
+  steelTarget.rotate(normalBtk);
+  normalBtk.delete();
+  
+  // Translate to final position (convert from Three.js to BTK)
+  // This will translate the attachment points, but anchors stay fixed
+  const initialPosThree = new THREE.Vector3(position_m.x, position_m.y, position_m.z);
+  const initialPos = threeJsToBtk(initialPosThree);
+  steelTarget.translate(initialPos);
+  initialPos.delete();
+  
+  // Cleanup
+  leftAnchorFixed.delete();
+  rightAnchorFixed.delete();
+  
+  // Set damping and ensure zero initial velocity
   steelTarget.setDamping(0.98, 0.95);
+  
+  // Reset velocities to zero after setup (in case any forces were applied during setup)
+  // Note: We can't directly set velocity, but we can ensure it starts at rest
   
   // Store configuration for later use (in meters for Three.js)
   targetConfig.position = position_m;
@@ -232,6 +232,13 @@ function setupScene() {
 
 
 function createTargetMesh() {
+  // Remove old mesh if it exists
+  if (targetMesh) {
+    scene.remove(targetMesh);
+    targetMesh.geometry.dispose();
+    targetMesh.material.dispose();
+  }
+  
   // Get vertices from BTK (world space, BTK coords)
   const btkVertices = steelTarget.getVertices(32);
   
@@ -325,52 +332,104 @@ function createChainLines() {
 }
 
 function updateChainLines() {
-  if (chainLines.length !== 2 || !targetConfig.bodyWidth || !steelTarget) return;
+  if (chainLines.length !== 2 || !steelTarget || !targetConfig.bodyWidth || !targetConfig.bodyHeight) return;
   
-  // Get shoulder positions in BTK local space (same as when adding chain anchors)
-  // In BTK local space: X=width, Y=height, Z=normal
+  // Get target's current center of mass and normal
+  const centerOfMass = steelTarget.getCenterOfMass();
+  const normal = steelTarget.getNormal();
+  
+  // Calculate attachment positions relative to center of mass
+  // Original positions were: left=(0, shoulderOffset, bodyHeight/2), right=(0, -shoulderOffset, bodyHeight/2)
+  // These are in the target's local frame (normal in +X, shape in YZ plane)
+  // After rotation, we need to transform these positions
   const shoulderOffset = targetConfig.bodyWidth / 2;
   const shoulderHeight = targetConfig.bodyHeight / 2;
   
-  // Use the same BTK local coordinates that were used when adding chain anchors
-  const leftShoulderLocal = new btk.Vector3D(-shoulderOffset, shoulderHeight, 0);
-  const leftShoulderWorld = steelTarget.localToWorld(leftShoulderLocal);
-  leftShoulderLocal.delete();
+  // Original attachment positions in local frame (before rotation)
+  const leftAttachLocal = new btk.Vector3D(0, shoulderOffset, shoulderHeight);
+  const rightAttachLocal = new btk.Vector3D(0, -shoulderOffset, shoulderHeight);
   
-  const rightShoulderLocal = new btk.Vector3D(shoulderOffset, shoulderHeight, 0);
-  const rightShoulderWorld = steelTarget.localToWorld(rightShoulderLocal);
-  rightShoulderLocal.delete();
+  // Rotate from +X normal to current normal
+  const defaultNormal = new btk.Vector3D(1, 0, 0);
+  const dot = normal.dot(defaultNormal);
   
-  // Anchors are in Three.js coordinates (stored in targetConfig)
+  let leftAttach, rightAttach;
+  if (dot > 0.9999 || dot < -0.9999) {
+    // Already aligned or opposite - no rotation needed (or 180 deg)
+    leftAttach = new btk.Vector3D(
+      centerOfMass.x + leftAttachLocal.x,
+      centerOfMass.y + leftAttachLocal.y,
+      centerOfMass.z + leftAttachLocal.z
+    );
+    rightAttach = new btk.Vector3D(
+      centerOfMass.x + rightAttachLocal.x,
+      centerOfMass.y + rightAttachLocal.y,
+      centerOfMass.z + rightAttachLocal.z
+    );
+  } else {
+    // Calculate rotation axis and angle
+    const axis = defaultNormal.cross(normal).normalized();
+    const angle = Math.acos(dot);
+    const rotation = btk.Quaternion.fromAxisAngle(axis, angle);
+    
+    // Rotate attachment positions
+    leftAttach = rotation.rotate(leftAttachLocal);
+    rightAttach = rotation.rotate(rightAttachLocal);
+    
+    // Translate to center of mass
+    leftAttach.x += centerOfMass.x;
+    leftAttach.y += centerOfMass.y;
+    leftAttach.z += centerOfMass.z;
+    rightAttach.x += centerOfMass.x;
+    rightAttach.y += centerOfMass.y;
+    rightAttach.z += centerOfMass.z;
+  }
+  
+  // Fixed anchor positions (convert from Three.js to BTK)
   const leftAnchorThree = new THREE.Vector3(targetConfig.leftAnchor.x, targetConfig.leftAnchor.y, targetConfig.leftAnchor.z);
+  const leftAnchorFixed = threeJsToBtk(leftAnchorThree);
+  
   const rightAnchorThree = new THREE.Vector3(targetConfig.rightAnchor.x, targetConfig.rightAnchor.y, targetConfig.rightAnchor.z);
+  const rightAnchorFixed = threeJsToBtk(rightAnchorThree);
   
-  // Convert shoulder positions from BTK to Three.js
-  const leftShoulderThree = btkToThreeJs(leftShoulderWorld);
-  const rightShoulderThree = btkToThreeJs(rightShoulderWorld);
+  // Convert to Three.js for rendering
+  const leftAttachThree = btkToThreeJs(leftAttach);
+  const rightAttachThree = btkToThreeJs(rightAttach);
+  const leftAnchorFixedThree = btkToThreeJs(leftAnchorFixed);
+  const rightAnchorFixedThree = btkToThreeJs(rightAnchorFixed);
   
-  // Update left chain line (connect left anchor to right shoulder)
+  // Update left chain line (connect left fixed anchor to right attachment)
   const leftPositions = chainLines[0].geometry.attributes.position.array;
-  leftPositions[0] = leftAnchorThree.x;
-  leftPositions[1] = leftAnchorThree.y;
-  leftPositions[2] = leftAnchorThree.z;
-  leftPositions[3] = rightShoulderThree.x;
-  leftPositions[4] = rightShoulderThree.y;
-  leftPositions[5] = rightShoulderThree.z;
+  leftPositions[0] = leftAnchorFixedThree.x;
+  leftPositions[1] = leftAnchorFixedThree.y;
+  leftPositions[2] = leftAnchorFixedThree.z;
+  leftPositions[3] = rightAttachThree.x;
+  leftPositions[4] = rightAttachThree.y;
+  leftPositions[5] = rightAttachThree.z;
   chainLines[0].geometry.attributes.position.needsUpdate = true;
   
-  // Update right chain line (connect right anchor to left shoulder)
+  // Update right chain line (connect right fixed anchor to left attachment)
   const rightPositions = chainLines[1].geometry.attributes.position.array;
-  rightPositions[0] = rightAnchorThree.x;
-  rightPositions[1] = rightAnchorThree.y;
-  rightPositions[2] = rightAnchorThree.z;
-  rightPositions[3] = leftShoulderThree.x;
-  rightPositions[4] = leftShoulderThree.y;
-  rightPositions[5] = leftShoulderThree.z;
+  rightPositions[0] = rightAnchorFixedThree.x;
+  rightPositions[1] = rightAnchorFixedThree.y;
+  rightPositions[2] = rightAnchorFixedThree.z;
+  rightPositions[3] = leftAttachThree.x;
+  rightPositions[4] = leftAttachThree.y;
+  rightPositions[5] = leftAttachThree.z;
   chainLines[1].geometry.attributes.position.needsUpdate = true;
   
-  leftShoulderWorld.delete();
-  rightShoulderWorld.delete();
+  // Cleanup
+  leftAttachLocal.delete();
+  rightAttachLocal.delete();
+  leftAttach.delete();
+  rightAttach.delete();
+  leftAnchorFixed.delete();
+  rightAnchorFixed.delete();
+  if (dot <= 0.9999 && dot >= -0.9999) {
+    defaultNormal.delete();
+    axis.delete();
+    rotation.delete();
+  }
 }
 
 function setupUI() {
@@ -469,23 +528,32 @@ function onCanvasClick(event) {
 }
 
 function resetTarget() {
-  if (!steelTarget || !targetConfig.position) return;
+  if (!targetConfig.position) return;
   
-  // Reset position (convert from Three.js to BTK)
-  const initialPosThree = new THREE.Vector3(targetConfig.position.x, targetConfig.position.y, targetConfig.position.z);
-  const initialPos = threeJsToBtk(initialPosThree);
-  steelTarget.setPosition(initialPos);
-  initialPos.delete();
+  // Clean up old target
+  if (steelTarget) {
+    steelTarget.delete();
+    steelTarget = null;
+  }
   
-  // Reset orientation: vertical target facing shooter
-  const directionBtk = new btk.Vector3D(-1, 0, 0);
-  const upBtk = new btk.Vector3D(0, 0, 1);
-  steelTarget.setOrientation(directionBtk, upBtk);
-  directionBtk.delete();
-  upBtk.delete();
+  // Remove old mesh
+  if (targetMesh) {
+    scene.remove(targetMesh);
+    targetMesh.geometry.dispose();
+    targetMesh.material.dispose();
+    targetMesh = null;
+  }
   
-  // Clear impacts
-  steelTarget.clearImpacts();
+  // Remove old chain lines
+  for (const line of chainLines) {
+    scene.remove(line);
+    if (line.geometry) line.geometry.dispose();
+    if (line.material) line.material.dispose();
+  }
+  chainLines = [];
+  
+  // Recreate target (simplest way to reset everything)
+  createTarget();
   
   // Update visuals
   updateTargetMesh();
