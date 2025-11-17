@@ -49,12 +49,12 @@ namespace btk::match
      */
     struct Impact
     {
-      btk::math::Vector3D position_;
+      btk::math::Vector3D position_local_; // Position in target-local coordinates (YZ plane)
       float bullet_diameter_;
       float timestamp_s_;
 
-      Impact() : position_(0, 0, 0), bullet_diameter_(0), timestamp_s_(0) {}
-      Impact(const btk::math::Vector3D& pos, float diameter, float time) : position_(pos), bullet_diameter_(diameter), timestamp_s_(time) {}
+      Impact() : position_local_(0, 0, 0), bullet_diameter_(0), timestamp_s_(0) {}
+      Impact(const btk::math::Vector3D& local_pos, float diameter, float time) : position_local_(local_pos), bullet_diameter_(diameter), timestamp_s_(time) {}
     };
 
     /**
@@ -176,6 +176,64 @@ namespace btk::match
 #endif
 
     /**
+     * @brief Get UV buffer as a JS-typed array view for zero-copy access
+     * 
+     * Returns UVs as [u,v, u,v, ...] for texture mapping.
+     * Each 6 consecutive floats form one triangle (3 vertices * 2 components).
+     * Buffer is updated by calling updateDisplay() before this.
+     */
+#ifdef __EMSCRIPTEN__
+    emscripten::val getUVs() const;
+#else
+    const std::vector<float>& getUVs() const { return uvs_buffer_; }
+#endif
+
+    /**
+     * @brief Get texture buffer as memory view for zero-copy access
+     * 
+     * Returns RGBA texture data as [r,g,b,a, r,g,b,a, ...] ready for WebGL texture.
+     * Texture shows paint color with bullet impacts revealing metal underneath.
+     * Buffer is updated by calling updateTexture().
+     * 
+     * @return Memory view of texture buffer (RGBA bytes)
+     */
+#ifdef __EMSCRIPTEN__
+    emscripten::val getTexture() const;
+#else
+    const std::vector<uint8_t>& getTexture() const { return texture_buffer_; }
+#endif
+
+    /**
+     * @brief Get texture dimensions
+     */
+    int getTextureWidth() const { return texture_width_; }
+    int getTextureHeight() const { return texture_height_; }
+
+    /**
+     * @brief Initialize texture with paint color
+     * 
+     * Creates the initial texture filled with paint color.
+     * Call this once during setup or when resetting the target.
+     * 
+     * @param texture_width Texture width in pixels (default 512)
+     * @param texture_height Texture height in pixels (default 512)
+     */
+    void initializeTexture(int texture_width = 512, int texture_height = 512);
+
+    /**
+     * @brief Set paint and metal colors
+     * 
+     * @param paint_r Paint red (0-255)
+     * @param paint_g Paint green (0-255)
+     * @param paint_b Paint blue (0-255)
+     * @param metal_r Metal red (0-255, default 128)
+     * @param metal_g Metal green (0-255, default 128)
+     * @param metal_b Metal blue (0-255, default 128)
+     */
+    void setColors(uint8_t paint_r, uint8_t paint_g, uint8_t paint_b,
+                   uint8_t metal_r = 128, uint8_t metal_g = 128, uint8_t metal_b = 128);
+
+    /**
      * @brief Get target mass
      */
     float getMass() const { return mass_kg_; }
@@ -192,9 +250,12 @@ namespace btk::match
     void rotate(const btk::math::Vector3D& normal);
 
     /**
-     * @brief Clear all recorded impacts
+     * @brief Clear all recorded impacts and reset texture to clean paint
      */
-    void clearImpacts() { impacts_.clear(); }
+    void clearImpacts() { 
+      impacts_.clear();
+      initializeTexture(texture_width_, texture_height_);
+    }
 
     private:
     // Steel density constant (kg/m³)
@@ -229,8 +290,16 @@ namespace btk::match
     float angular_damping_;
 
     // Display buffer
-    std::vector<float> vertices_buffer_;  // Flat array: x,y,z,x,y,z,... in BTK world coordinates
+    std::vector<float> vertices_buffer_;  // Flat array: x,y,z,x,y,z,... in Three.js coordinates
+    std::vector<float> uvs_buffer_;       // Flat array: u,v,u,v,... for texture mapping
     int segments_per_circle_;             // Number of segments for circular shapes
+    
+    // Texture buffer (RGBA format)
+    std::vector<uint8_t> texture_buffer_; // RGBA texture: r,g,b,a,r,g,b,a,...
+    int texture_width_;                   // Texture width in pixels
+    int texture_height_;                  // Texture height in pixels
+    uint8_t paint_color_[3];              // RGB paint color
+    uint8_t metal_color_[3];              // RGB metal color
 
     /**
      * @brief Calculate mass and moment of inertia from shape
@@ -263,9 +332,19 @@ namespace btk::match
     void applyForce(const btk::math::Vector3D& force, const btk::math::Vector3D& world_position, float dt);
 
     /**
-     * @brief Record an impact for visualization
+     * @brief Record an impact for visualization and update texture
+     * 
+     * Converts world position to local coordinates, stores the impact,
+     * and incrementally updates the texture with the new splatter mark.
      */
     void recordImpact(const btk::math::Vector3D& world_position, float bullet_diameter, float time);
+    
+    /**
+     * @brief Draw a single impact splatter on the texture
+     * 
+     * Draws the splatter mark for one impact at the given local coordinates.
+     */
+    void drawImpactOnTexture(const btk::math::Vector3D& local_position, float bullet_diameter);
 
     /**
      * @brief Test if point is inside any component (2D)

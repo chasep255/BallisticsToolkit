@@ -314,7 +314,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Steel Target - Impact
   value_object<btk::match::SteelTarget::Impact>("SteelTargetImpact")
-    .field("position", &btk::match::SteelTarget::Impact::position_)
+    .field("positionLocal", &btk::match::SteelTarget::Impact::position_local_)
     .field("bulletDiameter", &btk::match::SteelTarget::Impact::bullet_diameter_)
     .field("timestamp", &btk::match::SteelTarget::Impact::timestamp_s_);
 
@@ -354,5 +354,11 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("rotate", &btk::match::SteelTarget::rotate)
     .function("clearImpacts", &btk::match::SteelTarget::clearImpacts)
     .function("updateDisplay", &btk::match::SteelTarget::updateDisplay)
-    .function("getVertices", &btk::match::SteelTarget::getVertices);
+    .function("getVertices", &btk::match::SteelTarget::getVertices)
+    .function("getUVs", &btk::match::SteelTarget::getUVs)
+    .function("initializeTexture", &btk::match::SteelTarget::initializeTexture)
+    .function("getTexture", &btk::match::SteelTarget::getTexture)
+    .function("getTextureWidth", &btk::match::SteelTarget::getTextureWidth)
+    .function("getTextureHeight", &btk::match::SteelTarget::getTextureHeight)
+    .function("setColors", &btk::match::SteelTarget::setColors);
 }

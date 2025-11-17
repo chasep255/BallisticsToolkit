@@ -125,7 +125,7 @@ function createTarget(
     steelTarget: steelTarget,
     mesh: targetMesh,
     chainLines: chainLines,
-    impactMarkers: [],
+    texture: null, // Will be set when creating mesh
     position: position_m,
     width: width_m,
     height: height_m
@@ -317,19 +317,43 @@ function createTargetMesh(steelTarget) {
   const positions = new Float32Array(vertexView.length);
   positions.set(vertexView);
   
+  // Get UV buffer from C++ (already computed)
+  const uvView = steelTarget.getUVs();
+  if (!uvView || uvView.length === 0) {
+    console.error('getUVs returned empty or invalid view');
+    return null;
+  }
+  
+  // Copy UVs from memory view
+  const uvs = new Float32Array(uvView.length);
+  uvs.set(uvView);
+  
   // Create geometry
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   
-  // Create material (metallic steel)
+  // Get texture from C++ (already initialized with paint color)
+  const textureData = steelTarget.getTexture();
+  const texWidth = steelTarget.getTextureWidth();
+  const texHeight = steelTarget.getTextureHeight();
+  
+  // Create Three.js DataTexture from C++ buffer
+  const imageData = new Uint8ClampedArray(textureData);
+  const texture = new THREE.DataTexture(imageData, texWidth, texHeight, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  
+  // Create material with texture
   const material = new THREE.MeshStandardMaterial({
-    color: 0x808080,
-    metalness: 0.8,
-    roughness: 0.3,
+    map: texture,
+    metalness: 0.3,
+    roughness: 0.7,
     side: THREE.DoubleSide
   });
   
@@ -337,6 +361,7 @@ function createTargetMesh(steelTarget) {
   const targetMesh = new THREE.Mesh(geometry, material);
   targetMesh.castShadow = true;
   targetMesh.receiveShadow = true;
+  targetMesh.userData.texture = texture; // Store texture reference
   scene.add(targetMesh);
   
   return targetMesh;
@@ -425,41 +450,21 @@ function updateChainLines(target) {
   anchors.delete();
 }
 
-function updateImpactMarkers(target) {
-  if (!target || !target.steelTarget) return;
+function updateTargetTexture(target) {
+  if (!target || !target.steelTarget || !target.mesh) return;
   
-  // Get impacts from target
-  const impacts = target.steelTarget.getImpacts();
-  const currentCount = impacts.size();
+  // Get texture from mesh
+  const texture = target.mesh.userData.texture;
+  if (!texture) return;
   
-  // Remove excess markers if impacts were cleared
-  while (target.impactMarkers.length > currentCount) {
-    const marker = target.impactMarkers.pop();
-    scene.remove(marker);
-    if (marker.geometry) marker.geometry.dispose();
-    if (marker.material) marker.material.dispose();
-  }
+  // Get updated texture data from C++ (already updated incrementally with impacts)
+  const textureData = target.steelTarget.getTexture();
+  if (!textureData || textureData.length === 0) return;
   
-  // Add new markers for new impacts
-  while (target.impactMarkers.length < currentCount) {
-    const geometry = new THREE.SphereGeometry(0.01, 8, 8); // 1cm radius sphere
-    const material = new THREE.MeshStandardMaterial({ color: 0xff0000 }); // Red impact marker
-    const marker = new THREE.Mesh(geometry, material);
-    marker.castShadow = true;
-    scene.add(marker);
-    target.impactMarkers.push(marker);
-  }
-  
-  // Update marker positions
-  for (let i = 0; i < currentCount; i++) {
-    const impact = impacts.get(i);
-    const impactPos = btkToThreeJs(impact.position);
-    target.impactMarkers[i].position.set(impactPos.x, impactPos.y, impactPos.z);
-    // Scale marker based on bullet diameter
-    const scale = impact.bulletDiameter * 10; // Scale up for visibility
-    target.impactMarkers[i].scale.set(scale, scale, scale);
-  }
-  impacts.delete();
+  // Copy data from WASM memory to texture
+  const imageData = new Uint8ClampedArray(textureData);
+  texture.image.data.set(imageData);
+  texture.needsUpdate = true;
 }
 
 function setupUI() {
@@ -578,6 +583,9 @@ function onCanvasClick(event) {
     // Apply hit to target
     hitTarget.steelTarget.hitBullet(bullet);
     
+    // Update texture immediately after impact
+    updateTargetTexture(hitTarget);
+    
     // Cleanup
     baseBullet.delete();
     bullet.delete();
@@ -619,7 +627,6 @@ function animate() {
       target.steelTarget.timeStep(dt);
       updateTargetMesh(target);
       updateChainLines(target);
-      updateImpactMarkers(target);
     }
   }
   

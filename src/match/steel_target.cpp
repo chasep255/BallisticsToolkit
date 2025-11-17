@@ -25,9 +25,16 @@ namespace btk::match
       inertia_tensor_(0.0f, 0.0f, 0.0f),
       linear_damping_(0.95f),
       angular_damping_(0.95f),
-      segments_per_circle_(32) {
+      segments_per_circle_(32),
+      texture_width_(512),
+      texture_height_(512) {
+    // Default colors: red paint, gray metal
+    paint_color_[0] = 220; paint_color_[1] = 50; paint_color_[2] = 40;
+    metal_color_[0] = 140; metal_color_[1] = 140; metal_color_[2] = 140;
+    
     calculateMassAndInertia();
     updateDisplay(); // Initialize vertex buffer
+    initializeTexture(); // Initialize texture buffer
   }
 
   void SteelTarget::addChainAnchor(const btk::math::Vector3D& fixed, const btk::math::Vector3D& attachment, float rest_length, float spring_constant) {
@@ -242,8 +249,8 @@ namespace btk::match
     btk::math::Vector3D impulse = bullet_momentum * transfer_ratio;
     applyImpulse(impulse, intersection.impact_point_);
     
-    // Record impact for visualization
-    impacts_.emplace_back(intersection.impact_point_, intersection.bullet_diameter_, intersection.impact_time_s_);
+    // Record impact for visualization (converts to local coords and draws on texture)
+    recordImpact(intersection.impact_point_, intersection.bullet_diameter_, intersection.impact_time_s_);
   }
 
   void SteelTarget::applyImpulse(const btk::math::Vector3D& impulse, const btk::math::Vector3D& world_position) {
@@ -336,12 +343,22 @@ namespace btk::match
     }
   }
 
-  void SteelTarget::recordImpact(const btk::math::Vector3D& position, float bullet_diameter, float time) {
-    impacts_.emplace_back(position, bullet_diameter, time);
+  void SteelTarget::recordImpact(const btk::math::Vector3D& world_position, float bullet_diameter, float time) {
+    // Convert world position to target-local coordinates
+    btk::math::Vector3D local_pos = world_position - position_;
+    btk::math::Quaternion inv_orientation = orientation_.conjugate();
+    btk::math::Vector3D local_rotated = inv_orientation.rotate(local_pos);
+    
+    // Store impact in local coordinates
+    impacts_.emplace_back(local_rotated, bullet_diameter, time);
+    
+    // Incrementally draw this impact on the texture
+    drawImpactOnTexture(local_rotated, bullet_diameter);
   }
 
   void SteelTarget::updateDisplay() {
     vertices_buffer_.clear();
+    uvs_buffer_.clear();
     float halfThickness = thickness_ / 2.0f;
 
     // Use full orientation quaternion to rotate from local (+X-normal) frame to world
@@ -387,23 +404,45 @@ namespace btk::match
           vertices_buffer_.push_back(-btk.x); // BTK -X → Three Z
         };
         
+        // Helper lambda to push UV coordinates based on local YZ position
+        // Maps local YZ coords to [0, 1] texture space
+        auto pushUV = [&](const btk::math::Vector3D& local) {
+          float u = 0.5f + local.y / width_;   // Y maps to U
+          float v = 0.5f + local.z / height_;  // Z maps to V
+          uvs_buffer_.push_back(u);
+          uvs_buffer_.push_back(v);
+        };
+        
         // Front face - write as x,y,z,x,y,z,x,y,z in Three.js space
         pushThreeJsVertex(centerFront);
+        pushUV(centerFront_local);
         pushThreeJsVertex(v1Front);
+        pushUV(v1Front_local);
         pushThreeJsVertex(v2Front);
+        pushUV(v2Front_local);
         
         // Back face
         pushThreeJsVertex(centerBack);
+        pushUV(centerBack_local);
         pushThreeJsVertex(v2Back);
+        pushUV(v2Back_local);
         pushThreeJsVertex(v1Back);
+        pushUV(v1Back_local);
         
-        // Edge face (quad connecting front and back)
+        // Edge face (quad connecting front and back) - 2 triangles
         pushThreeJsVertex(v1Front);
+        pushUV(v1Front_local);
         pushThreeJsVertex(v1Back);
+        pushUV(v1Back_local);
         pushThreeJsVertex(v2Front);
+        pushUV(v2Front_local);
+        
         pushThreeJsVertex(v2Front);
+        pushUV(v2Front_local);
         pushThreeJsVertex(v1Back);
+        pushUV(v1Back_local);
         pushThreeJsVertex(v2Back);
+        pushUV(v2Back_local);
       }
     } else {
       // Rectangle with thickness: front face, back face, and 4 edge faces
@@ -440,51 +479,59 @@ namespace btk::match
         vertices_buffer_.push_back(-btk.x); // BTK -X → Three Z
       };
       
+      // Helper lambda to push UV coordinates based on local YZ position
+      auto pushUV = [&](const btk::math::Vector3D& local) {
+        float u = 0.5f + local.y / width_;   // Y maps to U
+        float v = 0.5f + local.z / height_;  // Z maps to V
+        uvs_buffer_.push_back(u);
+        uvs_buffer_.push_back(v);
+      };
+      
       // Front face (X = +halfThickness)
-      pushThreeJsVertex(v4);
-      pushThreeJsVertex(v5);
-      pushThreeJsVertex(v6);
-      pushThreeJsVertex(v4);
-      pushThreeJsVertex(v6);
-      pushThreeJsVertex(v7);
+      pushThreeJsVertex(v4); pushUV(v4_local);
+      pushThreeJsVertex(v5); pushUV(v5_local);
+      pushThreeJsVertex(v6); pushUV(v6_local);
+      pushThreeJsVertex(v4); pushUV(v4_local);
+      pushThreeJsVertex(v6); pushUV(v6_local);
+      pushThreeJsVertex(v7); pushUV(v7_local);
       
       // Back face (X = -halfThickness)
-      pushThreeJsVertex(v0);
-      pushThreeJsVertex(v2);
-      pushThreeJsVertex(v1);
-      pushThreeJsVertex(v0);
-      pushThreeJsVertex(v3);
-      pushThreeJsVertex(v2);
+      pushThreeJsVertex(v0); pushUV(v0_local);
+      pushThreeJsVertex(v2); pushUV(v2_local);
+      pushThreeJsVertex(v1); pushUV(v1_local);
+      pushThreeJsVertex(v0); pushUV(v0_local);
+      pushThreeJsVertex(v3); pushUV(v3_local);
+      pushThreeJsVertex(v2); pushUV(v2_local);
       
       // Edge faces (4 sides)
       // Bottom edge
-      pushThreeJsVertex(v0);
-      pushThreeJsVertex(v1);
-      pushThreeJsVertex(v5);
-      pushThreeJsVertex(v0);
-      pushThreeJsVertex(v5);
-      pushThreeJsVertex(v4);
+      pushThreeJsVertex(v0); pushUV(v0_local);
+      pushThreeJsVertex(v1); pushUV(v1_local);
+      pushThreeJsVertex(v5); pushUV(v5_local);
+      pushThreeJsVertex(v0); pushUV(v0_local);
+      pushThreeJsVertex(v5); pushUV(v5_local);
+      pushThreeJsVertex(v4); pushUV(v4_local);
       // Top edge
-      pushThreeJsVertex(v2);
-      pushThreeJsVertex(v6);
-      pushThreeJsVertex(v3);
-      pushThreeJsVertex(v3);
-      pushThreeJsVertex(v6);
-      pushThreeJsVertex(v7);
+      pushThreeJsVertex(v2); pushUV(v2_local);
+      pushThreeJsVertex(v6); pushUV(v6_local);
+      pushThreeJsVertex(v3); pushUV(v3_local);
+      pushThreeJsVertex(v3); pushUV(v3_local);
+      pushThreeJsVertex(v6); pushUV(v6_local);
+      pushThreeJsVertex(v7); pushUV(v7_local);
       // Left edge
-      pushThreeJsVertex(v0);
-      pushThreeJsVertex(v4);
-      pushThreeJsVertex(v7);
-      pushThreeJsVertex(v0);
-      pushThreeJsVertex(v7);
-      pushThreeJsVertex(v3);
+      pushThreeJsVertex(v0); pushUV(v0_local);
+      pushThreeJsVertex(v4); pushUV(v4_local);
+      pushThreeJsVertex(v7); pushUV(v7_local);
+      pushThreeJsVertex(v0); pushUV(v0_local);
+      pushThreeJsVertex(v7); pushUV(v7_local);
+      pushThreeJsVertex(v3); pushUV(v3_local);
       // Right edge
-      pushThreeJsVertex(v1);
-      pushThreeJsVertex(v5);
-      pushThreeJsVertex(v6);
-      pushThreeJsVertex(v1);
-      pushThreeJsVertex(v6);
-      pushThreeJsVertex(v2);
+      pushThreeJsVertex(v1); pushUV(v1_local);
+      pushThreeJsVertex(v5); pushUV(v5_local);
+      pushThreeJsVertex(v6); pushUV(v6_local);
+      pushThreeJsVertex(v1); pushUV(v1_local);
+      pushThreeJsVertex(v6); pushUV(v6_local);
+      pushThreeJsVertex(v2); pushUV(v2_local);
     }
   }
 
@@ -492,12 +539,120 @@ namespace btk::match
   emscripten::val SteelTarget::getVertices() const {
     using namespace emscripten;
     if (vertices_buffer_.empty()) {
-      // Return an empty Float32Array
       return val::global("Float32Array").new_(0);
     }
-    // Wrap a typed memory view in a JS value (Float32Array view into WASM memory)
     return val(typed_memory_view(vertices_buffer_.size(), vertices_buffer_.data()));
   }
+
+  emscripten::val SteelTarget::getUVs() const {
+    using namespace emscripten;
+    if (uvs_buffer_.empty()) {
+      return val::global("Float32Array").new_(0);
+    }
+    return val(typed_memory_view(uvs_buffer_.size(), uvs_buffer_.data()));
+  }
+
+  emscripten::val SteelTarget::getTexture() const {
+    using namespace emscripten;
+    if (texture_buffer_.empty()) {
+      return val::global("Uint8Array").new_(0);
+    }
+    return val(typed_memory_view(texture_buffer_.size(), texture_buffer_.data()));
+  }
 #endif
+
+  void SteelTarget::setColors(uint8_t paint_r, uint8_t paint_g, uint8_t paint_b,
+                               uint8_t metal_r, uint8_t metal_g, uint8_t metal_b) {
+    paint_color_[0] = paint_r;
+    paint_color_[1] = paint_g;
+    paint_color_[2] = paint_b;
+    metal_color_[0] = metal_r;
+    metal_color_[1] = metal_g;
+    metal_color_[2] = metal_b;
+  }
+
+  void SteelTarget::initializeTexture(int texture_width, int texture_height) {
+    // Calculate texture size based on target aspect ratio
+    // Keep a reasonable resolution while matching aspect ratio
+    float aspect_ratio = width_ / height_;
+    
+    if (aspect_ratio > 1.0f) {
+      // Width is larger
+      texture_width_ = texture_width;
+      texture_height_ = static_cast<int>(texture_width / aspect_ratio);
+    } else {
+      // Height is larger or square
+      texture_height_ = texture_height;
+      texture_width_ = static_cast<int>(texture_height * aspect_ratio);
+    }
+    
+    // Allocate RGBA buffer
+    size_t pixel_count = texture_width_ * texture_height_;
+    texture_buffer_.resize(pixel_count * 4);
+    
+    // Fill with paint color (fully opaque)
+    for (size_t i = 0; i < pixel_count; ++i) {
+      texture_buffer_[i * 4 + 0] = paint_color_[0]; // R
+      texture_buffer_[i * 4 + 1] = paint_color_[1]; // G
+      texture_buffer_[i * 4 + 2] = paint_color_[2]; // B
+      texture_buffer_[i * 4 + 3] = 255;              // A
+    }
+  }
+
+  void SteelTarget::drawImpactOnTexture(const btk::math::Vector3D& local_position, float bullet_diameter) {
+    // In local frame, target is in YZ plane (X is normal)
+    // Map Y and Z to UV coordinates [0, 1]
+    float u = 0.5f + local_position.y / width_;
+    float v = 0.5f + local_position.z / height_;
+    
+    // Skip if outside texture bounds
+    if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f) {
+      return;
+    }
+    
+    // Convert UV to pixel coordinates
+    int center_x = static_cast<int>(u * texture_width_);
+    int center_y = static_cast<int>(v * texture_height_);
+    
+    // Draw splatter as a circle revealing metal underneath
+    // Splatter radius based on bullet diameter (scaled to texture space)
+    float splatter_radius_m = bullet_diameter * 4.0f; // 2x bullet diameter
+    // Use average of texture dimensions for circular splatter
+    float avg_texture_size = (texture_width_ + texture_height_) / 2.0f;
+    float avg_target_size = (width_ + height_) / 2.0f;
+    int splatter_radius_px = static_cast<int>((splatter_radius_m / avg_target_size) * avg_texture_size);
+    splatter_radius_px = std::max(3, splatter_radius_px); // Minimum 3 pixels
+    
+    // Draw circle with soft edges
+    for (int dy = -splatter_radius_px; dy <= splatter_radius_px; ++dy) {
+      for (int dx = -splatter_radius_px; dx <= splatter_radius_px; ++dx) {
+        int px = center_x + dx;
+        int py = center_y + dy;
+        
+        // Check bounds
+        if (px < 0 || px >= texture_width_ || py < 0 || py >= texture_height_) continue;
+        
+        // Calculate distance from center
+        float dist = std::sqrt(static_cast<float>(dx * dx + dy * dy));
+        
+        if (dist <= splatter_radius_px) {
+          // Blend from metal (center) to paint (edge)
+          float blend = dist / splatter_radius_px; // 0 at center, 1 at edge
+          blend = blend * blend; // Quadratic falloff for softer edge
+          
+          size_t pixel_idx = (py * texture_width_ + px) * 4;
+          
+          // Blend between metal and paint colors
+          texture_buffer_[pixel_idx + 0] = static_cast<uint8_t>(
+            metal_color_[0] * (1.0f - blend) + paint_color_[0] * blend);
+          texture_buffer_[pixel_idx + 1] = static_cast<uint8_t>(
+            metal_color_[1] * (1.0f - blend) + paint_color_[1] * blend);
+          texture_buffer_[pixel_idx + 2] = static_cast<uint8_t>(
+            metal_color_[2] * (1.0f - blend) + paint_color_[2] * blend);
+          texture_buffer_[pixel_idx + 3] = 255; // Fully opaque
+        }
+      }
+    }
+  }
 
 } // namespace btk::match
