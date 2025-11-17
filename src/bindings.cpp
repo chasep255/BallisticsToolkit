@@ -307,8 +307,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Steel Target - Chain Anchor
   value_object<btk::match::SteelTarget::ChainAnchor>("ChainAnchor")
-    .field("fixed", &btk::match::SteelTarget::ChainAnchor::fixed_)
-    .field("attachment", &btk::match::SteelTarget::ChainAnchor::attachment_)
+    .field("localAttachment", &btk::match::SteelTarget::ChainAnchor::local_attachment_)
+    .field("worldFixed", &btk::match::SteelTarget::ChainAnchor::world_fixed_)
     .field("restLength", &btk::match::SteelTarget::ChainAnchor::rest_length_)
     .field("springConstant", &btk::match::SteelTarget::ChainAnchor::spring_constant_);
 
@@ -357,8 +357,9 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getVertices", &btk::match::SteelTarget::getVertices)
     .function("getUVs", &btk::match::SteelTarget::getUVs)
     .function("initializeTexture", &btk::match::SteelTarget::initializeTexture)
-    .function("getTexture", &btk::match::SteelTarget::getTexture)
     .function("getTextureWidth", &btk::match::SteelTarget::getTextureWidth)
     .function("getTextureHeight", &btk::match::SteelTarget::getTextureHeight)
-    .function("setColors", &btk::match::SteelTarget::setColors);
+    .function("getTexture", &btk::match::SteelTarget::getTexture)
+    .function("setColors", &btk::match::SteelTarget::setColors)
+    .function("localToWorld", &btk::match::SteelTarget::localToWorld);
 }

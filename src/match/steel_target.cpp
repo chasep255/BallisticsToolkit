@@ -1,6 +1,7 @@
 #include "match/steel_target.h"
 #include "physics/constants.h"
 #include "math/conversions.h"
+#include "math/random.h"
 #include <cmath>
 #include <stdexcept>
 
@@ -28,8 +29,8 @@ namespace btk::match
       segments_per_circle_(32),
       texture_width_(512),
       texture_height_(512) {
-    // Default colors: red paint, gray metal
-    paint_color_[0] = 220; paint_color_[1] = 50; paint_color_[2] = 40;
+    // Default colors: bright red paint, gray metal
+    paint_color_[0] = 255; paint_color_[1] = 40; paint_color_[2] = 40;
     metal_color_[0] = 140; metal_color_[1] = 140; metal_color_[2] = 140;
     
     calculateMassAndInertia();
@@ -37,8 +38,14 @@ namespace btk::match
     initializeTexture(); // Initialize texture buffer
   }
 
-  void SteelTarget::addChainAnchor(const btk::math::Vector3D& fixed, const btk::math::Vector3D& attachment, float rest_length, float spring_constant) {
-    anchors_.emplace_back(fixed, attachment, rest_length, spring_constant);
+  void SteelTarget::addChainAnchor(const btk::math::Vector3D& local_attachment, const btk::math::Vector3D& world_fixed, float spring_constant) {
+    // Transform local attachment to world space
+    btk::math::Vector3D world_attachment = localToWorld(local_attachment);
+    
+    // Calculate rest length as distance from world_fixed to world_attachment
+    float rest_length = (world_fixed - world_attachment).magnitude();
+    
+    anchors_.emplace_back(local_attachment, world_fixed, rest_length, spring_constant);
   }
 
   void SteelTarget::setDamping(float linear, float angular) {
@@ -46,14 +53,30 @@ namespace btk::match
     angular_damping_ = angular;
   }
 
+  btk::math::Vector3D SteelTarget::localToWorld(const btk::math::Vector3D& local_point) const {
+    // Rotate the local point by the target's orientation
+    btk::math::Vector3D rotated = orientation_.rotate(local_point);
+    // Translate by the target's position
+    return position_ + rotated;
+  }
+
+  void SteelTarget::recalculateChainRestLengths() {
+    for (auto& anchor : anchors_) {
+      // Transform local attachment to world space
+      btk::math::Vector3D world_attachment = localToWorld(anchor.local_attachment_);
+      
+      // Recalculate rest length as distance from world_fixed to world_attachment
+      anchor.rest_length_ = (anchor.world_fixed_ - world_attachment).magnitude();
+    }
+  }
+
   void SteelTarget::translate(const btk::math::Vector3D& offset) {
     // Update center of mass
     position_ += offset;
     
-    // Translate all chain attachments
-    for (auto& anchor : anchors_) {
-      anchor.attachment_ += offset;
-    }
+    // Recalculate chain rest lengths based on new position
+    // (local_attachment transforms to new world position, world_fixed stays put)
+    recalculateChainRestLengths();
   }
 
   void SteelTarget::rotate(const btk::math::Vector3D& normal) {
@@ -82,12 +105,9 @@ namespace btk::match
       rotation = btk::math::Quaternion::fromAxisAngle(axis, angle);
     }
     
-    // Rotate all chain attachments around center of mass
-    for (auto& anchor : anchors_) {
-      btk::math::Vector3D offset = anchor.attachment_ - position_;
-      offset = rotation.rotate(offset);
-      anchor.attachment_ = position_ + offset;
-    }
+    // Recalculate chain rest lengths based on new orientation
+    // (local_attachment transforms with new orientation, world_fixed stays put)
+    recalculateChainRestLengths();
     
     // Update orientation and normal
     orientation_ = rotation * orientation_;
@@ -128,7 +148,7 @@ namespace btk::match
     applyImpulse(impulse, impact_point);
     
     // Record impact for visualization
-    recordImpact(impact_point, bullet.getDiameter(), 0.0f);
+    recordImpact(bullet);
   }
 
   void SteelTarget::calculateMassAndInertia() {
@@ -249,8 +269,18 @@ namespace btk::match
     btk::math::Vector3D impulse = bullet_momentum * transfer_ratio;
     applyImpulse(impulse, intersection.impact_point_);
     
-    // Record impact for visualization (converts to local coords and draws on texture)
-    recordImpact(intersection.impact_point_, intersection.bullet_diameter_, intersection.impact_time_s_);
+    // Create bullet for impact recording
+    btk::ballistics::Bullet impact_bullet(
+      intersection.bullet_mass_kg_,
+      intersection.bullet_diameter_,
+      intersection.bullet_diameter_ * 3.0f, // Estimate length
+      0.3f, // Estimate BC
+      btk::ballistics::DragFunction::G7
+    );
+    btk::ballistics::Bullet flying_bullet(impact_bullet, intersection.impact_point_, intersection.impact_velocity_, 0.0f);
+    
+    // Record impact for visualization
+    recordImpact(flying_bullet);
   }
 
   void SteelTarget::applyImpulse(const btk::math::Vector3D& impulse, const btk::math::Vector3D& world_position) {
@@ -293,11 +323,6 @@ namespace btk::match
     btk::math::Vector3D position_delta = velocity_ms_ * dt;
     position_ += position_delta;
 
-    // Move all chain attachments with the center of mass
-    for (auto& anchor : anchors_) {
-      anchor.attachment_ += position_delta;
-    }
-
     // Angular velocity integration: allow X and Y axis rotation (twisting and swinging)
     // Z-axis is constrained (angular_velocity_.z was zeroed above) to reduce unphysical vertical spinning
     if (angular_velocity_.magnitude() > 1e-6f) {
@@ -309,20 +334,19 @@ namespace btk::match
       orientation_ = rotation * orientation_;
       orientation_.normalize();
       normal_ = orientation_.rotate(btk::math::Vector3D(1.0f, 0.0f, 0.0f));
-
-      // Rotate all chain attachments around center of mass
-      for (auto& anchor : anchors_) {
-        btk::math::Vector3D offset = anchor.attachment_ - position_;
-        offset = rotation.rotate(offset);
-        anchor.attachment_ = position_ + offset;
-      }
+      
+      // Note: Chain local_attachment is in local coordinates (moves with target),
+      // world_fixed is in world coordinates (stays put). No manual update needed.
     }
   }
 
   void SteelTarget::applyChainForces(float dt) {
     for (const auto& anchor : anchors_) {
-      // Vector from fixed anchor to attachment point
-      btk::math::Vector3D vec = anchor.attachment_ - anchor.fixed_;
+      // Transform local attachment to world space
+      btk::math::Vector3D world_attachment = localToWorld(anchor.local_attachment_);
+      
+      // Vector from world_fixed to world_attachment
+      btk::math::Vector3D vec = world_attachment - anchor.world_fixed_;
       float distance = vec.magnitude();
       
       if (distance < 1e-6f) continue; // Avoid division by zero
@@ -333,27 +357,31 @@ namespace btk::match
       // Chains can't push, only pull (tension only when extended)
       if (extension > 0.0f) {
         // Direction from attachment to fixed (pulling back)
-        btk::math::Vector3D direction = (anchor.fixed_ - anchor.attachment_) / distance;
+        btk::math::Vector3D direction = (anchor.world_fixed_ - world_attachment) / distance;
         // Spring force: F = -k * x (restoring force)
         btk::math::Vector3D tension_force = direction * (anchor.spring_constant_ * extension);
         
-        // Apply tension force at attachment point (handles both linear and angular)
-        applyForce(tension_force, anchor.attachment_, dt);
+        // Apply tension force at world_attachment point (handles both linear and angular)
+        applyForce(tension_force, world_attachment, dt);
       }
     }
   }
 
-  void SteelTarget::recordImpact(const btk::math::Vector3D& world_position, float bullet_diameter, float time) {
-    // Convert world position to target-local coordinates
-    btk::math::Vector3D local_pos = world_position - position_;
+  void SteelTarget::recordImpact(const btk::ballistics::Bullet& bullet) {
+    // Convert bullet position and velocity to target-local coordinates
+    btk::math::Vector3D local_pos = bullet.getPosition() - position_;
     btk::math::Quaternion inv_orientation = orientation_.conjugate();
-    btk::math::Vector3D local_rotated = inv_orientation.rotate(local_pos);
+    btk::math::Vector3D local_pos_rotated = inv_orientation.rotate(local_pos);
+    btk::math::Vector3D local_vel_rotated = inv_orientation.rotate(bullet.getVelocity());
+    
+    // Determine which face was hit based on local X coordinate
+    // In local frame: +X is front face, -X is back face
+    bool is_front_face = local_pos_rotated.x > 0.0f;
     
     // Store impact in local coordinates
-    impacts_.emplace_back(local_rotated, bullet_diameter, time);
+    impacts_.emplace_back(local_pos_rotated, local_vel_rotated, bullet.getDiameter(), 0.0f);
     
-    // Incrementally draw this impact on the texture
-    drawImpactOnTexture(local_rotated, bullet_diameter);
+    drawImpactOnTexture(local_pos_rotated, bullet.getDiameter(), is_front_face);
   }
 
   void SteelTarget::updateDisplay() {
@@ -404,45 +432,60 @@ namespace btk::match
           vertices_buffer_.push_back(-btk.x); // BTK -X → Three Z
         };
         
-        // Helper lambda to push UV coordinates based on local YZ position
-        // Maps local YZ coords to [0, 1] texture space
-        auto pushUV = [&](const btk::math::Vector3D& local) {
-          float u = 0.5f + local.y / width_;   // Y maps to U
-          float v = 0.5f + local.z / height_;  // Z maps to V
+        // Helper lambda to push UV coordinates for FRONT face (left half of texture)
+        auto pushUVFront = [&](const btk::math::Vector3D& local) {
+          float u = 0.5f + local.y / width_;   // Y maps to U [0, 1]
+          float v = 0.5f + local.z / height_;  // Z maps to V [0, 1]
+          u = u * 0.5f;  // Scale to left half [0, 0.5]
           uvs_buffer_.push_back(u);
           uvs_buffer_.push_back(v);
         };
         
-        // Front face - write as x,y,z,x,y,z,x,y,z in Three.js space
+        // Helper lambda to push UV coordinates for BACK face (right half of texture)
+        auto pushUVBack = [&](const btk::math::Vector3D& local) {
+          float u = 0.5f + local.y / width_;   // Y maps to U [0, 1]
+          float v = 0.5f + local.z / height_;  // Z maps to V [0, 1]
+          u = u * 0.5f + 0.5f;  // Scale to right half [0.5, 1.0]
+          uvs_buffer_.push_back(u);
+          uvs_buffer_.push_back(v);
+        };
+        
+        // Helper lambda to push blank UVs (for edges - no texture)
+        auto pushBlankUV = [&]() {
+          uvs_buffer_.push_back(-1.0f);  // Outside texture range
+          uvs_buffer_.push_back(-1.0f);
+        };
+        
+        // Front face - maps to left half of texture
         pushThreeJsVertex(centerFront);
-        pushUV(centerFront_local);
+        pushUVFront(centerFront_local);
         pushThreeJsVertex(v1Front);
-        pushUV(v1Front_local);
+        pushUVFront(v1Front_local);
         pushThreeJsVertex(v2Front);
-        pushUV(v2Front_local);
+        pushUVFront(v2Front_local);
         
-        // Back face
+        // Back face - maps to right half of texture
         pushThreeJsVertex(centerBack);
-        pushUV(centerBack_local);
+        pushUVBack(centerBack_local);
         pushThreeJsVertex(v2Back);
-        pushUV(v2Back_local);
+        pushUVBack(v2Back_local);
         pushThreeJsVertex(v1Back);
-        pushUV(v1Back_local);
+        pushUVBack(v1Back_local);
         
-        // Edge face (quad connecting front and back) - 2 triangles
+        // Edge face (quad connecting front and back) - 2 triangles - no texture
         pushThreeJsVertex(v1Front);
-        pushUV(v1Front_local);
+        pushBlankUV();
         pushThreeJsVertex(v1Back);
-        pushUV(v1Back_local);
+        pushBlankUV();
         pushThreeJsVertex(v2Front);
-        pushUV(v2Front_local);
+        pushBlankUV();
         
         pushThreeJsVertex(v2Front);
-        pushUV(v2Front_local);
+        pushBlankUV();
         pushThreeJsVertex(v1Back);
-        pushUV(v1Back_local);
+        pushBlankUV();
         pushThreeJsVertex(v2Back);
-        pushUV(v2Back_local);
+        pushBlankUV();
       }
     } else {
       // Rectangle with thickness: front face, back face, and 4 edge faces
@@ -479,59 +522,75 @@ namespace btk::match
         vertices_buffer_.push_back(-btk.x); // BTK -X → Three Z
       };
       
-      // Helper lambda to push UV coordinates based on local YZ position
-      auto pushUV = [&](const btk::math::Vector3D& local) {
-        float u = 0.5f + local.y / width_;   // Y maps to U
-        float v = 0.5f + local.z / height_;  // Z maps to V
+      // Helper lambda to push UV coordinates for FRONT face (left half of texture)
+      auto pushUVFront = [&](const btk::math::Vector3D& local) {
+        float u = 0.5f + local.y / width_;   // Y maps to U [0, 1]
+        float v = 0.5f + local.z / height_;  // Z maps to V [0, 1]
+        u = u * 0.5f;  // Scale to left half [0, 0.5]
         uvs_buffer_.push_back(u);
         uvs_buffer_.push_back(v);
       };
       
-      // Front face (X = +halfThickness)
-      pushThreeJsVertex(v4); pushUV(v4_local);
-      pushThreeJsVertex(v5); pushUV(v5_local);
-      pushThreeJsVertex(v6); pushUV(v6_local);
-      pushThreeJsVertex(v4); pushUV(v4_local);
-      pushThreeJsVertex(v6); pushUV(v6_local);
-      pushThreeJsVertex(v7); pushUV(v7_local);
+      // Helper lambda to push UV coordinates for BACK face (right half of texture)
+      auto pushUVBack = [&](const btk::math::Vector3D& local) {
+        float u = 0.5f + local.y / width_;   // Y maps to U [0, 1]
+        float v = 0.5f + local.z / height_;  // Z maps to V [0, 1]
+        u = u * 0.5f + 0.5f;  // Scale to right half [0.5, 1.0]
+        uvs_buffer_.push_back(u);
+        uvs_buffer_.push_back(v);
+      };
       
-      // Back face (X = -halfThickness)
-      pushThreeJsVertex(v0); pushUV(v0_local);
-      pushThreeJsVertex(v2); pushUV(v2_local);
-      pushThreeJsVertex(v1); pushUV(v1_local);
-      pushThreeJsVertex(v0); pushUV(v0_local);
-      pushThreeJsVertex(v3); pushUV(v3_local);
-      pushThreeJsVertex(v2); pushUV(v2_local);
+      // Helper lambda to push blank UVs (for edges - no texture)
+      auto pushBlankUV = [&]() {
+        uvs_buffer_.push_back(-1.0f);  // Outside texture range
+        uvs_buffer_.push_back(-1.0f);
+      };
       
-      // Edge faces (4 sides)
+      // Front face (X = +halfThickness) - maps to left half of texture
+      pushThreeJsVertex(v4); pushUVFront(v4_local);
+      pushThreeJsVertex(v5); pushUVFront(v5_local);
+      pushThreeJsVertex(v6); pushUVFront(v6_local);
+      pushThreeJsVertex(v4); pushUVFront(v4_local);
+      pushThreeJsVertex(v6); pushUVFront(v6_local);
+      pushThreeJsVertex(v7); pushUVFront(v7_local);
+      
+      // Back face (X = -halfThickness) - maps to right half of texture
+      pushThreeJsVertex(v0); pushUVBack(v0_local);
+      pushThreeJsVertex(v2); pushUVBack(v2_local);
+      pushThreeJsVertex(v1); pushUVBack(v1_local);
+      pushThreeJsVertex(v0); pushUVBack(v0_local);
+      pushThreeJsVertex(v3); pushUVBack(v3_local);
+      pushThreeJsVertex(v2); pushUVBack(v2_local);
+      
+      // Edge faces (4 sides) - no texture
       // Bottom edge
-      pushThreeJsVertex(v0); pushUV(v0_local);
-      pushThreeJsVertex(v1); pushUV(v1_local);
-      pushThreeJsVertex(v5); pushUV(v5_local);
-      pushThreeJsVertex(v0); pushUV(v0_local);
-      pushThreeJsVertex(v5); pushUV(v5_local);
-      pushThreeJsVertex(v4); pushUV(v4_local);
+      pushThreeJsVertex(v0); pushBlankUV();
+      pushThreeJsVertex(v1); pushBlankUV();
+      pushThreeJsVertex(v5); pushBlankUV();
+      pushThreeJsVertex(v0); pushBlankUV();
+      pushThreeJsVertex(v5); pushBlankUV();
+      pushThreeJsVertex(v4); pushBlankUV();
       // Top edge
-      pushThreeJsVertex(v2); pushUV(v2_local);
-      pushThreeJsVertex(v6); pushUV(v6_local);
-      pushThreeJsVertex(v3); pushUV(v3_local);
-      pushThreeJsVertex(v3); pushUV(v3_local);
-      pushThreeJsVertex(v6); pushUV(v6_local);
-      pushThreeJsVertex(v7); pushUV(v7_local);
+      pushThreeJsVertex(v2); pushBlankUV();
+      pushThreeJsVertex(v6); pushBlankUV();
+      pushThreeJsVertex(v3); pushBlankUV();
+      pushThreeJsVertex(v3); pushBlankUV();
+      pushThreeJsVertex(v6); pushBlankUV();
+      pushThreeJsVertex(v7); pushBlankUV();
       // Left edge
-      pushThreeJsVertex(v0); pushUV(v0_local);
-      pushThreeJsVertex(v4); pushUV(v4_local);
-      pushThreeJsVertex(v7); pushUV(v7_local);
-      pushThreeJsVertex(v0); pushUV(v0_local);
-      pushThreeJsVertex(v7); pushUV(v7_local);
-      pushThreeJsVertex(v3); pushUV(v3_local);
+      pushThreeJsVertex(v0); pushBlankUV();
+      pushThreeJsVertex(v4); pushBlankUV();
+      pushThreeJsVertex(v7); pushBlankUV();
+      pushThreeJsVertex(v0); pushBlankUV();
+      pushThreeJsVertex(v7); pushBlankUV();
+      pushThreeJsVertex(v3); pushBlankUV();
       // Right edge
-      pushThreeJsVertex(v1); pushUV(v1_local);
-      pushThreeJsVertex(v5); pushUV(v5_local);
-      pushThreeJsVertex(v6); pushUV(v6_local);
-      pushThreeJsVertex(v1); pushUV(v1_local);
-      pushThreeJsVertex(v6); pushUV(v6_local);
-      pushThreeJsVertex(v2); pushUV(v2_local);
+      pushThreeJsVertex(v1); pushBlankUV();
+      pushThreeJsVertex(v5); pushBlankUV();
+      pushThreeJsVertex(v6); pushBlankUV();
+      pushThreeJsVertex(v1); pushBlankUV();
+      pushThreeJsVertex(v6); pushBlankUV();
+      pushThreeJsVertex(v2); pushBlankUV();
     }
   }
 
@@ -586,11 +645,12 @@ namespace btk::match
       texture_width_ = static_cast<int>(texture_height * aspect_ratio);
     }
     
-    // Allocate RGBA buffer
+    // Allocate RGBA buffer - texture is 2x width (front on left half, back on right half)
+    texture_width_ = texture_width_ * 2;  // Double the width to fit both faces side-by-side
     size_t pixel_count = texture_width_ * texture_height_;
     texture_buffer_.resize(pixel_count * 4);
     
-    // Fill with paint color (fully opaque)
+    // Fill entire texture with paint color (fully opaque)
     for (size_t i = 0; i < pixel_count; ++i) {
       texture_buffer_[i * 4 + 0] = paint_color_[0]; // R
       texture_buffer_[i * 4 + 1] = paint_color_[1]; // G
@@ -599,11 +659,18 @@ namespace btk::match
     }
   }
 
-  void SteelTarget::drawImpactOnTexture(const btk::math::Vector3D& local_position, float bullet_diameter) {
+  void SteelTarget::drawImpactOnTexture(const btk::math::Vector3D& local_position,
+                                         float bullet_diameter,
+                                         bool is_front_face) {
     // In local frame, target is in YZ plane (X is normal)
     // Map Y and Z to UV coordinates [0, 1]
     float u = 0.5f + local_position.y / width_;
     float v = 0.5f + local_position.z / height_;
+    
+    // Offset U coordinate based on which face: front = left half (0-0.5), back = right half (0.5-1.0)
+    // Since texture_width_ is 2x the target aspect, we need to map to the correct half
+    float u_offset = is_front_face ? 0.0f : 0.5f;
+    u = u * 0.5f + u_offset;  // Scale U to half width and offset to correct half
     
     // Skip if outside texture bounds
     if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f) {
@@ -616,14 +683,14 @@ namespace btk::match
     
     // Draw splatter as a circle revealing metal underneath
     // Splatter radius based on bullet diameter (scaled to texture space)
-    float splatter_radius_m = bullet_diameter * 4.0f; // 2x bullet diameter
+    float splatter_radius_m = bullet_diameter * 3.0f; // 2x bullet diameter
     // Use average of texture dimensions for circular splatter
     float avg_texture_size = (texture_width_ + texture_height_) / 2.0f;
     float avg_target_size = (width_ + height_) / 2.0f;
     int splatter_radius_px = static_cast<int>((splatter_radius_m / avg_target_size) * avg_texture_size);
     splatter_radius_px = std::max(3, splatter_radius_px); // Minimum 3 pixels
     
-    // Draw circle with soft edges
+    // Draw main circular splatter
     for (int dy = -splatter_radius_px; dy <= splatter_radius_px; ++dy) {
       for (int dx = -splatter_radius_px; dx <= splatter_radius_px; ++dx) {
         int px = center_x + dx;
@@ -650,6 +717,54 @@ namespace btk::match
           texture_buffer_[pixel_idx + 2] = static_cast<uint8_t>(
             metal_color_[2] * (1.0f - blend) + paint_color_[2] * blend);
           texture_buffer_[pixel_idx + 3] = 255; // Fully opaque
+        }
+      }
+    }
+    
+    // Draw sharp spikes radiating outward
+    int num_spikes = 10 + btk::math::Random::uniformInt(-4, 4);
+    
+    for (int spike = 0; spike < num_spikes; ++spike) {
+      // Base angle evenly distributed, with random variation
+      float base_angle = (2.0f * M_PI_F * spike) / num_spikes;
+      float angle_variation = btk::math::Random::uniform(-0.3f, 0.3f);
+      float angle = base_angle + angle_variation;
+      
+      float spike_dir_x = std::cos(angle);
+      float spike_dir_y = std::sin(angle);
+      
+      // Random spike length and width
+      float length_randomness = btk::math::Random::uniform(0.8f, 1.2f);
+      float spike_length = splatter_radius_px * 3.0f * length_randomness;
+      float spike_width = 2.5f * btk::math::Random::uniform(0.8f, 1.2f);
+      
+      // Draw spike as a thin triangle
+      for (float t = 0.0f; t < spike_length; t += 0.5f) {
+        float width_at_t = spike_width * (1.0f - t / spike_length); // Taper to point
+        
+        int spike_x = center_x + static_cast<int>(spike_dir_x * t);
+        int spike_y = center_y + static_cast<int>(spike_dir_y * t);
+        
+        // Draw width of spike at this point
+        for (int w = -static_cast<int>(width_at_t); w <= static_cast<int>(width_at_t); ++w) {
+          int px = spike_x + static_cast<int>(spike_dir_y * w);
+          int py = spike_y - static_cast<int>(spike_dir_x * w);
+          
+          if (px >= 0 && px < texture_width_ && py >= 0 && py < texture_height_) {
+            size_t pixel_idx = (py * texture_width_ + px) * 4;
+            
+            // Fade spike from metal to paint along its length
+            float fade = t / spike_length;
+            fade = fade * fade; // Quadratic falloff
+            
+            texture_buffer_[pixel_idx + 0] = static_cast<uint8_t>(
+              metal_color_[0] * (1.0f - fade) + paint_color_[0] * fade);
+            texture_buffer_[pixel_idx + 1] = static_cast<uint8_t>(
+              metal_color_[1] * (1.0f - fade) + paint_color_[1] * fade);
+            texture_buffer_[pixel_idx + 2] = static_cast<uint8_t>(
+              metal_color_[2] * (1.0f - fade) + paint_color_[2] * fade);
+            texture_buffer_[pixel_idx + 3] = 255;
+          }
         }
       }
     }

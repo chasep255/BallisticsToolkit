@@ -36,9 +36,7 @@ function createTarget(
   thickness = 0.5, // inches
   isOval = false, // true for oval shape, false for rectangle
   chainLength = 1, // feet
-  springConstant = 500, // N/m
-  leftAnchor = null,  // Three.js coords in meters (or null to auto-calculate)
-  rightAnchor = null  // Three.js coords in meters (or null to auto-calculate)
+  springConstant = 500 // N/m
 ) {
   // Convert all inputs to meters using BTK conversions
   const position_m = {
@@ -55,63 +53,68 @@ function createTarget(
   const chainVert = chainLength_m / Math.sqrt(2);
   const chainHoriz = chainLength_m / Math.sqrt(2);
   
-  // Attach chains with some lateral separation for ALL shapes so they can resist twisting
-  // Use 1/3 of the width as lateral offset on the plate, and keep anchors roughly at 45°
-  const attachmentY = width_m / 3;
-  const anchorOffsetX = attachmentY + chainHoriz;
+  // Calculate attachment points based on shape
+  // For ovals: attach at edge of circle at 45° angle from top
+  // For rectangles: attach at top corners
+  let attachmentY, attachmentZ;
   
-  // Calculate anchor positions if not provided (in Three.js coordinates, meters)
-  // Anchors should be above the target's top
-  // Target will be at position_m, with top at +height_m/2
-  if (!leftAnchor) {
-    leftAnchor = {
-      x: position_m.x - anchorOffsetX,
-      y: position_m.y + height_m / 2 + chainVert,  // Above the top
-      z: position_m.z
-    };
-  }
-  if (!rightAnchor) {
-    rightAnchor = {
-      x: position_m.x + anchorOffsetX,
-      y: position_m.y + height_m / 2 + chainVert,  // Above the top
-      z: position_m.z
-    };
+  if (isOval) {
+    // For circles, attach at 45° from vertical on the circle edge
+    // At 45°: y = radius * sin(45°), z = radius * cos(45°)
+    const radius = width_m / 2;
+    const angle = Math.PI / 4; // 45 degrees
+    attachmentY = radius * Math.sin(angle);
+    attachmentZ = radius * Math.cos(angle);
+  } else {
+    // For rectangles, attach at top corners
+    attachmentY = width_m / 3;
+    attachmentZ = height_m / 2;
   }
   
-  // Create BTK steel target with single shape
+  // Create BTK steel target with single shape at origin
   const steelTarget = new btk.SteelTarget(width_m, height_m, thickness_m, isOval);
   
-  // Add chain anchors
-  // Fixed anchor positions (convert from Three.js to BTK) - these stay fixed in world space
-  const leftAnchorThree = new THREE.Vector3(leftAnchor.x, leftAnchor.y, leftAnchor.z);
-  const leftAnchorFixed = threeJsToBtk(leftAnchorThree);
-  // Attachment points on target - these move with the target
-  // Target is centered at origin, so top is at +height_m/2 in Z direction
-  // For ovals, attach at top center edge (y=0). For rectangles, attach at top corners
-  const leftAttach = new btk.Vector3D(0, attachmentY, height_m / 2);
-  steelTarget.addChainAnchor(leftAnchorFixed, leftAttach, chainLength_m, springConstant);
-  
-  const rightAnchorThree = new THREE.Vector3(rightAnchor.x, rightAnchor.y, rightAnchor.z);
-  const rightAnchorFixed = threeJsToBtk(rightAnchorThree);
-  const rightAttach = new btk.Vector3D(0, -attachmentY, height_m / 2);
-  steelTarget.addChainAnchor(rightAnchorFixed, rightAttach, chainLength_m, springConstant);
-  
-  // Rotate to face shooter (normal should be -X in BTK, which is towards shooter)
-  // This will rotate the attachment points, but anchors stay fixed
+  // Rotate target to face shooter FIRST (before adding chains)
   const normalBtk = new btk.Vector3D(-1, 0, 0);
   steelTarget.rotate(normalBtk);
   normalBtk.delete();
   
-  // Translate to final position (convert from Three.js to BTK)
-  // This will translate the attachment points, but anchors stay fixed
+  // Translate to final position
   const initialPosThree = new THREE.Vector3(position_m.x, position_m.y, position_m.z);
   const initialPos = threeJsToBtk(initialPosThree);
   steelTarget.translate(initialPos);
   initialPos.delete();
   
-  // Cleanup
-  leftAnchorFixed.delete();
-  rightAnchorFixed.delete();
+  // NOW add chain anchors with local attachment and world fixed points
+  // Local attachment: point on target surface (in target's local coordinate system)
+  const leftLocalAttach = new btk.Vector3D(thickness_m / 2, attachmentY, attachmentZ);
+  const rightLocalAttach = new btk.Vector3D(thickness_m / 2, -attachmentY, attachmentZ);
+  
+  // World fixed: beam anchor points at beamHeight (in BTK world coordinates)
+  // BTK coords: X=downrange, Y=crossrange, Z=up
+  // Three.js position_m: x=right, y=up, z=forward
+  // So: BTK_X = -position_m.z, BTK_Y = position_m.x, BTK_Z = beamHeight
+  const beamHeight = 2.5; // meters
+  const leftWorldFixed = new btk.Vector3D(
+    -position_m.z,  // BTK X (downrange) = -Three.js Z (forward)
+    position_m.x + attachmentY + chainHoriz,  // BTK Y (crossrange) = Three.js X (right)
+    beamHeight  // BTK Z (up) = fixed beam height
+  );
+  const rightWorldFixed = new btk.Vector3D(
+    -position_m.z,  // BTK X (downrange) = -Three.js Z (forward)
+    position_m.x - attachmentY - chainHoriz,  // BTK Y (crossrange) = Three.js X (right)
+    beamHeight  // BTK Z (up) = fixed beam height
+  );
+  
+  // Add chains: local attachment on target, world fixed on beam
+  steelTarget.addChainAnchor(leftLocalAttach, leftWorldFixed, springConstant);
+  steelTarget.addChainAnchor(rightLocalAttach, rightWorldFixed, springConstant);
+  
+  // Clean up
+  leftLocalAttach.delete();
+  rightLocalAttach.delete();
+  leftWorldFixed.delete();
+  rightWorldFixed.delete();
   
   // Set damping
   steelTarget.setDamping(0.95, 0.92);
@@ -139,11 +142,18 @@ function createTargetRack() {
   // Clear any existing targets
   clearAllTargets();
   
+  // Create horizontal beam across the top
+  const beamHeight = 2.5; // meters (about 8 feet high)
+  const beamWidth = 8; // meters (spans all targets)
+  const beamDepth = btk.Conversions.yardsToMeters(-10/3); // Same Z as targets
+  createHorizontalBeam(beamWidth, beamHeight, beamDepth);
+  
   // Target spacing in yards (side by side)
   const spacing = 2; // 2 yards between targets
   const baseY = 1; // 1 yard up
   const baseZ = -10/3; // -10/3 yards downrange
   
+  // All chains hang from the beam at beamHeight
   // Target 1: 6" Circle (oval)
   createTarget(
     { x: -spacing * 1.5, y: baseY, z: baseZ },
@@ -171,6 +181,25 @@ function createTargetRack() {
     12, 18, 0.5, false, // 12" × 18" rectangle
     1.2, 500 // 1.2 foot chain (slightly longer for rectangle), 500 N/m spring
   );
+}
+
+// Create horizontal beam that chains hang from
+function createHorizontalBeam(width, height, depth) {
+  const beamGeometry = new THREE.CylinderGeometry(0.05, 0.05, width, 16); // 5cm diameter cylinder
+  const beamMaterial = new THREE.MeshStandardMaterial({
+    color: 0x444444, // Dark gray steel
+    metalness: 0.8,
+    roughness: 0.3
+  });
+  const beam = new THREE.Mesh(beamGeometry, beamMaterial);
+  
+  // Rotate to horizontal (cylinder is vertical by default)
+  beam.rotation.z = Math.PI / 2;
+  beam.position.set(0, height, depth);
+  beam.castShadow = true;
+  beam.receiveShadow = true;
+  
+  scene.add(beam);
 }
 
 function clearAllTargets() {
@@ -388,8 +417,8 @@ function updateTargetMesh(target) {
 }
 
 function createChainLines(steelTarget) {
-  // Create line material
-  const material = new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 2 });
+  // Create line material - steel gray color
+  const material = new THREE.LineBasicMaterial({ color: 0x666666, linewidth: 3 });
   
   // Left chain
   const leftGeometry = new THREE.BufferGeometry();
@@ -420,11 +449,15 @@ function updateChainLines(target) {
   const leftAnchor = anchors.get(0);
   const rightAnchor = anchors.get(1);
   
+  // Transform local attachments to world space
+  const leftAttachWorld = target.steelTarget.localToWorld(leftAnchor.localAttachment);
+  const rightAttachWorld = target.steelTarget.localToWorld(rightAnchor.localAttachment);
+  
   // Convert BTK positions to Three.js for rendering
-  const leftFixed = btkToThreeJs(leftAnchor.fixed);
-  const leftAttach = btkToThreeJs(leftAnchor.attachment);
-  const rightFixed = btkToThreeJs(rightAnchor.fixed);
-  const rightAttach = btkToThreeJs(rightAnchor.attachment);
+  const leftFixed = btkToThreeJs(leftAnchor.worldFixed);
+  const leftAttach = btkToThreeJs(leftAttachWorld);
+  const rightFixed = btkToThreeJs(rightAnchor.worldFixed);
+  const rightAttach = btkToThreeJs(rightAttachWorld);
   
   // Update left chain line: connects leftAnchor.fixed to leftAnchor.attachment
   const leftPositions = target.chainLines[0].geometry.attributes.position.array;
@@ -447,6 +480,8 @@ function updateChainLines(target) {
   target.chainLines[1].geometry.attributes.position.needsUpdate = true;
   
   // Cleanup
+  leftAttachWorld.delete();
+  rightAttachWorld.delete();
   anchors.delete();
 }
 

@@ -34,14 +34,14 @@ namespace btk::match
      */
     struct ChainAnchor
     {
-      btk::math::Vector3D fixed_;            ///< Fixed anchor point (does not move with target)
-      btk::math::Vector3D attachment_;       ///< Attachment point on target (moves with target)
-      float rest_length_;                    ///< Rest length of chain
-      float spring_constant_;                ///< Spring constant (N/m)
+      btk::math::Vector3D local_attachment_;  ///< Attachment point in local coordinates (moves with target)
+      btk::math::Vector3D world_fixed_;       ///< Fixed anchor point in world coordinates (never moves)
+      float rest_length_;                     ///< Rest length of chain (recalculated when target moves)
+      float spring_constant_;                 ///< Spring constant (N/m)
 
-      ChainAnchor() : fixed_(0, 0, 0), attachment_(0, 0, 0), rest_length_(0), spring_constant_(0) {}
-      ChainAnchor(const btk::math::Vector3D& fixed, const btk::math::Vector3D& attachment, float rest_length, float spring_k) 
-        : fixed_(fixed), attachment_(attachment), rest_length_(rest_length), spring_constant_(spring_k) {}
+      ChainAnchor() : local_attachment_(0, 0, 0), world_fixed_(0, 0, 0), rest_length_(0), spring_constant_(0) {}
+      ChainAnchor(const btk::math::Vector3D& local_attach, const btk::math::Vector3D& world_fixed, float rest_length, float spring_k) 
+        : local_attachment_(local_attach), world_fixed_(world_fixed), rest_length_(rest_length), spring_constant_(spring_k) {}
     };
 
     /**
@@ -50,11 +50,13 @@ namespace btk::match
     struct Impact
     {
       btk::math::Vector3D position_local_; // Position in target-local coordinates (YZ plane)
+      btk::math::Vector3D velocity_local_; // Impact velocity in target-local coordinates
       float bullet_diameter_;
       float timestamp_s_;
 
-      Impact() : position_local_(0, 0, 0), bullet_diameter_(0), timestamp_s_(0) {}
-      Impact(const btk::math::Vector3D& local_pos, float diameter, float time) : position_local_(local_pos), bullet_diameter_(diameter), timestamp_s_(time) {}
+      Impact() : position_local_(0, 0, 0), velocity_local_(0, 0, 0), bullet_diameter_(0), timestamp_s_(0) {}
+      Impact(const btk::math::Vector3D& local_pos, const btk::math::Vector3D& local_vel, float diameter, float time) 
+        : position_local_(local_pos), velocity_local_(local_vel), bullet_diameter_(diameter), timestamp_s_(time) {}
     };
 
     /**
@@ -86,12 +88,14 @@ namespace btk::match
     /**
      * @brief Add a chain anchor constraint
      *
-     * @param fixed Fixed anchor point (does not move with target)
-     * @param attachment Attachment point on target (moves with target)
-     * @param rest_length Rest length of chain
+     * @param local_attachment Attachment point in local coordinates (moves with target)
+     * @param world_fixed Fixed anchor point in world coordinates (never moves)
      * @param spring_constant Spring constant (N/m), defaults to 500 N/m
+     * 
+     * Rest length is automatically calculated by transforming local_attachment to world space
+     * and measuring distance to world_fixed. Rest length is recalculated when target moves.
      */
-    void addChainAnchor(const btk::math::Vector3D& fixed, const btk::math::Vector3D& attachment, float rest_length, float spring_constant = DEFAULT_SPRING_CONSTANT);
+    void addChainAnchor(const btk::math::Vector3D& local_attachment, const btk::math::Vector3D& world_fixed, float spring_constant = DEFAULT_SPRING_CONSTANT);
 
     /**
      * @brief Set damping coefficients
@@ -155,6 +159,14 @@ namespace btk::match
      * @brief Get current angular velocity
      */
     const btk::math::Vector3D& getAngularVelocity() const { return angular_velocity_; }
+
+    /**
+     * @brief Transform a point from local coordinates to world coordinates
+     * 
+     * @param local_point Point in local coordinate system
+     * @return Point in world coordinate system
+     */
+    btk::math::Vector3D localToWorld(const btk::math::Vector3D& local_point) const;
 
     /**
      * @brief Update the vertex buffer with current position and orientation
@@ -294,12 +306,12 @@ namespace btk::match
     std::vector<float> uvs_buffer_;       // Flat array: u,v,u,v,... for texture mapping
     int segments_per_circle_;             // Number of segments for circular shapes
     
-    // Texture buffer (RGBA format)
-    std::vector<uint8_t> texture_buffer_; // RGBA texture: r,g,b,a,r,g,b,a,...
-    int texture_width_;                   // Texture width in pixels
-    int texture_height_;                  // Texture height in pixels
-    uint8_t paint_color_[3];              // RGB paint color
-    uint8_t metal_color_[3];              // RGB metal color
+    // Texture buffer (RGBA format) - single texture with front on left half, back on right half
+    std::vector<uint8_t> texture_buffer_;       // Combined texture: r,g,b,a,r,g,b,a,...
+    int texture_width_;                         // Total texture width in pixels (2x target aspect)
+    int texture_height_;                        // Texture height in pixels
+    uint8_t paint_color_[3];                    // RGB paint color
+    uint8_t metal_color_[3];                    // RGB metal color
 
     /**
      * @brief Calculate mass and moment of inertia from shape
@@ -332,19 +344,34 @@ namespace btk::match
     void applyForce(const btk::math::Vector3D& force, const btk::math::Vector3D& world_position, float dt);
 
     /**
+     * @brief Recalculate rest lengths for all chain anchors
+     * 
+     * Transforms local_attachment points to world space and recalculates
+     * rest lengths based on distance to world_fixed points.
+     * Called automatically by translate() and rotate().
+     */
+    void recalculateChainRestLengths();
+
+    /**
      * @brief Record an impact for visualization and update texture
      * 
-     * Converts world position to local coordinates, stores the impact,
+     * Converts bullet data to local coordinates, stores the impact,
      * and incrementally updates the texture with the new splatter mark.
      */
-    void recordImpact(const btk::math::Vector3D& world_position, float bullet_diameter, float time);
+    void recordImpact(const btk::ballistics::Bullet& bullet);
     
     /**
      * @brief Draw a single impact splatter on the texture
      * 
-     * Draws the splatter mark for one impact at the given local coordinates.
+     * Draws the splatter mark for one impact with random spikes radiating outward.
+     * 
+     * @param local_position Impact position in local coordinates
+     * @param bullet_diameter Bullet diameter in meters
+     * @param is_front_face True to draw on front texture, false for back texture
      */
-    void drawImpactOnTexture(const btk::math::Vector3D& local_position, float bullet_diameter);
+    void drawImpactOnTexture(const btk::math::Vector3D& local_position, 
+                             float bullet_diameter,
+                             bool is_front_face);
 
     /**
      * @brief Test if point is inside any component (2D)
