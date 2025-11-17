@@ -8,6 +8,11 @@
 #include <variant>
 #include <vector>
 
+// Forward declaration for WASM builds (for getVertices())
+#ifdef __EMSCRIPTEN__
+#include <emscripten/val.h>
+#endif
+
 namespace btk::match
 {
 
@@ -152,15 +157,23 @@ namespace btk::match
     const btk::math::Vector3D& getAngularVelocity() const { return angular_velocity_; }
 
     /**
-     * @brief Get triangulated vertices as flat array for WebGL
-     * 
-     * Returns vertices as [x,y,z, x,y,z, ...] ready for WebGL buffer.
-     * Each 9 consecutive floats form one triangle (3 vertices * 3 components).
-     * 
-     * @param segments_per_circle Number of segments to use for circular shapes (default 32)
-     * @return Flat array of vertex coordinates in world space
+     * @brief Update the vertex buffer with current position and orientation
      */
-    std::vector<btk::math::Vector3D> getVertices(int segments_per_circle = 32) const;
+    void updateDisplay();
+
+    /**
+     * @brief Get vertex buffer as a JS-typed array view for zero-copy access
+     * 
+     * Returns vertices as [x,y,z, x,y,z, ...] in Three.js coordinates.
+     * Each 9 consecutive floats form one triangle (3 vertices * 3 components).
+     * Buffer is updated by calling updateDisplay() before this.
+     */
+#ifdef __EMSCRIPTEN__
+    emscripten::val getVertices() const;
+#else
+    // Non-WASM builds can access the raw buffer directly
+    const std::vector<float>& getVertices() const { return vertices_buffer_; }
+#endif
 
     /**
      * @brief Get target mass
@@ -214,6 +227,10 @@ namespace btk::match
     // Damping
     float linear_damping_;
     float angular_damping_;
+
+    // Display buffer
+    std::vector<float> vertices_buffer_;  // Flat array: x,y,z,x,y,z,... in BTK world coordinates
+    int segments_per_circle_;             // Number of segments for circular shapes
 
     /**
      * @brief Calculate mass and moment of inertia from shape

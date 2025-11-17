@@ -15,19 +15,17 @@ let targets = [];
 // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
 
 function btkToThreeJs(btkVec) {
-  return new THREE.Vector3(
-    btkVec.y,   // BTK Y (crossrange) → Three X (right)
-    btkVec.z,   // BTK Z (up) → Three Y (up)
-    -btkVec.x   // BTK -X (downrange) → Three Z (towards camera)
-  );
+  const converted = btkVec.toThreeJs();
+  const result = new THREE.Vector3(converted.x, converted.y, converted.z);
+  converted.delete(); // Clean up WASM object
+  return result;
 }
 
 function threeJsToBtk(threeVec) {
-  return new btk.Vector3D(
-    -threeVec.z,  // Three Z → BTK X (downrange)
-    threeVec.x,   // Three X → BTK Y (crossrange)
-    threeVec.y    // Three Y → BTK Z (up)
-  );
+  const threeJsVec = new btk.Vector3D(threeVec.x, threeVec.y, threeVec.z);
+  const result = btk.Vector3D.fromThreeJs(threeJsVec);
+  threeJsVec.delete(); // Clean up WASM object
+  return result;
 }
 
 // Create a single target and add it to the targets array
@@ -302,22 +300,22 @@ function setupScene() {
 
 
 function createTargetMesh(steelTarget) {
-  // Get vertices from BTK (world space, BTK coords)
-  const btkVertices = steelTarget.getVertices(32);
+  // Ensure display buffer is up to date
+  steelTarget.updateDisplay();
   
-  // Convert to Three.js coordinates
-  const positions = new Float32Array(btkVertices.size() * 3);
-  for (let i = 0; i < btkVertices.size(); i++) {
-    const btkVec = btkVertices.get(i);
-    const threeVec = btkToThreeJs(btkVec);
-    
-    positions[i * 3] = threeVec.x;
-    positions[i * 3 + 1] = threeVec.y;
-    positions[i * 3 + 2] = threeVec.z;
-    
-    btkVec.delete(); // Clean up WASM object
+  // Get vertex buffer as memory view (already in Three.js coordinates)
+  const vertexView = steelTarget.getVertices();
+  
+  // Check if view is valid
+  if (!vertexView || vertexView.length === 0) {
+    console.error('getVertices returned empty or invalid view');
+    return null;
   }
-  btkVertices.delete();
+  
+  // Vertices are already in Three.js space, just copy directly
+  // Create Float32Array from the memory view
+  const positions = new Float32Array(vertexView.length);
+  positions.set(vertexView);
   
   // Create geometry
   const geometry = new THREE.BufferGeometry();
@@ -347,22 +345,15 @@ function createTargetMesh(steelTarget) {
 function updateTargetMesh(target) {
   if (!target || !target.mesh || !target.steelTarget) return;
   
-  // Get updated vertices from BTK (world space, BTK coords)
-  const btkVertices = target.steelTarget.getVertices(32);
+  // Update display buffer before reading vertices
+  target.steelTarget.updateDisplay();
   
-  // Update position buffer in-place, converting BTK → Three.js coords
+  // Get vertex buffer as memory view (already in Three.js coordinates)
+  const vertexView = target.steelTarget.getVertices();
+  
+  // Update position buffer in-place (vertices already in Three.js space)
   const positions = target.mesh.geometry.attributes.position.array;
-  for (let i = 0; i < btkVertices.size(); i++) {
-    const btkVec = btkVertices.get(i);
-    const threeVec = btkToThreeJs(btkVec);
-    
-    positions[i * 3] = threeVec.x;
-    positions[i * 3 + 1] = threeVec.y;
-    positions[i * 3 + 2] = threeVec.z;
-    
-    btkVec.delete(); // Clean up WASM object
-  }
-  btkVertices.delete();
+  positions.set(vertexView);
   
   // Mark buffer as needing update
   target.mesh.geometry.attributes.position.needsUpdate = true;

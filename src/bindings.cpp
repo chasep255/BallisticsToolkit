@@ -90,7 +90,9 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("normalized", &Vector3D::normalized)
     .function("dot", &Vector3D::dot)
     .function("cross", &Vector3D::cross)
-    .function("lerp", &Vector3D::lerp);
+    .function("lerp", &Vector3D::lerp)
+    .function("toThreeJs", &Vector3D::toThreeJs)
+    .class_function("fromThreeJs", &Vector3D::fromThreeJs);
 
   class_<btk::math::Vector2D>("Vector2D")
     .constructor<float, float>()
@@ -351,5 +353,6 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("translate", &btk::match::SteelTarget::translate)
     .function("rotate", &btk::match::SteelTarget::rotate)
     .function("clearImpacts", &btk::match::SteelTarget::clearImpacts)
+    .function("updateDisplay", &btk::match::SteelTarget::updateDisplay)
     .function("getVertices", &btk::match::SteelTarget::getVertices);
 }

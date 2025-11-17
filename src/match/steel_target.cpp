@@ -4,6 +4,10 @@
 #include <cmath>
 #include <stdexcept>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/val.h>
+#endif
+
 namespace btk::match
 {
 
@@ -20,8 +24,10 @@ namespace btk::match
       mass_kg_(0.0f),
       inertia_tensor_(0.0f, 0.0f, 0.0f),
       linear_damping_(0.95f),
-      angular_damping_(0.95f) {
+      angular_damping_(0.95f),
+      segments_per_circle_(32) {
     calculateMassAndInertia();
+    updateDisplay(); // Initialize vertex buffer
   }
 
   void SteelTarget::addChainAnchor(const btk::math::Vector3D& fixed, const btk::math::Vector3D& attachment, float rest_length, float spring_constant) {
@@ -334,8 +340,8 @@ namespace btk::match
     impacts_.emplace_back(position, bullet_diameter, time);
   }
 
-  std::vector<btk::math::Vector3D> SteelTarget::getVertices(int segments_per_circle) const {
-    std::vector<btk::math::Vector3D> vertices;
+  void SteelTarget::updateDisplay() {
+    vertices_buffer_.clear();
     float halfThickness = thickness_ / 2.0f;
 
     // Use full orientation quaternion to rotate from local (+X-normal) frame to world
@@ -348,9 +354,9 @@ namespace btk::match
       float ry = height_ / 2.0f;
       
       // Generate front and back faces
-      for (int i = 0; i < segments_per_circle; ++i) {
-        float angle1 = (2.0f * M_PI_F * i) / segments_per_circle;
-        float angle2 = (2.0f * M_PI_F * (i + 1)) / segments_per_circle;
+      for (int i = 0; i < segments_per_circle_; ++i) {
+        float angle1 = (2.0f * M_PI_F * i) / segments_per_circle_;
+        float angle2 = (2.0f * M_PI_F * (i + 1)) / segments_per_circle_;
         
         float cos1 = std::cos(angle1), sin1 = std::sin(angle1);
         float cos2 = std::cos(angle2), sin2 = std::sin(angle2);
@@ -364,7 +370,7 @@ namespace btk::match
         btk::math::Vector3D v1Back_local(-halfThickness, rx * cos1, ry * sin1);
         btk::math::Vector3D v2Back_local(-halfThickness, rx * cos2, ry * sin2);
         
-        // Rotate vertices by current orientation
+        // Rotate vertices by current orientation (in BTK space)
         btk::math::Vector3D centerFront = position_ + rotation_quat.rotate(centerFront_local);
         btk::math::Vector3D v1Front = position_ + rotation_quat.rotate(v1Front_local);
         btk::math::Vector3D v2Front = position_ + rotation_quat.rotate(v2Front_local);
@@ -372,23 +378,32 @@ namespace btk::match
         btk::math::Vector3D v1Back = position_ + rotation_quat.rotate(v1Back_local);
         btk::math::Vector3D v2Back = position_ + rotation_quat.rotate(v2Back_local);
         
-        // Front face
-        vertices.push_back(centerFront);
-        vertices.push_back(v1Front);
-        vertices.push_back(v2Front);
+        // Helper lambda to convert BTK coords to Three.js coords and push to buffer
+        // BTK: X=downrange, Y=crossrange, Z=up
+        // Three.js: X=right, Y=up, Z=towards camera
+        auto pushThreeJsVertex = [&](const btk::math::Vector3D& btk) {
+          vertices_buffer_.push_back(btk.y);   // BTK Y → Three X
+          vertices_buffer_.push_back(btk.z);  // BTK Z → Three Y
+          vertices_buffer_.push_back(-btk.x); // BTK -X → Three Z
+        };
+        
+        // Front face - write as x,y,z,x,y,z,x,y,z in Three.js space
+        pushThreeJsVertex(centerFront);
+        pushThreeJsVertex(v1Front);
+        pushThreeJsVertex(v2Front);
         
         // Back face
-        vertices.push_back(centerBack);
-        vertices.push_back(v2Back);
-        vertices.push_back(v1Back);
+        pushThreeJsVertex(centerBack);
+        pushThreeJsVertex(v2Back);
+        pushThreeJsVertex(v1Back);
         
         // Edge face (quad connecting front and back)
-        vertices.push_back(v1Front);
-        vertices.push_back(v1Back);
-        vertices.push_back(v2Front);
-        vertices.push_back(v2Front);
-        vertices.push_back(v1Back);
-        vertices.push_back(v2Back);
+        pushThreeJsVertex(v1Front);
+        pushThreeJsVertex(v1Back);
+        pushThreeJsVertex(v2Front);
+        pushThreeJsVertex(v2Front);
+        pushThreeJsVertex(v1Back);
+        pushThreeJsVertex(v2Back);
       }
     } else {
       // Rectangle with thickness: front face, back face, and 4 edge faces
@@ -406,7 +421,7 @@ namespace btk::match
       btk::math::Vector3D v6_local(+halfThickness, +hw, +hh);
       btk::math::Vector3D v7_local(+halfThickness, -hw, +hh);
       
-      // Rotate to world space using full orientation
+      // Rotate to world space using full orientation (in BTK space)
       btk::math::Vector3D v0 = position_ + rotation_quat.rotate(v0_local);
       btk::math::Vector3D v1 = position_ + rotation_quat.rotate(v1_local);
       btk::math::Vector3D v2 = position_ + rotation_quat.rotate(v2_local);
@@ -416,54 +431,73 @@ namespace btk::match
       btk::math::Vector3D v6 = position_ + rotation_quat.rotate(v6_local);
       btk::math::Vector3D v7 = position_ + rotation_quat.rotate(v7_local);
       
+      // Helper lambda to convert BTK coords to Three.js coords and push to buffer
+      // BTK: X=downrange, Y=crossrange, Z=up
+      // Three.js: X=right, Y=up, Z=towards camera
+      auto pushThreeJsVertex = [&](const btk::math::Vector3D& btk) {
+        vertices_buffer_.push_back(btk.y);   // BTK Y → Three X
+        vertices_buffer_.push_back(btk.z);  // BTK Z → Three Y
+        vertices_buffer_.push_back(-btk.x); // BTK -X → Three Z
+      };
+      
       // Front face (X = +halfThickness)
-      vertices.push_back(v4);
-      vertices.push_back(v5);
-      vertices.push_back(v6);
-      vertices.push_back(v4);
-      vertices.push_back(v6);
-      vertices.push_back(v7);
+      pushThreeJsVertex(v4);
+      pushThreeJsVertex(v5);
+      pushThreeJsVertex(v6);
+      pushThreeJsVertex(v4);
+      pushThreeJsVertex(v6);
+      pushThreeJsVertex(v7);
       
       // Back face (X = -halfThickness)
-      vertices.push_back(v0);
-      vertices.push_back(v2);
-      vertices.push_back(v1);
-      vertices.push_back(v0);
-      vertices.push_back(v3);
-      vertices.push_back(v2);
+      pushThreeJsVertex(v0);
+      pushThreeJsVertex(v2);
+      pushThreeJsVertex(v1);
+      pushThreeJsVertex(v0);
+      pushThreeJsVertex(v3);
+      pushThreeJsVertex(v2);
       
       // Edge faces (4 sides)
       // Bottom edge
-      vertices.push_back(v0);
-      vertices.push_back(v1);
-      vertices.push_back(v5);
-      vertices.push_back(v0);
-      vertices.push_back(v5);
-      vertices.push_back(v4);
+      pushThreeJsVertex(v0);
+      pushThreeJsVertex(v1);
+      pushThreeJsVertex(v5);
+      pushThreeJsVertex(v0);
+      pushThreeJsVertex(v5);
+      pushThreeJsVertex(v4);
       // Top edge
-      vertices.push_back(v2);
-      vertices.push_back(v6);
-      vertices.push_back(v3);
-      vertices.push_back(v3);
-      vertices.push_back(v6);
-      vertices.push_back(v7);
+      pushThreeJsVertex(v2);
+      pushThreeJsVertex(v6);
+      pushThreeJsVertex(v3);
+      pushThreeJsVertex(v3);
+      pushThreeJsVertex(v6);
+      pushThreeJsVertex(v7);
       // Left edge
-      vertices.push_back(v0);
-      vertices.push_back(v4);
-      vertices.push_back(v7);
-      vertices.push_back(v0);
-      vertices.push_back(v7);
-      vertices.push_back(v3);
+      pushThreeJsVertex(v0);
+      pushThreeJsVertex(v4);
+      pushThreeJsVertex(v7);
+      pushThreeJsVertex(v0);
+      pushThreeJsVertex(v7);
+      pushThreeJsVertex(v3);
       // Right edge
-      vertices.push_back(v1);
-      vertices.push_back(v5);
-      vertices.push_back(v6);
-      vertices.push_back(v1);
-      vertices.push_back(v6);
-      vertices.push_back(v2);
+      pushThreeJsVertex(v1);
+      pushThreeJsVertex(v5);
+      pushThreeJsVertex(v6);
+      pushThreeJsVertex(v1);
+      pushThreeJsVertex(v6);
+      pushThreeJsVertex(v2);
     }
-
-    return vertices;
   }
+
+#ifdef __EMSCRIPTEN__
+  emscripten::val SteelTarget::getVertices() const {
+    using namespace emscripten;
+    if (vertices_buffer_.empty()) {
+      // Return an empty Float32Array
+      return val::global("Float32Array").new_(0);
+    }
+    // Wrap a typed memory view in a JS value (Float32Array view into WASM memory)
+    return val(typed_memory_view(vertices_buffer_.size(), vertices_buffer_.data()));
+  }
+#endif
 
 } // namespace btk::match
