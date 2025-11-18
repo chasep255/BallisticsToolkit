@@ -71,53 +71,49 @@ function createTarget(
     attachmentZ = height_m / 2;
   }
   
-  // Create BTK steel target with single shape at origin
-  const steelTarget = new btk.SteelTarget(width_m, height_m, thickness_m, isOval);
-  
-  // Rotate target to face shooter FIRST (before adding chains)
-  const normalBtk = new btk.Vector3D(-1, 0, 0);
-  steelTarget.rotate(normalBtk);
-  normalBtk.delete();
-  
-  // Translate to final position
+  // Create BTK steel target at final position (no rotation needed - symmetric target)
   const initialPosThree = new THREE.Vector3(position_m.x, position_m.y, position_m.z);
   const initialPos = threeJsToBtk(initialPosThree);
-  steelTarget.translate(initialPos);
+  const defaultNormal = new btk.Vector3D(1, 0, 0);  // Default orientation (no rotation)
+  const steelTarget = new btk.SteelTarget(width_m, height_m, thickness_m, isOval, initialPos, defaultNormal);
   initialPos.delete();
+  defaultNormal.delete();
   
-  // NOW add chain anchors with local attachment and world fixed points
-  // Local attachment: point on target surface (in target's local coordinate system)
+  // Add chain anchors - local attachment on target, world fixed on beam
   const leftLocalAttach = new btk.Vector3D(thickness_m / 2, attachmentY, attachmentZ);
   const rightLocalAttach = new btk.Vector3D(thickness_m / 2, -attachmentY, attachmentZ);
   
-  // World fixed: beam anchor points at beamHeight (in BTK world coordinates)
-  // BTK coords: X=downrange, Y=crossrange, Z=up
-  // Three.js position_m: x=right, y=up, z=forward
-  // So: BTK_X = -position_m.z, BTK_Y = position_m.x, BTK_Z = beamHeight
+  // Transform local attachments to world space
+  const leftWorldAttach = steelTarget.localToWorld(leftLocalAttach);
+  const rightWorldAttach = steelTarget.localToWorld(rightLocalAttach);
+  
+  // Place fixed anchors above and slightly outward from attachment points
+  // This angles the chains outward for a more realistic look
   const beamHeight = 2.5; // meters
+  const outwardOffset = 0.25; // meters - how far outward to angle chains
   const leftWorldFixed = new btk.Vector3D(
-    -position_m.z,  // BTK X (downrange) = -Three.js Z (forward)
-    position_m.x + attachmentY + chainHoriz,  // BTK Y (crossrange) = Three.js X (right)
-    beamHeight  // BTK Z (up) = fixed beam height
+    leftWorldAttach.x,
+    leftWorldAttach.y + outwardOffset,  // Angle left chain outward (left = +Y in BTK)
+    beamHeight
   );
   const rightWorldFixed = new btk.Vector3D(
-    -position_m.z,  // BTK X (downrange) = -Three.js Z (forward)
-    position_m.x - attachmentY - chainHoriz,  // BTK Y (crossrange) = Three.js X (right)
-    beamHeight  // BTK Z (up) = fixed beam height
+    rightWorldAttach.x,
+    rightWorldAttach.y - outwardOffset,  // Angle right chain outward (right = -Y in BTK)
+    beamHeight
   );
   
-  // Add chains: local attachment on target, world fixed on beam
   steelTarget.addChainAnchor(leftLocalAttach, leftWorldFixed, springConstant);
   steelTarget.addChainAnchor(rightLocalAttach, rightWorldFixed, springConstant);
   
-  // Clean up
+  leftWorldAttach.delete();
+  rightWorldAttach.delete();
   leftLocalAttach.delete();
   rightLocalAttach.delete();
   leftWorldFixed.delete();
   rightWorldFixed.delete();
   
-  // Set damping
-  steelTarget.setDamping(0.95, 0.92);
+  // Set damping (fraction remaining after 1 second)
+  steelTarget.setDamping(0.1, 0.1);  // 20% linear, 20% angular remains after 1s
   
   // Create Three.js mesh and chain lines
   const targetMesh = createTargetMesh(steelTarget);
@@ -150,7 +146,7 @@ function createTargetRack() {
   
   // Target spacing in yards (side by side)
   const spacing = 2; // 2 yards between targets
-  const baseY = 1; // 1 yard up
+  const baseY = 2; // 2 yards up (1.83m)
   const baseZ = -10/3; // -10/3 yards downrange
   
   // All chains hang from the beam at beamHeight
@@ -219,13 +215,6 @@ function clearAllTargets() {
       scene.remove(line);
       if (line.geometry) line.geometry.dispose();
       if (line.material) line.material.dispose();
-    }
-    
-    // Clean up impact markers
-    for (const marker of target.impactMarkers) {
-      scene.remove(marker);
-      if (marker.geometry) marker.geometry.dispose();
-      if (marker.material) marker.material.dispose();
     }
   }
   targets = [];
@@ -425,6 +414,7 @@ function createChainLines(steelTarget) {
   const leftPositions = new Float32Array(6); // 2 points * 3 coords
   leftGeometry.setAttribute('position', new THREE.BufferAttribute(leftPositions, 3));
   const leftLine = new THREE.Line(leftGeometry, material);
+  leftLine.castShadow = true;
   scene.add(leftLine);
   
   // Right chain
@@ -432,6 +422,7 @@ function createChainLines(steelTarget) {
   const rightPositions = new Float32Array(6);
   rightGeometry.setAttribute('position', new THREE.BufferAttribute(rightPositions, 3));
   const rightLine = new THREE.Line(rightGeometry, material);
+  rightLine.castShadow = true;
   scene.add(rightLine);
   
   return [leftLine, rightLine];
@@ -439,49 +430,43 @@ function createChainLines(steelTarget) {
 
 
 function updateChainLines(target) {
-  if (!target || target.chainLines.length !== 2 || !target.steelTarget) return;
+  if (!target || !target.chainLines || !target.steelTarget) return;
   
   // Get actual anchor data from C++ physics engine (already updated by simulation)
   const anchors = target.steelTarget.getAnchors();
-  if (anchors.size() < 2) return;
+  if (anchors.size() === 0) {
+    anchors.delete();
+    return;
+  }
   
-  // Get the two anchors (left=0, right=1 based on creation order)
-  const leftAnchor = anchors.get(0);
-  const rightAnchor = anchors.get(1);
+  // Update each chain line for each anchor
+  const numAnchors = anchors.size();
+  const numChainLines = target.chainLines.length;
   
-  // Transform local attachments to world space
-  const leftAttachWorld = target.steelTarget.localToWorld(leftAnchor.localAttachment);
-  const rightAttachWorld = target.steelTarget.localToWorld(rightAnchor.localAttachment);
+  for (let i = 0; i < Math.min(numAnchors, numChainLines); i++) {
+    const anchor = anchors.get(i);
+    
+    // Transform local attachment to world space
+    const attachWorld = target.steelTarget.localToWorld(anchor.localAttachment);
+    
+    // Convert BTK positions to Three.js for rendering
+    const fixed = btkToThreeJs(anchor.worldFixed);
+    const attach = btkToThreeJs(attachWorld);
+    
+    // Update chain line: connects fixed anchor to attachment point
+    const positions = target.chainLines[i].geometry.attributes.position.array;
+    positions[0] = fixed.x;
+    positions[1] = fixed.y;
+    positions[2] = fixed.z;
+    positions[3] = attach.x;
+    positions[4] = attach.y;
+    positions[5] = attach.z;
+    target.chainLines[i].geometry.attributes.position.needsUpdate = true;
+    
+    // Cleanup
+    attachWorld.delete();
+  }
   
-  // Convert BTK positions to Three.js for rendering
-  const leftFixed = btkToThreeJs(leftAnchor.worldFixed);
-  const leftAttach = btkToThreeJs(leftAttachWorld);
-  const rightFixed = btkToThreeJs(rightAnchor.worldFixed);
-  const rightAttach = btkToThreeJs(rightAttachWorld);
-  
-  // Update left chain line: connects leftAnchor.fixed to leftAnchor.attachment
-  const leftPositions = target.chainLines[0].geometry.attributes.position.array;
-  leftPositions[0] = leftFixed.x;
-  leftPositions[1] = leftFixed.y;
-  leftPositions[2] = leftFixed.z;
-  leftPositions[3] = leftAttach.x;
-  leftPositions[4] = leftAttach.y;
-  leftPositions[5] = leftAttach.z;
-  target.chainLines[0].geometry.attributes.position.needsUpdate = true;
-  
-  // Update right chain line: connects rightAnchor.fixed to rightAnchor.attachment
-  const rightPositions = target.chainLines[1].geometry.attributes.position.array;
-  rightPositions[0] = rightFixed.x;
-  rightPositions[1] = rightFixed.y;
-  rightPositions[2] = rightFixed.z;
-  rightPositions[3] = rightAttach.x;
-  rightPositions[4] = rightAttach.y;
-  rightPositions[5] = rightAttach.z;
-  target.chainLines[1].geometry.attributes.position.needsUpdate = true;
-  
-  // Cleanup
-  leftAttachWorld.delete();
-  rightAttachWorld.delete();
   anchors.delete();
 }
 
@@ -630,20 +615,26 @@ function onCanvasClick(event) {
 }
 
 function resetTarget() {
-  // Clear all impacts and reset all targets
+  // Clean up existing targets
   for (const target of targets) {
-    if (target.steelTarget) {
-      target.steelTarget.clearImpacts();
+    // Clean up physics object
+    if (target.steelTarget) target.steelTarget.delete();
+    
+    // Clean up mesh
+    if (target.mesh) {
+      scene.remove(target.mesh);
+      if (target.mesh.geometry) target.mesh.geometry.dispose();
+      if (target.mesh.material) target.mesh.material.dispose();
     }
     
-    // Remove impact markers
-    for (const marker of target.impactMarkers) {
-      scene.remove(marker);
-      if (marker.geometry) marker.geometry.dispose();
-      if (marker.material) marker.material.dispose();
+    // Clean up chain lines
+    for (const line of target.chainLines) {
+      scene.remove(line);
+      if (line.geometry) line.geometry.dispose();
+      if (line.material) line.material.dispose();
     }
-    target.impactMarkers = [];
   }
+  targets = [];
   
   // Recreate the rack
   createTargetRack();
@@ -665,39 +656,8 @@ function animate() {
     }
   }
   
-  // Update stats (show first target's stats)
-  if (targets.length > 0 && targets[0].steelTarget) {
-    updateStats(targets[0].steelTarget);
-  }
-  
   // Render
   renderer.render(scene, camera);
-}
-
-function updateStats(steelTarget) {
-  if (!steelTarget) return;
-  
-  // Get velocity
-  const velocity = steelTarget.getVelocity();
-  const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z);
-  document.getElementById('linearVelocity').textContent = speed.toFixed(2) + ' m/s';
-  velocity.delete();
-  
-  // Get angular velocity
-  const angVel = steelTarget.getAngularVelocity();
-  const angSpeed = Math.sqrt(angVel.x * angVel.x + angVel.y * angVel.y + angVel.z * angVel.z);
-  document.getElementById('angularVelocity').textContent = angSpeed.toFixed(2) + ' rad/s';
-  angVel.delete();
-  
-  // Get position
-  const position = steelTarget.getCenterOfMass();
-  document.getElementById('positionX').textContent = position.x.toFixed(3) + ' m';
-  document.getElementById('positionZ').textContent = position.z.toFixed(3) + ' m';
-  position.delete();
-  
-  // Get mass
-  const mass = steelTarget.getMass();
-  document.getElementById('targetMass').textContent = mass.toFixed(2) + ' kg';
 }
 
 function showError(message) {

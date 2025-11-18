@@ -24,8 +24,8 @@ namespace btk::match
       angular_velocity_(0.0f, 0.0f, 0.0f),
       mass_kg_(0.0f),
       inertia_tensor_(0.0f, 0.0f, 0.0f),
-      linear_damping_(0.95f),
-      angular_damping_(0.95f),
+      linear_damping_(0.1f),   // 10% velocity remains after 1 second
+      angular_damping_(0.1f),  // 10% angular velocity remains after 1 second
       segments_per_circle_(32),
       texture_width_(512),
       texture_height_(512) {
@@ -36,6 +36,49 @@ namespace btk::match
     calculateMassAndInertia();
     updateDisplay(); // Initialize vertex buffer
     initializeTexture(); // Initialize texture buffer
+  }
+
+  SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval,
+                           const btk::math::Vector3D& position, const btk::math::Vector3D& normal)
+    : width_(width),
+      height_(height),
+      thickness_(thickness),
+      is_oval_(is_oval),
+      position_(position),
+      normal_(normal.normalized()),
+      orientation_(btk::math::Quaternion()),
+      velocity_ms_(0.0f, 0.0f, 0.0f),
+      angular_velocity_(0.0f, 0.0f, 0.0f),
+      mass_kg_(0.0f),
+      inertia_tensor_(0.0f, 0.0f, 0.0f),
+      linear_damping_(0.1f),
+      angular_damping_(0.1f),
+      segments_per_circle_(32),
+      texture_width_(512),
+      texture_height_(512) {
+    // Default colors: bright red paint, gray metal
+    paint_color_[0] = 255; paint_color_[1] = 40; paint_color_[2] = 40;
+    metal_color_[0] = 140; metal_color_[1] = 140; metal_color_[2] = 140;
+    
+    // Calculate orientation from normal
+    btk::math::Vector3D default_normal(1.0f, 0.0f, 0.0f);
+    float dot = normal_.dot(default_normal);
+    
+    if (dot < -0.9999f) {
+      // Opposite direction: 180° rotation around Z
+      btk::math::Vector3D axis(0.0f, 0.0f, 1.0f);
+      orientation_ = btk::math::Quaternion::fromAxisAngle(axis, 3.14159265359f);
+    } else if (dot < 0.9999f) {
+      // General case
+      btk::math::Vector3D axis = default_normal.cross(normal_).normalized();
+      float angle = std::acos(dot);
+      orientation_ = btk::math::Quaternion::fromAxisAngle(axis, angle);
+    }
+    // else: already aligned, identity quaternion is correct
+    
+    calculateMassAndInertia();
+    updateDisplay();
+    initializeTexture();
   }
 
   void SteelTarget::addChainAnchor(const btk::math::Vector3D& local_attachment, const btk::math::Vector3D& world_fixed, float spring_constant) {
@@ -58,61 +101,6 @@ namespace btk::match
     btk::math::Vector3D rotated = orientation_.rotate(local_point);
     // Translate by the target's position
     return position_ + rotated;
-  }
-
-  void SteelTarget::recalculateChainRestLengths() {
-    for (auto& anchor : anchors_) {
-      // Transform local attachment to world space
-      btk::math::Vector3D world_attachment = localToWorld(anchor.local_attachment_);
-      
-      // Recalculate rest length as distance from world_fixed to world_attachment
-      anchor.rest_length_ = (anchor.world_fixed_ - world_attachment).magnitude();
-    }
-  }
-
-  void SteelTarget::translate(const btk::math::Vector3D& offset) {
-    // Update center of mass
-    position_ += offset;
-    
-    // Recalculate chain rest lengths based on new position
-    // (local_attachment transforms to new world position, world_fixed stays put)
-    recalculateChainRestLengths();
-  }
-
-  void SteelTarget::rotate(const btk::math::Vector3D& normal) {
-    // Normalize target normal
-    btk::math::Vector3D target_normal = normal.normalized();
-    
-    // Current normal (default is +X)
-    btk::math::Vector3D current_normal = normal_;
-    
-    // Check if already aligned
-    float dot = target_normal.dot(current_normal);
-    if (dot > 0.9999f) {
-      // Already aligned, no rotation needed
-      return;
-    }
-    
-    btk::math::Quaternion rotation;
-    if (dot < -0.9999f) {
-      // Opposite direction, rotate 180 degrees around Z axis to keep target upright
-      btk::math::Vector3D axis(0.0f, 0.0f, 1.0f);
-      rotation = btk::math::Quaternion::fromAxisAngle(axis, 3.14159265359f);
-    } else {
-      // General case: rotate from current normal to target normal
-      btk::math::Vector3D axis = current_normal.cross(target_normal).normalized();
-      float angle = std::acos(dot);
-      rotation = btk::math::Quaternion::fromAxisAngle(axis, angle);
-    }
-    
-    // Recalculate chain rest lengths based on new orientation
-    // (local_attachment transforms with new orientation, world_fixed stays put)
-    recalculateChainRestLengths();
-    
-    // Update orientation and normal
-    orientation_ = rotation * orientation_;
-    orientation_.normalize();
-    normal_ = orientation_.rotate(btk::math::Vector3D(1.0f, 0.0f, 0.0f));
   }
 
   bool SteelTarget::hit(const btk::ballistics::Trajectory& trajectory) {
@@ -308,35 +296,46 @@ namespace btk::match
   }
 
   void SteelTarget::timeStep(float dt) {
-    // Apply gravity (BTK: Z is up, so gravity is in -Z direction)
-    btk::math::Vector3D gravity_force(0.0f, 0.0f, -btk::physics::Constants::GRAVITY * mass_kg_);
-    applyForce(gravity_force, position_, dt);
+    // Clamp dt and subdivide if necessary for stability
+    constexpr float MAX_SUBSTEP_DT = 0.01f;  // 10ms maximum substep (can be smaller)
+    constexpr float MAX_TOTAL_DT = 1.0f;     // 1s maximum total time
     
-    // Apply chain tension forces
-    applyChainForces(dt);
+    // Clamp total time to maximum
+    dt = std::min(dt, MAX_TOTAL_DT);
     
-    // Apply damping
-    velocity_ms_ = velocity_ms_ * linear_damping_;
-    angular_velocity_ = angular_velocity_ * angular_damping_;
-
-    // Semi-implicit Euler integration for stability
-    btk::math::Vector3D position_delta = velocity_ms_ * dt;
-    position_ += position_delta;
-
-    // Angular velocity integration: allow X and Y axis rotation (twisting and swinging)
-    // Z-axis is constrained (angular_velocity_.z was zeroed above) to reduce unphysical vertical spinning
-    if (angular_velocity_.magnitude() > 1e-6f) {
-      float angle = angular_velocity_.magnitude() * dt;
-      btk::math::Vector3D axis = angular_velocity_.normalized();
-      btk::math::Quaternion rotation = btk::math::Quaternion::fromAxisAngle(axis, angle);
-
-      // Update orientation and normal from accumulated rotation
-      orientation_ = rotation * orientation_;
-      orientation_.normalize();
-      normal_ = orientation_.rotate(btk::math::Vector3D(1.0f, 0.0f, 0.0f));
+    // Subdivide into smaller steps if needed
+    int num_substeps = static_cast<int>(std::ceil(dt / MAX_SUBSTEP_DT));
+    float substep_dt = dt / num_substeps;
+    
+    for (int i = 0; i < num_substeps; ++i) {
+      // Apply gravity (BTK: Z is up, so gravity is in -Z direction)
+      btk::math::Vector3D gravity_force(0.0f, 0.0f, -btk::physics::Constants::GRAVITY * mass_kg_);
+      applyForce(gravity_force, position_, substep_dt);
       
-      // Note: Chain local_attachment is in local coordinates (moves with target),
-      // world_fixed is in world coordinates (stays put). No manual update needed.
+      // Apply chain tension forces
+      applyChainForces(substep_dt);
+      
+      // Apply damping proportional to dt
+      // Convert damping coefficients to per-second rates
+      // damping_factor = damping_coefficient^dt
+      float linear_damping_factor = std::pow(linear_damping_, substep_dt);
+      float angular_damping_factor = std::pow(angular_damping_, substep_dt);
+      velocity_ms_ = velocity_ms_ * linear_damping_factor;
+      angular_velocity_ = angular_velocity_ * angular_damping_factor;
+
+      // Semi-implicit Euler integration
+      position_ += velocity_ms_ * substep_dt;
+      
+      // Angular velocity integration
+      float angular_speed = angular_velocity_.magnitude();
+      if (angular_speed > 0.0f) {
+        float angle = angular_speed * substep_dt;
+        btk::math::Vector3D axis = angular_velocity_ / angular_speed;
+        btk::math::Quaternion rotation = btk::math::Quaternion::fromAxisAngle(axis, angle);
+        orientation_ = rotation * orientation_;
+        orientation_.normalize();
+        normal_ = orientation_.rotate(btk::math::Vector3D(1.0f, 0.0f, 0.0f));
+      }
     }
   }
 

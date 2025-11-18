@@ -59,30 +59,9 @@
   <div class="nav-header"></div>
 
   <div class="app-container">
-    <h1>🎯 Steel Target Simulator</h1>
-
-    <!-- Stats Bar -->
-    <div class="stats-container">
-      <div class="stat-item">
-        <div class="stat-label">Linear Velocity</div>
-        <div id="linearVelocity" class="stat-value">0.0 m/s</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Angular Velocity</div>
-        <div id="angularVelocity" class="stat-value">0.0 rad/s</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Position X</div>
-        <div id="positionX" class="stat-value">0.0 m</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Position Z</div>
-        <div id="positionZ" class="stat-value">0.0 m</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Target Mass</div>
-        <div id="targetMass" class="stat-value">0.0 kg</div>
-      </div>
+    <h1>🔩 Steel Target Simulator</h1>
+    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 12px; margin: 20px 0; color: #856404;">
+      <strong>⚠️ Under Construction:</strong> This is currently a physics animation demo showcasing steel target dynamics. Eventually this will be a full shooting range simulator with multiple reactive steel targets.
     </div>
 
     <!-- Control Buttons -->
@@ -104,51 +83,87 @@
   <div id="helpModal" class="help-modal" style="display: none;">
     <div class="help-modal-content">
       <div class="help-modal-header">
-        <h2>🎯 Steel Target Simulator Help</h2>
+        <h2>🔩 Steel Target Simulator Help</h2>
         <span class="help-close">&times;</span>
       </div>
       <div class="help-modal-body">
+        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
+          <h3 style="margin-top: 0;">Need Help or Found an Issue?</h3>
+          <div class="param-help">
+            <strong>📧 Email:</strong> <a href="mailto:admin@ballisticstoolkit.com">admin@ballisticstoolkit.com</a><br>
+            <strong>💻 GitHub:</strong> <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener noreferrer">github.com/chasep255/BallisticsToolkit</a>
+          </div>
+        </div>
+        
         <div class="help-section">
           <h3>Quick Start</h3>
-          <p>Click anywhere on the steel target to simulate a bullet impact. Watch the realistic physics simulation as the target swings and rotates based on where you hit it.</p>
+          <p>Click anywhere on a steel target to simulate a bullet impact. Watch the realistic physics simulation as the target swings and rotates based on where you hit it. The demo features 4 different targets to showcase various physics behaviors.</p>
         </div>
         
         <div class="help-section">
           <h3>Controls</h3>
           <div class="param-help">
-            <strong>Left Click:</strong> Simulate a bullet impact at the clicked location. The target will respond with realistic physics based on the impact point, including both linear motion and rotation.<br><br>
-            <strong>Reset Target:</strong> Returns the target to its initial resting position and clears all velocities and impact history.
+            <strong>Left Click:</strong> Simulate a bullet impact at the clicked location. The target will respond with realistic physics based on the impact point, including both linear motion and rotation. Bullet velocity is 800 m/s from the camera position.<br><br>
+            <strong>Reset All Targets:</strong> Returns all targets to their initial resting positions and clears all velocities and impact history. Targets are recreated fresh.
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Target Configuration</h3>
+          <div class="param-help">
+            <strong>Demo Targets:</strong> The demo features 4 steel targets: 6" circle, 18"×30" rectangle, 12" circle, and 12"×18" rectangle. All targets are 0.5" thick steel with realistic mass calculations based on dimensions.<br><br>
+            <strong>Chain Mounting:</strong> Each target has two chains attached at the top corners (rectangles) or at 45° angles (circles), connecting to an overhead beam. Chains are angled slightly outward for a realistic look. Chains act as springs with 500 N/m spring constant.<br><br>
+            <strong>Chain Dynamics:</strong> Chains have rest lengths calculated from the initial attachment positions. As targets move, chains stretch and apply restoring forces, creating realistic swinging behavior.
           </div>
         </div>
         
         <div class="help-section">
           <h3>Physics Simulation</h3>
           <div class="param-help">
-            <strong>Target Configuration:</strong> IPSC-style steel target with rectangular body (18" × 30") and head (6" × 9"), made of 0.5" thick steel.<br><br>
-            <strong>Chain Mounting:</strong> Two chains attached at 45-degree angles from the shoulders to overhead anchor points. Chains act as springs with realistic tension forces.<br><br>
-            <strong>Impact Physics:</strong> Bullet impacts transfer momentum to the target, causing both linear motion and rotation. The exact response depends on where you hit the target relative to its center of mass.<br><br>
-            <strong>Damping:</strong> Air resistance and internal friction gradually slow down the target motion, causing it to eventually return to rest.<br><br>
-            <strong>Constraints:</strong> The chain springs pull the target back toward its resting position, creating realistic swinging behavior.
+            <strong>Rigid Body Physics:</strong> Targets are simulated as rigid bodies with position, orientation (quaternion), linear velocity, and angular velocity. Mass and inertia tensor (simplified diagonal) are calculated automatically from target dimensions and steel density.<br><br>
+            <strong>Impact Physics:</strong> Bullet impacts transfer momentum to the target using impulse calculations. The exact response depends on where you hit the target relative to its center of mass. Impacts off-center create both linear motion and rotation.<br><br>
+            <strong>Chain Constraints:</strong> Chains apply spring forces based on their current length versus rest length. Forces are applied at the attachment points, creating both linear and rotational effects.<br><br>
+            <strong>Damping:</strong> Linear and angular damping (10% velocity remaining per second) simulate air resistance and internal friction. Damping is applied proportionally to the time step for consistent behavior.<br><br>
+            <strong>Time Stepping:</strong> Physics uses variable time steps with subdivision (max 0.01s substeps, max 1.0s total) for stability. Multiple substeps ensure accurate integration even with large time steps.
           </div>
         </div>
         
         <div class="help-section">
           <h3>What to Observe</h3>
           <div class="param-help">
-            <strong>Center Hits:</strong> Hitting near the center of mass causes mostly linear motion with minimal rotation.<br><br>
-            <strong>Edge Hits:</strong> Hitting near the edges causes significant rotation as well as linear motion.<br><br>
-            <strong>Head vs Body:</strong> The head is lighter and offset, so hits there create different dynamics than body hits.<br><br>
-            <strong>Chain Dynamics:</strong> Watch how the chains stretch and pull the target back, creating oscillating motion.
+            <strong>Center Hits:</strong> Hitting near the center of mass causes mostly linear motion with minimal rotation. The target swings back and forth like a pendulum.<br><br>
+            <strong>Edge Hits:</strong> Hitting near the edges causes significant rotation as well as linear motion. Watch how the target spins while swinging.<br><br>
+            <strong>Different Target Sizes:</strong> Smaller targets (6" circle) respond more dramatically to impacts than larger ones (18"×30" rectangle) due to their lower mass and inertia.<br><br>
+            <strong>Chain Dynamics:</strong> Watch how the chains stretch and pull the target back, creating oscillating motion.<br><br>
+            <strong>Impact Visualization:</strong> Bullet impacts are drawn on the target texture as splatter marks. Impacts appear on the side that was hit (front or back), with metal showing through the red paint.
           </div>
         </div>
         
         <div class="help-section">
-          <h3>Statistics Display</h3>
+          <h3>Technical Details</h3>
           <div class="param-help">
-            <strong>Linear Velocity:</strong> Overall speed of the target's center of mass (m/s).<br><br>
-            <strong>Angular Velocity:</strong> Rotation speed around the target's center of mass (rad/s).<br><br>
-            <strong>Position X/Z:</strong> Current position of the target's center of mass. X is downrange, Z is vertical.<br><br>
-            <strong>Target Mass:</strong> Total mass of the steel target in kilograms.
+            <strong>Physics Engine:</strong> Custom rigid body physics implemented in C++ and compiled to WebAssembly for high performance. Uses quaternion-based orientation representation for stable rotations.<br><br>
+            <strong>Rendering:</strong> Three.js WebGL rendering with dynamic geometry updates. Vertex positions are computed in C++ and transferred via typed memory views for zero-copy efficiency. Textures are generated procedurally in C++ and updated incrementally as impacts occur.<br><br>
+            <strong>Chain Physics:</strong> Chains are modeled as ideal springs with rest lengths calculated from initial positions. Forces are applied at attachment points in world coordinates, with local attachment points transformed using the target's current orientation.<br><br>
+            <strong>Impact Detection:</strong> Raycasting from camera through mouse position detects target intersections. Impact points are converted to local target coordinates for physics calculations and texture drawing.<br><br>
+            <strong>Texture Generation:</strong> Targets use a single texture buffer that is twice as wide, with front face UVs mapping to the left half (0-0.5) and back face UVs mapping to the right half (0.5-1.0). This allows impacts to appear on the correct side.
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Limitations</h3>
+          <div class="param-help">
+            <strong>Simplified Physics:</strong> The simulation uses simplified rigid body physics without advanced collision detection between targets or complex material properties. Targets do not interact with each other.<br><br>
+            <strong>Chain Model:</strong> Chains are modeled as ideal springs without mass or realistic chain link physics. They cannot go slack or wrap around objects. Damping is applied to the target's motion, not to the chains themselves.<br><br>
+            <strong>Fixed Environment:</strong> The simulation assumes a fixed overhead beam and does not model ground interactions, wind effects, or other environmental factors.<br><br>
+            <strong>Demo Scope:</strong> This is currently a physics animation demo. Future versions will include full shooting range simulation with multiple scenarios and scoring.
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Future Plans</h3>
+          <div class="param-help">
+            This demo showcases the physics animation capabilities. Eventually, this will expand to a full shooting range simulator with multiple reactive steel targets, realistic shooting scenarios, and support for various target configurations and shooting disciplines.
           </div>
         </div>
       </div>

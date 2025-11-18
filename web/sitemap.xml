@@ -24,5 +24,9 @@
     <loc>https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html</loc>
     <priority>0.9</priority>
   </url>
+  <url>
+    <loc>https://www.ballisticstoolkit.com/steel-sim/steel-sim.html</loc>
+    <priority>0.1</priority>
+  </url>
 </urlset>
 

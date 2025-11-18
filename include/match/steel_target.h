@@ -76,7 +76,7 @@ namespace btk::match
     };
 
     /**
-     * @brief Initialize steel target with single shape
+     * @brief Initialize steel target with single shape at origin
      *
      * @param width Target width (bounding box)
      * @param height Target height (bounding box)
@@ -84,6 +84,19 @@ namespace btk::match
      * @param is_oval True for oval shape, false for rectangle
      */
     SteelTarget(float width, float height, float thickness, bool is_oval = false);
+    
+    /**
+     * @brief Initialize steel target with position and orientation
+     *
+     * @param width Target width (bounding box)
+     * @param height Target height (bounding box)
+     * @param thickness Target thickness
+     * @param is_oval True for oval shape, false for rectangle
+     * @param position Initial position (center of mass)
+     * @param normal Surface normal direction (target faces this direction)
+     */
+    SteelTarget(float width, float height, float thickness, bool is_oval,
+                const btk::math::Vector3D& position, const btk::math::Vector3D& normal);
 
     /**
      * @brief Add a chain anchor constraint
@@ -251,17 +264,6 @@ namespace btk::match
     float getMass() const { return mass_kg_; }
 
     /**
-     * @brief Translate all components and anchors by the given offset
-     */
-    void translate(const btk::math::Vector3D& offset);
-
-    /**
-     * @brief Rotate all components and anchors to face the given normal direction
-     * Components default to normal in +X direction
-     */
-    void rotate(const btk::math::Vector3D& normal);
-
-    /**
      * @brief Clear all recorded impacts and reset texture to clean paint
      */
     void clearImpacts() { 
@@ -342,15 +344,6 @@ namespace btk::match
      * @brief Apply force at a world-space point
      */
     void applyForce(const btk::math::Vector3D& force, const btk::math::Vector3D& world_position, float dt);
-
-    /**
-     * @brief Recalculate rest lengths for all chain anchors
-     * 
-     * Transforms local_attachment points to world space and recalculates
-     * rest lengths based on distance to world_fixed points.
-     * Called automatically by translate() and rotate().
-     */
-    void recalculateChainRestLengths();
 
     /**
      * @brief Record an impact for visualization and update texture

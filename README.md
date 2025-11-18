@@ -37,6 +37,11 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Immersive Environment** - Procedural terrain, dynamic audio, comprehensive HUD
 - **Debug Mode** - Add `?debug=1` to URL for rapid testing (1-min relays, 2 shots)
 
+### 🔩 Steel Target Simulator *(Under Construction)*
+- **Physics Animation Demo** - Currently showcases realistic steel target dynamics with chain constraints, momentum transfer, and bullet impact visualization
+- **Current Demo** - Features 4 targets (6" circle, 18"×30" rectangle, 12" circle, 12"×18" rectangle) demonstrating rigid body physics
+- **Future Plans** - Will expand to a full shooting range simulator with multiple reactive steel targets and realistic shooting scenarios
+
 ## Quick Start
 
 ### Ballistic Calculator
