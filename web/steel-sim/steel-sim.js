@@ -1,6 +1,7 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 import * as THREE from 'three';
 import { SteelTarget, SteelTargetFactory } from './SteelTarget.js';
+import { DustCloudFactory } from './DustCloud.js';
 
 let btk = null;
 let scene, camera, renderer;
@@ -8,8 +9,6 @@ let raycaster, mouse;
 let animationId = null;
 let lastTime = performance.now();
 
-// Array of active dust clouds
-let dustClouds = [];
 let groundMesh = null;
 let beamMesh = null; // Track beam for cleanup
 
@@ -345,79 +344,26 @@ function onCanvasClick(event) {
     const groundIntersects = raycaster.intersectObject(groundMesh);
     if (groundIntersects.length > 0) {
       const groundImpact = groundIntersects[0].point; // Three.js coords
-      // Get face normal and transform to world space
-      const localNormal = groundIntersects[0].face.normal.clone();
-      const worldNormal = localNormal.applyMatrix3(
-        new THREE.Matrix3().getNormalMatrix(groundIntersects[0].object.matrixWorld)
-      ).normalize();
-      createDustCloud(groundImpact, worldNormal);
+      createDustCloud(groundImpact);
     }
   }
 }
 
 // Create dust cloud at impact point
-function createDustCloud(impactPointThree, normalThree) {
-  // Convert impact point to BTK coordinates
-  const impactPos = threeJsToBtk(impactPointThree);
-  
-  // Convert normal to BTK coordinates
-  // Three.js: X=right, Y=up, Z=towards camera
-  // BTK: X=downrange, Y=crossrange, Z=up
-  const normalBtk = new btk.Vector3D(
-    -normalThree.z,  // Three Z → BTK X (negated)
-    normalThree.x,   // Three X → BTK Y
-    normalThree.y    // Three Y → BTK Z
-  );
-  
-  // Wind vector with diagonal drift (slow, dust-like movement)
-  // BTK: X=downrange, Y=crossrange, Z=up
-  // Diagonal wind: slight downrange, slight crossrange, slow upward
-  const wind = new btk.Vector3D(0.1, 0.15, 0.15); // Diagonal wind (slow, like dust)
-  
-  // Dust color (brown/tan)
-  const dustR = 139; // Brown
-  const dustG = 115;
-  const dustB = 85;
-  
-  // Create dust cloud with 500 particles, 2 second lifetime (faster fade)
-  const dustCloud = new btk.DustCloud(
-    500, // num_particles
-    impactPos, // position
-    wind, // wind (includes upward drift)
-    dustR, dustG, dustB, // color
-    2.0, // lifetime (seconds) - faster fade
-    0.1, // spawn_radius (meters) - small initial spread
-    normalBtk // direction_bias - particles biased towards surface normal
-  );
-  
-  // Create instanced spheres for dust particles (so they can cast shadows)
-  const sphereGeometry = new THREE.SphereGeometry(0.003, 6, 6); // 3mm radius, smaller spheres
-  const sphereMaterial = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(dustR / 255, dustG / 255, dustB / 255),
-    transparent: true,
-    opacity: 1.0,
-    roughness: 0.8,
-    metalness: 0.1
+function createDustCloud(impactPointThree) {
+  // Create dust cloud using factory
+  // Particles spawn from zero with random initial velocities
+  // Alpha decays over time, particles stop when alpha < 0.01
+  // Each particle gets random color jitter
+  // Add wind and updraft for realistic dust behavior
+  DustCloudFactory.create({
+    position: impactPointThree,
+    scene: scene,
+    numParticles: 5000,
+    color: { r: 139, g: 115, b: 85 }, // Brown/tan (base color, each particle gets jitter)
+    wind: { x: 0.5, y: 0.0, z: 0.2 }, // Wind: slight crosswind (x), no updraft (y), slight downrange (z)
+    dragCoefficient: 10.0 // Strong drag for quick slowdown
   });
-  
-  // Create instanced mesh (max 500 instances)
-  const instancedMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, 500);
-  instancedMesh.castShadow = true;
-  instancedMesh.receiveShadow = false;
-  scene.add(instancedMesh);
-  
-  // Store dust cloud data
-  dustClouds.push({
-    dustCloud: dustCloud,
-    instancedMesh: instancedMesh,
-    sphereGeometry: sphereGeometry,
-    sphereMaterial: sphereMaterial
-  });
-  
-  // Cleanup BTK objects
-  impactPos.delete();
-  normalBtk.delete();
-  wind.delete();
 }
 
 function resetTarget() {
@@ -425,14 +371,7 @@ function resetTarget() {
   SteelTargetFactory.deleteAll();
   
   // Clean up dust clouds
-  for (const cloud of dustClouds) {
-    scene.remove(cloud.instancedMesh);
-    cloud.sphereGeometry.dispose();
-    cloud.sphereMaterial.dispose();
-    cloud.instancedMesh.dispose();
-    cloud.dustCloud.delete();
-  }
-  dustClouds = [];
+  DustCloudFactory.deleteAll();
   
   // Recreate the rack
   createTargetRack();
@@ -448,65 +387,8 @@ function animate() {
   // Update physics for all targets
   SteelTargetFactory.updateAll(dt);
   
-  // Update dust clouds
-  for (let i = dustClouds.length - 1; i >= 0; i--) {
-    const cloud = dustClouds[i];
-    
-    // Step physics
-    cloud.dustCloud.timeStep(dt);
-    
-    // Check if done (all particles faded to zero)
-    if (cloud.dustCloud.isDone()) {
-      // Remove from scene
-      scene.remove(cloud.instancedMesh);
-      
-      // Dispose geometry
-      cloud.sphereGeometry.dispose();
-      
-      // Dispose material
-      cloud.sphereMaterial.dispose();
-      
-      // Dispose instanced mesh
-      cloud.instancedMesh.dispose();
-      
-      // Cleanup C++ object
-      cloud.dustCloud.delete();
-      
-      // Remove from array
-      dustClouds.splice(i, 1);
-      continue;
-    }
-    
-    // Update instanced mesh with matrices directly from C++ (zero-copy DMA)
-    const matrices = cloud.dustCloud.getInstanceMatrices();
-    
-    // Check if any particles are still visible
-    if (matrices.length > 0) {
-      const numParticles = matrices.length / 16; // 16 floats per matrix
-      
-      // Get global alpha for the cloud
-      const alpha = cloud.dustCloud.getAlpha();
-      
-      // Copy matrices directly into instanceMatrix buffer (bulk copy from WASM memory view)
-      const instanceMatrixArray = cloud.instancedMesh.instanceMatrix.array;
-      instanceMatrixArray.set(matrices);
-      
-      // Update instance count
-      cloud.instancedMesh.count = numParticles;
-      cloud.instancedMesh.instanceMatrix.needsUpdate = true;
-      
-      // Update material opacity with global alpha
-      cloud.sphereMaterial.opacity = alpha;
-    } else {
-      // No particles visible - remove immediately
-      scene.remove(cloud.instancedMesh);
-      cloud.sphereGeometry.dispose();
-      cloud.sphereMaterial.dispose();
-      cloud.instancedMesh.dispose();
-      cloud.dustCloud.delete();
-      dustClouds.splice(i, 1);
-    }
-  }
+  // Update dust clouds (factory automatically disposes when done)
+  DustCloudFactory.updateAll(dt);
   
   // Render
   renderer.render(scene, camera);
