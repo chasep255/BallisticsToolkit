@@ -35,8 +35,7 @@ function createTarget(
   height = 30, // inches
   thickness = 0.5, // inches
   isOval = false, // true for oval shape, false for rectangle
-  chainLength = 1, // feet
-  springConstant = 500 // N/m
+  chainLength = 1 // feet
 ) {
   // Convert all inputs to meters using BTK conversions
   const position_m = {
@@ -102,8 +101,8 @@ function createTarget(
     beamHeight
   );
   
-  steelTarget.addChainAnchor(leftLocalAttach, leftWorldFixed, springConstant);
-  steelTarget.addChainAnchor(rightLocalAttach, rightWorldFixed, springConstant);
+  steelTarget.addChainAnchor(leftLocalAttach, leftWorldFixed);
+  steelTarget.addChainAnchor(rightLocalAttach, rightWorldFixed);
   
   leftWorldAttach.delete();
   rightWorldAttach.delete();
@@ -112,8 +111,6 @@ function createTarget(
   leftWorldFixed.delete();
   rightWorldFixed.delete();
   
-  // Set damping (fraction remaining after 1 second)
-  steelTarget.setDamping(0.1, 0.1);  // 20% linear, 20% angular remains after 1s
   
   // Create Three.js mesh and chain lines
   const targetMesh = createTargetMesh(steelTarget);
@@ -154,28 +151,28 @@ function createTargetRack() {
   createTarget(
     { x: -spacing * 1.5, y: baseY, z: baseZ },
     6, 6, 0.5, true, // 6" circle
-    1, 500 // 1 foot chain, 500 N/m spring
+    1, 10000 // 1 foot chain, 10,000 N/m spring
   );
   
   // Target 2: Large Rectangle (18" × 30")
   createTarget(
     { x: -spacing * 0.5, y: baseY, z: baseZ },
     18, 30, 0.5, false, // 18" × 30" rectangle
-    1.5, 500 // 1.5 foot chain (longer for large rectangle), 500 N/m spring
+    1.5, 10000 // 1.5 foot chain (longer for large rectangle), 10,000 N/m spring
   );
   
   // Target 3: 12" Circle with closer chains (allows more rotation)
   createTarget(
     { x: spacing * 0.5, y: baseY, z: baseZ },
     12, 12, 0.5, true, // 12" circle
-    0.5, 500 // 0.5 foot chain (closer), 500 N/m spring
+    0.5, 10000 // 0.5 foot chain (closer), 10,000 N/m spring
   );
   
   // Target 4: 12" × 18" Rectangle
   createTarget(
     { x: spacing * 1.5, y: baseY, z: baseZ },
     12, 18, 0.5, false, // 12" × 18" rectangle
-    1.2, 500 // 1.2 foot chain (slightly longer for rectangle), 500 N/m spring
+    1.2, 10000 // 1.2 foot chain (slightly longer for rectangle), 10,000 N/m spring
   );
 }
 

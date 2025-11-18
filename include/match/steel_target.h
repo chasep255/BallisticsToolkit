@@ -103,20 +103,12 @@ namespace btk::match
      *
      * @param local_attachment Attachment point in local coordinates (moves with target)
      * @param world_fixed Fixed anchor point in world coordinates (never moves)
-     * @param spring_constant Spring constant (N/m), defaults to 500 N/m
      * 
      * Rest length is automatically calculated by transforming local_attachment to world space
-     * and measuring distance to world_fixed. Rest length is recalculated when target moves.
+     * and measuring distance to world_fixed. Spring constant is set to DEFAULT_SPRING_CONSTANT (1000 N/m).
      */
-    void addChainAnchor(const btk::math::Vector3D& local_attachment, const btk::math::Vector3D& world_fixed, float spring_constant = DEFAULT_SPRING_CONSTANT);
+    void addChainAnchor(const btk::math::Vector3D& local_attachment, const btk::math::Vector3D& world_fixed);
 
-    /**
-     * @brief Set damping coefficients
-     *
-     * @param linear Linear velocity damping [0, 1]
-     * @param angular Angular velocity damping [0, 1]
-     */
-    void setDamping(float linear, float angular);
 
     /**
      * @brief Process bullet hit from trajectory
@@ -276,7 +268,11 @@ namespace btk::match
     static constexpr float STEEL_DENSITY = 7850.0f;
     
     // Default spring constant for chain anchors (N/m)
-    static constexpr float DEFAULT_SPRING_CONSTANT = 500.0f;
+    static constexpr float DEFAULT_SPRING_CONSTANT = 1000.0f;
+    
+    // Default damping coefficients (fraction remaining after 1 second)
+    static constexpr float DEFAULT_LINEAR_DAMPING = 0.75f;  // 75% velocity remains after 1 second
+    static constexpr float DEFAULT_ANGULAR_DAMPING = 0.1f;  // 10% angular velocity remains after 1 second
 
     // Shape definition (in YZ plane, normal in +X direction)
     float width_;

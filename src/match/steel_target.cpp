@@ -24,8 +24,8 @@ namespace btk::match
       angular_velocity_(0.0f, 0.0f, 0.0f),
       mass_kg_(0.0f),
       inertia_tensor_(0.0f, 0.0f, 0.0f),
-      linear_damping_(0.1f),   // 10% velocity remains after 1 second
-      angular_damping_(0.1f),  // 10% angular velocity remains after 1 second
+      linear_damping_(DEFAULT_LINEAR_DAMPING),
+      angular_damping_(DEFAULT_ANGULAR_DAMPING),
       segments_per_circle_(32),
       texture_width_(512),
       texture_height_(512) {
@@ -51,8 +51,8 @@ namespace btk::match
       angular_velocity_(0.0f, 0.0f, 0.0f),
       mass_kg_(0.0f),
       inertia_tensor_(0.0f, 0.0f, 0.0f),
-      linear_damping_(0.1f),
-      angular_damping_(0.1f),
+      linear_damping_(DEFAULT_LINEAR_DAMPING),
+      angular_damping_(DEFAULT_ANGULAR_DAMPING),
       segments_per_circle_(32),
       texture_width_(512),
       texture_height_(512) {
@@ -81,20 +81,16 @@ namespace btk::match
     initializeTexture();
   }
 
-  void SteelTarget::addChainAnchor(const btk::math::Vector3D& local_attachment, const btk::math::Vector3D& world_fixed, float spring_constant) {
+  void SteelTarget::addChainAnchor(const btk::math::Vector3D& local_attachment, const btk::math::Vector3D& world_fixed) {
     // Transform local attachment to world space
     btk::math::Vector3D world_attachment = localToWorld(local_attachment);
     
     // Calculate rest length as distance from world_fixed to world_attachment
     float rest_length = (world_fixed - world_attachment).magnitude();
     
-    anchors_.emplace_back(local_attachment, world_fixed, rest_length, spring_constant);
+    anchors_.emplace_back(local_attachment, world_fixed, rest_length, DEFAULT_SPRING_CONSTANT);
   }
 
-  void SteelTarget::setDamping(float linear, float angular) {
-    linear_damping_ = linear;
-    angular_damping_ = angular;
-  }
 
   btk::math::Vector3D SteelTarget::localToWorld(const btk::math::Vector3D& local_point) const {
     // Rotate the local point by the target's orientation
@@ -297,7 +293,7 @@ namespace btk::match
 
   void SteelTarget::timeStep(float dt) {
     // Clamp dt and subdivide if necessary for stability
-    constexpr float MAX_SUBSTEP_DT = 0.01f;  // 10ms maximum substep (can be smaller)
+    constexpr float MAX_SUBSTEP_DT = 0.005f;  // 5ms maximum substep (can be smaller)
     constexpr float MAX_TOTAL_DT = 1.0f;     // 1s maximum total time
     
     // Clamp total time to maximum
@@ -357,6 +353,7 @@ namespace btk::match
       if (extension > 0.0f) {
         // Direction from attachment to fixed (pulling back)
         btk::math::Vector3D direction = (anchor.world_fixed_ - world_attachment) / distance;
+        
         // Spring force: F = -k * x (restoring force)
         btk::math::Vector3D tension_force = direction * (anchor.spring_constant_ * extension);
         
