@@ -332,6 +332,9 @@ function onCanvasClick(event) {
     // Update texture immediately after impact
     hitTarget.updateTexture();
     
+    // Create metallic dust cloud at impact point
+    createMetallicDustCloud(impactPoint);
+    
     // Note: C++ automatically marks target as moving when impulse is applied
     
     // Cleanup
@@ -352,17 +355,38 @@ function onCanvasClick(event) {
 // Create dust cloud at impact point
 function createDustCloud(impactPointThree) {
   // Create dust cloud using factory
-  // Particles spawn from zero with random initial velocities
-  // Alpha decays over time, particles stop when alpha < 0.01
-  // Each particle gets random color jitter
-  // Add wind and updraft for realistic dust behavior
+  // Particles have relative positions from cloud center (Gaussian distribution)
+  // Cloud radius grows linearly, center advects with wind
+  // Alpha fades exponentially over time (independent of radius growth)
   DustCloudFactory.create({
     position: impactPointThree,
     scene: scene,
-    numParticles: 5000,
+    numParticles: 1000,
     color: { r: 139, g: 115, b: 85 }, // Brown/tan (base color, each particle gets jitter)
     wind: { x: 0.5, y: 0.0, z: 0.2 }, // Wind: slight crosswind (x), no updraft (y), slight downrange (z)
-    dragCoefficient: 10.0 // Strong drag for quick slowdown
+    initialRadius: 0.01, // 10cm initial radius
+    growthRate: 0.05, // 0.5 m/s growth rate
+    fadeRate: 0.25, 
+    particleDiameter: 0.01 // 1cm particle diameter (increased from 6mm)
+  });
+}
+
+// Create metallic dust cloud at target impact point
+function createMetallicDustCloud(impactPointThree) {
+  // Create metallic dust cloud with higher growth, faster fade, smaller size
+  // Particles have relative positions from cloud center (Gaussian distribution)
+  // Cloud radius grows linearly, center advects with wind
+  // Alpha fades exponentially over time (independent of radius growth)
+  DustCloudFactory.create({
+    position: impactPointThree,
+    scene: scene,
+    numParticles: 1000,
+    color: { r: 192, g: 192, b: 192 }, // Silver/gray metallic color
+    wind: { x: 0.5, y: 0.0, z: 0.2 }, // Wind: slight crosswind (x), no updraft (y), slight downrange (z)
+    initialRadius: 0.005, // 5mm initial radius (smaller than ground dust)
+    growthRate: 0.1, // 0.1 m/s growth rate (higher than ground dust)
+    fadeRate: 0.5, // Faster fade rate (fades faster than ground dust)
+    particleDiameter: 0.005 // 5mm particle diameter (smaller than ground dust)
   });
 }
 

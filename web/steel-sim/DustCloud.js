@@ -13,28 +13,28 @@ export class DustCloud {
   /**
    * Create a new dust cloud
    * @param {Object} options - Configuration options
-   * @param {THREE.Vector3} options.position - Impact position in Three.js coordinates (required)
+   * @param {THREE.Vector3} options.position - Initial cloud center position in Three.js coordinates (required)
    * @param {THREE.Scene} options.scene - Three.js scene to add mesh to (required)
-   * @param {number} options.numParticles - Number of particles (default 500)
+   * @param {number} options.numParticles - Number of particles (default 1000)
    * @param {Object} options.color - RGB color {r, g, b} 0-255 (default brown: {r: 139, g: 115, b: 85})
    *                                 Each particle gets random color jitter (±20%)
    * @param {THREE.Vector3} options.wind - Wind vector in Three.js coordinates (default {x: 0, y: 0, z: 0})
-   * @param {number} options.initialVelocityScale - Initial velocity scale in m/s (default 1.0 m/s)
-   * @param {number} options.fadeRate - Exponential fade rate per second (default 0.5 = e^(-0.5t))
-   * @param {number} options.dragCoefficient - Drag coefficient for quadratic drag (default 10.0, higher = stronger drag)
-   * @param {number} options.particleDiameter - Particle diameter in meters (default 0.006 = 6mm)
+   * @param {number} options.initialRadius - Initial cloud radius in meters (default 0.01 = 1cm)
+   * @param {number} options.growthRate - Cloud radius growth rate in m/s (default 0.05 m/s)
+   * @param {number} options.fadeRate - Alpha fade rate per second (default 0.25 = e^(-0.25t))
+   * @param {number} options.particleDiameter - Particle diameter in meters (default 0.01 = 1cm)
    */
   constructor(options) {
     const {
       position,
       scene,
-      numParticles = 500,
+      numParticles = 1000,
       color = { r: 139, g: 115, b: 85 },
       wind = { x: 0, y: 0, z: 0 }, // Default: no wind
-      initialVelocityScale = 1.0, // 1.0 m/s default
-      fadeRate = 0.5, // Exponential decay rate (e^(-0.5t)
-      dragCoefficient = 10.0, // Quadratic drag coefficient (higher = stronger drag)
-      particleDiameter = 0.006 // 6mm default
+      initialRadius = 0.01, // 1cm default
+      growthRate = 0.05, // 0.05 m/s default
+      fadeRate = 0.25, // Exponential fade rate (e^(-0.25t))
+      particleDiameter = 0.01 // 1cm default
     } = options;
 
     if (!scene) throw new Error('Scene is required');
@@ -55,10 +55,10 @@ export class DustCloud {
     const windBtk = window.threeJsToBtk(windThree);
     
     // Create C++ dust cloud
-    // Particles spawn from exact position with random initial velocities
-    // Alpha fades linearly over time
-    // Each particle gets random color jitter
-    // Velocity slows down due to quadratic drag (F ∝ v²), wind advects particles
+    // Particles have relative positions from cloud center (Gaussian distribution)
+    // Cloud radius grows linearly over time (independent of alpha fade)
+    // Cloud center advects with wind
+    // Alpha fades exponentially over time (independent of radius growth)
     this.dustCloud = new btk.DustCloud(
       numParticles,
       impactPos,
@@ -66,9 +66,9 @@ export class DustCloud {
       color.r,
       color.g,
       color.b,
-      initialVelocityScale,
+      initialRadius,
+      growthRate,
       fadeRate,
-      dragCoefficient,
       particleDiameter
     );
     

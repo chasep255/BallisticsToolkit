@@ -26,40 +26,41 @@ namespace btk::rendering
      */
     struct Particle
     {
-      btk::math::Vector3D position_;  ///< Current position in world space
-      btk::math::Vector3D velocity_;  ///< Random initial velocity
-      uint8_t color_[3];              ///< RGB color with random jitter
+      btk::math::Vector3D relative_position_;  ///< Relative position from cloud center (normalized, scaled by radius)
+      uint8_t color_[3];                       ///< RGB color with random jitter
 
-      Particle() : position_(0, 0, 0), velocity_(0, 0, 0), color_{0, 0, 0} {}
-      Particle(const btk::math::Vector3D& pos, const btk::math::Vector3D& vel, uint8_t r, uint8_t g, uint8_t b)
-        : position_(pos), velocity_(vel), color_{r, g, b} {}
+      Particle() : relative_position_(0, 0, 0), color_{0, 0, 0} {}
+      Particle(const btk::math::Vector3D& rel_pos, uint8_t r, uint8_t g, uint8_t b)
+        : relative_position_(rel_pos), color_{r, g, b} {}
     };
 
     /**
      * @brief Construct dust cloud
      *
-     * Particles spawn from exact position with random initial velocities.
-     * Alpha fades exponentially over time (more realistic than linear).
-     * Particles stop when alpha < 0.01.
+     * Particles have relative positions from cloud center, distributed using Gaussian distribution.
+     * Cloud radius grows linearly over time (independent of alpha fade).
+     * Cloud center advects with wind.
+     * Alpha fades exponentially over time (alpha = e^(-fade_rate * t)), independent of radius growth.
+     * Cloud disappears when alpha < 0.01.
      *
      * @param num_particles Initial number of particles
-     * @param position Initial position (particles spawn here)
-     * @param wind Wind vector (m/s) - includes upward drift component
+     * @param position Initial cloud center position
+     * @param wind Wind vector (m/s) - advects cloud center
      * @param color_r Red component (0-255) - base color, each particle gets random jitter
      * @param color_g Green component (0-255) - base color, each particle gets random jitter
      * @param color_b Blue component (0-255) - base color, each particle gets random jitter
-     * @param initial_velocity_scale Initial velocity scale in m/s (default 1.0 m/s)
-     * @param fade_rate Exponential fade rate per second (default 0.5 = e^(-0.5t))
-     * @param drag_coefficient Drag coefficient for quadratic drag (default 10.0, higher = stronger drag)
+     * @param initial_radius Initial cloud radius in meters (default 0.1m = 10cm)
+     * @param growth_rate Cloud radius growth rate in m/s (default 0.5 m/s)
+     * @param fade_rate Alpha fade rate per second (default 0.5 = e^(-0.5t))
      * @param particle_diameter Particle diameter in meters (default 0.006m = 6mm)
      */
     DustCloud(int num_particles,
               const btk::math::Vector3D& position,
               const btk::math::Vector3D& wind,
               uint8_t color_r, uint8_t color_g, uint8_t color_b,
-              float initial_velocity_scale = 1.0f,
+              float initial_radius = 0.1f,
+              float growth_rate = 0.5f,
               float fade_rate = 0.5f,
-              float drag_coefficient = 10.0f,
               float particle_diameter = 0.006f);
 
     /**
@@ -113,23 +114,19 @@ namespace btk::rendering
      */
     float getParticleDiameter() const { return particle_diameter_; }
 
-    /**
-     * @brief Set wind vector
-     *
-     * @param wind New wind vector (m/s)
-     */
-    void setWind(const btk::math::Vector3D& wind) { wind_ = wind; }
-
     private:
     static constexpr float ALPHA_THRESHOLD = 0.01f; ///< Alpha threshold for particle visibility
 
     std::vector<Particle> particles_;      ///< All particles
-    btk::math::Vector3D wind_;             ///< Constant wind vector (includes upward drift)
-    float initial_velocity_scale_;         ///< Initial velocity scale in m/s
-    float fade_rate_;                      ///< Alpha fade rate per second
-    float drag_coefficient_;               ///< Drag coefficient for quadratic drag (F ∝ v²)
+    btk::math::Vector3D wind_;             ///< Constant wind vector (advects cloud center)
+    btk::math::Vector3D center_position_;  ///< Current cloud center position
+    float initial_radius_;                 ///< Initial cloud radius in meters
+    float growth_rate_;                    ///< Cloud radius growth rate in m/s
+    float fade_rate_;                      ///< Alpha fade rate per second (exponential decay)
+    float radius_;                         ///< Current cloud radius in meters
     float particle_diameter_;              ///< Particle diameter in meters
-    float alpha_;                          ///< Current alpha (shared by all particles, fades linearly)
+    float alpha_;                          ///< Current alpha (shared by all particles, fades exponentially over time)
+    float elapsed_time_;                   ///< Elapsed time since creation (for independent alpha fade)
 
     // Display buffers (updated each timeStep)
     std::vector<float> matrices_buffer_;    ///< Flat array: 16 floats per matrix (column-major) for InstancedMesh

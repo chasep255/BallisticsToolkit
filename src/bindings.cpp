@@ -372,6 +372,5 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getAlpha", &DustCloud::getAlpha)
     .function("isDone", &DustCloud::isDone)
     .function("getParticleCount", &DustCloud::getParticleCount)
-    .function("getParticleDiameter", &DustCloud::getParticleDiameter)
-    .function("setWind", &DustCloud::setWind);
+    .function("getParticleDiameter", &DustCloud::getParticleDiameter);
 }
