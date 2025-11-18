@@ -88,7 +88,7 @@ namespace btk::match
     // Calculate rest length as distance from world_fixed to world_attachment
     float rest_length = (world_fixed - world_attachment).magnitude();
     
-    anchors_.emplace_back(local_attachment, world_fixed, rest_length, DEFAULT_SPRING_CONSTANT);
+    anchors_.emplace_back(local_attachment, world_fixed, rest_length, DEFAULT_SPRING_CONSTANT, DEFAULT_CHAIN_DAMPING);
   }
 
 
@@ -354,11 +354,29 @@ namespace btk::match
         // Direction from attachment to fixed (pulling back)
         btk::math::Vector3D direction = (anchor.world_fixed_ - world_attachment) / distance;
         
-        // Spring force: F = -k * x (restoring force)
-        btk::math::Vector3D tension_force = direction * (anchor.spring_constant_ * extension);
+        // Calculate velocity of attachment point along chain direction
+        // Velocity of a point on rigid body = v_com + omega × r
+        btk::math::Vector3D r = world_attachment - position_;
+        btk::math::Vector3D attachment_velocity = velocity_ms_ + angular_velocity_.cross(r);
         
-        // Apply tension force at world_attachment point (handles both linear and angular)
-        applyForce(tension_force, world_attachment, dt);
+        // Velocity component along chain direction (positive = extending)
+        float velocity_along_chain = attachment_velocity.dot(direction);
+        
+        // Spring force: F = -k * x (restoring force)
+        btk::math::Vector3D spring_force = direction * (anchor.spring_constant_ * extension);
+        
+        // Damping force: F = -c * v (dissipates energy, prevents bouncing)
+        // Only apply when extending (velocity > 0) - chains don't resist going slack
+        btk::math::Vector3D damping_force(0.0f, 0.0f, 0.0f);
+        if (velocity_along_chain > 0.0f) {
+          damping_force = direction * (-anchor.damping_coefficient_ * velocity_along_chain);
+        }
+        
+        // Total force - critically damped system prevents oscillation
+        btk::math::Vector3D total_force = spring_force + damping_force;
+        
+        // Apply force at world_attachment point (handles both linear and angular)
+        applyForce(total_force, world_attachment, dt);
       }
     }
   }

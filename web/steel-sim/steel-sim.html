@@ -112,8 +112,8 @@
           <h3>Target Configuration</h3>
           <div class="param-help">
             <strong>Demo Targets:</strong> The demo features 4 steel targets: 6" circle, 18"×30" rectangle, 12" circle, and 12"×18" rectangle. All targets are 0.5" thick steel with realistic mass calculations based on dimensions.<br><br>
-            <strong>Chain Mounting:</strong> Each target has two chains attached at the top corners (rectangles) or at 45° angles (circles), connecting to an overhead beam. Chains act as springs with 10,000 N/m spring constant.<br><br>
-            <strong>Chain Dynamics:</strong> Chains have rest lengths calculated from the initial attachment positions. As targets move, chains stretch and apply restoring forces, creating realistic swinging behavior.
+            <strong>Chain Mounting:</strong> Each target has two chains attached at the top corners (rectangles) or at 45° angles (circles), connecting to an overhead beam. Chains act as damped springs with 10,000 N/m spring constant and 200 N·s/m damping.<br><br>
+            <strong>Chain Dynamics:</strong> Chains have rest lengths calculated from the initial attachment positions. Chains are effectively rigid (very high spring constant) and dissipate energy through damping, preventing bouncing. When targets stop moving, chains stop smoothly without oscillation.
           </div>
         </div>
         
@@ -122,7 +122,7 @@
           <div class="param-help">
             <strong>Rigid Body Physics:</strong> Targets are simulated as rigid bodies with position, orientation (quaternion), linear velocity, and angular velocity. Mass and inertia tensor (simplified diagonal) are calculated automatically from target dimensions and steel density.<br><br>
             <strong>Impact Physics:</strong> Bullet impacts transfer momentum to the target using impulse calculations. The exact response depends on where you hit the target relative to its center of mass. Impacts off-center create both linear motion and rotation.<br><br>
-            <strong>Chain Constraints:</strong> Chains apply spring forces based on their current length versus rest length. Forces are applied at the attachment points, creating both linear and rotational effects.<br><br>
+            <strong>Chain Constraints:</strong> Chains apply spring forces based on their current length versus rest length, with damping to dissipate energy and prevent bouncing. Forces are applied at the attachment points, creating both linear and rotational effects. Chains are effectively rigid (10,000 N/m) and stop smoothly without oscillation.<br><br>
             <strong>Damping:</strong> Linear damping (75% velocity remaining per second) and angular damping (10% angular velocity remaining per second) simulate air resistance and internal friction. Angular damping is much higher to reduce excessive rotation. Damping is applied proportionally to the time step for consistent behavior.<br><br>
             <strong>Time Stepping:</strong> Physics uses variable time steps with subdivision (max 0.01s substeps, max 1.0s total) for stability. Multiple substeps ensure accurate integration even with large time steps.
           </div>
@@ -134,7 +134,7 @@
             <strong>Center Hits:</strong> Hitting near the center of mass causes mostly linear motion with minimal rotation. The target swings back and forth like a pendulum.<br><br>
             <strong>Edge Hits:</strong> Hitting near the edges causes significant rotation as well as linear motion. Watch how the target spins while swinging.<br><br>
             <strong>Different Target Sizes:</strong> Smaller targets (6" circle) respond more dramatically to impacts than larger ones (18"×30" rectangle) due to their lower mass and inertia.<br><br>
-            <strong>Chain Dynamics:</strong> Watch how the chains stretch and pull the target back, creating oscillating motion.<br><br>
+            <strong>Chain Dynamics:</strong> Watch how chains pull targets back smoothly without bouncing. Chains dissipate energy, so targets stop naturally rather than oscillating.<br><br>
             <strong>Impact Visualization:</strong> Bullet impacts are drawn on the target texture as splatter marks. Impacts appear on the side that was hit (front or back), with metal showing through the red paint.
           </div>
         </div>
@@ -144,7 +144,7 @@
           <div class="param-help">
             <strong>Physics Engine:</strong> Custom rigid body physics implemented in C++ and compiled to WebAssembly for high performance. Uses quaternion-based orientation representation for stable rotations.<br><br>
             <strong>Rendering:</strong> Three.js WebGL rendering with dynamic geometry updates. Vertex positions are computed in C++ and transferred via typed memory views for zero-copy efficiency. Textures are generated procedurally in C++ and updated incrementally as impacts occur.<br><br>
-            <strong>Chain Physics:</strong> Chains are modeled as ideal springs with rest lengths calculated from initial positions. Forces are applied at attachment points in world coordinates, with local attachment points transformed using the target's current orientation.<br><br>
+            <strong>Chain Physics:</strong> Chains are modeled as damped springs (10,000 N/m spring constant, 200 N·s/m damping) with rest lengths calculated from initial positions. The high spring constant makes chains effectively rigid, while damping dissipates energy to prevent bouncing. Forces are applied at attachment points in world coordinates, with local attachment points transformed using the target's current orientation.<br><br>
             <strong>Impact Detection:</strong> Raycasting from camera through mouse position detects target intersections. Impact points are converted to local target coordinates for physics calculations and texture drawing.<br><br>
             <strong>Texture Generation:</strong> Targets use a single texture buffer that is twice as wide, with front face UVs mapping to the left half (0-0.5) and back face UVs mapping to the right half (0.5-1.0). This allows impacts to appear on the correct side.
           </div>
@@ -154,7 +154,7 @@
           <h3>Limitations</h3>
           <div class="param-help">
             <strong>Simplified Physics:</strong> The simulation uses simplified rigid body physics without advanced collision detection between targets or complex material properties. Targets do not interact with each other.<br><br>
-            <strong>Chain Model:</strong> Chains are modeled as ideal springs without mass or realistic chain link physics. They cannot go slack or wrap around objects. Damping is applied to the target's motion, not to the chains themselves.<br><br>
+            <strong>Chain Model:</strong> Chains are modeled as damped springs (critically damped) without mass or realistic chain link physics. They cannot go slack or wrap around objects. Chain damping dissipates energy to prevent bouncing, creating realistic behavior where targets stop smoothly rather than oscillating.<br><br>
             <strong>Fixed Environment:</strong> The simulation assumes a fixed overhead beam and does not model ground interactions, wind effects, or other environmental factors.<br><br>
             <strong>Demo Scope:</strong> This is currently a physics animation demo. Future versions will include full shooting range simulation with multiple scenarios and scoring.
           </div>

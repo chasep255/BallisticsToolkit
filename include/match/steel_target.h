@@ -37,11 +37,12 @@ namespace btk::match
       btk::math::Vector3D local_attachment_;  ///< Attachment point in local coordinates (moves with target)
       btk::math::Vector3D world_fixed_;       ///< Fixed anchor point in world coordinates (never moves)
       float rest_length_;                     ///< Rest length of chain (recalculated when target moves)
-      float spring_constant_;                 ///< Spring constant (N/m)
+      float spring_constant_;                 ///< Spring constant (N/m) - very high for rigid chains
+      float damping_coefficient_;             ///< Damping coefficient (N·s/m) - for energy dissipation
 
-      ChainAnchor() : local_attachment_(0, 0, 0), world_fixed_(0, 0, 0), rest_length_(0), spring_constant_(0) {}
-      ChainAnchor(const btk::math::Vector3D& local_attach, const btk::math::Vector3D& world_fixed, float rest_length, float spring_k) 
-        : local_attachment_(local_attach), world_fixed_(world_fixed), rest_length_(rest_length), spring_constant_(spring_k) {}
+      ChainAnchor() : local_attachment_(0, 0, 0), world_fixed_(0, 0, 0), rest_length_(0), spring_constant_(0), damping_coefficient_(0) {}
+      ChainAnchor(const btk::math::Vector3D& local_attach, const btk::math::Vector3D& world_fixed, float rest_length, float spring_k, float damping) 
+        : local_attachment_(local_attach), world_fixed_(world_fixed), rest_length_(rest_length), spring_constant_(spring_k), damping_coefficient_(damping) {}
     };
 
     /**
@@ -267,8 +268,12 @@ namespace btk::match
     // Steel density constant (kg/m³)
     static constexpr float STEEL_DENSITY = 7850.0f;
     
-    // Default spring constant for chain anchors (N/m)
-    static constexpr float DEFAULT_SPRING_CONSTANT = 1000.0f;
+    // Default spring constant for chain anchors (N/m) - very high for rigid chains
+    static constexpr float DEFAULT_SPRING_CONSTANT = 10000.0f;
+    
+    // Default chain damping coefficient (N·s/m) - critically damped to prevent bouncing
+    // Chains dissipate energy and don't bounce back - they just stop
+    static constexpr float DEFAULT_CHAIN_DAMPING = 200.0f;
     
     // Default damping coefficients (fraction remaining after 1 second)
     static constexpr float DEFAULT_LINEAR_DAMPING = 0.75f;  // 75% velocity remains after 1 second
