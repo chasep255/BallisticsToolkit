@@ -167,6 +167,11 @@ namespace btk::rendering
     const btk::math::Vector3D& getAngularVelocity() const { return angular_velocity_; }
 
     /**
+     * @brief Check if target is currently moving
+     */
+    bool isMoving() const { return is_moving_; }
+
+    /**
      * @brief Transform a point from local coordinates to world coordinates
      * 
      * @param local_point Point in local coordinate system
@@ -279,6 +284,10 @@ namespace btk::rendering
     static constexpr float DEFAULT_LINEAR_DAMPING = 0.75f;  // 75% velocity remains after 1 second
     static constexpr float DEFAULT_ANGULAR_DAMPING = 0.1f;  // 10% angular velocity remains after 1 second
 
+    // Velocity thresholds for "done moving" detection
+    static constexpr float VELOCITY_THRESHOLD = 0.01f; // m/s
+    static constexpr float ANGULAR_VELOCITY_THRESHOLD = 0.01f; // rad/s
+
     // Shape definition (in YZ plane, normal in +X direction)
     float width_;
     float height_;
@@ -291,6 +300,7 @@ namespace btk::rendering
     btk::math::Quaternion orientation_;    // Full 3D orientation (from local +X-normal frame to world)
     btk::math::Vector3D velocity_ms_;      // Linear velocity
     btk::math::Vector3D angular_velocity_; // Angular velocity (rad/s)
+    bool is_moving_;                       // True if target is moving (updated during timeStep)
 
     // Physical properties
     float mass_kg_;

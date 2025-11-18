@@ -1,5 +1,6 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 import * as THREE from 'three';
+import { SteelTarget, SteelTargetFactory } from './SteelTarget.js';
 
 let btk = null;
 let scene, camera, renderer;
@@ -7,29 +8,37 @@ let raycaster, mouse;
 let animationId = null;
 let lastTime = performance.now();
 
-// Array of targets, each with its own physics object, mesh, chains, and impacts
-let targets = [];
-
 // Array of active dust clouds
 let dustClouds = [];
 let groundMesh = null;
+let beamMesh = null; // Track beam for cleanup
 
 // ===== COORDINATE CONVERSION UTILITIES =====
 // BTK: X=downrange, Y=crossrange-right, Z=up
 // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
 
-function btkToThreeJs(btkVec) {
+// Attach coordinate conversion utilities to window for global access
+window.btkToThreeJs = function(btkVec) {
   const converted = btkVec.toThreeJs();
   const result = new THREE.Vector3(converted.x, converted.y, converted.z);
   converted.delete(); // Clean up WASM object
   return result;
-}
+};
 
-function threeJsToBtk(threeVec) {
+window.threeJsToBtk = function(threeVec) {
   const threeJsVec = new btk.Vector3D(threeVec.x, threeVec.y, threeVec.z);
   const result = btk.Vector3D.fromThreeJs(threeJsVec);
   threeJsVec.delete(); // Clean up WASM object
   return result;
+};
+
+// Keep local functions for backward compatibility
+function btkToThreeJs(btkVec) {
+  return window.btkToThreeJs(btkVec);
+}
+
+function threeJsToBtk(threeVec) {
+  return window.threeJsToBtk(threeVec);
 }
 
 // Create a single target and add it to the targets array
@@ -38,100 +47,20 @@ function createTarget(
   width = 18,  // inches
   height = 30, // inches
   thickness = 0.5, // inches
-  isOval = false, // true for oval shape, false for rectangle
-  chainLength = 1 // feet
+  isOval = false // true for oval shape, false for rectangle
 ) {
-  // Convert all inputs to meters using BTK conversions
-  const position_m = {
-    x: btk.Conversions.yardsToMeters(position.x),
-    y: btk.Conversions.yardsToMeters(position.y),
-    z: btk.Conversions.yardsToMeters(position.z)
-  };
-  const width_m = btk.Conversions.inchesToMeters(width);
-  const height_m = btk.Conversions.inchesToMeters(height);
-  const thickness_m = btk.Conversions.inchesToMeters(thickness);
-  const chainLength_m = btk.Conversions.yardsToMeters(chainLength / 3); // feet to yards to meters
-  
-  // Calculate chain offsets (45 degree angle)
-  const chainVert = chainLength_m / Math.sqrt(2);
-  const chainHoriz = chainLength_m / Math.sqrt(2);
-  
-  // Calculate attachment points based on shape
-  // For ovals: attach at edge of circle at 45° angle from top
-  // For rectangles: attach at top corners
-  let attachmentY, attachmentZ;
-  
-  if (isOval) {
-    // For circles, attach at 45° from vertical on the circle edge
-    // At 45°: y = radius * sin(45°), z = radius * cos(45°)
-    const radius = width_m / 2;
-    const angle = Math.PI / 4; // 45 degrees
-    attachmentY = radius * Math.sin(angle);
-    attachmentZ = radius * Math.cos(angle);
-  } else {
-    // For rectangles, attach at top corners
-    attachmentY = width_m / 3;
-    attachmentZ = height_m / 2;
-  }
-  
-  // Create BTK steel target at final position (no rotation needed - symmetric target)
-  const initialPosThree = new THREE.Vector3(position_m.x, position_m.y, position_m.z);
-  const initialPos = threeJsToBtk(initialPosThree);
-  const defaultNormal = new btk.Vector3D(1, 0, 0);  // Default orientation (no rotation)
-  const steelTarget = new btk.SteelTarget(width_m, height_m, thickness_m, isOval, initialPos, defaultNormal);
-  initialPos.delete();
-  defaultNormal.delete();
-  
-  // Add chain anchors - local attachment on target, world fixed on beam
-  const leftLocalAttach = new btk.Vector3D(thickness_m / 2, attachmentY, attachmentZ);
-  const rightLocalAttach = new btk.Vector3D(thickness_m / 2, -attachmentY, attachmentZ);
-  
-  // Transform local attachments to world space
-  const leftWorldAttach = steelTarget.localToWorld(leftLocalAttach);
-  const rightWorldAttach = steelTarget.localToWorld(rightLocalAttach);
-  
-  // Place fixed anchors above and slightly outward from attachment points
-  // This angles the chains outward for a more realistic look
-  const beamHeight = 2.5; // meters
-  const outwardOffset = 0.25; // meters - how far outward to angle chains
-  const leftWorldFixed = new btk.Vector3D(
-    leftWorldAttach.x,
-    leftWorldAttach.y + outwardOffset,  // Angle left chain outward (left = +Y in BTK)
-    beamHeight
-  );
-  const rightWorldFixed = new btk.Vector3D(
-    rightWorldAttach.x,
-    rightWorldAttach.y - outwardOffset,  // Angle right chain outward (right = -Y in BTK)
-    beamHeight
-  );
-  
-  steelTarget.addChainAnchor(leftLocalAttach, leftWorldFixed);
-  steelTarget.addChainAnchor(rightLocalAttach, rightWorldFixed);
-  
-  leftWorldAttach.delete();
-  rightWorldAttach.delete();
-  leftLocalAttach.delete();
-  rightLocalAttach.delete();
-  leftWorldFixed.delete();
-  rightWorldFixed.delete();
-  
-  
-  // Create Three.js mesh and chain lines
-  const targetMesh = createTargetMesh(steelTarget);
-  const chainLines = createChainLines(steelTarget);
-  
-  // Add to targets array
-  targets.push({
-    steelTarget: steelTarget,
-    mesh: targetMesh,
-    chainLines: chainLines,
-    texture: null, // Will be set when creating mesh
-    position: position_m,
-    width: width_m,
-    height: height_m
+  // Create SteelTarget instance using factory (it creates and owns all its resources)
+  const target = SteelTargetFactory.create({
+    position,
+    width,
+    height,
+    thickness,
+    isOval,
+    beamHeight: 2.5, // meters
+    scene
   });
   
-  return steelTarget;
+  return target;
 }
 
 // Create a rack of 4 different targets
@@ -154,78 +83,65 @@ function createTargetRack() {
   // Target 1: 6" Circle (oval)
   createTarget(
     { x: -spacing * 1.5, y: baseY, z: baseZ },
-    6, 6, 0.5, true, // 6" circle
-    1, 10000 // 1 foot chain, 10,000 N/m spring
+    6, 6, 0.5, true // 6" circle
   );
   
   // Target 2: Large Rectangle (18" × 30")
   createTarget(
     { x: -spacing * 0.5, y: baseY, z: baseZ },
-    18, 30, 0.5, false, // 18" × 30" rectangle
-    1.5, 10000 // 1.5 foot chain (longer for large rectangle), 10,000 N/m spring
+    18, 30, 0.5, false // 18" × 30" rectangle
   );
   
-  // Target 3: 12" Circle with closer chains (allows more rotation)
+  // Target 3: 12" Circle
   createTarget(
     { x: spacing * 0.5, y: baseY, z: baseZ },
-    12, 12, 0.5, true, // 12" circle
-    0.5, 10000 // 0.5 foot chain (closer), 10,000 N/m spring
+    12, 12, 0.5, true // 12" circle
   );
   
   // Target 4: 12" × 18" Rectangle
   createTarget(
     { x: spacing * 1.5, y: baseY, z: baseZ },
-    12, 18, 0.5, false, // 12" × 18" rectangle
-    1.2, 10000 // 1.2 foot chain (slightly longer for rectangle), 10,000 N/m spring
+    12, 18, 0.5, false // 12" × 18" rectangle
   );
 }
 
 // Create horizontal beam that chains hang from
 function createHorizontalBeam(width, height, depth) {
+  // Remove existing beam if present
+  if (beamMesh) {
+    scene.remove(beamMesh);
+    if (beamMesh.geometry) beamMesh.geometry.dispose();
+    if (beamMesh.material) beamMesh.material.dispose();
+    beamMesh = null;
+  }
+  
   const beamGeometry = new THREE.CylinderGeometry(0.05, 0.05, width, 16); // 5cm diameter cylinder
   const beamMaterial = new THREE.MeshStandardMaterial({
     color: 0x444444, // Dark gray steel
     metalness: 0.8,
     roughness: 0.3
   });
-  const beam = new THREE.Mesh(beamGeometry, beamMaterial);
+  beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
   
   // Rotate to horizontal (cylinder is vertical by default)
-  beam.rotation.z = Math.PI / 2;
-  beam.position.set(0, height, depth);
-  beam.castShadow = true;
-  beam.receiveShadow = true;
+  beamMesh.rotation.z = Math.PI / 2;
+  beamMesh.position.set(0, height, depth);
+  beamMesh.castShadow = true;
+  beamMesh.receiveShadow = true;
   
-  scene.add(beam);
+  scene.add(beamMesh);
 }
 
 
 function clearAllTargets() {
-  for (const target of targets) {
-    // Clean up physics object
-    if (target.steelTarget) target.steelTarget.delete();
-    
-    // Clean up mesh
-    if (target.mesh) {
-      scene.remove(target.mesh);
-      if (target.mesh.geometry) target.mesh.geometry.dispose();
-      if (target.mesh.material) target.mesh.material.dispose();
-    }
-    
-    // Clean up chain lines
-    for (const line of target.chainLines) {
-      scene.remove(line);
-      if (line.geometry) line.geometry.dispose();
-      if (line.material) line.material.dispose();
-    }
-  }
-  targets = [];
+  SteelTargetFactory.deleteAll();
 }
 
 async function init() {
   try {
-    // Load WASM module
+    // Load WASM module and attach to window for global access
     btk = await BallisticsToolkit();
+    window.btk = btk;
     
     // Setup Three.js scene
     setupScene();
@@ -315,176 +231,6 @@ function setupScene() {
 }
 
 
-function createTargetMesh(steelTarget) {
-  // Ensure display buffer is up to date
-  steelTarget.updateDisplay();
-  
-  // Get vertex buffer as memory view (already in Three.js coordinates)
-  const vertexView = steelTarget.getVertices();
-  
-  // Check if view is valid
-  if (!vertexView || vertexView.length === 0) {
-    console.error('getVertices returned empty or invalid view');
-    return null;
-  }
-  
-  // Vertices are already in Three.js space, just copy directly
-  // Create Float32Array from the memory view
-  const positions = new Float32Array(vertexView.length);
-  positions.set(vertexView);
-  
-  // Get UV buffer from C++ (already computed)
-  const uvView = steelTarget.getUVs();
-  if (!uvView || uvView.length === 0) {
-    console.error('getUVs returned empty or invalid view');
-    return null;
-  }
-  
-  // Copy UVs from memory view
-  const uvs = new Float32Array(uvView.length);
-  uvs.set(uvView);
-  
-  // Create geometry
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  
-  // Get texture from C++ (already initialized with paint color)
-  const textureData = steelTarget.getTexture();
-  const texWidth = steelTarget.getTextureWidth();
-  const texHeight = steelTarget.getTextureHeight();
-  
-  // Create Three.js DataTexture from C++ buffer
-  const imageData = new Uint8ClampedArray(textureData);
-  const texture = new THREE.DataTexture(imageData, texWidth, texHeight, THREE.RGBAFormat);
-  texture.needsUpdate = true;
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  
-  // Create material with texture
-  const material = new THREE.MeshStandardMaterial({
-    map: texture,
-    metalness: 0.3,
-    roughness: 0.7,
-    side: THREE.DoubleSide
-  });
-  
-  // Create mesh
-  const targetMesh = new THREE.Mesh(geometry, material);
-  targetMesh.castShadow = true;
-  targetMesh.receiveShadow = true;
-  targetMesh.userData.texture = texture; // Store texture reference
-  scene.add(targetMesh);
-  
-  return targetMesh;
-}
-
-function updateTargetMesh(target) {
-  if (!target || !target.mesh || !target.steelTarget) return;
-  
-  // Update display buffer before reading vertices
-  target.steelTarget.updateDisplay();
-  
-  // Get vertex buffer as memory view (already in Three.js coordinates)
-  const vertexView = target.steelTarget.getVertices();
-  
-  // Update position buffer in-place (vertices already in Three.js space)
-  const positions = target.mesh.geometry.attributes.position.array;
-  positions.set(vertexView);
-  
-  // Mark buffer as needing update
-  target.mesh.geometry.attributes.position.needsUpdate = true;
-  target.mesh.geometry.computeVertexNormals();
-  target.mesh.geometry.computeBoundingBox();
-  target.mesh.geometry.computeBoundingSphere();
-}
-
-function createChainLines(steelTarget) {
-  // Create line material - steel gray color
-  const material = new THREE.LineBasicMaterial({ color: 0x666666, linewidth: 3 });
-  
-  // Left chain
-  const leftGeometry = new THREE.BufferGeometry();
-  const leftPositions = new Float32Array(6); // 2 points * 3 coords
-  leftGeometry.setAttribute('position', new THREE.BufferAttribute(leftPositions, 3));
-  const leftLine = new THREE.Line(leftGeometry, material);
-  leftLine.castShadow = true;
-  scene.add(leftLine);
-  
-  // Right chain
-  const rightGeometry = new THREE.BufferGeometry();
-  const rightPositions = new Float32Array(6);
-  rightGeometry.setAttribute('position', new THREE.BufferAttribute(rightPositions, 3));
-  const rightLine = new THREE.Line(rightGeometry, material);
-  rightLine.castShadow = true;
-  scene.add(rightLine);
-  
-  return [leftLine, rightLine];
-}
-
-
-function updateChainLines(target) {
-  if (!target || !target.chainLines || !target.steelTarget) return;
-  
-  // Get actual anchor data from C++ physics engine (already updated by simulation)
-  const anchors = target.steelTarget.getAnchors();
-  if (anchors.size() === 0) {
-    anchors.delete();
-    return;
-  }
-  
-  // Update each chain line for each anchor
-  const numAnchors = anchors.size();
-  const numChainLines = target.chainLines.length;
-  
-  for (let i = 0; i < Math.min(numAnchors, numChainLines); i++) {
-    const anchor = anchors.get(i);
-    
-    // Transform local attachment to world space
-    const attachWorld = target.steelTarget.localToWorld(anchor.localAttachment);
-    
-    // Convert BTK positions to Three.js for rendering
-    const fixed = btkToThreeJs(anchor.worldFixed);
-    const attach = btkToThreeJs(attachWorld);
-    
-    // Update chain line: connects fixed anchor to attachment point
-    const positions = target.chainLines[i].geometry.attributes.position.array;
-    positions[0] = fixed.x;
-    positions[1] = fixed.y;
-    positions[2] = fixed.z;
-    positions[3] = attach.x;
-    positions[4] = attach.y;
-    positions[5] = attach.z;
-    target.chainLines[i].geometry.attributes.position.needsUpdate = true;
-    
-    // Cleanup
-    attachWorld.delete();
-  }
-  
-  anchors.delete();
-}
-
-function updateTargetTexture(target) {
-  if (!target || !target.steelTarget || !target.mesh) return;
-  
-  // Get texture from mesh
-  const texture = target.mesh.userData.texture;
-  if (!texture) return;
-  
-  // Get updated texture data from C++ (already updated incrementally with impacts)
-  const textureData = target.steelTarget.getTexture();
-  if (!textureData || textureData.length === 0) return;
-  
-  // Copy data from WASM memory to texture
-  const imageData = new Uint8ClampedArray(textureData);
-  texture.image.data.set(imageData);
-  texture.needsUpdate = true;
-}
-
 function setupUI() {
   const resetBtn = document.getElementById('resetBtn');
   const helpBtn = document.getElementById('helpBtn');
@@ -525,7 +271,7 @@ function onWindowResize() {
 }
 
 function onCanvasClick(event) {
-  if (targets.length === 0) return;
+  if (SteelTargetFactory.getCount() === 0) return;
   
   const canvas = document.getElementById('steelCanvas');
   const rect = canvas.getBoundingClientRect();
@@ -538,27 +284,10 @@ function onCanvasClick(event) {
   raycaster.setFromCamera(mouse, camera);
   
   // Check intersections with all targets, find closest
-  let closestIntersection = null;
-  let hitTarget = null;
+  const hitResult = SteelTargetFactory.findClosestHit(raycaster);
   
-  for (const target of targets) {
-    if (!target.mesh || !target.steelTarget) continue;
-    
-    // Update bounding volumes
-    target.mesh.geometry.computeBoundingBox();
-    target.mesh.geometry.computeBoundingSphere();
-    
-    const intersects = raycaster.intersectObject(target.mesh);
-    if (intersects.length > 0) {
-      const intersection = intersects[0];
-      if (!closestIntersection || intersection.distance < closestIntersection.distance) {
-        closestIntersection = intersection;
-        hitTarget = target;
-      }
-    }
-  }
-  
-  if (closestIntersection && hitTarget) {
+  if (hitResult) {
+    const { target: hitTarget, intersection: closestIntersection } = hitResult;
     const impactPoint = closestIntersection.point; // Three.js coords
     
     // Get camera position (shooter position) in Three.js coords
@@ -602,12 +331,9 @@ function onCanvasClick(event) {
     hitTarget.steelTarget.hitBullet(bullet);
     
     // Update texture immediately after impact
-    updateTargetTexture(hitTarget);
+    hitTarget.updateTexture();
     
-    // Create metallic dust cloud at impact point
-    // Use opposite of bullet direction so particles fly back towards shooter (debris direction)
-    const debrisDirectionThree = direction.clone().negate().normalize(); // Opposite of bullet direction
-    createMetallicDustCloud(impactPoint, debrisDirectionThree);
+    // Note: C++ automatically marks target as moving when impulse is applied
     
     // Cleanup
     baseBullet.delete();
@@ -627,76 +353,6 @@ function onCanvasClick(event) {
       createDustCloud(groundImpact, worldNormal);
     }
   }
-}
-
-// Create metallic dust cloud at target impact point
-function createMetallicDustCloud(impactPointThree, directionThree) {
-  // Offset spawn position slightly away from target surface (in direction of impact)
-  // This ensures particles spawn in front of the target, not behind it
-  const offsetDistance = 0.02; // 2cm offset from surface
-  const offsetPointThree = impactPointThree.clone().add(directionThree.clone().multiplyScalar(offsetDistance));
-  
-  // Convert impact point to BTK coordinates (with offset)
-  const impactPos = threeJsToBtk(offsetPointThree);
-  
-  // Convert impact direction to BTK coordinates
-  // Three.js: X=right, Y=up, Z=towards camera
-  // BTK: X=downrange, Y=crossrange, Z=up
-  const directionBtk = new btk.Vector3D(
-    -directionThree.z,  // Three Z → BTK X (negated)
-    directionThree.x,   // Three X → BTK Y
-    directionThree.y    // Three Y → BTK Z
-  );
-  
-  // Wind vector with diagonal drift (slow, dust-like movement)
-  // BTK: X=downrange, Y=crossrange, Z=up
-  // Diagonal wind: slight downrange, slight crossrange, slow upward
-  const wind = new btk.Vector3D(0.1, 0.15, 0.15); // Diagonal wind (slow, like dust)
-  
-  // Metallic color (silver/gray)
-  const metallicR = 192; // Silver-gray
-  const metallicG = 192;
-  const metallicB = 192;
-  
-  // Create dust cloud with 200 particles (smaller than ground dust), 1.5 second lifetime (faster fade)
-  const dustCloud = new btk.DustCloud(
-    200, // num_particles - smaller than ground dust
-    impactPos, // position
-    wind, // wind (includes upward drift)
-    metallicR, metallicG, metallicB, // metallic color
-    1.5, // lifetime (seconds) - faster fade for metallic particles
-    0.05, // spawn_radius (meters) - smaller spread than ground dust
-    directionBtk // direction_bias - particles biased in bullet impact direction
-  );
-  
-  // Create instanced spheres for dust particles (so they can cast shadows)
-  const sphereGeometry = new THREE.SphereGeometry(0.002, 6, 6); // 2mm radius, smaller than ground dust
-  const sphereMaterial = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(metallicR / 255, metallicG / 255, metallicB / 255),
-    transparent: true,
-    opacity: 1.0,
-    roughness: 0.3, // More metallic (lower roughness)
-    metalness: 0.8   // High metalness for metallic look
-  });
-  
-  // Create instanced mesh (max 200 instances)
-  const instancedMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, 200);
-  instancedMesh.castShadow = true;
-  instancedMesh.receiveShadow = false;
-  scene.add(instancedMesh);
-  
-  // Store dust cloud data
-  dustClouds.push({
-    dustCloud: dustCloud,
-    instancedMesh: instancedMesh,
-    sphereGeometry: sphereGeometry,
-    sphereMaterial: sphereMaterial
-  });
-  
-  // Cleanup BTK objects
-  impactPos.delete();
-  directionBtk.delete();
-  wind.delete();
 }
 
 // Create dust cloud at impact point
@@ -766,25 +422,7 @@ function createDustCloud(impactPointThree, normalThree) {
 
 function resetTarget() {
   // Clean up existing targets
-  for (const target of targets) {
-    // Clean up physics object
-    if (target.steelTarget) target.steelTarget.delete();
-    
-    // Clean up mesh
-    if (target.mesh) {
-      scene.remove(target.mesh);
-      if (target.mesh.geometry) target.mesh.geometry.dispose();
-      if (target.mesh.material) target.mesh.material.dispose();
-    }
-    
-    // Clean up chain lines
-    for (const line of target.chainLines) {
-      scene.remove(line);
-      if (line.geometry) line.geometry.dispose();
-      if (line.material) line.material.dispose();
-    }
-  }
-  targets = [];
+  SteelTargetFactory.deleteAll();
   
   // Clean up dust clouds
   for (const cloud of dustClouds) {
@@ -808,13 +446,7 @@ function animate() {
   lastTime = currentTime;
   
   // Update physics for all targets
-  for (const target of targets) {
-    if (target.steelTarget) {
-      target.steelTarget.timeStep(dt);
-      updateTargetMesh(target);
-      updateChainLines(target);
-    }
-  }
+  SteelTargetFactory.updateAll(dt);
   
   // Update dust clouds
   for (let i = dustClouds.length - 1; i >= 0; i--) {

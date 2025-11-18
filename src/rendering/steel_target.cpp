@@ -22,6 +22,7 @@ namespace btk::rendering
       orientation_(btk::math::Quaternion()), // Identity orientation (no rotation)
       velocity_ms_(0.0f, 0.0f, 0.0f),
       angular_velocity_(0.0f, 0.0f, 0.0f),
+      is_moving_(true), // Assume moving initially
       mass_kg_(0.0f),
       inertia_tensor_(0.0f, 0.0f, 0.0f),
       linear_damping_(DEFAULT_LINEAR_DAMPING),
@@ -49,6 +50,7 @@ namespace btk::rendering
       orientation_(btk::math::Quaternion()),
       velocity_ms_(0.0f, 0.0f, 0.0f),
       angular_velocity_(0.0f, 0.0f, 0.0f),
+      is_moving_(true), // Assume moving initially
       mass_kg_(0.0f),
       inertia_tensor_(0.0f, 0.0f, 0.0f),
       linear_damping_(DEFAULT_LINEAR_DAMPING),
@@ -283,6 +285,9 @@ namespace btk::rendering
     );
 
     angular_velocity_ += angular_accel;
+    
+    // Impulse applied - target is now moving
+    is_moving_ = true;
   }
 
   void SteelTarget::applyForce(const btk::math::Vector3D& force, const btk::math::Vector3D& world_position, float dt) {
@@ -292,12 +297,11 @@ namespace btk::rendering
   }
 
   void SteelTarget::timeStep(float dt) {
-    // Clamp dt and subdivide if necessary for stability
-    constexpr float MAX_SUBSTEP_DT = 0.005f;  // 5ms maximum substep (can be smaller)
-    constexpr float MAX_TOTAL_DT = 1.0f;     // 1s maximum total time
+    // Clamp dt to maximum 1 second
+    dt = std::min(dt, 1.0f);
     
-    // Clamp total time to maximum
-    dt = std::min(dt, MAX_TOTAL_DT);
+    // Subdivide into smaller steps if needed for stability
+    constexpr float MAX_SUBSTEP_DT = 0.005f;  // 5ms maximum substep (can be smaller)
     
     // Subdivide into smaller steps if needed
     int num_substeps = static_cast<int>(std::ceil(dt / MAX_SUBSTEP_DT));
@@ -333,6 +337,11 @@ namespace btk::rendering
         normal_ = orientation_.rotate(btk::math::Vector3D(1.0f, 0.0f, 0.0f));
       }
     }
+    
+    // Update is_moving flag based on velocity thresholds
+    float linear_speed = velocity_ms_.magnitude();
+    float angular_speed = angular_velocity_.magnitude();
+    is_moving_ = !(linear_speed < VELOCITY_THRESHOLD && angular_speed < ANGULAR_VELOCITY_THRESHOLD);
   }
 
   void SteelTarget::applyChainForces(float dt) {
