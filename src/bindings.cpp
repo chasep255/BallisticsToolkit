@@ -6,7 +6,8 @@
 #include "ballistics/simulator.h"
 #include "ballistics/trajectory.h"
 #include "match/match.h"
-#include "match/steel_target.h"
+#include "rendering/steel_target.h"
+#include "rendering/dust_cloud.h"
 #include "match/targets.h"
 #include "match/simulator.h"
 #include "match/target.h"
@@ -19,6 +20,7 @@
 using namespace emscripten;
 using namespace btk::ballistics;
 using namespace btk::match;
+using namespace btk::rendering;
 using namespace btk::math;
 using namespace btk::physics;
 
@@ -306,58 +308,68 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .class_function("hasPreset", &WindPresets::hasPreset);
 
   // Steel Target - Chain Anchor
-  value_object<btk::match::SteelTarget::ChainAnchor>("ChainAnchor")
-    .field("localAttachment", &btk::match::SteelTarget::ChainAnchor::local_attachment_)
-    .field("worldFixed", &btk::match::SteelTarget::ChainAnchor::world_fixed_)
-    .field("restLength", &btk::match::SteelTarget::ChainAnchor::rest_length_)
-    .field("springConstant", &btk::match::SteelTarget::ChainAnchor::spring_constant_);
+  value_object<btk::rendering::SteelTarget::ChainAnchor>("ChainAnchor")
+    .field("localAttachment", &btk::rendering::SteelTarget::ChainAnchor::local_attachment_)
+    .field("worldFixed", &btk::rendering::SteelTarget::ChainAnchor::world_fixed_)
+    .field("restLength", &btk::rendering::SteelTarget::ChainAnchor::rest_length_)
+    .field("springConstant", &btk::rendering::SteelTarget::ChainAnchor::spring_constant_);
 
   // Steel Target - Impact
-  value_object<btk::match::SteelTarget::Impact>("SteelTargetImpact")
-    .field("positionLocal", &btk::match::SteelTarget::Impact::position_local_)
-    .field("bulletDiameter", &btk::match::SteelTarget::Impact::bullet_diameter_)
-    .field("timestamp", &btk::match::SteelTarget::Impact::timestamp_s_);
+  value_object<btk::rendering::SteelTarget::Impact>("SteelTargetImpact")
+    .field("positionLocal", &btk::rendering::SteelTarget::Impact::position_local_)
+    .field("bulletDiameter", &btk::rendering::SteelTarget::Impact::bullet_diameter_)
+    .field("timestamp", &btk::rendering::SteelTarget::Impact::timestamp_s_);
 
   // Steel Target - Intersection Result
-  value_object<btk::match::SteelTarget::IntersectionResult>("IntersectionResult")
-    .field("hit", &btk::match::SteelTarget::IntersectionResult::hit)
-    .field("impactPoint", &btk::match::SteelTarget::IntersectionResult::impact_point_)
-    .field("impactVelocity", &btk::match::SteelTarget::IntersectionResult::impact_velocity_)
-    .field("surfaceNormal", &btk::match::SteelTarget::IntersectionResult::surface_normal_)
-    .field("impactTime", &btk::match::SteelTarget::IntersectionResult::impact_time_s_)
-    .field("bulletMass", &btk::match::SteelTarget::IntersectionResult::bullet_mass_kg_)
-    .field("bulletDiameter", &btk::match::SteelTarget::IntersectionResult::bullet_diameter_);
+  value_object<btk::rendering::SteelTarget::IntersectionResult>("IntersectionResult")
+    .field("hit", &btk::rendering::SteelTarget::IntersectionResult::hit)
+    .field("impactPoint", &btk::rendering::SteelTarget::IntersectionResult::impact_point_)
+    .field("impactVelocity", &btk::rendering::SteelTarget::IntersectionResult::impact_velocity_)
+    .field("surfaceNormal", &btk::rendering::SteelTarget::IntersectionResult::surface_normal_)
+    .field("impactTime", &btk::rendering::SteelTarget::IntersectionResult::impact_time_s_)
+    .field("bulletMass", &btk::rendering::SteelTarget::IntersectionResult::bullet_mass_kg_)
+    .field("bulletDiameter", &btk::rendering::SteelTarget::IntersectionResult::bullet_diameter_);
 
   // Register optional<IntersectionResult>
-  register_optional<btk::match::SteelTarget::IntersectionResult>();
+  register_optional<btk::rendering::SteelTarget::IntersectionResult>();
 
   // Register vectors for SteelTarget
-  register_vector<btk::match::SteelTarget::ChainAnchor>("ChainAnchorVector");
-  register_vector<btk::match::SteelTarget::Impact>("ImpactVector");
+  register_vector<btk::rendering::SteelTarget::ChainAnchor>("ChainAnchorVector");
+  register_vector<btk::rendering::SteelTarget::Impact>("ImpactVector");
 
   // Steel Target class
-  class_<btk::match::SteelTarget>("SteelTarget")
+  class_<btk::rendering::SteelTarget>("SteelTarget")
     .constructor<float, float, float, bool>()
     .constructor<float, float, float, bool, const btk::math::Vector3D&, const btk::math::Vector3D&>()
-    .function("addChainAnchor", &btk::match::SteelTarget::addChainAnchor)
-    .function("hit", select_overload<bool(const btk::ballistics::Trajectory&)>(&btk::match::SteelTarget::hit))
-    .function("hitBullet", select_overload<void(const btk::ballistics::Bullet&)>(&btk::match::SteelTarget::hit))
-    .function("timeStep", &btk::match::SteelTarget::timeStep)
-    .function("getImpacts", &btk::match::SteelTarget::getImpacts)
-    .function("getAnchors", &btk::match::SteelTarget::getAnchors)
-    .function("getCenterOfMass", &btk::match::SteelTarget::getCenterOfMass)
-    .function("getNormal", &btk::match::SteelTarget::getNormal)
-    .function("getVelocity", &btk::match::SteelTarget::getVelocity)
-    .function("getAngularVelocity", &btk::match::SteelTarget::getAngularVelocity)
-    .function("getMass", &btk::match::SteelTarget::getMass)
-    .function("clearImpacts", &btk::match::SteelTarget::clearImpacts)
-    .function("updateDisplay", &btk::match::SteelTarget::updateDisplay)
-    .function("getVertices", &btk::match::SteelTarget::getVertices)
-    .function("getUVs", &btk::match::SteelTarget::getUVs)
-    .function("initializeTexture", &btk::match::SteelTarget::initializeTexture)
-    .function("getTextureWidth", &btk::match::SteelTarget::getTextureWidth)
-    .function("getTextureHeight", &btk::match::SteelTarget::getTextureHeight)
-    .function("getTexture", &btk::match::SteelTarget::getTexture)
-    .function("setColors", &btk::match::SteelTarget::setColors)
-    .function("localToWorld", &btk::match::SteelTarget::localToWorld);
+    .function("addChainAnchor", &btk::rendering::SteelTarget::addChainAnchor)
+    .function("hit", select_overload<bool(const btk::ballistics::Trajectory&)>(&btk::rendering::SteelTarget::hit))
+    .function("hitBullet", select_overload<void(const btk::ballistics::Bullet&)>(&btk::rendering::SteelTarget::hit))
+    .function("timeStep", &btk::rendering::SteelTarget::timeStep)
+    .function("getImpacts", &btk::rendering::SteelTarget::getImpacts)
+    .function("getAnchors", &btk::rendering::SteelTarget::getAnchors)
+    .function("getCenterOfMass", &btk::rendering::SteelTarget::getCenterOfMass)
+    .function("getNormal", &btk::rendering::SteelTarget::getNormal)
+    .function("getVelocity", &btk::rendering::SteelTarget::getVelocity)
+    .function("getAngularVelocity", &btk::rendering::SteelTarget::getAngularVelocity)
+    .function("getMass", &btk::rendering::SteelTarget::getMass)
+    .function("clearImpacts", &btk::rendering::SteelTarget::clearImpacts)
+    .function("updateDisplay", &btk::rendering::SteelTarget::updateDisplay)
+    .function("getVertices", &btk::rendering::SteelTarget::getVertices)
+    .function("getUVs", &btk::rendering::SteelTarget::getUVs)
+    .function("initializeTexture", &btk::rendering::SteelTarget::initializeTexture)
+    .function("getTextureWidth", &btk::rendering::SteelTarget::getTextureWidth)
+    .function("getTextureHeight", &btk::rendering::SteelTarget::getTextureHeight)
+    .function("getTexture", &btk::rendering::SteelTarget::getTexture)
+    .function("setColors", &btk::rendering::SteelTarget::setColors)
+    .function("localToWorld", &btk::rendering::SteelTarget::localToWorld);
+
+  // Dust Cloud class
+  class_<DustCloud>("DustCloud")
+    .constructor<int, const btk::math::Vector3D&, const btk::math::Vector3D&, uint8_t, uint8_t, uint8_t, float, float, const btk::math::Vector3D&>()
+    .function("timeStep", &DustCloud::timeStep)
+    .function("getInstanceMatrices", &DustCloud::getInstanceMatrices)
+    .function("getAlpha", &DustCloud::getAlpha)
+    .function("isDone", &DustCloud::isDone)
+    .function("getParticleCount", &DustCloud::getParticleCount)
+    .function("setWind", &DustCloud::setWind);
 }

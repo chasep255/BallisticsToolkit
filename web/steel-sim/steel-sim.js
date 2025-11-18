@@ -10,6 +10,10 @@ let lastTime = performance.now();
 // Array of targets, each with its own physics object, mesh, chains, and impacts
 let targets = [];
 
+// Array of active dust clouds
+let dustClouds = [];
+let groundMesh = null;
+
 // ===== COORDINATE CONVERSION UTILITIES =====
 // BTK: X=downrange, Y=crossrange-right, Z=up
 // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
@@ -195,6 +199,7 @@ function createHorizontalBeam(width, height, depth) {
   scene.add(beam);
 }
 
+
 function clearAllTargets() {
   for (const target of targets) {
     // Clean up physics object
@@ -292,15 +297,11 @@ function setupScene() {
     roughness: 0.8,
     metalness: 0.2
   });
-  const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.5;
-  ground.receiveShadow = true;
-  scene.add(ground);
-  
-  // Add grid for reference (ground plane)
-  const gridHelper = new THREE.GridHelper(10, 20, 0x444444, 0x222222);
-  scene.add(gridHelper);
+  groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+  groundMesh.rotation.x = -Math.PI / 2;
+  groundMesh.position.y = -0.5;
+  groundMesh.receiveShadow = true;
+  scene.add(groundMesh);
   
   // Setup raycaster for mouse interaction
   raycaster = new THREE.Raycaster();
@@ -603,12 +604,164 @@ function onCanvasClick(event) {
     // Update texture immediately after impact
     updateTargetTexture(hitTarget);
     
+    // Create metallic dust cloud at impact point
+    // Use opposite of bullet direction so particles fly back towards shooter (debris direction)
+    const debrisDirectionThree = direction.clone().negate().normalize(); // Opposite of bullet direction
+    createMetallicDustCloud(impactPoint, debrisDirectionThree);
+    
     // Cleanup
     baseBullet.delete();
     bullet.delete();
     bulletPos.delete();
     bulletVel.delete();
+  } else if (groundMesh) {
+    // No target hit - check for ground intersection
+    const groundIntersects = raycaster.intersectObject(groundMesh);
+    if (groundIntersects.length > 0) {
+      const groundImpact = groundIntersects[0].point; // Three.js coords
+      // Get face normal and transform to world space
+      const localNormal = groundIntersects[0].face.normal.clone();
+      const worldNormal = localNormal.applyMatrix3(
+        new THREE.Matrix3().getNormalMatrix(groundIntersects[0].object.matrixWorld)
+      ).normalize();
+      createDustCloud(groundImpact, worldNormal);
+    }
   }
+}
+
+// Create metallic dust cloud at target impact point
+function createMetallicDustCloud(impactPointThree, directionThree) {
+  // Offset spawn position slightly away from target surface (in direction of impact)
+  // This ensures particles spawn in front of the target, not behind it
+  const offsetDistance = 0.02; // 2cm offset from surface
+  const offsetPointThree = impactPointThree.clone().add(directionThree.clone().multiplyScalar(offsetDistance));
+  
+  // Convert impact point to BTK coordinates (with offset)
+  const impactPos = threeJsToBtk(offsetPointThree);
+  
+  // Convert impact direction to BTK coordinates
+  // Three.js: X=right, Y=up, Z=towards camera
+  // BTK: X=downrange, Y=crossrange, Z=up
+  const directionBtk = new btk.Vector3D(
+    -directionThree.z,  // Three Z → BTK X (negated)
+    directionThree.x,   // Three X → BTK Y
+    directionThree.y    // Three Y → BTK Z
+  );
+  
+  // Wind vector with diagonal drift (slow, dust-like movement)
+  // BTK: X=downrange, Y=crossrange, Z=up
+  // Diagonal wind: slight downrange, slight crossrange, slow upward
+  const wind = new btk.Vector3D(0.1, 0.15, 0.15); // Diagonal wind (slow, like dust)
+  
+  // Metallic color (silver/gray)
+  const metallicR = 192; // Silver-gray
+  const metallicG = 192;
+  const metallicB = 192;
+  
+  // Create dust cloud with 200 particles (smaller than ground dust), 1.5 second lifetime (faster fade)
+  const dustCloud = new btk.DustCloud(
+    200, // num_particles - smaller than ground dust
+    impactPos, // position
+    wind, // wind (includes upward drift)
+    metallicR, metallicG, metallicB, // metallic color
+    1.5, // lifetime (seconds) - faster fade for metallic particles
+    0.05, // spawn_radius (meters) - smaller spread than ground dust
+    directionBtk // direction_bias - particles biased in bullet impact direction
+  );
+  
+  // Create instanced spheres for dust particles (so they can cast shadows)
+  const sphereGeometry = new THREE.SphereGeometry(0.002, 6, 6); // 2mm radius, smaller than ground dust
+  const sphereMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(metallicR / 255, metallicG / 255, metallicB / 255),
+    transparent: true,
+    opacity: 1.0,
+    roughness: 0.3, // More metallic (lower roughness)
+    metalness: 0.8   // High metalness for metallic look
+  });
+  
+  // Create instanced mesh (max 200 instances)
+  const instancedMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, 200);
+  instancedMesh.castShadow = true;
+  instancedMesh.receiveShadow = false;
+  scene.add(instancedMesh);
+  
+  // Store dust cloud data
+  dustClouds.push({
+    dustCloud: dustCloud,
+    instancedMesh: instancedMesh,
+    sphereGeometry: sphereGeometry,
+    sphereMaterial: sphereMaterial
+  });
+  
+  // Cleanup BTK objects
+  impactPos.delete();
+  directionBtk.delete();
+  wind.delete();
+}
+
+// Create dust cloud at impact point
+function createDustCloud(impactPointThree, normalThree) {
+  // Convert impact point to BTK coordinates
+  const impactPos = threeJsToBtk(impactPointThree);
+  
+  // Convert normal to BTK coordinates
+  // Three.js: X=right, Y=up, Z=towards camera
+  // BTK: X=downrange, Y=crossrange, Z=up
+  const normalBtk = new btk.Vector3D(
+    -normalThree.z,  // Three Z → BTK X (negated)
+    normalThree.x,   // Three X → BTK Y
+    normalThree.y    // Three Y → BTK Z
+  );
+  
+  // Wind vector with diagonal drift (slow, dust-like movement)
+  // BTK: X=downrange, Y=crossrange, Z=up
+  // Diagonal wind: slight downrange, slight crossrange, slow upward
+  const wind = new btk.Vector3D(0.1, 0.15, 0.15); // Diagonal wind (slow, like dust)
+  
+  // Dust color (brown/tan)
+  const dustR = 139; // Brown
+  const dustG = 115;
+  const dustB = 85;
+  
+  // Create dust cloud with 500 particles, 2 second lifetime (faster fade)
+  const dustCloud = new btk.DustCloud(
+    500, // num_particles
+    impactPos, // position
+    wind, // wind (includes upward drift)
+    dustR, dustG, dustB, // color
+    2.0, // lifetime (seconds) - faster fade
+    0.1, // spawn_radius (meters) - small initial spread
+    normalBtk // direction_bias - particles biased towards surface normal
+  );
+  
+  // Create instanced spheres for dust particles (so they can cast shadows)
+  const sphereGeometry = new THREE.SphereGeometry(0.003, 6, 6); // 3mm radius, smaller spheres
+  const sphereMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(dustR / 255, dustG / 255, dustB / 255),
+    transparent: true,
+    opacity: 1.0,
+    roughness: 0.8,
+    metalness: 0.1
+  });
+  
+  // Create instanced mesh (max 500 instances)
+  const instancedMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, 500);
+  instancedMesh.castShadow = true;
+  instancedMesh.receiveShadow = false;
+  scene.add(instancedMesh);
+  
+  // Store dust cloud data
+  dustClouds.push({
+    dustCloud: dustCloud,
+    instancedMesh: instancedMesh,
+    sphereGeometry: sphereGeometry,
+    sphereMaterial: sphereMaterial
+  });
+  
+  // Cleanup BTK objects
+  impactPos.delete();
+  normalBtk.delete();
+  wind.delete();
 }
 
 function resetTarget() {
@@ -633,6 +786,16 @@ function resetTarget() {
   }
   targets = [];
   
+  // Clean up dust clouds
+  for (const cloud of dustClouds) {
+    scene.remove(cloud.instancedMesh);
+    cloud.sphereGeometry.dispose();
+    cloud.sphereMaterial.dispose();
+    cloud.instancedMesh.dispose();
+    cloud.dustCloud.delete();
+  }
+  dustClouds = [];
+  
   // Recreate the rack
   createTargetRack();
 }
@@ -650,6 +813,66 @@ function animate() {
       target.steelTarget.timeStep(dt);
       updateTargetMesh(target);
       updateChainLines(target);
+    }
+  }
+  
+  // Update dust clouds
+  for (let i = dustClouds.length - 1; i >= 0; i--) {
+    const cloud = dustClouds[i];
+    
+    // Step physics
+    cloud.dustCloud.timeStep(dt);
+    
+    // Check if done (all particles faded to zero)
+    if (cloud.dustCloud.isDone()) {
+      // Remove from scene
+      scene.remove(cloud.instancedMesh);
+      
+      // Dispose geometry
+      cloud.sphereGeometry.dispose();
+      
+      // Dispose material
+      cloud.sphereMaterial.dispose();
+      
+      // Dispose instanced mesh
+      cloud.instancedMesh.dispose();
+      
+      // Cleanup C++ object
+      cloud.dustCloud.delete();
+      
+      // Remove from array
+      dustClouds.splice(i, 1);
+      continue;
+    }
+    
+    // Update instanced mesh with matrices directly from C++ (zero-copy DMA)
+    const matrices = cloud.dustCloud.getInstanceMatrices();
+    
+    // Check if any particles are still visible
+    if (matrices.length > 0) {
+      const numParticles = matrices.length / 16; // 16 floats per matrix
+      
+      // Get global alpha for the cloud
+      const alpha = cloud.dustCloud.getAlpha();
+      
+      // Copy matrices directly into instanceMatrix buffer (bulk copy from WASM memory view)
+      const instanceMatrixArray = cloud.instancedMesh.instanceMatrix.array;
+      instanceMatrixArray.set(matrices);
+      
+      // Update instance count
+      cloud.instancedMesh.count = numParticles;
+      cloud.instancedMesh.instanceMatrix.needsUpdate = true;
+      
+      // Update material opacity with global alpha
+      cloud.sphereMaterial.opacity = alpha;
+    } else {
+      // No particles visible - remove immediately
+      scene.remove(cloud.instancedMesh);
+      cloud.sphereGeometry.dispose();
+      cloud.sphereMaterial.dispose();
+      cloud.instancedMesh.dispose();
+      cloud.dustCloud.delete();
+      dustClouds.splice(i, 1);
     }
   }
   

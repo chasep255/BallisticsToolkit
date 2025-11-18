@@ -135,7 +135,8 @@
             <strong>Edge Hits:</strong> Hitting near the edges causes significant rotation as well as linear motion. Watch how the target spins while swinging.<br><br>
             <strong>Different Target Sizes:</strong> Smaller targets (6" circle) respond more dramatically to impacts than larger ones (18"×30" rectangle) due to their lower mass and inertia.<br><br>
             <strong>Chain Dynamics:</strong> Watch how chains pull targets back smoothly without bouncing. Chains dissipate energy, so targets stop naturally rather than oscillating.<br><br>
-            <strong>Impact Visualization:</strong> Bullet impacts are drawn on the target texture as splatter marks. Impacts appear on the side that was hit (front or back), with metal showing through the red paint.
+            <strong>Impact Visualization:</strong> Bullet impacts are drawn on the target texture as splatter marks. Impacts appear on the side that was hit (front or back), with metal showing through the red paint.<br><br>
+            <strong>Dust Effects:</strong> When you hit a target, metallic dust particles (silver-gray) fly back towards you, simulating debris from the impact. When you miss and hit the ground, brown dust clouds appear at the impact point. Dust particles fade out over time and are automatically cleaned up.
           </div>
         </div>
         
@@ -143,7 +144,7 @@
           <h3>Technical Details</h3>
           <div class="param-help">
             <strong>Physics Engine:</strong> Custom rigid body physics implemented in C++ and compiled to WebAssembly for high performance. Uses quaternion-based orientation representation for stable rotations.<br><br>
-            <strong>Rendering:</strong> Three.js WebGL rendering with dynamic geometry updates. Vertex positions are computed in C++ and transferred via typed memory views for zero-copy efficiency. Textures are generated procedurally in C++ and updated incrementally as impacts occur.<br><br>
+            <strong>Rendering:</strong> Three.js WebGL rendering with dynamic geometry updates. Vertex positions are computed in C++ and transferred via typed memory views, allowing efficient bulk copying from WASM memory to WebGL buffers. Textures are generated procedurally in C++ and updated incrementally as impacts occur. Dust particles use instanced rendering with bulk matrix updates for efficient performance with hundreds of particles.<br><br>
             <strong>Chain Physics:</strong> Chains are modeled as damped springs (10,000 N/m spring constant, 200 N·s/m damping) with rest lengths calculated from initial positions. The high spring constant makes chains effectively rigid, while damping dissipates energy to prevent bouncing. Forces are applied at attachment points in world coordinates, with local attachment points transformed using the target's current orientation.<br><br>
             <strong>Impact Detection:</strong> Raycasting from camera through mouse position detects target intersections. Impact points are converted to local target coordinates for physics calculations and texture drawing.<br><br>
             <strong>Texture Generation:</strong> Targets use a single texture buffer that is twice as wide, with front face UVs mapping to the left half (0-0.5) and back face UVs mapping to the right half (0.5-1.0). This allows impacts to appear on the correct side.
@@ -155,7 +156,7 @@
           <div class="param-help">
             <strong>Simplified Physics:</strong> The simulation uses simplified rigid body physics without advanced collision detection between targets or complex material properties. Targets do not interact with each other.<br><br>
             <strong>Chain Model:</strong> Chains are modeled as damped springs (critically damped) without mass or realistic chain link physics. They cannot go slack or wrap around objects. Chain damping dissipates energy to prevent bouncing, creating realistic behavior where targets stop smoothly rather than oscillating.<br><br>
-            <strong>Fixed Environment:</strong> The simulation assumes a fixed overhead beam and does not model ground interactions, wind effects, or other environmental factors.<br><br>
+            <strong>Fixed Environment:</strong> The simulation assumes a fixed overhead beam. Ground interactions are limited to visual dust effects when missing targets. Wind effects are simulated only for dust particle movement, not for bullet trajectories.<br><br>
             <strong>Demo Scope:</strong> This is currently a physics animation demo. Future versions will include full shooting range simulation with multiple scenarios and scoring.
           </div>
         </div>
