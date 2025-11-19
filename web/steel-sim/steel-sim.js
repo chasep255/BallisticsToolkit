@@ -5,6 +5,7 @@ import { DustCloudFactory } from './DustCloud.js';
 import { Landscape } from './Landscape.js';
 import { TargetRackFactory } from './TargetRack.js';
 import { CompositionRenderer, VirtualCoordinates as VC } from './CompositionRenderer.js';
+import { Scope } from './Scope.js';
 
 // ===== CONSTANTS =====
 const SHOOTER_HEIGHT = 1; // yards
@@ -41,8 +42,10 @@ const METAL_DUST_CONFIG = {
 let btk = null;
 let scene, camera, renderer;
 let compositionRenderer = null;
+let scope = null;
 let sceneRenderTarget = null;
-let raycaster, mouse;
+let backgroundCamera = null; // Fixed camera for background scene
+let raycaster;
 let animationId = null;
 let lastTime = performance.now();
 let landscape = null;
@@ -225,20 +228,27 @@ function setupScene() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87ceeb);
   
-  // Setup camera at shooter position
-  camera = new THREE.PerspectiveCamera(
+  // Setup lighting first
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  directionalLight.position.set(0, 0, 1000);
+  scene.add(directionalLight);
+  
+  // Create fixed background camera (wide-angle view that doesn't zoom)
+  backgroundCamera = new THREE.PerspectiveCamera(
     CAMERA_FOV,
     canvas.clientWidth / canvas.clientHeight,
     0.1,
     CAMERA_FAR_PLANE
   );
-  camera.position.set(0, SHOOTER_HEIGHT, 0);
-  camera.lookAt(0, 0, -CAMERA_FAR_PLANE);
+  backgroundCamera.position.set(0, SHOOTER_HEIGHT, 0);
+  backgroundCamera.lookAt(0, 0, -CAMERA_FAR_PLANE);
   
   // Setup composition renderer
   compositionRenderer = new CompositionRenderer({ canvas });
   renderer = compositionRenderer.getRenderer();
   
+  // Create render target for background 3D scene
   sceneRenderTarget = new THREE.WebGLRenderTarget(canvas.clientWidth, canvas.clientHeight, {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
@@ -246,6 +256,7 @@ function setupScene() {
     samples: 4
   });
   
+  // Add background 3D scene as fullscreen element
   const sceneGeometry = new THREE.PlaneGeometry(VC.WIDTH, VC.HEIGHT);
   const sceneMaterial = new THREE.MeshBasicMaterial({
     map: sceneRenderTarget.texture,
@@ -257,11 +268,21 @@ function setupScene() {
     x: 0, y: 0, z: 0, renderOrder: 0
   });
   
-  // Setup lighting
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(0, 0, 1000);
-  scene.add(directionalLight);
+  // Create scope (has its own camera with zoom, renders on top)
+  scope = new Scope({
+    scene,
+    renderer,
+    compositionRenderer,
+    canvasWidth: canvas.clientWidth,
+    canvasHeight: canvas.clientHeight,
+    initialFOV: 30,
+    minFOV: 1,
+    maxFOV: 30,
+    cameraPosition: { x: 0, y: SHOOTER_HEIGHT, z: 0 },
+    initialLookAt: { x: 0, y: 0, z: -1000 },
+    scopeSize: 0.8
+  });
+  camera = scope.getCamera(); // For raycasting
   
   // Create landscape
   landscape = new Landscape(scene, {
@@ -275,12 +296,12 @@ function setupScene() {
   // Create target racks
   createTargetRacks();
   
-  // Setup raycaster
+  // Setup raycaster for scope-based shooting
   raycaster = new THREE.Raycaster();
-  mouse = new THREE.Vector2();
   
   // Event listeners (no resize - canvas is locked)
-  canvas.addEventListener('click', onCanvasClick);
+  canvas.addEventListener('wheel', onMouseWheel, { passive: false });
+  window.addEventListener('keydown', onKeyDown);
 }
 
 // ===== TARGET RACK CREATION =====
@@ -347,6 +368,57 @@ function setupUI() {
 
 // ===== EVENT HANDLERS =====
 
+function onMouseWheel(event) {
+  event.preventDefault();
+  
+  if (event.deltaY < 0) {
+    scope.zoomIn();
+  } else {
+    scope.zoomOut();
+  }
+}
+
+function onKeyDown(event) {
+  // Fire bullet with spacebar (scope reticle aim)
+  if (event.key === ' ') {
+    event.preventDefault();
+    fireFromScope();
+    return;
+  }
+  
+  // Zoom controls: +/- or =/- keys
+  if (event.key === '=' || event.key === '+') {
+    event.preventDefault();
+    scope.zoomIn();
+    return;
+  }
+  if (event.key === '-' || event.key === '_') {
+    event.preventDefault();
+    scope.zoomOut();
+    return;
+  }
+  
+  // Pan controls: arrow keys (amount scales with zoom automatically)
+  switch(event.key) {
+    case 'ArrowLeft':
+      event.preventDefault();
+      scope.panLeft();
+      break;
+    case 'ArrowRight':
+      event.preventDefault();
+      scope.panRight();
+      break;
+    case 'ArrowUp':
+      event.preventDefault();
+      scope.panUp();
+      break;
+    case 'ArrowDown':
+      event.preventDefault();
+      scope.panDown();
+      break;
+  }
+}
+
 function createBullet(impactPoint, shooterPos) {
   const direction = impactPoint.clone().sub(shooterPos).normalize();
   const bulletSpeedFps = btk.Conversions.mpsToFps(BULLET_SPEED_MPS);
@@ -373,17 +445,13 @@ function createBullet(impactPoint, shooterPos) {
   return bullet;
 }
 
-function onCanvasClick(event) {
+function fireFromScope() {
   const allTargets = TargetRackFactory.getAllTargets();
   if (allTargets.length === 0) return;
   
-  const canvas = document.getElementById('steelCanvas');
-  const rect = canvas.getBoundingClientRect();
-  
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  
-  raycaster.setFromCamera(mouse, camera);
+  // Cast ray from scope camera center (reticle crosshair)
+  const scopeCamera = scope.getCamera();
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), scopeCamera);
   
   // Check for target hit
   const intersects = raycaster.intersectObjects(allTargets.map(t => t.mesh));
@@ -391,7 +459,7 @@ function onCanvasClick(event) {
     const hitTarget = allTargets.find(t => t.mesh === intersects[0].object);
     if (hitTarget) {
       const impactPoint = intersects[0].point;
-      const bullet = createBullet(impactPoint, camera.position);
+      const bullet = createBullet(impactPoint, scopeCamera.position);
       
       hitTarget.hitBullet(bullet);
       hitTarget.updateTexture();
@@ -461,13 +529,17 @@ function animate() {
   SteelTargetFactory.updateAll(dt);
   DustCloudFactory.updateAll(dt);
   
-  // Render 3D scene to target
+  // 3-pass rendering (like fclass-sim):
+  // 1) Render main scene with fixed background camera (for areas outside scope)
   renderer.setRenderTarget(sceneRenderTarget);
   renderer.clear();
-  renderer.render(scene, camera);
+  renderer.render(scene, backgroundCamera);
   renderer.setRenderTarget(null);
   
-  // Composite to screen
+  // 2) Render scope with its own camera (zoomed view with reticle)
+  scope.render();
+  
+  // 3) Composite everything to screen
   compositionRenderer.render();
 }
 

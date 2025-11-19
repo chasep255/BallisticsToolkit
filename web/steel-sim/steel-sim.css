@@ -83,11 +83,42 @@
   display: block;
 }
 
-.canvas-instructions {
-  margin-top: 10px;
-  font-size: 14px;
-  color: #666;
-  font-style: italic;
+/* Quick key guide (displayed below canvas) */
+.quick-keys {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  font-size: 13px;
+  color: #333;
+  flex-wrap: wrap;
+}
+
+.quick-keys-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-keys kbd {
+  display: inline-block;
+  padding: 3px 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: bold;
+  color: #333;
+  background: linear-gradient(to bottom, #f9f9f9 0%, #e8e8e8 100%);
+  border: 1px solid #aaa;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 0 #fff;
+  white-space: nowrap;
+  margin: 0 1px;
 }
 
 .error {
@@ -115,6 +146,17 @@
   
   #steelCanvas {
     height: 600px;
+  }
+  
+  .quick-keys {
+    font-size: 11px;
+    gap: 12px;
+    padding: 8px;
+  }
+  
+  .quick-keys kbd {
+    padding: 2px 4px;
+    font-size: 10px;
   }
 }
 
