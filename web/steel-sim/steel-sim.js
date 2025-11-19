@@ -267,13 +267,16 @@ function setupScene() {
   camera.position.set(0, 1, 0); // Shooter at origin, 1 yard up (Y is up in Three.js)
   camera.lookAt(0, 0, -1000); // Look downrange (negative Z is downrange in Three.js)
   
-  // Setup renderer
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // Setup renderer with proper anti-aliasing
+  renderer = new THREE.WebGLRenderer({ 
+    canvas, 
+    antialias: true,
+    powerPreference: "high-performance"
+  });
   renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+  // Use higher pixel ratio for better quality on high-DPI displays
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x87ceeb, 1.0); // Sky blue background, fully opaque
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   
   // Add lighting
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -281,9 +284,6 @@ function setupScene() {
   
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
   directionalLight.position.set(0, 0, 1000);
-  directionalLight.castShadow = true;
-  // Shadow map size will be set by landscape.configureShadowCamera()
-  directionalLight.shadow.bias = -0.0001;
   scene.add(directionalLight);
   
   // Create landscape
@@ -294,9 +294,6 @@ function setupScene() {
     brownGroundLength: 2000, // yards
     slopeAngle: 5 // degrees (uphill downrange)
   });
-  
-  // Configure shadow camera to match landscape dimensions
-  landscape.configureShadowCamera(directionalLight);
   
   // Create target racks within 50 yards of shooter, max 2 yards high
   createTargetRacks();

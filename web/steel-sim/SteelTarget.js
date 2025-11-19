@@ -20,6 +20,7 @@ export class SteelTarget {
    * @param {boolean} options.isOval - True for oval shape, false for rectangle (default false)
    * @param {number} options.beamHeight - Height of overhead beam in yards (default ~2.73 yards = 2.5m)
    * @param {number} options.attachmentAngle - Angle in radians for oval attachment point (default Math.PI / 4 = 45°)
+   * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (default 0)
    * @param {THREE.Scene} options.scene - Three.js scene to add mesh/chain lines to (required)
    */
   constructor(options) {
@@ -31,6 +32,7 @@ export class SteelTarget {
       isOval = false,
       beamHeight = 2.5, // Default 2.5 yards
       attachmentAngle = Math.PI / 4, // 45 degrees
+      outwardOffset = 0, // Default 0 meters
       scene
     } = options;
 
@@ -43,6 +45,7 @@ export class SteelTarget {
     const btk = window.btk;
 
     this.scene = scene;
+    this.outwardOffset = outwardOffset; // Store for use in addChainAnchor
     
     this.lastUpdateTime = performance.now();
     
@@ -85,15 +88,14 @@ export class SteelTarget {
     const beamHeightMeters = btk.Conversions.yardsToMeters(beamHeight);
     
     // Place fixed anchors above and slightly outward from attachment points
-    const outwardOffset = 0.25; // meters
     const leftWorldFixed = new btk.Vector3D(
       leftWorldAttach.x,
-      leftWorldAttach.y + outwardOffset,
+      leftWorldAttach.y + this.outwardOffset,
       beamHeightMeters
     );
     const rightWorldFixed = new btk.Vector3D(
       rightWorldAttach.x,
-      rightWorldAttach.y - outwardOffset,
+      rightWorldAttach.y - this.outwardOffset,
       beamHeightMeters
     );
 
@@ -204,30 +206,40 @@ export class SteelTarget {
   }
 
   /**
-   * Create chain line geometries
+   * Create chain cylinder geometries
    * @private
    */
   createChainLines() {
-    // Create line material - steel gray color
-    const material = new THREE.LineBasicMaterial({ color: 0x666666, linewidth: 3 });
+    const btk = window.btk;
+    
+    // Chain radius: 1/2" diameter = 0.25" radius
+    const chainRadius = btk.Conversions.inchesToYards(0.25);
+    
+    // Create cylinder geometry for chains (will be resized in updateChainLines)
+    // Use many segments (128) for very smooth appearance on thin cylinders
+    // More segments = smoother curves, especially important when viewed from distance
+    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, 1, 128);
+    chainGeometry.computeVertexNormals();
+    
+    // Use MeshPhysicalMaterial for better edge rendering and anti-aliasing
+    // Physical material has better handling of thin geometry edges
+    const material = new THREE.MeshPhysicalMaterial({
+      color: 0x666666,
+      metalness: 0.6,
+      roughness: 0.5,
+      clearcoat: 0.1, // Slight clearcoat for metallic look
+      clearcoatRoughness: 0.3
+    });
 
-    // Left chain
-    const leftGeometry = new THREE.BufferGeometry();
-    const leftPositions = new Float32Array(6); // 2 points * 3 coords
-    leftGeometry.setAttribute('position', new THREE.BufferAttribute(leftPositions, 3));
-    const leftLine = new THREE.Line(leftGeometry, material);
-    leftLine.castShadow = true;
-    this.scene.add(leftLine);
+    // Left chain cylinder
+    const leftCylinder = new THREE.Mesh(chainGeometry.clone(), material);
+    this.scene.add(leftCylinder);
 
-    // Right chain
-    const rightGeometry = new THREE.BufferGeometry();
-    const rightPositions = new Float32Array(6);
-    rightGeometry.setAttribute('position', new THREE.BufferAttribute(rightPositions, 3));
-    const rightLine = new THREE.Line(rightGeometry, material);
-    rightLine.castShadow = true;
-    this.scene.add(rightLine);
+    // Right chain cylinder
+    const rightCylinder = new THREE.Mesh(chainGeometry.clone(), material);
+    this.scene.add(rightCylinder);
 
-    return [leftLine, rightLine];
+    return [leftCylinder, rightCylinder];
   }
 
   /**
@@ -286,7 +298,7 @@ export class SteelTarget {
   }
 
   /**
-   * Update chain line positions from C++ physics state
+   * Update chain cylinder positions and orientations from C++ physics state
    */
   updateChainLines() {
     if (!this.chainLines || !this.steelTarget) return;
@@ -298,7 +310,10 @@ export class SteelTarget {
       return;
     }
     
-    // Update each chain line for each anchor
+    const btk = window.btk;
+    const chainRadius = btk.Conversions.inchesToYards(0.25);
+    
+    // Update each chain cylinder for each anchor
     const numAnchors = anchors.size();
     const numChainLines = this.chainLines.length;
     
@@ -312,17 +327,37 @@ export class SteelTarget {
       const fixed = window.btkToThreeJsPosition(anchor.worldFixed);
       const attach = window.btkToThreeJsPosition(attachWorld);
       
-      // Update chain line: connects fixed anchor to attachment point
-      const positions = this.chainLines[i].geometry.attributes.position.array;
-      positions[0] = fixed.x;
-      positions[1] = fixed.y;
-      positions[2] = fixed.z;
-      positions[3] = attach.x;
-      positions[4] = attach.y;
-      positions[5] = attach.z;
-      this.chainLines[i].geometry.attributes.position.needsUpdate = true;
+      // Calculate chain length and direction
+      const chainDirection = new THREE.Vector3();
+      chainDirection.subVectors(attach, fixed);
+      const chainLength = chainDirection.length();
       
-      // Cleanup WASM objects (Three.js Vector3 objects will be GC'd)
+      // Dispose old geometry if it exists
+      if (this.chainLines[i].geometry) {
+        this.chainLines[i].geometry.dispose();
+      }
+      
+      // Create new cylinder geometry with correct length
+      // Use many segments (128) for very smooth appearance, especially important for thin cylinders
+      // More segments = smoother curves and better anti-aliasing when viewed from distance
+      const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, chainLength, 128);
+      chainGeometry.computeVertexNormals();
+      this.chainLines[i].geometry = chainGeometry;
+      
+      // Position cylinder at midpoint
+      const midpoint = new THREE.Vector3();
+      midpoint.addVectors(fixed, attach);
+      midpoint.multiplyScalar(0.5);
+      this.chainLines[i].position.copy(midpoint);
+      
+      // Rotate cylinder to align with chain direction
+      // Cylinder default orientation is along Y-axis, so we need to rotate to match chain direction
+      const up = new THREE.Vector3(0, 1, 0);
+      const quaternion = new THREE.Quaternion();
+      quaternion.setFromUnitVectors(up, chainDirection.normalize());
+      this.chainLines[i].quaternion.copy(quaternion);
+      
+      // Cleanup WASM objects
       attachWorld.delete();
     }
     

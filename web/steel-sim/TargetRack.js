@@ -17,12 +17,14 @@ export class TargetRack {
    * @param {Object} options - Configuration options
    * @param {{x:number,y:number,z:number}} options.bottomLeft - Bottom-left corner in yards
    * @param {{x:number,y:number,z:number}} options.topRight - Top-right corner in yards
+   * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (default 0)
    * @param {THREE.Scene} options.scene - Three.js scene to add meshes to (required)
    */
   constructor(options) {
     const {
       bottomLeft,
       topRight,
+      outwardOffset = 0, // Default 0 meters
       scene
     } = options;
 
@@ -55,6 +57,7 @@ export class TargetRack {
     this.beamMesh = null;
     this.leftPostMesh = null;
     this.rightPostMesh = null;
+    this.outwardOffset = outwardOffset; // Store default outward offset for all targets
   }
 
   /**
@@ -64,6 +67,7 @@ export class TargetRack {
    * @param {number} options.height - Height in inches (required)
    * @param {number} options.thickness - Thickness in inches (default 0.5)
    * @param {boolean} options.isOval - True for oval shape, false for rectangle (default false)
+   * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (defaults to rack's outwardOffset)
    * @returns {SteelTarget} The created target instance
    */
   addTarget(options) {
@@ -71,7 +75,8 @@ export class TargetRack {
       width,
       height,
       thickness = 0.5,
-      isOval = false
+      isOval = false,
+      outwardOffset = this.outwardOffset // Default to rack's outwardOffset
     } = options;
 
     if (width === undefined || width === null) throw new Error('Width is required');
@@ -83,6 +88,7 @@ export class TargetRack {
       height,
       thickness,
       isOval,
+      outwardOffset, // Store per-target outwardOffset
       steelTarget: null // Will be created in repositionTargets
     });
 
@@ -125,6 +131,7 @@ export class TargetRack {
           thickness: targetConfig.thickness,
           isOval: targetConfig.isOval,
           beamHeight: this.beamY,
+          outwardOffset: targetConfig.outwardOffset,
           scene: this.scene
         });
     }

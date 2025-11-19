@@ -169,18 +169,11 @@ export class Landscape {
     directionalLight.shadow.camera.top = top;
     directionalLight.shadow.camera.bottom = bottom;
     
-    // Update shadow map size to better match the aspect ratio
-    // Scene is much taller than wide, so use a taller shadow map
-    const aspectRatio = (top - bottom) / this.groundWidth;
-    if (aspectRatio > 1) {
-      // Taller than wide - use more vertical resolution
-      directionalLight.shadow.mapSize.width = 2048;
-      directionalLight.shadow.mapSize.height = Math.min(4096, Math.round(2048 * aspectRatio));
-    } else {
-      // Wider than tall - use more horizontal resolution
-      directionalLight.shadow.mapSize.width = Math.min(4096, Math.round(2048 / aspectRatio));
-      directionalLight.shadow.mapSize.height = 2048;
-    }
+    // Set shadow map size to one pixel per square yard
+    const shadowWidth = Math.round(this.groundWidth);
+    const shadowHeight = Math.round(top - bottom);
+    directionalLight.shadow.mapSize.width = shadowWidth;
+    directionalLight.shadow.mapSize.height = shadowHeight;
   }
 
   /**
