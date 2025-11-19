@@ -18,7 +18,7 @@ export class SteelTarget {
    * @param {number} options.height - Height in inches (required)
    * @param {number} options.thickness - Thickness in inches (default 0.5)
    * @param {boolean} options.isOval - True for oval shape, false for rectangle (default false)
-   * @param {number} options.beamHeight - Height of overhead beam in meters (default 2.5)
+   * @param {number} options.beamHeight - Height of overhead beam in yards (default ~2.73 yards = 2.5m)
    * @param {number} options.attachmentAngle - Angle in radians for oval attachment point (default Math.PI / 4 = 45°)
    * @param {THREE.Scene} options.scene - Three.js scene to add mesh/chain lines to (required)
    */
@@ -29,7 +29,7 @@ export class SteelTarget {
       height,
       thickness = 0.5,
       isOval = false,
-      beamHeight = 2.5,
+      beamHeight = 2.5, // Default 2.5 yards
       attachmentAngle = Math.PI / 4, // 45 degrees
       scene
     } = options;
@@ -47,11 +47,6 @@ export class SteelTarget {
     this.lastUpdateTime = performance.now();
     
     // Convert all inputs to meters using BTK conversions
-    const position_m = {
-      x: btk.Conversions.yardsToMeters(position.x),
-      y: btk.Conversions.yardsToMeters(position.y),
-      z: btk.Conversions.yardsToMeters(position.z)
-    };
     const width_m = btk.Conversions.inchesToMeters(width);
     const height_m = btk.Conversions.inchesToMeters(height);
     const thickness_m = btk.Conversions.inchesToMeters(thickness);
@@ -70,8 +65,9 @@ export class SteelTarget {
     }
 
     // Create BTK steel target
-    const initialPosThree = new THREE.Vector3(position_m.x, position_m.y, position_m.z);
-    const initialPos = window.threeJsToBtk(initialPosThree);
+    // Convert position from Three.js (yards) to BTK (meters) using conversion function
+    const positionThree = new THREE.Vector3(position.x, position.y, position.z);
+    const initialPos = window.threeJsToBtkPosition(positionThree);
     const defaultNormal = new btk.Vector3D(1, 0, 0);
     this.steelTarget = new btk.SteelTarget(width_m, height_m, thickness_m, isOval, initialPos, defaultNormal);
     initialPos.delete();
@@ -85,17 +81,20 @@ export class SteelTarget {
     const leftWorldAttach = this.steelTarget.localToWorld(leftLocalAttach);
     const rightWorldAttach = this.steelTarget.localToWorld(rightLocalAttach);
 
+    // Convert beamHeight from yards to meters for BTK
+    const beamHeightMeters = btk.Conversions.yardsToMeters(beamHeight);
+    
     // Place fixed anchors above and slightly outward from attachment points
     const outwardOffset = 0.25; // meters
     const leftWorldFixed = new btk.Vector3D(
       leftWorldAttach.x,
       leftWorldAttach.y + outwardOffset,
-      beamHeight
+      beamHeightMeters
     );
     const rightWorldFixed = new btk.Vector3D(
       rightWorldAttach.x,
       rightWorldAttach.y - outwardOffset,
-      beamHeight
+      beamHeightMeters
     );
 
     this.steelTarget.addChainAnchor(leftLocalAttach, leftWorldFixed);
@@ -309,9 +308,9 @@ export class SteelTarget {
       // Transform local attachment to world space
       const attachWorld = this.steelTarget.localToWorld(anchor.localAttachment);
       
-      // Convert BTK positions to Three.js for rendering
-      const fixed = window.btkToThreeJs(anchor.worldFixed);
-      const attach = window.btkToThreeJs(attachWorld);
+      // Convert BTK positions (meters) to Three.js (yards) for rendering
+      const fixed = window.btkToThreeJsPosition(anchor.worldFixed);
+      const attach = window.btkToThreeJsPosition(attachWorld);
       
       // Update chain line: connects fixed anchor to attachment point
       const positions = this.chainLines[i].geometry.attributes.position.array;
@@ -364,6 +363,15 @@ export class SteelTarget {
     
     const intersects = raycaster.intersectObject(this.mesh);
     return intersects.length > 0 ? intersects[0] : null;
+  }
+
+  /**
+   * Apply a bullet hit to this target
+   * @param {btk.Bullet} bullet - Bullet instance to apply hit with
+   */
+  hitBullet(bullet) {
+    if (!this.steelTarget) return;
+    this.steelTarget.hitBullet(bullet);
   }
 
   /**

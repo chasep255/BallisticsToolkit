@@ -96,10 +96,12 @@ namespace btk::rendering
       // relative_position_ is already in meters (scaled by initial_radius), so scale by radius ratio
       btk::math::Vector3D world_position = center_position_ + particle.relative_position_ * radius_scale;
       
-      // Convert BTK to Three.js coordinates
-      float x = world_position.y;   // BTK Y → Three X
-      float y = world_position.z;  // BTK Z → Three Y
-      float z = -world_position.x;  // BTK -X → Three Z
+      // Convert BTK coordinates (meters) to Three.js coordinates (yards)
+      // BTK: X=downrange, Y=crossrange-right, Z=up (meters)
+      // Three.js: X=right, Y=up, Z=towards-camera (yards)
+      float x = btk::math::Conversions::metersToYards(world_position.y);   // BTK Y → Three X (yards)
+      float y = btk::math::Conversions::metersToYards(world_position.z);  // BTK Z → Three Y (yards)
+      float z = -btk::math::Conversions::metersToYards(world_position.x);  // BTK -X → Three Z (yards)
 
       // Create identity scale and translation matrix (column-major order for Three.js)
       // Three.js Matrix4 layout: [col0, col1, col2, col3] = [m0-m3, m4-m7, m8-m11, m12-m15]

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "math/conversions.h"
 #include <cmath>
 #include <string>
 
@@ -398,28 +399,6 @@ namespace btk::math
      */
     constexpr Vector3D lerp(const Vector3D& other, float t) const { return Vector3D(x + t * (other.x - x), y + t * (other.y - y), z + t * (other.z - z)); }
   
-    /**
-     * @brief Convert to Three.js vector
-     * 
-     * BTK: X=downrange, Y=crossrange-right, Z=up
-     * Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-     * 
-     * Conversion: (BTK Y, BTK Z, -BTK X) → (Three X, Three Y, Three Z)
-     *
-     * @return Three.js vector
-     */
-    constexpr Vector3D toThreeJs() const { return Vector3D(y, z, -x); }
-
-    /**
-     * @brief Convert from Three.js vector
-     * 
-     * Reverse of toThreeJs():
-     * Three.js (a, b, c) → BTK (-c, a, b)
-     * 
-     * @param other Three.js vector
-     * @return BTK vector
-     */
-    static constexpr Vector3D fromThreeJs(const Vector3D& other) { return Vector3D(-other.z, other.x, other.y); }
   };
 
   // Friend operators for scalar operations from left

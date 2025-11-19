@@ -92,9 +92,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("normalized", &Vector3D::normalized)
     .function("dot", &Vector3D::dot)
     .function("cross", &Vector3D::cross)
-    .function("lerp", &Vector3D::lerp)
-    .function("toThreeJs", &Vector3D::toThreeJs)
-    .class_function("fromThreeJs", &Vector3D::fromThreeJs);
+    .function("lerp", &Vector3D::lerp);
 
   class_<btk::math::Vector2D>("Vector2D")
     .constructor<float, float>()

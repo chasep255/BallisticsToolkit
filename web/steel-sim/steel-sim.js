@@ -2,6 +2,8 @@ import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 import * as THREE from 'three';
 import { SteelTarget, SteelTargetFactory } from './SteelTarget.js';
 import { DustCloudFactory } from './DustCloud.js';
+import { Landscape } from './Landscape.js';
+import { TargetRack, TargetRackFactory } from './TargetRack.js';
 
 let btk = null;
 let scene, camera, renderer;
@@ -9,36 +11,120 @@ let raycaster, mouse;
 let animationId = null;
 let lastTime = performance.now();
 
-let groundMesh = null;
+let landscape = null; // Landscape instance
 let beamMesh = null; // Track beam for cleanup
 
 // ===== COORDINATE CONVERSION UTILITIES =====
 // BTK: X=downrange, Y=crossrange-right, Z=up
 // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
 
-// Attach coordinate conversion utilities to window for global access
-window.btkToThreeJs = function(btkVec) {
-  const converted = btkVec.toThreeJs();
-  const result = new THREE.Vector3(converted.x, converted.y, converted.z);
-  converted.delete(); // Clean up WASM object
-  return result;
+// ===== POSITION CONVERSIONS (Distance) =====
+// Positions: BTK uses meters, Three.js uses yards
+
+/**
+ * Convert BTK Vector3D position (meters, BTK coords) to THREE.Vector3 (yards, Three.js coords)
+ * @param {btk.Vector3D} btkVec - Position vector in BTK coordinates (meters)
+ * @returns {THREE.Vector3} Position vector in Three.js coordinates (yards)
+ */
+window.btkToThreeJsPosition = function(btkVec) {
+  // Coordinate system conversion and meters to yards
+  // BTK: X=downrange, Y=crossrange-right, Z=up
+  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
+  // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
+  return new THREE.Vector3(
+    btk.Conversions.metersToYards(btkVec.y),   // BTK Y (crossrange-right) → Three.js X (right)
+    btk.Conversions.metersToYards(btkVec.z),   // BTK Z (up) → Three.js Y (up)
+    -btk.Conversions.metersToYards(btkVec.x)   // BTK X (downrange) → Three.js -Z (downrange)
+  );
 };
 
-window.threeJsToBtk = function(threeVec) {
-  const threeJsVec = new btk.Vector3D(threeVec.x, threeVec.y, threeVec.z);
-  const result = btk.Vector3D.fromThreeJs(threeJsVec);
-  threeJsVec.delete(); // Clean up WASM object
-  return result;
+/**
+ * Convert THREE.Vector3 position (yards, Three.js coords) to BTK Vector3D (meters, BTK coords)
+ * @param {THREE.Vector3|Object} threeVec - Position vector in Three.js coordinates (yards)
+ * @returns {btk.Vector3D} Position vector in BTK coordinates (meters)
+ */
+window.threeJsToBtkPosition = function(threeVec) {
+  // Convert yards to meters and coordinate system conversion
+  // BTK: X=downrange, Y=crossrange-right, Z=up
+  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
+  // Conversion: Three.js (x, y, z) → BTK (-z, x, y)
+  return new btk.Vector3D(
+    -btk.Conversions.yardsToMeters(threeVec.z), // Three.js Z (downrange) → BTK X (downrange)
+    btk.Conversions.yardsToMeters(threeVec.x),   // Three.js X (right) → BTK Y (crossrange-right)
+    btk.Conversions.yardsToMeters(threeVec.y)    // Three.js Y (up) → BTK Z (up)
+  );
 };
 
-// Keep local functions for backward compatibility
-function btkToThreeJs(btkVec) {
-  return window.btkToThreeJs(btkVec);
-}
+// ===== VELOCITY CONVERSIONS =====
+// Velocities: BTK uses m/s, Three.js uses fps or mph
 
-function threeJsToBtk(threeVec) {
-  return window.threeJsToBtk(threeVec);
-}
+/**
+ * Convert BTK Vector3D velocity (m/s, BTK coords) to THREE.Vector3 (fps, Three.js coords)
+ * @param {btk.Vector3D} btkVec - Velocity vector in BTK coordinates (m/s)
+ * @returns {THREE.Vector3} Velocity vector in Three.js coordinates (fps)
+ */
+window.btkToThreeJsVelocity = function(btkVec) {
+  // Coordinate system conversion and m/s to fps
+  // BTK: X=downrange, Y=crossrange-right, Z=up
+  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
+  // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
+  return new THREE.Vector3(
+    btk.Conversions.mpsToFps(btkVec.y),   // BTK Y (crossrange-right) → Three.js X (right)
+    btk.Conversions.mpsToFps(btkVec.z),   // BTK Z (up) → Three.js Y (up)
+    -btk.Conversions.mpsToFps(btkVec.x)   // BTK X (downrange) → Three.js -Z (downrange)
+  );
+};
+
+/**
+ * Convert THREE.Vector3 velocity (fps, Three.js coords) to BTK Vector3D (m/s, BTK coords)
+ * @param {THREE.Vector3|Object} threeVec - Velocity vector in Three.js coordinates (fps)
+ * @returns {btk.Vector3D} Velocity vector in BTK coordinates (m/s)
+ */
+window.threeJsToBtkVelocity = function(threeVec) {
+  // Convert fps to m/s and coordinate system conversion
+  // BTK: X=downrange, Y=crossrange-right, Z=up
+  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
+  // Conversion: Three.js (x, y, z) → BTK (-z, x, y)
+  return new btk.Vector3D(
+    -btk.Conversions.fpsToMps(threeVec.z), // Three.js Z (downrange) → BTK X (downrange)
+    btk.Conversions.fpsToMps(threeVec.x),  // Three.js X (right) → BTK Y (crossrange-right)
+    btk.Conversions.fpsToMps(threeVec.y)   // Three.js Y (up) → BTK Z (up)
+  );
+};
+
+/**
+ * Convert BTK Vector3D velocity (m/s, BTK coords) to THREE.Vector3 (mph, Three.js coords)
+ * @param {btk.Vector3D} btkVec - Velocity vector in BTK coordinates (m/s)
+ * @returns {THREE.Vector3} Velocity vector in Three.js coordinates (mph)
+ */
+window.btkToThreeJsVelocityMph = function(btkVec) {
+  // Coordinate system conversion and m/s to mph
+  // BTK: X=downrange, Y=crossrange-right, Z=up
+  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
+  // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
+  return new THREE.Vector3(
+    btk.Conversions.mpsToMph(btkVec.y),   // BTK Y (crossrange-right) → Three.js X (right)
+    btk.Conversions.mpsToMph(btkVec.z),   // BTK Z (up) → Three.js Y (up)
+    -btk.Conversions.mpsToMph(btkVec.x)   // BTK X (downrange) → Three.js -Z (downrange)
+  );
+};
+
+/**
+ * Convert THREE.Vector3 velocity (mph, Three.js coords) to BTK Vector3D (m/s, BTK coords)
+ * @param {THREE.Vector3|Object} threeVec - Velocity vector in Three.js coordinates (mph)
+ * @returns {btk.Vector3D} Velocity vector in BTK coordinates (m/s)
+ */
+window.threeJsToBtkVelocityMph = function(threeVec) {
+  // Convert mph to m/s and coordinate system conversion
+  // BTK: X=downrange, Y=crossrange-right, Z=up
+  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
+  // Conversion: Three.js (x, y, z) → BTK (-z, x, y)
+  return new btk.Vector3D(
+    -btk.Conversions.mphToMps(threeVec.z), // Three.js Z (downrange) → BTK X (downrange)
+    btk.Conversions.mphToMps(threeVec.x),  // Three.js X (right) → BTK Y (crossrange-right)
+    btk.Conversions.mphToMps(threeVec.y)   // Three.js Y (up) → BTK Z (up)
+  );
+};
 
 // Create a single target and add it to the targets array
 function createTarget(
@@ -55,7 +141,7 @@ function createTarget(
     height,
     thickness,
     isOval,
-    beamHeight: 2.5, // meters
+    beamHeight: 2.5, // yards
     scene
   });
   
@@ -67,44 +153,47 @@ function createTargetRack() {
   // Clear any existing targets
   clearAllTargets();
   
-  // Create horizontal beam across the top
-  const beamHeight = 2.5; // meters (about 8 feet high)
-  const beamWidth = 8; // meters (spans all targets)
-  const beamDepth = btk.Conversions.yardsToMeters(-10/3); // Same Z as targets
-  createHorizontalBeam(beamWidth, beamHeight, beamDepth);
+  // Create horizontal beam across the top (all values in yards)
+  const beamHeight = 2.5; // yards (about 7.5 feet high)
+  const beamWidth = 8; // yards (spans all targets)
+  const targetZ = -10/3; // yards downrange
+  createHorizontalBeam(beamWidth, beamHeight, targetZ);
   
-  // Target spacing in yards (side by side)
-  const spacing = 2; // 2 yards between targets
-  const baseY = 2; // 2 yards up (1.83m)
-  const baseZ = -10/3; // -10/3 yards downrange
+  // Target spacing (side by side)
+  const spacing = 2; // yards between targets
+  const baseY = 2; // yards up
+  const baseZ = -10/3; // yards downrange
   
   // All chains hang from the beam at beamHeight
   // Target 1: 6" Circle (oval)
   createTarget(
     { x: -spacing * 1.5, y: baseY, z: baseZ },
-    6, 6, 0.5, true // 6" circle
+    6, 6, 0.5, true // inches: 6" circle
   );
   
   // Target 2: Large Rectangle (18" × 30")
   createTarget(
     { x: -spacing * 0.5, y: baseY, z: baseZ },
-    18, 30, 0.5, false // 18" × 30" rectangle
+    18, 30, 0.5, false // inches: 18" × 30" rectangle
   );
   
   // Target 3: 12" Circle
   createTarget(
     { x: spacing * 0.5, y: baseY, z: baseZ },
-    12, 12, 0.5, true // 12" circle
+    12, 12, 0.5, true // inches: 12" circle
   );
   
   // Target 4: 12" × 18" Rectangle
   createTarget(
     { x: spacing * 1.5, y: baseY, z: baseZ },
-    12, 18, 0.5, false // 12" × 18" rectangle
+    12, 18, 0.5, false // inches: 12" × 18" rectangle
   );
 }
 
 // Create horizontal beam that chains hang from
+// @param {number} width - Beam width (yards)
+// @param {number} height - Beam height Y position (yards)
+// @param {number} depth - Beam depth Z position (yards)
 function createHorizontalBeam(width, height, depth) {
   // Remove existing beam if present
   if (beamMesh) {
@@ -114,7 +203,10 @@ function createHorizontalBeam(width, height, depth) {
     beamMesh = null;
   }
   
-  const beamGeometry = new THREE.CylinderGeometry(0.05, 0.05, width, 16); // 5cm diameter cylinder
+  // Beam radius: 2 inches diameter (1 inch radius)
+  const beamRadius = btk.Conversions.inchesToYards(1);
+  
+  const beamGeometry = new THREE.CylinderGeometry(beamRadius, beamRadius, width, 16);
   const beamMaterial = new THREE.MeshStandardMaterial({
     color: 0x444444, // Dark gray steel
     metalness: 0.8,
@@ -142,11 +234,8 @@ async function init() {
     btk = await BallisticsToolkit();
     window.btk = btk;
     
-    // Setup Three.js scene
+    // Setup Three.js scene (includes creating target racks)
     setupScene();
-    
-    // Create rack of 4 targets
-    createTargetRack();
     
     // Setup UI event listeners
     setupUI();
@@ -173,11 +262,10 @@ function setupScene() {
     1000
   );
   
-  // Position camera to view all targets in the rack
-  // Targets are spaced 2 yards apart, centered around x=0
-  // Position camera back and up to see all 4 targets
-  camera.position.set(0, 1.5, 2);
-  camera.lookAt(0, 1, -3);
+  // Position camera at shooter position (all values in yards)
+  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
+  camera.position.set(0, 1, 0); // Shooter at origin, 1 yard up (Y is up in Three.js)
+  camera.lookAt(0, 0, -1000); // Look downrange (negative Z is downrange in Three.js)
   
   // Setup renderer
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -192,31 +280,26 @@ function setupScene() {
   scene.add(ambientLight);
   
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(5, 5, 5);
+  directionalLight.position.set(0, 0, 1000);
   directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.width = 2048;
-  directionalLight.shadow.mapSize.height = 2048;
-  directionalLight.shadow.camera.near = 0.5;
-  directionalLight.shadow.camera.far = 50;
-  directionalLight.shadow.camera.left = -10;
-  directionalLight.shadow.camera.right = 10;
-  directionalLight.shadow.camera.top = 10;
-  directionalLight.shadow.camera.bottom = -10;
+  // Shadow map size will be set by landscape.configureShadowCamera()
   directionalLight.shadow.bias = -0.0001;
   scene.add(directionalLight);
   
-  // Add ground plane that receives shadows
-  const groundGeometry = new THREE.PlaneGeometry(20, 20);
-  const groundMaterial = new THREE.MeshStandardMaterial({
-    color: 0x888888,
-    roughness: 0.8,
-    metalness: 0.2
+  // Create landscape
+  landscape = new Landscape(scene, {
+    groundWidth: 100, // yards
+    groundLength: 2000, // yards
+    brownGroundWidth: 500, // yards
+    brownGroundLength: 2000, // yards
+    slopeAngle: 5 // degrees (uphill downrange)
   });
-  groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
-  groundMesh.rotation.x = -Math.PI / 2;
-  groundMesh.position.y = -0.5;
-  groundMesh.receiveShadow = true;
-  scene.add(groundMesh);
+  
+  // Configure shadow camera to match landscape dimensions
+  landscape.configureShadowCamera(directionalLight);
+  
+  // Create target racks within 50 yards of shooter, max 2 yards high
+  createTargetRacks();
   
   // Setup raycaster for mouse interaction
   raycaster = new THREE.Raycaster();
@@ -229,6 +312,70 @@ function setupScene() {
   canvas.addEventListener('click', onCanvasClick);
 }
 
+/**
+ * Add a target rack at a specific XZ position
+ * @param {number} x - X position in yards (crossrange)
+ * @param {number} z - Z position in yards (downrange, negative = downrange)
+ * @param {number} rackWidth - Width of rack in yards
+ * @param {number} rackHeight - Height of rack in yards
+ * @param {Array} targets - Array of target definitions {width, height, thickness, isOval}
+ * @returns {TargetRack} The created rack instance
+ */
+function addTargetRack(x, z, rackWidth, rackHeight, targets) {
+  if (!landscape) {
+    throw new Error('Landscape must be initialized before creating target racks');
+  }
+  
+  // Calculate terrain height at center position
+  const groundHeight = landscape.getHeightAt(x, z) || 0;
+  
+  // Calculate bottom-left and top-right corners
+  const halfWidth = rackWidth / 2;
+  const bottomLeft = { x: x - halfWidth, y: groundHeight, z: z };
+  const topRight = { x: x + halfWidth, y: groundHeight + rackHeight, z: z };
+  
+  // Create rack
+  const rack = TargetRackFactory.create({
+    bottomLeft,
+    topRight,
+    scene: scene
+  });
+  
+  // Add all targets
+  for (const target of targets) {
+    rack.addTarget(target);
+  }
+  
+  return rack;
+}
+
+/**
+ * Create target racks with different targets within 50 yards
+ */
+function createTargetRacks() {
+  if (!landscape) return;
+  
+  // Rack 1: Close range (10 yards), small targets
+  addTargetRack(0, -10, 6, 1.5, [
+    { width: 12, height: 12, thickness: 0.5, isOval: false }, // 12" square
+    { width: 10, height: 10, thickness: 0.5, isOval: true }, // 10" round
+    { width: 8, height: 8, thickness: 0.5, isOval: false } // 8" square
+  ]);
+  
+  // Rack 2: Mid range (25 yards), medium targets
+  addTargetRack(15, -25, 8, 2, [
+    { width: 18, height: 18, thickness: 0.5, isOval: false }, // 18" square
+    { width: 16, height: 16, thickness: 0.5, isOval: true }, // 16" round
+    { width: 14, height: 14, thickness: 0.5, isOval: false } // 14" square
+  ]);
+  
+  // Rack 3: Far range (40 yards), larger targets
+  addTargetRack(-15, -40, 10, 2, [
+    { width: 24, height: 30, thickness: 0.5, isOval: false }, // 24"x30" rectangle
+    { width: 20, height: 20, thickness: 0.5, isOval: true }, // 20" round
+    { width: 18, height: 24, thickness: 0.5, isOval: false } // 18"x24" rectangle
+  ]);
+}
 
 function setupUI() {
   const resetBtn = document.getElementById('resetBtn');
@@ -270,7 +417,8 @@ function onWindowResize() {
 }
 
 function onCanvasClick(event) {
-  if (SteelTargetFactory.getCount() === 0) return;
+  const allTargets = TargetRackFactory.getAllTargets();
+  if (allTargets.length === 0) return;
   
   const canvas = document.getElementById('steelCanvas');
   const rect = canvas.getBoundingClientRect();
@@ -283,11 +431,17 @@ function onCanvasClick(event) {
   raycaster.setFromCamera(mouse, camera);
   
   // Check intersections with all targets, find closest
-  const hitResult = SteelTargetFactory.findClosestHit(raycaster);
+  const intersects = raycaster.intersectObjects(allTargets.map(t => t.mesh));
+  let hitResult = null;
+  if (intersects.length > 0) {
+    const hitTarget = allTargets.find(t => t.mesh === intersects[0].object);
+    if (hitTarget) {
+      hitResult = { steelTarget: hitTarget, point: intersects[0].point };
+    }
+  }
   
   if (hitResult) {
-    const { target: hitTarget, intersection: closestIntersection } = hitResult;
-    const impactPoint = closestIntersection.point; // Three.js coords
+    const impactPoint = hitResult.point; // Three.js coords
     
     // Get camera position (shooter position) in Three.js coords
     const shooterPos = camera.position.clone();
@@ -295,13 +449,14 @@ function onCanvasClick(event) {
     // Calculate direction from shooter to impact point (for velocity calculation)
     const direction = impactPoint.clone().sub(shooterPos).normalize();
     
-    // Bullet velocity: 800 m/s towards impact point (from shooter)
-    const bulletSpeed = 800; // m/s
-    const bulletVelThree = direction.multiplyScalar(bulletSpeed);
+    // Bullet velocity: 800 m/s = ~2625 fps towards impact point (from shooter)
+    const bulletSpeedMps = 800; // m/s
+    const bulletSpeedFps = btk.Conversions.mpsToFps(bulletSpeedMps); // Convert to fps
+    const bulletVelThree = direction.multiplyScalar(bulletSpeedFps); // fps in Three.js coords
     
-    // Convert impact point and velocity to BTK coordinates
-    const bulletPos = threeJsToBtk(impactPoint);
-    const bulletVel = threeJsToBtk(bulletVelThree);
+    // Convert impact point (yards) and velocity (fps) to BTK coordinates (meters, m/s)
+    const bulletPos = window.threeJsToBtkPosition(impactPoint);
+    const bulletVel = window.threeJsToBtkVelocity(bulletVelThree);
     
     // Create bullet with realistic parameters
     const bulletMass = 0.00907; // 140 grains = 0.00907 kg
@@ -327,10 +482,10 @@ function onCanvasClick(event) {
     );
     
     // Apply hit to target
-    hitTarget.steelTarget.hitBullet(bullet);
+    hitResult.steelTarget.hitBullet(bullet);
     
     // Update texture immediately after impact
-    hitTarget.updateTexture();
+    hitResult.steelTarget.updateTexture();
     
     // Create metallic dust cloud at impact point
     createMetallicDustCloud(impactPoint);
@@ -342,11 +497,11 @@ function onCanvasClick(event) {
     bullet.delete();
     bulletPos.delete();
     bulletVel.delete();
-  } else if (groundMesh) {
-    // No target hit - check for ground intersection
-    const groundIntersects = raycaster.intersectObject(groundMesh);
-    if (groundIntersects.length > 0) {
-      const groundImpact = groundIntersects[0].point; // Three.js coords
+  } else if (landscape) {
+    // No target hit - check for landscape intersection
+    const landscapeIntersect = landscape.intersectRaycaster(raycaster);
+    if (landscapeIntersect) {
+      const groundImpact = landscapeIntersect.point; // Three.js coords
       createDustCloud(groundImpact);
     }
   }
@@ -363,11 +518,11 @@ function createDustCloud(impactPointThree) {
     scene: scene,
     numParticles: 1000,
     color: { r: 139, g: 115, b: 85 }, // Brown/tan (base color, each particle gets jitter)
-    wind: { x: 0.5, y: 0.0, z: 0.2 }, // Wind: slight crosswind (x), no updraft (y), slight downrange (z)
-    initialRadius: 0.01, // 10cm initial radius
-    growthRate: 0.05, // 0.5 m/s growth rate
-    fadeRate: 0.25, 
-    particleDiameter: 0.01 // 1cm particle diameter (increased from 6mm)
+    wind: { x: 1.1, y: 0.0, z: 0.45 }, // Wind in mph: slight crosswind (x), no updraft (y), slight downrange (z)
+    initialRadius: btk.Conversions.inchesToYards(0.25), // yards (0.25 inches)
+    growthRate: 0.5, // feet/second growth rate
+    fadeRate: 0.5, 
+    particleDiameter: btk.Conversions.inchesToYards(0.2) // yards (0.5 inches)
   });
 }
 
@@ -382,23 +537,23 @@ function createMetallicDustCloud(impactPointThree) {
     scene: scene,
     numParticles: 1000,
     color: { r: 192, g: 192, b: 192 }, // Silver/gray metallic color
-    wind: { x: 0.5, y: 0.0, z: 0.2 }, // Wind: slight crosswind (x), no updraft (y), slight downrange (z)
-    initialRadius: 0.005, // 5mm initial radius (smaller than ground dust)
-    growthRate: 0.1, // 0.1 m/s growth rate (higher than ground dust)
+    wind: { x: 1.1, y: 0.0, z: 0.45 }, // Wind in mph: slight crosswind (x), no updraft (y), slight downrange (z)
+    initialRadius: btk.Conversions.inchesToYards(0.5), // yards (0.5 inches, smaller than ground dust)
+    growthRate: 0.5, // feet/second growth rate (higher than ground dust)
     fadeRate: 0.5, // Faster fade rate (fades faster than ground dust)
-    particleDiameter: 0.005 // 5mm particle diameter (smaller than ground dust)
+    particleDiameter: btk.Conversions.inchesToYards(0.2) // yards (0.25 inches, smaller than ground dust)
   });
 }
 
 function resetTarget() {
-  // Clean up existing targets
-  SteelTargetFactory.deleteAll();
+  // Clean up existing target racks
+  TargetRackFactory.deleteAll();
   
   // Clean up dust clouds
   DustCloudFactory.deleteAll();
   
-  // Recreate the rack
-  createTargetRack();
+  // Recreate the racks
+  createTargetRacks();
 }
 
 function animate() {

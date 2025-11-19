@@ -18,11 +18,11 @@ export class DustCloud {
    * @param {number} options.numParticles - Number of particles (default 1000)
    * @param {Object} options.color - RGB color {r, g, b} 0-255 (default brown: {r: 139, g: 115, b: 85})
    *                                 Each particle gets random color jitter (±20%)
-   * @param {THREE.Vector3} options.wind - Wind vector in Three.js coordinates (default {x: 0, y: 0, z: 0})
-   * @param {number} options.initialRadius - Initial cloud radius in meters (default 0.01 = 1cm)
-   * @param {number} options.growthRate - Cloud radius growth rate in m/s (default 0.05 m/s)
+   * @param {Object} options.wind - Wind vector in mph, Three.js coordinates (default {x: 0, y: 0, z: 0})
+   * @param {number} options.initialRadius - Initial cloud radius in yards (default 0.25 inches)
+   * @param {number} options.growthRate - Cloud radius growth rate in feet/second (default 0.05 ft/s)
    * @param {number} options.fadeRate - Alpha fade rate per second (default 0.25 = e^(-0.25t))
-   * @param {number} options.particleDiameter - Particle diameter in meters (default 0.01 = 1cm)
+   * @param {number} options.particleDiameter - Particle diameter in yards (default ~0.011 yards = 1cm)
    */
   constructor(options) {
     const {
@@ -30,11 +30,11 @@ export class DustCloud {
       scene,
       numParticles = 1000,
       color = { r: 139, g: 115, b: 85 },
-      wind = { x: 0, y: 0, z: 0 }, // Default: no wind
-      initialRadius = 0.01, // 1cm default
-      growthRate = 0.05, // 0.05 m/s default
+      wind = { x: 0, y: 0, z: 0 }, // Default: no wind (mph)
+      initialRadius = btk.Conversions.inchesToYards(0.25), // Default 0.25 inches
+      growthRate = 0.05, // Default 0.05 feet/second
       fadeRate = 0.25, // Exponential fade rate (e^(-0.25t))
-      particleDiameter = 0.01 // 1cm default
+      particleDiameter = btk.Conversions.inchesToYards(0.5) // Default 0.5 inches (~0.014 yards)
     } = options;
 
     if (!scene) throw new Error('Scene is required');
@@ -45,14 +45,17 @@ export class DustCloud {
 
     this.scene = scene;
 
-    // Convert impact point to BTK coordinates
-    const impactPos = window.threeJsToBtk(position);
+    // Convert impact point (yards, Three.js coords) to BTK coordinates (meters)
+    const impactPos = window.threeJsToBtkPosition(position);
     
-    // Convert wind vector to BTK coordinates
-    // Three.js: X=right, Y=up, Z=towards camera
-    // BTK: X=downrange, Y=crossrange, Z=up
-    const windThree = new THREE.Vector3(wind.x, wind.y, wind.z);
-    const windBtk = window.threeJsToBtk(windThree);
+    // Convert wind vector (mph, Three.js coords) to BTK coordinates (m/s)
+    const windMph = new THREE.Vector3(wind.x, wind.y, wind.z);
+    const windBtk = window.threeJsToBtkVelocityMph(windMph);
+    
+    // Convert parameters from yards/fps to meters/mps for BTK
+    const initialRadiusMeters = btk.Conversions.yardsToMeters(initialRadius);
+    const growthRateMps = btk.Conversions.fpsToMps(growthRate);
+    const particleDiameterMeters = btk.Conversions.yardsToMeters(particleDiameter);
     
     // Create C++ dust cloud
     // Particles have relative positions from cloud center (Gaussian distribution)
@@ -66,10 +69,10 @@ export class DustCloud {
       color.r,
       color.g,
       color.b,
-      initialRadius,
-      growthRate,
+      initialRadiusMeters,
+      growthRateMps,
       fadeRate,
-      particleDiameter
+      particleDiameterMeters
     );
     
     // Cleanup temporary BTK objects
@@ -86,6 +89,7 @@ export class DustCloud {
    * @private
    */
   createInstancedMesh(numParticles, color, particleDiameter) {
+    // particleDiameter is already in yards
     // Create sphere geometry for particles (radius = diameter / 2)
     const particleRadius = particleDiameter / 2;
     this.sphereGeometry = new THREE.SphereGeometry(particleRadius, 6, 6);

@@ -446,13 +446,13 @@ namespace btk::rendering
         btk::math::Vector3D v1Back = position_ + rotation_quat.rotate(v1Back_local);
         btk::math::Vector3D v2Back = position_ + rotation_quat.rotate(v2Back_local);
         
-        // Helper lambda to convert BTK coords to Three.js coords and push to buffer
-        // BTK: X=downrange, Y=crossrange, Z=up
-        // Three.js: X=right, Y=up, Z=towards camera
-        auto pushThreeJsVertex = [&](const btk::math::Vector3D& btk) {
-          vertices_buffer_.push_back(btk.y);   // BTK Y → Three X
-          vertices_buffer_.push_back(btk.z);  // BTK Z → Three Y
-          vertices_buffer_.push_back(-btk.x); // BTK -X → Three Z
+        // Helper lambda to convert BTK coords (meters) to Three.js coords (yards) and push to buffer
+        // BTK: X=downrange, Y=crossrange-right, Z=up (meters)
+        // Three.js: X=right, Y=up, Z=towards-camera (yards)
+        auto pushVertex = [&](const btk::math::Vector3D& btk) {
+          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.y));   // BTK Y → Three X (yards)
+          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.z));  // BTK Z → Three Y (yards)
+          vertices_buffer_.push_back(-btk::math::Conversions::metersToYards(btk.x)); // BTK -X → Three Z (yards)
         };
         
         // Helper lambda to push UV coordinates for FRONT face (left half of texture)
@@ -480,34 +480,34 @@ namespace btk::rendering
         };
         
         // Front face - maps to left half of texture
-        pushThreeJsVertex(centerFront);
+        pushVertex(centerFront);
         pushUVFront(centerFront_local);
-        pushThreeJsVertex(v1Front);
+        pushVertex(v1Front);
         pushUVFront(v1Front_local);
-        pushThreeJsVertex(v2Front);
+        pushVertex(v2Front);
         pushUVFront(v2Front_local);
         
         // Back face - maps to right half of texture
-        pushThreeJsVertex(centerBack);
+        pushVertex(centerBack);
         pushUVBack(centerBack_local);
-        pushThreeJsVertex(v2Back);
+        pushVertex(v2Back);
         pushUVBack(v2Back_local);
-        pushThreeJsVertex(v1Back);
+        pushVertex(v1Back);
         pushUVBack(v1Back_local);
         
         // Edge face (quad connecting front and back) - 2 triangles - no texture
-        pushThreeJsVertex(v1Front);
+        pushVertex(v1Front);
         pushBlankUV();
-        pushThreeJsVertex(v1Back);
+        pushVertex(v1Back);
         pushBlankUV();
-        pushThreeJsVertex(v2Front);
+        pushVertex(v2Front);
         pushBlankUV();
         
-        pushThreeJsVertex(v2Front);
+        pushVertex(v2Front);
         pushBlankUV();
-        pushThreeJsVertex(v1Back);
+        pushVertex(v1Back);
         pushBlankUV();
-        pushThreeJsVertex(v2Back);
+        pushVertex(v2Back);
         pushBlankUV();
       }
     } else {
@@ -536,13 +536,13 @@ namespace btk::rendering
       btk::math::Vector3D v6 = position_ + rotation_quat.rotate(v6_local);
       btk::math::Vector3D v7 = position_ + rotation_quat.rotate(v7_local);
       
-      // Helper lambda to convert BTK coords to Three.js coords and push to buffer
-      // BTK: X=downrange, Y=crossrange, Z=up
-      // Three.js: X=right, Y=up, Z=towards camera
-      auto pushThreeJsVertex = [&](const btk::math::Vector3D& btk) {
-        vertices_buffer_.push_back(btk.y);   // BTK Y → Three X
-        vertices_buffer_.push_back(btk.z);  // BTK Z → Three Y
-        vertices_buffer_.push_back(-btk.x); // BTK -X → Three Z
+      // Helper lambda to convert BTK coords (meters) to Three.js coords (yards) and push to buffer
+      // BTK: X=downrange, Y=crossrange-right, Z=up (meters)
+      // Three.js: X=right, Y=up, Z=towards-camera (yards)
+      auto pushVertex = [&](const btk::math::Vector3D& btk) {
+        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.y));   // BTK Y → Three X (yards)
+        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.z));  // BTK Z → Three Y (yards)
+        vertices_buffer_.push_back(-btk::math::Conversions::metersToYards(btk.x)); // BTK -X → Three Z (yards)
       };
       
       // Helper lambda to push UV coordinates for FRONT face (left half of texture)
@@ -570,50 +570,50 @@ namespace btk::rendering
       };
       
       // Front face (X = +halfThickness) - maps to left half of texture
-      pushThreeJsVertex(v4); pushUVFront(v4_local);
-      pushThreeJsVertex(v5); pushUVFront(v5_local);
-      pushThreeJsVertex(v6); pushUVFront(v6_local);
-      pushThreeJsVertex(v4); pushUVFront(v4_local);
-      pushThreeJsVertex(v6); pushUVFront(v6_local);
-      pushThreeJsVertex(v7); pushUVFront(v7_local);
+      pushVertex(v4); pushUVFront(v4_local);
+      pushVertex(v5); pushUVFront(v5_local);
+      pushVertex(v6); pushUVFront(v6_local);
+      pushVertex(v4); pushUVFront(v4_local);
+      pushVertex(v6); pushUVFront(v6_local);
+      pushVertex(v7); pushUVFront(v7_local);
       
       // Back face (X = -halfThickness) - maps to right half of texture
-      pushThreeJsVertex(v0); pushUVBack(v0_local);
-      pushThreeJsVertex(v2); pushUVBack(v2_local);
-      pushThreeJsVertex(v1); pushUVBack(v1_local);
-      pushThreeJsVertex(v0); pushUVBack(v0_local);
-      pushThreeJsVertex(v3); pushUVBack(v3_local);
-      pushThreeJsVertex(v2); pushUVBack(v2_local);
+      pushVertex(v0); pushUVBack(v0_local);
+      pushVertex(v2); pushUVBack(v2_local);
+      pushVertex(v1); pushUVBack(v1_local);
+      pushVertex(v0); pushUVBack(v0_local);
+      pushVertex(v3); pushUVBack(v3_local);
+      pushVertex(v2); pushUVBack(v2_local);
       
       // Edge faces (4 sides) - no texture
       // Bottom edge
-      pushThreeJsVertex(v0); pushBlankUV();
-      pushThreeJsVertex(v1); pushBlankUV();
-      pushThreeJsVertex(v5); pushBlankUV();
-      pushThreeJsVertex(v0); pushBlankUV();
-      pushThreeJsVertex(v5); pushBlankUV();
-      pushThreeJsVertex(v4); pushBlankUV();
+      pushVertex(v0); pushBlankUV();
+      pushVertex(v1); pushBlankUV();
+      pushVertex(v5); pushBlankUV();
+      pushVertex(v0); pushBlankUV();
+      pushVertex(v5); pushBlankUV();
+      pushVertex(v4); pushBlankUV();
       // Top edge
-      pushThreeJsVertex(v2); pushBlankUV();
-      pushThreeJsVertex(v6); pushBlankUV();
-      pushThreeJsVertex(v3); pushBlankUV();
-      pushThreeJsVertex(v3); pushBlankUV();
-      pushThreeJsVertex(v6); pushBlankUV();
-      pushThreeJsVertex(v7); pushBlankUV();
+      pushVertex(v2); pushBlankUV();
+      pushVertex(v6); pushBlankUV();
+      pushVertex(v3); pushBlankUV();
+      pushVertex(v3); pushBlankUV();
+      pushVertex(v6); pushBlankUV();
+      pushVertex(v7); pushBlankUV();
       // Left edge
-      pushThreeJsVertex(v0); pushBlankUV();
-      pushThreeJsVertex(v4); pushBlankUV();
-      pushThreeJsVertex(v7); pushBlankUV();
-      pushThreeJsVertex(v0); pushBlankUV();
-      pushThreeJsVertex(v7); pushBlankUV();
-      pushThreeJsVertex(v3); pushBlankUV();
+      pushVertex(v0); pushBlankUV();
+      pushVertex(v4); pushBlankUV();
+      pushVertex(v7); pushBlankUV();
+      pushVertex(v0); pushBlankUV();
+      pushVertex(v7); pushBlankUV();
+      pushVertex(v3); pushBlankUV();
       // Right edge
-      pushThreeJsVertex(v1); pushBlankUV();
-      pushThreeJsVertex(v5); pushBlankUV();
-      pushThreeJsVertex(v6); pushBlankUV();
-      pushThreeJsVertex(v1); pushBlankUV();
-      pushThreeJsVertex(v6); pushBlankUV();
-      pushThreeJsVertex(v2); pushBlankUV();
+      pushVertex(v1); pushBlankUV();
+      pushVertex(v5); pushBlankUV();
+      pushVertex(v6); pushBlankUV();
+      pushVertex(v1); pushBlankUV();
+      pushVertex(v6); pushBlankUV();
+      pushVertex(v2); pushBlankUV();
     }
   }
 
