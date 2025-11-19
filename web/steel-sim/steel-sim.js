@@ -4,13 +4,13 @@ import { SteelTargetFactory } from './SteelTarget.js';
 import { DustCloudFactory } from './DustCloud.js';
 import { Landscape } from './Landscape.js';
 import { TargetRackFactory } from './TargetRack.js';
-import { CompositionRenderer, VirtualCoordinates as VC } from './CompositionRenderer.js';
+import { CompositionRenderer } from './CompositionRenderer.js';
 import { Scope } from './Scope.js';
 
 // ===== CONSTANTS =====
 const SHOOTER_HEIGHT = 1; // yards
 const CAMERA_FOV = 50;
-const CAMERA_FAR_PLANE = 1000;
+const CAMERA_FAR_PLANE = 3000; // Must be > ground length (2000 yards)
 
 const BULLET_MASS = 0.00907; // 140 grains in kg
 const BULLET_DIAMETER = 0.00762; // .308 caliber in meters
@@ -40,10 +40,10 @@ const METAL_DUST_CONFIG = {
 
 // ===== GLOBAL STATE =====
 let btk = null;
-let scene, camera, renderer;
+let scene, camera;
 let compositionRenderer = null;
+let backgroundElement = null;
 let scope = null;
-let sceneRenderTarget = null;
 let backgroundCamera = null; // Fixed camera for background scene
 let raycaster;
 let animationId = null;
@@ -234,53 +234,38 @@ function setupScene() {
   directionalLight.position.set(0, 0, 1000);
   scene.add(directionalLight);
   
-  // Create fixed background camera (wide-angle view that doesn't zoom)
+  // Setup composition renderer
+  compositionRenderer = new CompositionRenderer({ canvas });
+  
+  // Create background 3D scene layer (covers full screen)
+  const aspect = compositionRenderer.getAspect();
+  backgroundElement = compositionRenderer.createElement(0, 0, 2 * aspect, 2, { renderOrder: 0 });
+  
+  // Create fixed background camera (aspect ratio matches render target)
   backgroundCamera = new THREE.PerspectiveCamera(
     CAMERA_FOV,
-    canvas.clientWidth / canvas.clientHeight,
+    backgroundElement.pixelWidth / backgroundElement.pixelHeight,
     0.1,
     CAMERA_FAR_PLANE
   );
   backgroundCamera.position.set(0, SHOOTER_HEIGHT, 0);
   backgroundCamera.lookAt(0, 0, -CAMERA_FAR_PLANE);
   
-  // Setup composition renderer
-  compositionRenderer = new CompositionRenderer({ canvas });
-  renderer = compositionRenderer.getRenderer();
+  // Create scope layer (bottom-center, ~80% of screen height)
+  const scopeHeightNorm = 1.6;          // 80% of vertical span (2)
+  const scopeWidthNorm = scopeHeightNorm; // square in virtual units
+  const scopeY = -1 + scopeHeightNorm / 2; // bottom + half height
+  const scopeLayer = compositionRenderer.createElement(0, scopeY, scopeWidthNorm, scopeHeightNorm, { renderOrder: 1 });
   
-  // Create render target for background 3D scene
-  sceneRenderTarget = new THREE.WebGLRenderTarget(canvas.clientWidth, canvas.clientHeight, {
-    minFilter: THREE.LinearFilter,
-    magFilter: THREE.LinearFilter,
-    format: THREE.RGBAFormat,
-    samples: 4
-  });
-  
-  // Add background 3D scene as fullscreen element
-  const sceneGeometry = new THREE.PlaneGeometry(VC.WIDTH, VC.HEIGHT);
-  const sceneMaterial = new THREE.MeshBasicMaterial({
-    map: sceneRenderTarget.texture,
-    depthTest: false,
-    depthWrite: false,
-    toneMapped: false
-  });
-  compositionRenderer.addElement(new THREE.Mesh(sceneGeometry, sceneMaterial), {
-    x: 0, y: 0, z: 0, renderOrder: 0
-  });
-  
-  // Create scope (has its own camera with zoom, renders on top)
   scope = new Scope({
     scene,
-    renderer,
-    compositionRenderer,
-    canvasWidth: canvas.clientWidth,
-    canvasHeight: canvas.clientHeight,
+    renderTarget: scopeLayer.renderTarget,
+    renderer: scopeLayer.getRenderer(), // Must use the renderer that created the render target
     initialFOV: 30,
     minFOV: 1,
     maxFOV: 30,
     cameraPosition: { x: 0, y: SHOOTER_HEIGHT, z: 0 },
-    initialLookAt: { x: 0, y: 0, z: -1000 },
-    scopeSize: 0.8
+    initialLookAt: { x: 0, y: 0, z: -1000 }
   });
   camera = scope.getCamera(); // For raycasting
   
@@ -370,7 +355,6 @@ function setupUI() {
 
 function onMouseWheel(event) {
   event.preventDefault();
-  
   if (event.deltaY < 0) {
     scope.zoomIn();
   } else {
@@ -529,17 +513,16 @@ function animate() {
   SteelTargetFactory.updateAll(dt);
   DustCloudFactory.updateAll(dt);
   
-  // 3-pass rendering (like fclass-sim):
-  // 1) Render main scene with fixed background camera (for areas outside scope)
-  renderer.setRenderTarget(sceneRenderTarget);
-  renderer.clear();
-  renderer.render(scene, backgroundCamera);
-  renderer.setRenderTarget(null);
+  // Render background scene into element's render target
+  backgroundElement.render(scene, backgroundCamera, {
+    clear: true,
+    clearColor: 0x87ceeb
+  });
   
-  // 2) Render scope with its own camera (zoomed view with reticle)
+  // Render scope (composites 3D scene + reticle into its render target)
   scope.render();
   
-  // 3) Composite everything to screen
+  // Composite everything to screen
   compositionRenderer.render();
 }
 

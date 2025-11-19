@@ -6,15 +6,16 @@
  */
 
 import * as THREE from 'three';
-import { VirtualCoordinates as VC } from './CompositionRenderer.js';
 
 export class Scope {
   constructor(config) {
     this.scene = config.scene;
-    this.renderer = config.renderer;
-    this.compositionRenderer = config.compositionRenderer;
-    this.canvasWidth = config.canvasWidth;
-    this.canvasHeight = config.canvasHeight;
+    this.outputRenderTarget = config.renderTarget; // Render target from CompositionLayer
+    this.renderer = config.renderer; // Must use the renderer that created the render target
+    
+    // Get render target dimensions
+    const renderWidth = this.outputRenderTarget.width;
+    const renderHeight = this.outputRenderTarget.height;
     
     // FOV settings
     this.currentFOV = config.initialFOV || 30;
@@ -30,29 +31,15 @@ export class Scope {
     this.cameraPosition = config.cameraPosition || { x: 0, y: 1, z: 0 };
     this.lookAtBase = config.initialLookAt || { x: 0, y: 0, z: -1000 };
     
-    // Scope size calculation
-    const availableHeight = VC.HEIGHT - (VC.MARGIN_SMALL * 2);
-    const scopeSizeFraction = config.scopeSize || 0.8;
-    this.scopeSizeVirtual = availableHeight * scopeSizeFraction;
-    
-    // Calculate pixel size for render target
-    const pixelsPerVirtualUnit = this.canvasHeight / VC.HEIGHT;
-    const renderSize = Math.floor(this.scopeSizeVirtual * pixelsPerVirtualUnit);
-    
-    // Position in virtual coordinates
-    this.scopeX = 0; // Centered
-    this.scopeY = VC.fromBottom(VC.MARGIN_SMALL + this.scopeSizeVirtual / 2);
-    
     // Create resources
-    this.createRenderTarget(renderSize);
+    this.createInternalRenderTarget(renderWidth, renderHeight);
     this.createCamera();
-    this.createCircularMaskTexture(renderSize);
-    this.createViewMesh();
-    this.createCrosshair();
+    this.createInternalComposition(renderWidth, renderHeight);
   }
   
-  createRenderTarget(size) {
-    this.renderTarget = new THREE.WebGLRenderTarget(size, size, {
+  createInternalRenderTarget(width, height) {
+    // Internal render target for 3D scene before compositing with reticle
+    this.sceneRenderTarget = new THREE.WebGLRenderTarget(width, height, {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
@@ -63,7 +50,7 @@ export class Scope {
   createCamera() {
     this.camera = new THREE.PerspectiveCamera(
       this.currentFOV,
-      1.0, // Square aspect ratio
+      this.outputRenderTarget.width / this.outputRenderTarget.height,
       0.1,
       3000
     );
@@ -104,32 +91,39 @@ export class Scope {
     this.camera.lookAt(lookAt);
   }
   
-  createCircularMaskTexture(size) {
+  createInternalComposition(width, height) {
+    // Create internal orthographic scene for compositing 3D scene + reticle
+    this.internalScene = new THREE.Scene();
+    this.internalCamera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0, 10);
+    this.internalCamera.position.z = 5;
+    
+    // Create circular mask texture with actual render target dimensions
+    // This ensures the circle stays circular even if render target is not square
     const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = size;
-    maskCanvas.height = size;
+    maskCanvas.width = width;
+    maskCanvas.height = height;
     const maskCtx = maskCanvas.getContext('2d');
     
-    const cx = size / 2;
-    const cy = size / 2;
-    const r = size / 2 - 5;
+    const cx = width / 2;
+    const cy = height / 2;
+    // Use smaller dimension for radius to ensure circle fits
+    const radius = Math.min(width, height) / 2 - 5;
     
     // Black outside, white inside (alpha mask)
     maskCtx.fillStyle = 'black';
-    maskCtx.fillRect(0, 0, size, size);
+    maskCtx.fillRect(0, 0, width, height);
     
     maskCtx.fillStyle = 'white';
     maskCtx.beginPath();
-    maskCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    maskCtx.arc(cx, cy, radius, 0, Math.PI * 2);
     maskCtx.fill();
     
     this.maskTexture = new THREE.CanvasTexture(maskCanvas);
-  }
-  
-  createViewMesh() {
-    const geometry = new THREE.PlaneGeometry(this.scopeSizeVirtual, this.scopeSizeVirtual);
-    const material = new THREE.MeshBasicMaterial({
-      map: this.renderTarget.texture,
+    
+    // Create mesh for 3D scene view (with circular mask)
+    const viewGeometry = new THREE.PlaneGeometry(1, 1);
+    const viewMaterial = new THREE.MeshBasicMaterial({
+      map: this.sceneRenderTarget.texture,
       alphaMap: this.maskTexture,
       transparent: true,
       depthTest: false,
@@ -137,21 +131,21 @@ export class Scope {
       toneMapped: false
     });
     
-    this.viewMesh = new THREE.Mesh(geometry, material);
-    this.viewMesh.position.set(this.scopeX, this.scopeY, 1);
-    this.viewMesh.renderOrder = 1;
-    this.viewMesh.frustumCulled = false;
+    const viewMesh = new THREE.Mesh(viewGeometry, viewMaterial);
+    viewMesh.position.set(0, 0, 1);
+    viewMesh.renderOrder = 1;
+    this.internalScene.add(viewMesh);
     
-    this.compositionRenderer.getCompositionScene().add(this.viewMesh);
-  }
-  
-  createCrosshair() {
-    const geometry = new THREE.PlaneGeometry(this.scopeSizeVirtual, this.scopeSizeVirtual);
+    // Calculate aspect ratio for shader
+    const aspectRatio = width / height;
     
-    const material = new THREE.ShaderMaterial({
+    // Create mesh for reticle overlay
+    const reticleGeometry = new THREE.PlaneGeometry(1, 1);
+    const reticleMaterial = new THREE.ShaderMaterial({
       uniforms: {
         fov: { value: this.currentFOV },
-        scopeRadius: { value: 0.492 }
+        scopeRadius: { value: 0.492 },
+        aspectRatio: { value: aspectRatio }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -280,19 +274,20 @@ export class Scope {
       depthWrite: false
     });
     
-    this.crosshairMesh = new THREE.Mesh(geometry, material);
-    this.crosshairMesh.position.set(this.scopeX, this.scopeY, 2);
-    this.crosshairMesh.renderOrder = 2;
-    this.crosshairMesh.frustumCulled = false;
+    const reticleMesh = new THREE.Mesh(reticleGeometry, reticleMaterial);
+    reticleMesh.position.set(0, 0, 2);
+    reticleMesh.renderOrder = 2;
+    this.internalScene.add(reticleMesh);
     
-    this.compositionRenderer.getCompositionScene().add(this.crosshairMesh);
+    // Store material for FOV updates
+    this.reticleMaterial = reticleMaterial;
   }
   
   setFOV(fov) {
     this.currentFOV = Math.max(this.minFOV, Math.min(this.maxFOV, fov));
     this.camera.fov = this.currentFOV;
     this.camera.updateProjectionMatrix();
-    this.crosshairMesh.material.uniforms.fov.value = this.currentFOV;
+    this.reticleMaterial.uniforms.fov.value = this.currentFOV;
   }
   
   zoomIn(delta = 1) {
@@ -345,20 +340,36 @@ export class Scope {
   }
   
   render() {
-    // Render scene to scope's render target
-    this.renderer.setRenderTarget(this.renderTarget);
+    // Step 1: Render 3D scene to internal render target
+    this.renderer.setRenderTarget(this.sceneRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
+    
+    // Mark texture as updated
+    this.sceneRenderTarget.texture.needsUpdate = true;
+    
+    // Step 2: Composite scene + reticle to output render target
+    this.renderer.setRenderTarget(this.outputRenderTarget);
+    this.renderer.clear();
+    this.renderer.render(this.internalScene, this.internalCamera);
+    
+    // Mark output texture as updated
+    this.outputRenderTarget.texture.needsUpdate = true;
+    
     this.renderer.setRenderTarget(null);
   }
   
   dispose() {
-    this.renderTarget.dispose();
-    this.viewMesh.geometry.dispose();
-    this.viewMesh.material.dispose();
-    this.crosshairMesh.geometry.dispose();
-    this.crosshairMesh.material.dispose();
+    this.sceneRenderTarget.dispose();
     this.maskTexture.dispose();
+    this.reticleMaterial.dispose();
+    // Note: renderer is owned by CompositionRenderer, don't dispose it here
+    
+    // Dispose all meshes in internal scene
+    this.internalScene.traverse((object) => {
+      if (object.geometry) object.geometry.dispose();
+      if (object.material) object.material.dispose();
+    });
   }
 }
 
