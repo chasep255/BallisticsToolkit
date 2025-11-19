@@ -1,18 +1,51 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 import * as THREE from 'three';
-import { SteelTarget, SteelTargetFactory } from './SteelTarget.js';
+import { SteelTargetFactory } from './SteelTarget.js';
 import { DustCloudFactory } from './DustCloud.js';
 import { Landscape } from './Landscape.js';
-import { TargetRack, TargetRackFactory } from './TargetRack.js';
+import { TargetRackFactory } from './TargetRack.js';
+import { CompositionRenderer, VirtualCoordinates as VC } from './CompositionRenderer.js';
 
+// ===== CONSTANTS =====
+const SHOOTER_HEIGHT = 1; // yards
+const CAMERA_FOV = 50;
+const CAMERA_FAR_PLANE = 1000;
+
+const BULLET_MASS = 0.00907; // 140 grains in kg
+const BULLET_DIAMETER = 0.00762; // .308 caliber in meters
+const BULLET_LENGTH = 0.0305; // ~30mm typical
+const BULLET_BC = 0.3;
+const BULLET_SPEED_MPS = 800; // m/s
+
+const WIND_MPH = { x: 1.1, y: 0.0, z: 0.45 }; // Slight crosswind and downrange
+
+const GROUND_DUST_CONFIG = {
+  numParticles: 1000,
+  color: { r: 139, g: 115, b: 85 }, // Brown/tan
+  initialRadius: 0.25, // inches
+  growthRate: 0.5, // feet/second
+  fadeRate: 0.5,
+  particleDiameter: 0.2 // inches
+};
+
+const METAL_DUST_CONFIG = {
+  numParticles: 1000,
+  color: { r: 192, g: 192, b: 192 }, // Silver/gray
+  initialRadius: 0.5, // inches
+  growthRate: 0.5, // feet/second
+  fadeRate: 0.5,
+  particleDiameter: 0.2 // inches
+};
+
+// ===== GLOBAL STATE =====
 let btk = null;
 let scene, camera, renderer;
+let compositionRenderer = null;
+let sceneRenderTarget = null;
 let raycaster, mouse;
 let animationId = null;
 let lastTime = performance.now();
-
-let landscape = null; // Landscape instance
-let beamMesh = null; // Track beam for cleanup
+let landscape = null;
 
 // ===== COORDINATE CONVERSION UTILITIES =====
 // BTK: X=downrange, Y=crossrange-right, Z=up
@@ -126,121 +159,56 @@ window.threeJsToBtkVelocityMph = function(threeVec) {
   );
 };
 
-// Create a single target and add it to the targets array
-function createTarget(
-  position = { x: 0, y: 1, z: -10/3 }, // yards (y=1 yard up, z=-10/3 yards downrange)
-  width = 18,  // inches
-  height = 30, // inches
-  thickness = 0.5, // inches
-  isOval = false // true for oval shape, false for rectangle
-) {
-  // Create SteelTarget instance using factory (it creates and owns all its resources)
-  const target = SteelTargetFactory.create({
-    position,
-    width,
-    height,
-    thickness,
-    isOval,
-    beamHeight: 2.5, // yards
-    scene
-  });
-  
-  return target;
-}
+// ===== INITIALIZATION =====
 
-// Create a rack of 4 different targets
-function createTargetRack() {
-  // Clear any existing targets
-  clearAllTargets();
+function lockCanvasSize() {
+  const canvas = document.getElementById('steelCanvas');
   
-  // Create horizontal beam across the top (all values in yards)
-  const beamHeight = 2.5; // yards (about 7.5 feet high)
-  const beamWidth = 8; // yards (spans all targets)
-  const targetZ = -10/3; // yards downrange
-  createHorizontalBeam(beamWidth, beamHeight, targetZ);
+  // Detect mobile devices
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isTouchOnly = !window.matchMedia('(hover: hover)').matches;
   
-  // Target spacing (side by side)
-  const spacing = 2; // yards between targets
-  const baseY = 2; // yards up
-  const baseZ = -10/3; // yards downrange
-  
-  // All chains hang from the beam at beamHeight
-  // Target 1: 6" Circle (oval)
-  createTarget(
-    { x: -spacing * 1.5, y: baseY, z: baseZ },
-    6, 6, 0.5, true // inches: 6" circle
-  );
-  
-  // Target 2: Large Rectangle (18" × 30")
-  createTarget(
-    { x: -spacing * 0.5, y: baseY, z: baseZ },
-    18, 30, 0.5, false // inches: 18" × 30" rectangle
-  );
-  
-  // Target 3: 12" Circle
-  createTarget(
-    { x: spacing * 0.5, y: baseY, z: baseZ },
-    12, 12, 0.5, true // inches: 12" circle
-  );
-  
-  // Target 4: 12" × 18" Rectangle
-  createTarget(
-    { x: spacing * 1.5, y: baseY, z: baseZ },
-    12, 18, 0.5, false // inches: 12" × 18" rectangle
-  );
-}
-
-// Create horizontal beam that chains hang from
-// @param {number} width - Beam width (yards)
-// @param {number} height - Beam height Y position (yards)
-// @param {number} depth - Beam depth Z position (yards)
-function createHorizontalBeam(width, height, depth) {
-  // Remove existing beam if present
-  if (beamMesh) {
-    scene.remove(beamMesh);
-    if (beamMesh.geometry) beamMesh.geometry.dispose();
-    if (beamMesh.material) beamMesh.material.dispose();
-    beamMesh = null;
+  if (isMobile || isTouchOnly) {
+    console.warn('Mobile device detected - Steel Sim is designed for desktop use');
   }
   
-  // Beam radius: 2 inches diameter (1 inch radius)
-  const beamRadius = btk.Conversions.inchesToYards(1);
+  // Calculate canvas size with max constraints
+  const maxWidth = 1600;
+  const maxHeightVh = 0.90; // 90vh
   
-  const beamGeometry = new THREE.CylinderGeometry(beamRadius, beamRadius, width, 16);
-  const beamMaterial = new THREE.MeshStandardMaterial({
-    color: 0x444444, // Dark gray steel
-    metalness: 0.8,
-    roughness: 0.3
-  });
-  beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
+  const availableWidth = Math.min(canvas.clientWidth, maxWidth);
+  const availableHeight = window.innerHeight * maxHeightVh;
   
-  // Rotate to horizontal (cylinder is vertical by default)
-  beamMesh.rotation.z = Math.PI / 2;
-  beamMesh.position.set(0, height, depth);
-  beamMesh.castShadow = true;
-  beamMesh.receiveShadow = true;
+  // Use smaller of the two to fit on screen
+  const canvasWidth = Math.floor(Math.min(availableWidth, canvas.clientWidth));
+  const canvasHeight = Math.floor(Math.min(availableHeight, canvas.clientHeight));
   
-  scene.add(beamMesh);
-}
-
-
-function clearAllTargets() {
-  SteelTargetFactory.deleteAll();
+  // Lock canvas size permanently
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  canvas.style.width = canvasWidth + 'px';
+  canvas.style.height = canvasHeight + 'px';
+  canvas.style.maxWidth = canvasWidth + 'px';
+  canvas.style.maxHeight = canvasHeight + 'px';
+  canvas.style.minWidth = canvasWidth + 'px';
+  canvas.style.minHeight = canvasHeight + 'px';
+  
+  // Store locked dimensions
+  canvas.dataset.lockedWidth = canvasWidth;
+  canvas.dataset.lockedHeight = canvasHeight;
+  
+  console.log(`Canvas locked at ${canvasWidth}x${canvasHeight}`);
 }
 
 async function init() {
   try {
-    // Load WASM module and attach to window for global access
+    lockCanvasSize();
+    
     btk = await BallisticsToolkit();
     window.btk = btk;
     
-    // Setup Three.js scene (includes creating target racks)
     setupScene();
-    
-    // Setup UI event listeners
     setupUI();
-    
-    // Start animation loop
     animate();
   } catch (e) {
     console.error('Failed to initialize:', e);
@@ -248,131 +216,114 @@ async function init() {
   }
 }
 
+// ===== SCENE SETUP =====
+
 function setupScene() {
+  const canvas = document.getElementById('steelCanvas');
+  
   // Create scene
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb); // Sky blue for visibility
+  scene.background = new THREE.Color(0x87ceeb);
   
-  // Setup camera (3D perspective view)
-  const canvas = document.getElementById('steelCanvas');
+  // Setup camera at shooter position
   camera = new THREE.PerspectiveCamera(
-    50, // FOV
+    CAMERA_FOV,
     canvas.clientWidth / canvas.clientHeight,
     0.1,
-    1000
+    CAMERA_FAR_PLANE
   );
+  camera.position.set(0, SHOOTER_HEIGHT, 0);
+  camera.lookAt(0, 0, -CAMERA_FAR_PLANE);
   
-  // Position camera at shooter position (all values in yards)
-  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-  camera.position.set(0, 1, 0); // Shooter at origin, 1 yard up (Y is up in Three.js)
-  camera.lookAt(0, 0, -1000); // Look downrange (negative Z is downrange in Three.js)
+  // Setup composition renderer
+  compositionRenderer = new CompositionRenderer({ canvas });
+  renderer = compositionRenderer.getRenderer();
   
-  // Setup renderer with proper anti-aliasing
-  renderer = new THREE.WebGLRenderer({ 
-    canvas, 
-    antialias: true,
-    powerPreference: "high-performance"
+  sceneRenderTarget = new THREE.WebGLRenderTarget(canvas.clientWidth, canvas.clientHeight, {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat,
+    samples: 4
   });
-  renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-  // Use higher pixel ratio for better quality on high-DPI displays
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0x87ceeb, 1.0); // Sky blue background, fully opaque
   
-  // Add lighting
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
+  const sceneGeometry = new THREE.PlaneGeometry(VC.WIDTH, VC.HEIGHT);
+  const sceneMaterial = new THREE.MeshBasicMaterial({
+    map: sceneRenderTarget.texture,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false
+  });
+  compositionRenderer.addElement(new THREE.Mesh(sceneGeometry, sceneMaterial), {
+    x: 0, y: 0, z: 0, renderOrder: 0
+  });
   
+  // Setup lighting
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
   directionalLight.position.set(0, 0, 1000);
   scene.add(directionalLight);
   
   // Create landscape
   landscape = new Landscape(scene, {
-    groundWidth: 100, // yards
-    groundLength: 2000, // yards
-    brownGroundWidth: 500, // yards
-    brownGroundLength: 2000, // yards
-    slopeAngle: 5 // degrees (uphill downrange)
+    groundWidth: 100,
+    groundLength: 2000,
+    brownGroundWidth: 500,
+    brownGroundLength: 2000,
+    slopeAngle: 5
   });
   
-  // Create target racks within 50 yards of shooter, max 2 yards high
+  // Create target racks
   createTargetRacks();
   
-  // Setup raycaster for mouse interaction
+  // Setup raycaster
   raycaster = new THREE.Raycaster();
   mouse = new THREE.Vector2();
   
-  // Handle window resize
-  window.addEventListener('resize', onWindowResize);
-  
-  // Handle mouse clicks
+  // Event listeners (no resize - canvas is locked)
   canvas.addEventListener('click', onCanvasClick);
 }
 
-/**
- * Add a target rack at a specific XZ position
- * @param {number} x - X position in yards (crossrange)
- * @param {number} z - Z position in yards (downrange, negative = downrange)
- * @param {number} rackWidth - Width of rack in yards
- * @param {number} rackHeight - Height of rack in yards
- * @param {Array} targets - Array of target definitions {width, height, thickness, isOval}
- * @returns {TargetRack} The created rack instance
- */
+// ===== TARGET RACK CREATION =====
+
 function addTargetRack(x, z, rackWidth, rackHeight, targets) {
-  if (!landscape) {
-    throw new Error('Landscape must be initialized before creating target racks');
-  }
+  if (!landscape) throw new Error('Landscape must be initialized');
   
-  // Calculate terrain height at center position
   const groundHeight = landscape.getHeightAt(x, z) || 0;
-  
-  // Calculate bottom-left and top-right corners
   const halfWidth = rackWidth / 2;
-  const bottomLeft = { x: x - halfWidth, y: groundHeight, z: z };
-  const topRight = { x: x + halfWidth, y: groundHeight + rackHeight, z: z };
   
-  // Create rack
   const rack = TargetRackFactory.create({
-    bottomLeft,
-    topRight,
-    scene: scene
+    bottomLeft: { x: x - halfWidth, y: groundHeight, z },
+    topRight: { x: x + halfWidth, y: groundHeight + rackHeight, z },
+    scene
   });
   
-  // Add all targets
-  for (const target of targets) {
-    rack.addTarget(target);
-  }
-  
+  targets.forEach(target => rack.addTarget(target));
   return rack;
 }
 
-/**
- * Create target racks with different targets within 50 yards
- */
 function createTargetRacks() {
   if (!landscape) return;
   
-  // Rack 1: Close range (10 yards), small targets
   addTargetRack(0, -10, 6, 1.5, [
-    { width: 12, height: 12, thickness: 0.5, isOval: false }, // 12" square
-    { width: 10, height: 10, thickness: 0.5, isOval: true }, // 10" round
-    { width: 8, height: 8, thickness: 0.5, isOval: false } // 8" square
+    { width: 12, height: 12, thickness: 0.5, isOval: false },
+    { width: 10, height: 10, thickness: 0.5, isOval: true },
+    { width: 8, height: 8, thickness: 0.5, isOval: false }
   ]);
   
-  // Rack 2: Mid range (25 yards), medium targets
   addTargetRack(15, -25, 8, 2, [
-    { width: 18, height: 18, thickness: 0.5, isOval: false }, // 18" square
-    { width: 16, height: 16, thickness: 0.5, isOval: true }, // 16" round
-    { width: 14, height: 14, thickness: 0.5, isOval: false } // 14" square
+    { width: 18, height: 18, thickness: 0.5, isOval: false },
+    { width: 16, height: 16, thickness: 0.5, isOval: true },
+    { width: 14, height: 14, thickness: 0.5, isOval: false }
   ]);
   
-  // Rack 3: Far range (40 yards), larger targets
   addTargetRack(-15, -40, 10, 2, [
-    { width: 24, height: 30, thickness: 0.5, isOval: false }, // 24"x30" rectangle
-    { width: 20, height: 20, thickness: 0.5, isOval: true }, // 20" round
-    { width: 18, height: 24, thickness: 0.5, isOval: false } // 18"x24" rectangle
+    { width: 24, height: 30, thickness: 0.5, isOval: false },
+    { width: 20, height: 20, thickness: 0.5, isOval: true },
+    { width: 18, height: 24, thickness: 0.5, isOval: false }
   ]);
 }
+
+// ===== UI SETUP =====
 
 function setupUI() {
   const resetBtn = document.getElementById('resetBtn');
@@ -381,36 +332,45 @@ function setupUI() {
   const helpClose = document.querySelector('.help-close');
   
   resetBtn.addEventListener('click', resetTarget);
-  
-  helpBtn.addEventListener('click', () => {
-    helpModal.style.display = 'block';
-  });
+  helpBtn.addEventListener('click', () => helpModal.style.display = 'block');
   
   if (helpClose) {
-    helpClose.addEventListener('click', () => {
-      helpModal.style.display = 'none';
-    });
+    helpClose.addEventListener('click', () => helpModal.style.display = 'none');
   }
   
   if (helpModal) {
     helpModal.addEventListener('click', (e) => {
-      if (e.target === helpModal) {
-        helpModal.style.display = 'none';
-      }
+      if (e.target === helpModal) helpModal.style.display = 'none';
     });
   }
 }
 
-function onWindowResize() {
-  const canvas = document.getElementById('steelCanvas');
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
+// ===== EVENT HANDLERS =====
+
+function createBullet(impactPoint, shooterPos) {
+  const direction = impactPoint.clone().sub(shooterPos).normalize();
+  const bulletSpeedFps = btk.Conversions.mpsToFps(BULLET_SPEED_MPS);
+  const bulletVelThree = direction.multiplyScalar(bulletSpeedFps);
   
-  renderer.setSize(width, height);
+  const bulletPos = window.threeJsToBtkPosition(impactPoint);
+  const bulletVel = window.threeJsToBtkVelocity(bulletVelThree);
   
-  // Update camera aspect ratio
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
+  const baseBullet = new btk.Bullet(
+    BULLET_MASS,
+    BULLET_DIAMETER,
+    BULLET_LENGTH,
+    BULLET_BC,
+    btk.DragFunction.G7
+  );
+  
+  const bullet = new btk.Bullet(baseBullet, bulletPos, bulletVel, 0);
+  
+  // Cleanup base objects
+  baseBullet.delete();
+  bulletPos.delete();
+  bulletVel.delete();
+  
+  return bullet;
 }
 
 function onCanvasClick(event) {
@@ -420,155 +380,98 @@ function onCanvasClick(event) {
   const canvas = document.getElementById('steelCanvas');
   const rect = canvas.getBoundingClientRect();
   
-  // Convert mouse position to normalized device coordinates (-1 to +1)
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   
-  // Cast ray from camera through mouse position
   raycaster.setFromCamera(mouse, camera);
   
-  // Check intersections with all targets, find closest
+  // Check for target hit
   const intersects = raycaster.intersectObjects(allTargets.map(t => t.mesh));
-  let hitResult = null;
   if (intersects.length > 0) {
     const hitTarget = allTargets.find(t => t.mesh === intersects[0].object);
     if (hitTarget) {
-      hitResult = { steelTarget: hitTarget, point: intersects[0].point };
+      const impactPoint = intersects[0].point;
+      const bullet = createBullet(impactPoint, camera.position);
+      
+      hitTarget.hitBullet(bullet);
+      hitTarget.updateTexture();
+      createMetallicDustCloud(impactPoint);
+      
+      bullet.delete();
+      return;
     }
   }
   
-  if (hitResult) {
-    const impactPoint = hitResult.point; // Three.js coords
-    
-    // Get camera position (shooter position) in Three.js coords
-    const shooterPos = camera.position.clone();
-    
-    // Calculate direction from shooter to impact point (for velocity calculation)
-    const direction = impactPoint.clone().sub(shooterPos).normalize();
-    
-    // Bullet velocity: 800 m/s = ~2625 fps towards impact point (from shooter)
-    const bulletSpeedMps = 800; // m/s
-    const bulletSpeedFps = btk.Conversions.mpsToFps(bulletSpeedMps); // Convert to fps
-    const bulletVelThree = direction.multiplyScalar(bulletSpeedFps); // fps in Three.js coords
-    
-    // Convert impact point (yards) and velocity (fps) to BTK coordinates (meters, m/s)
-    const bulletPos = window.threeJsToBtkPosition(impactPoint);
-    const bulletVel = window.threeJsToBtkVelocity(bulletVelThree);
-    
-    // Create bullet with realistic parameters
-    const bulletMass = 0.00907; // 140 grains = 0.00907 kg
-    const bulletDiameter = 0.00762; // .308 = 7.62mm
-    const bulletLength = 0.0305; // ~30mm typical
-    const bulletBC = 0.3; // Typical
-    
-    // Create base bullet (static properties only)
-    const baseBullet = new btk.Bullet(
-      bulletMass,
-      bulletDiameter,
-      bulletLength,
-      bulletBC,
-      btk.DragFunction.G7
-    );
-    
-    // Create flying bullet with position and velocity
-    const bullet = new btk.Bullet(
-      baseBullet,
-      bulletPos,
-      bulletVel,
-      0 // spin rate
-    );
-    
-    // Apply hit to target
-    hitResult.steelTarget.hitBullet(bullet);
-    
-    // Update texture immediately after impact
-    hitResult.steelTarget.updateTexture();
-    
-    // Create metallic dust cloud at impact point
-    createMetallicDustCloud(impactPoint);
-    
-    // Note: C++ automatically marks target as moving when impulse is applied
-    
-    // Cleanup
-    baseBullet.delete();
-    bullet.delete();
-    bulletPos.delete();
-    bulletVel.delete();
-  } else if (landscape) {
-    // No target hit - check for landscape intersection
+  // No target hit - check landscape
+  if (landscape) {
     const landscapeIntersect = landscape.intersectRaycaster(raycaster);
     if (landscapeIntersect) {
-      const groundImpact = landscapeIntersect.point; // Three.js coords
-      createDustCloud(groundImpact);
+      createDustCloud(landscapeIntersect.point);
     }
   }
 }
 
-// Create dust cloud at impact point
+// ===== DUST CLOUD EFFECTS =====
+
 function createDustCloud(impactPointThree) {
-  // Create dust cloud using factory
-  // Particles have relative positions from cloud center (Gaussian distribution)
-  // Cloud radius grows linearly, center advects with wind
-  // Alpha fades exponentially over time (independent of radius growth)
   DustCloudFactory.create({
     position: impactPointThree,
-    scene: scene,
-    numParticles: 1000,
-    color: { r: 139, g: 115, b: 85 }, // Brown/tan (base color, each particle gets jitter)
-    wind: { x: 1.1, y: 0.0, z: 0.45 }, // Wind in mph: slight crosswind (x), no updraft (y), slight downrange (z)
-    initialRadius: btk.Conversions.inchesToYards(0.25), // yards (0.25 inches)
-    growthRate: 0.5, // feet/second growth rate
-    fadeRate: 0.5, 
-    particleDiameter: btk.Conversions.inchesToYards(0.2) // yards (0.5 inches)
+    scene,
+    numParticles: GROUND_DUST_CONFIG.numParticles,
+    color: GROUND_DUST_CONFIG.color,
+    wind: WIND_MPH,
+    initialRadius: btk.Conversions.inchesToYards(GROUND_DUST_CONFIG.initialRadius),
+    growthRate: GROUND_DUST_CONFIG.growthRate,
+    fadeRate: GROUND_DUST_CONFIG.fadeRate,
+    particleDiameter: btk.Conversions.inchesToYards(GROUND_DUST_CONFIG.particleDiameter)
   });
 }
 
-// Create metallic dust cloud at target impact point
 function createMetallicDustCloud(impactPointThree) {
-  // Create metallic dust cloud with higher growth, faster fade, smaller size
-  // Particles have relative positions from cloud center (Gaussian distribution)
-  // Cloud radius grows linearly, center advects with wind
-  // Alpha fades exponentially over time (independent of radius growth)
   DustCloudFactory.create({
     position: impactPointThree,
-    scene: scene,
-    numParticles: 1000,
-    color: { r: 192, g: 192, b: 192 }, // Silver/gray metallic color
-    wind: { x: 1.1, y: 0.0, z: 0.45 }, // Wind in mph: slight crosswind (x), no updraft (y), slight downrange (z)
-    initialRadius: btk.Conversions.inchesToYards(0.5), // yards (0.5 inches, smaller than ground dust)
-    growthRate: 0.5, // feet/second growth rate (higher than ground dust)
-    fadeRate: 0.5, // Faster fade rate (fades faster than ground dust)
-    particleDiameter: btk.Conversions.inchesToYards(0.2) // yards (0.25 inches, smaller than ground dust)
+    scene,
+    numParticles: METAL_DUST_CONFIG.numParticles,
+    color: METAL_DUST_CONFIG.color,
+    wind: WIND_MPH,
+    initialRadius: btk.Conversions.inchesToYards(METAL_DUST_CONFIG.initialRadius),
+    growthRate: METAL_DUST_CONFIG.growthRate,
+    fadeRate: METAL_DUST_CONFIG.fadeRate,
+    particleDiameter: btk.Conversions.inchesToYards(METAL_DUST_CONFIG.particleDiameter)
   });
 }
+
+// ===== RESET =====
 
 function resetTarget() {
-  // Clean up existing target racks
   TargetRackFactory.deleteAll();
-  
-  // Clean up dust clouds
   DustCloudFactory.deleteAll();
-  
-  // Recreate the racks
   createTargetRacks();
 }
+
+// ===== ANIMATION LOOP =====
 
 function animate() {
   animationId = requestAnimationFrame(animate);
   
   const currentTime = performance.now();
-  const dt = Math.min((currentTime - lastTime) / 1000, 1/30); // Cap at 30 FPS
+  const dt = Math.min((currentTime - lastTime) / 1000, 1/30);
   lastTime = currentTime;
   
-  // Update physics for all targets
   SteelTargetFactory.updateAll(dt);
-  
-  // Update dust clouds (factory automatically disposes when done)
   DustCloudFactory.updateAll(dt);
   
-  // Render
+  // Render 3D scene to target
+  renderer.setRenderTarget(sceneRenderTarget);
+  renderer.clear();
   renderer.render(scene, camera);
+  renderer.setRenderTarget(null);
+  
+  // Composite to screen
+  compositionRenderer.render();
 }
+
+// ===== ERROR HANDLING =====
 
 function showError(message) {
   const errorDiv = document.getElementById('error');
@@ -578,6 +481,7 @@ function showError(message) {
   }
 }
 
-// Initialize when DOM is ready
+// ===== START =====
+
 document.addEventListener('DOMContentLoaded', init);
 
