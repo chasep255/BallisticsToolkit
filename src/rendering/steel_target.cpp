@@ -285,14 +285,28 @@ namespace btk::rendering
     // Linear impulse
     velocity_ms_ += impulse / mass_kg_;
 
-    // Angular impulse (torque = r × F)
-    btk::math::Vector3D r = world_position - position_;
-    btk::math::Vector3D angular_impulse = r.cross(impulse);
+    // Angular impulse: apply torque consistently with local-space inertia tensor.
+    // 1) Lever arm and force in world space
+    btk::math::Vector3D r_world = world_position - position_;
+    btk::math::Vector3D F_world = impulse;
 
-    // Apply to angular velocity (omega += I^-1 * L) using full 3D inertia
-    btk::math::Vector3D angular_accel(angular_impulse.x / inertia_tensor_.x, angular_impulse.y / inertia_tensor_.y, angular_impulse.z / inertia_tensor_.z);
+    // 2) Convert r and F to local space using the conjugate (inverse) rotation
+    btk::math::Quaternion inv_orientation = orientation_.conjugate();
+    btk::math::Vector3D r_local = inv_orientation.rotate(r_world);
+    btk::math::Vector3D F_local = inv_orientation.rotate(F_world);
 
-    angular_velocity_ += angular_accel;
+    // 3) Torque in local space
+    btk::math::Vector3D torque_local = r_local.cross(F_local);
+
+    // 4) Angular acceleration in local space using diagonal inertia tensor
+    btk::math::Vector3D ang_acc_local(
+      torque_local.x / inertia_tensor_.x,
+      torque_local.y / inertia_tensor_.y,
+      torque_local.z / inertia_tensor_.z);
+
+    // 5) Convert angular acceleration back to world space and accumulate
+    btk::math::Vector3D ang_acc_world = orientation_.rotate(ang_acc_local);
+    angular_velocity_ += ang_acc_world;
 
     // Impulse applied - target is now moving
     is_moving_ = true;
@@ -311,7 +325,7 @@ namespace btk::rendering
     dt = std::min(dt, 1.0f);
 
     // Subdivide into smaller steps if needed for stability
-    constexpr float MAX_SUBSTEP_DT = 0.005f; // 5ms maximum substep (can be smaller)
+    constexpr float MAX_SUBSTEP_DT = 0.001f; // 5ms maximum substep (can be smaller)
 
     // Subdivide into smaller steps if needed
     int num_substeps = static_cast<int>(std::ceil(dt / MAX_SUBSTEP_DT));
