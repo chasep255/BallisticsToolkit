@@ -353,7 +353,7 @@ namespace btk::rendering
 
       // Angular velocity integration
       float angular_speed = angular_velocity_.magnitude();
-      if(angular_speed > 1e-5f)
+      if(angular_speed > 1e-6f)
       {
         float angle = angular_speed * substep_dt;
         btk::math::Vector3D axis = angular_velocity_ / angular_speed;

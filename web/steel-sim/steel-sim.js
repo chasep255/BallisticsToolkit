@@ -416,19 +416,19 @@ function createTargetRacks()
     {
       width: baseSize * 1.5,
       height: baseSize * 1.5,
-      thickness: 0.1,
+      thickness: 0.25,
       isOval: false
     },
     {
       width: baseSize,
       height: baseSize,
-      thickness: 0.1,
+      thickness: 0.25,
       isOval: true
     },
     {
       width: baseSize * 0.75,
       height: baseSize * 0.75,
-      thickness: 0.1,
+      thickness: 0.25,
       isOval: false
     }];
 
@@ -551,17 +551,6 @@ function onKeyDown(event)
     return;
   }
 
-  // Fire bullet with spacebar (scope reticle aim)
-  if (event.key === ' ')
-  {
-    event.preventDefault();
-    if (scopeMode)
-    {
-      fireFromScope();
-    }
-    return;
-  }
-
   // Zoom controls: +/- or =/- keys (only when in scope mode)
   if (scopeMode)
   {
@@ -576,27 +565,6 @@ function onKeyDown(event)
       event.preventDefault();
       scope.zoomOut();
       return;
-    }
-
-    // Pan controls: arrow keys (amount scales with zoom automatically)
-    switch (event.key)
-    {
-      case 'ArrowLeft':
-        event.preventDefault();
-        scope.panLeft();
-        break;
-      case 'ArrowRight':
-        event.preventDefault();
-        scope.panRight();
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        scope.panUp();
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        scope.panDown();
-        break;
     }
   }
 }

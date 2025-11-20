@@ -80,10 +80,7 @@
       <div class="quick-keys">
         <div class="quick-keys-section">
           <strong>Scope:</strong><br>
-          <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Aim • <kbd>+</kbd><kbd>-</kbd> or <kbd>Wheel</kbd> Zoom
-        </div>
-        <div class="quick-keys-section">
-          <strong>Fire:</strong> <kbd>Space</kbd>
+          Click scope to enter • Mouse move to pan • <kbd>Wheel</kbd> or <kbd>+</kbd><kbd>-</kbd> Zoom • Click to fire • <kbd>Esc</kbd> to exit
         </div>
       </div>
     </div>
@@ -108,11 +105,13 @@
         <div class="help-section">
           <h3>Controls</h3>
           <div class="param-help">
-            <strong>Rifle Scope (Fullscreen):</strong><br>
-            - <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Pan/aim (movement scales with zoom for precise control)<br>
-            - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (FOV 1° to 30°)<br>
-            - <kbd>Space</kbd> Fire bullet from scope crosshair (800 m/s)<br>
-            - FFP reticle scales with zoom<br><br>
+            <strong>Rifle Scope:</strong><br>
+            - Click inside the scope circle to enter scope mode (pointer lock activates)<br>
+            - Move mouse to pan/aim the scope (reticle moves with cursor at 1:1 speed)<br>
+            - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (4.5X to 30X magnification)<br>
+            - Click to fire bullet from scope crosshair (800 m/s)<br>
+            - <kbd>Esc</kbd> to exit scope mode<br>
+            - FFP reticle scales with zoom (maintains MRAD subtensions)<br><br>
             
             <strong>Reset All Targets:</strong> Returns all targets to their initial resting positions and clears all velocities and impact history.
           </div>
@@ -121,7 +120,7 @@
         <div class="help-section">
           <h3>Targets & Physics</h3>
           <div class="param-help">
-            <strong>Demo Targets:</strong> 4 steel targets (6" circle, 18"×30" rectangle, 12" circle, 12"×18" rectangle). All are 0.5" thick steel with realistic mass calculations.<br><br>
+            <strong>Target Racks:</strong> 10 target racks positioned at 100, 200, 300, ..., 1000 yards (every 100 yards). Each rack contains 3 targets with sizes scaling from 6" to 36" based on distance. All targets are 0.25" thick steel with realistic mass calculations.<br><br>
             <strong>Chain Mounting:</strong> Each target has two chains attached at the top, connecting to an overhead beam. Chains act as damped springs (10,000 N/m spring constant, 200 N·s/m damping) that dissipate energy to prevent bouncing.<br><br>
             <strong>Impact Physics:</strong> Bullet impacts transfer momentum to targets. Center hits cause mostly linear motion; edge hits create rotation. Smaller targets respond more dramatically than larger ones.<br><br>
             <strong>Damping:</strong> Linear damping (75% velocity per second) and angular damping (10% angular velocity per second) simulate air resistance and friction.
@@ -141,7 +140,7 @@
           <div class="param-help">
             <strong>Physics Engine:</strong> Custom rigid body physics in C++ (WebAssembly) with quaternion-based orientation for stable rotations.<br><br>
             <strong>Rendering:</strong> 3-pass composition system: background scene renders to texture, scope renders independently with zoom, then composited with reticle overlay. Three.js WebGL with 4× MSAA anti-aliasing. Vertex positions computed in C++ and transferred via typed memory views.<br><br>
-            <strong>Scope Reticle:</strong> Custom GLSL shader renders circular scope view with black bezel ring and white crosshair. FFP behavior scales with zoom.<br><br>
+            <strong>Scope Reticle:</strong> Geometry-based reticle using Three.js meshes.  FFP behavior scales with zoom, maintaining MRAD subtensions.<br><br>
             <strong>Impact Detection:</strong> Raycasting from scope camera center detects target intersections. Impact points converted to local target coordinates for physics and texture drawing.<br><br>
             <strong>Texture Generation:</strong> Targets use double-width texture buffer: front face UVs map to left half (0-0.5), back face to right half (0.5-1.0), allowing impacts to appear on the correct side.
           </div>

@@ -39,7 +39,8 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 
 ### 🔩 Steel Target Simulator *(Under Construction)*
 - **Physics Animation Demo** - Currently showcases realistic steel target dynamics with chain constraints, momentum transfer, and bullet impact visualization
-- **Current Demo** - Features 4 targets (6" circle, 18"×30" rectangle, 12" circle, 12"×18" rectangle) demonstrating rigid body physics
+- **Current Demo** - Features 10 target racks at 100-1000 yards (every 100 yards), with 3 targets per rack. Target sizes scale from 6" to 36" based on distance. All targets are 0.25" thick steel with realistic mass calculations
+- **Scope Controls** - Mouse-based scope interaction: click scope to enter, mouse move to pan, scroll wheel to zoom (4.5X to 30X), click to fire. Scope starts at minimum zoom (4.5X)
 - **Future Plans** - Will expand to a full shooting range simulator with multiple reactive steel targets and realistic shooting scenarios
 
 ## Quick Start

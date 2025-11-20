@@ -1,5 +1,5 @@
 /**
- * Scope - FFP (First Focal Plane) scope with shader-based reticle
+ * Scope - FFP (First Focal Plane) scope with geometry-based reticle
  * 
  * Renders the 3D scene through a scope view with mrad reticle that scales with zoom.
  * Positioned at bottom-center of composition for future turret overlays on top.
@@ -48,7 +48,7 @@ export class Scope
     // Zoom/FOV settings based on real scope spec
     this.minZoomX = SCOPE_MIN_ZOOM_X;
     this.maxZoomX = SCOPE_MAX_ZOOM_X;
-    this.currentZoomX = 10.0; // reasonable mid-range starting zoom
+    this.currentZoomX = this.minZoomX; // Start fully zoomed out
 
     this.currentFOV = this.getFovForZoomX(this.currentZoomX);
     this.minFOVDeg = this.getFovForZoomX(this.minZoomX);
