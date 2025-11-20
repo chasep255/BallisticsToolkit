@@ -73,11 +73,29 @@ export class Scope
       z: -1000
     };
 
+    // Normalized placement within composition
+    this.centerNormalized = config.centerNormalized ||
+    {
+      x: 0,
+      y: 0
+    };
+    this.heightNormalized = config.heightNormalized || 0;
+    this.scopeRadiusNormalized = 0;
+
     // Create resources
     this.createInternalRenderTarget(renderWidth, renderHeight);
     this.createCamera();
     this.createInternalComposition(renderWidth, renderHeight);
+
+    // Derive normalized scope radius (matches scopeRadius in HUD)
+    const hudScopeRadius = 0.98; // must match scopeRadius in createInternalComposition
+    if (this.heightNormalized > 0)
+    {
+      this.scopeRadiusNormalized = (this.heightNormalized / 2) * hudScopeRadius;
+    }
   }
+
+  // No static helpers here; Scope owns its own geometry/materials.
 
   createInternalRenderTarget(width, height)
   {
@@ -105,6 +123,26 @@ export class Scope
       this.cameraPosition.z
     );
     this.updateCameraLookAt();
+  }
+
+  /**
+   * Resize internal render targets and camera aspect when the scope's
+   * output render target has been resized.
+   * @param {number} outputWidth - New pixel width of the output render target
+   * @param {number} outputHeight - New pixel height of the output render target
+   */
+  resizeRenderTargets(outputWidth, outputHeight)
+  {
+    if (this.sceneRenderTarget)
+    {
+      this.sceneRenderTarget.setSize(outputWidth, outputHeight);
+    }
+
+    if (this.camera)
+    {
+      this.camera.aspect = outputWidth / outputHeight;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   updateCameraLookAt()
@@ -144,21 +182,6 @@ export class Scope
     this.internalCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
     this.internalCamera.position.z = 5;
 
-    // Black housing disc (background) - rendered as dark metal
-    const housingGeom = new THREE.CircleGeometry(1.0, 128);
-    const housingMat = new THREE.MeshStandardMaterial(
-    {
-      color: 0x000000,
-      metalness: 0.9,
-      roughness: 0.35,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false
-    });
-    const housingMesh = new THREE.Mesh(housingGeom, housingMat);
-    housingMesh.position.set(0, 0, 0);
-    this.internalScene.add(housingMesh);
-
     // Main scope view: circle mapped with lit 3D scene texture
     const scopeRadius = 0.98;
     const scopeGeom = new THREE.CircleGeometry(scopeRadius, 128);
@@ -189,6 +212,22 @@ export class Scope
     const maskMesh = new THREE.Mesh(maskGeom, maskMat);
     maskMesh.position.set(0, 0, 0.015);
     this.internalScene.add(maskMesh);
+
+    // Thin black housing ring around the glass (simple geometry)
+    const housingOuterRadius = 1.0; // controls thickness
+    const housingGeom = new THREE.RingGeometry(scopeRadius, housingOuterRadius, 128);
+    const housingMat = new THREE.MeshStandardMaterial(
+    {
+      color: 0x000000,
+      metalness: 0.9,
+      roughness: 0.35,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+    const housingMesh = new THREE.Mesh(housingGeom, housingMat);
+    housingMesh.position.set(0, 0, 0.02);
+    this.internalScene.add(housingMesh);
 
     // Reticle group built in MRAD space, then mapped into HUD units
     this.reticleGroup = new THREE.Group();
@@ -237,6 +276,20 @@ export class Scope
   }
 
   /**
+   * Convert a normalized composition delta into yaw/pitch radians.
+   * This keeps the mapping between screen-space movement and scope
+   * rotation independent of canvas resolution.
+   */
+  normalizedDeltaToAngles(deltaNormX, deltaNormY)
+  {
+    // Single sensitivity so horizontal and vertical feel identical.
+    const sensitivity = this.getFovRad() / 2;
+    const deltaYaw = -deltaNormX * sensitivity;
+    const deltaPitch = -deltaNormY * sensitivity;
+    return { deltaYaw, deltaPitch };
+  }
+
+  /**
    * Get camera FOV (degrees) for a given zoom X using the fitted model.
    */
   getFovForZoomX(zoomX)
@@ -261,6 +314,28 @@ export class Scope
   getZoomX()
   {
     return this.currentZoomX;
+  }
+
+  getFovDeg()
+  {
+    return this.currentFOV;
+  }
+
+  getFovRad()
+  {
+    return THREE.MathUtils.degToRad(this.currentFOV);
+  }
+
+  /**
+   * Test if a normalized composition-space point is inside the scope circle.
+   */
+  isPointInside(normX, normY)
+  {
+    if (!this.scopeRadiusNormalized) return false;
+
+    const dx = normX - this.centerNormalized.x;
+    const dy = normY - this.centerNormalized.y;
+    return dx * dx + dy * dy <= this.scopeRadiusNormalized * this.scopeRadiusNormalized;
   }
 
   /**
@@ -428,44 +503,34 @@ export class Scope
   }
 
   /**
-   * Calculate scaled pan amount based on current zoom level
-   * More zoomed in (smaller FOV) = smaller pan movements for finer control
+   * Pan scope by explicit yaw/pitch deltas (in radians).
    */
-  getScaledPanAmount(baseAmount)
+  panBy(deltaYawRad, deltaPitchRad)
   {
-    // Scale pan amount inversely with zoom:
-    // - At min zoom (4.5X), use full amount
-    // - At max zoom (30X), use much smaller steps for fine control
-    const zoomRatio = this.currentZoomX / this.minZoomX;
-    return baseAmount / zoomRatio;
-  }
-
-  panLeft(baseAmount = 0.001)
-  {
-    const amount = this.getScaledPanAmount(baseAmount);
-    this.yaw += amount;
+    this.yaw += deltaYawRad;
+    this.pitch += deltaPitchRad;
     this.updateCameraLookAt();
   }
 
-  panRight(baseAmount = 0.001)
+  // Optional keyboard helpers: small fixed steps
+  panLeft(stepRad = 0.001)
   {
-    const amount = this.getScaledPanAmount(baseAmount);
-    this.yaw -= amount;
-    this.updateCameraLookAt();
+    this.panBy(stepRad, 0);
   }
 
-  panUp(baseAmount = 0.001)
+  panRight(stepRad = 0.001)
   {
-    const amount = this.getScaledPanAmount(baseAmount);
-    this.pitch += amount;
-    this.updateCameraLookAt();
+    this.panBy(-stepRad, 0);
   }
 
-  panDown(baseAmount = 0.001)
+  panUp(stepRad = 0.001)
   {
-    const amount = this.getScaledPanAmount(baseAmount);
-    this.pitch -= amount;
-    this.updateCameraLookAt();
+    this.panBy(0, stepRad);
+  }
+
+  panDown(stepRad = 0.001)
+  {
+    this.panBy(0, -stepRad);
   }
 
   getCamera()

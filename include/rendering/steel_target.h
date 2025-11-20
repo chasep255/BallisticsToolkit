@@ -271,6 +271,15 @@ namespace btk::rendering
       initializeTexture(texture_width_, texture_height_);
     }
 
+    /**
+     * @brief Enable or disable verbose debug logging for this target.
+     *
+     * When enabled, the physics step will print detailed state (orientation,
+     * velocities, chain forces) to stdout each substep. Intended for debugging
+     * a single problematic target selected from the UI.
+     */
+    void setDebug(bool debug) { debug_ = debug; }
+
     private:
     // Steel density constant (kg/m³)
     static constexpr float STEEL_DENSITY = 7850.0f;
@@ -303,6 +312,7 @@ namespace btk::rendering
     btk::math::Vector3D velocity_ms_;      // Linear velocity
     btk::math::Vector3D angular_velocity_; // Angular velocity (rad/s)
     bool is_moving_;                       // True if target is moving (updated during timeStep)
+    bool debug_ = false;                   // Verbose debug logging flag
 
     // Physical properties
     float mass_kg_;

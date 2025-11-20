@@ -71,15 +71,15 @@
   align-items: center;
   margin: 20px 0;
   position: relative;
+  width: 100%; /* Let canvas width track container/page width */
 }
 
 #steelCanvas {
   border: 2px solid #333;
   background: #1a1a1a;
   width: 100%;
-  max-width: 1200px;
-  height: 800px;
-  cursor: crosshair;
+  height: auto;
+  aspect-ratio: 16 / 9;
   display: block;
 }
 
@@ -145,7 +145,7 @@
   }
   
   #steelCanvas {
-    height: 600px;
+    max-height: 80vh;
   }
   
   .quick-keys {

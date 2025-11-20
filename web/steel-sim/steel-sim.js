@@ -89,9 +89,6 @@ let lastTime = performance.now();
 let landscape = null;
 let scopeMode = false; // Whether mouse is controlling the scope
 let scopeLayer = null; // Store scope layer for bounds checking
-let scopeBounds = null; // Store scope bounds for click detection
-let lastMouseX = 0;
-let lastMouseY = 0;
 
 // ===== COORDINATE CONVERSION UTILITIES =====
 // BTK: X=downrange, Y=crossrange-right, Z=up
@@ -213,53 +210,10 @@ window.threeJsToBtkVelocityMph = function(threeVec)
 
 // ===== INITIALIZATION =====
 
-function lockCanvasSize()
-{
-  const canvas = document.getElementById('steelCanvas');
-
-  // Detect mobile devices
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  const isTouchOnly = !window.matchMedia('(hover: hover)').matches;
-
-  if (isMobile || isTouchOnly)
-  {
-    console.warn('Mobile device detected - Steel Sim is designed for desktop use');
-  }
-
-  // Calculate canvas size with max constraints
-  const maxWidth = 1600;
-  const maxHeightVh = 0.90; // 90vh
-
-  const availableWidth = Math.min(canvas.clientWidth, maxWidth);
-  const availableHeight = window.innerHeight * maxHeightVh;
-
-  // Use smaller of the two to fit on screen
-  const canvasWidth = Math.floor(Math.min(availableWidth, canvas.clientWidth));
-  const canvasHeight = Math.floor(Math.min(availableHeight, canvas.clientHeight));
-
-  // Lock canvas size permanently
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
-  canvas.style.width = canvasWidth + 'px';
-  canvas.style.height = canvasHeight + 'px';
-  canvas.style.maxWidth = canvasWidth + 'px';
-  canvas.style.maxHeight = canvasHeight + 'px';
-  canvas.style.minWidth = canvasWidth + 'px';
-  canvas.style.minHeight = canvasHeight + 'px';
-
-  // Store locked dimensions
-  canvas.dataset.lockedWidth = canvasWidth;
-  canvas.dataset.lockedHeight = canvasHeight;
-
-  console.log(`Canvas locked at ${canvasWidth}x${canvasHeight}`);
-}
-
 async function init()
 {
   try
   {
-    lockCanvasSize();
-
     btk = await BallisticsToolkit();
     window.btk = btk;
 
@@ -313,6 +267,22 @@ function setupScene()
   backgroundCamera.position.set(0, SHOOTER_HEIGHT, 0);
   backgroundCamera.lookAt(0, 0, -CAMERA_FAR_PLANE);
 
+  // Create landscape
+  landscape = new Landscape(scene,
+  {
+    groundWidth: 100,
+    groundLength: 2000,
+    brownGroundWidth: 500,
+    brownGroundLength: 2000,
+    slopeAngle: 5
+  });
+
+  // Compute 1000-yard target center height for initial scope aim
+  const THOUSAND_YARDS = 1000;
+  const THOUSAND_RACK_HEIGHT = 2; // matches createTargetRacks
+  const thousandGroundHeight = landscape.getHeightAt(0, -THOUSAND_YARDS) || 0;
+  const thousandTargetCenterY = thousandGroundHeight + THOUSAND_RACK_HEIGHT / 2;
+
   // Create scope layer (bottom-center, ~80% of screen height)
   const scopeHeightNorm = 1.6; // 80% of vertical span (2)
   const scopeWidthNorm = scopeHeightNorm; // square in virtual units
@@ -322,14 +292,6 @@ function setupScene()
     renderOrder: 1,
     transparent: true
   });
-  
-  // Store scope bounds for click detection
-  scopeBounds = {
-    centerX: 0,
-    centerY: scopeY,
-    width: scopeWidthNorm,
-    height: scopeHeightNorm
-  };
 
   scope = new Scope(
   {
@@ -348,20 +310,23 @@ function setupScene()
     initialLookAt:
     {
       x: 0,
-      y: 0,
-      z: -1000
-    }
+      y: thousandTargetCenterY,
+      z: -THOUSAND_YARDS
+    },
+    centerNormalized:
+    {
+      x: 0,
+      y: scopeY
+    },
+    heightNormalized: scopeHeightNorm
   });
   camera = scope.getCamera(); // For raycasting
 
-  // Create landscape
-  landscape = new Landscape(scene,
+  // When the scope layer's render target is resized by the composition
+  // renderer, update the scope's internal render targets and camera aspect.
+  scopeLayer.setResizeHandler((w, h) =>
   {
-    groundWidth: 100,
-    groundLength: 2000,
-    brownGroundWidth: 500,
-    brownGroundLength: 2000,
-    slopeAngle: 5
+    scope.resizeRenderTargets(w, h);
   });
 
   // Create target racks
@@ -370,14 +335,33 @@ function setupScene()
   // Setup raycaster for scope-based shooting
   raycaster = new THREE.Raycaster();
 
-  // Event listeners (no resize - canvas is locked)
-  canvas.addEventListener('wheel', onMouseWheel,
+  // Event listeners
+  document.addEventListener('wheel', onMouseWheel,
   {
     passive: false
   });
   canvas.addEventListener('mousemove', onMouseMove);
   canvas.addEventListener('mousedown', onMouseDown);
   window.addEventListener('keydown', onKeyDown);
+  document.addEventListener('pointerlockchange', onPointerLockChange);
+  window.addEventListener('resize', onWindowResize);
+
+  // Ensure renderer uses the final CSS size on first layout
+  onWindowResize();
+}
+
+function onWindowResize()
+{
+  const canvas = document.getElementById('steelCanvas');
+  if (!canvas || !compositionRenderer) return;
+
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+
+  // Resize main renderer, composition camera, and all layer render targets.
+  // Layer-specific resize callbacks (like Scope) are invoked by the
+  // CompositionRenderer itself.
+  compositionRenderer.handleResize(width, height);
 }
 
 // ===== TARGET RACK CREATION =====
@@ -432,19 +416,19 @@ function createTargetRacks()
     {
       width: baseSize * 1.5,
       height: baseSize * 1.5,
-      thickness: 0.5,
+      thickness: 0.1,
       isOval: false
     },
     {
       width: baseSize,
       height: baseSize,
-      thickness: 0.5,
+      thickness: 0.1,
       isOval: true
     },
     {
       width: baseSize * 0.75,
       height: baseSize * 0.75,
-      thickness: 0.5,
+      thickness: 0.1,
       isOval: false
     }];
 
@@ -482,48 +466,19 @@ function setupUI()
 
 // ===== EVENT HANDLERS =====
 
-/**
- * Convert screen coordinates to normalized composition coordinates
- */
-function screenToNormalized(x, y, canvas)
-{
-  const rect = canvas.getBoundingClientRect();
-  const aspect = compositionRenderer.getAspect();
-  
-  // Convert screen coords to canvas coords (0 to width/height)
-  const canvasX = x - rect.left;
-  const canvasY = y - rect.top;
-  
-  // Convert to normalized coords
-  // X: 0 to canvasWidth -> -aspect to +aspect
-  // Y: 0 to canvasHeight -> +1 to -1 (flipped)
-  const normX = (canvasX / canvas.width) * (2 * aspect) - aspect;
-  const normY = 1 - (canvasY / canvas.height) * 2;
-  
-  return { x: normX, y: normY };
-}
-
-/**
- * Check if normalized coordinates are within scope bounds
- */
-function isPointInScope(normX, normY)
-{
-  if (!scopeBounds) return false;
-  
-  const scopeLeft = scopeBounds.centerX - scopeBounds.width / 2;
-  const scopeRight = scopeBounds.centerX + scopeBounds.width / 2;
-  const scopeBottom = scopeBounds.centerY - scopeBounds.height / 2;
-  const scopeTop = scopeBounds.centerY + scopeBounds.height / 2;
-  
-  return normX >= scopeLeft && normX <= scopeRight &&
-         normY >= scopeBottom && normY <= scopeTop;
-}
-
 function onMouseWheel(event)
 {
-  if (!scopeMode) return; // Only zoom when in scope mode
-  
+  const canvas = document.getElementById('steelCanvas');
+  const locked = document.pointerLockElement === canvas;
+
+  // Only intercept wheel when the scope has pointer lock (scope mode)
+  if (!locked || !scopeMode)
+  {
+    return; // allow normal page scrolling
+  }
+
   event.preventDefault();
+
   if (event.deltaY < 0)
   {
     scope.zoomIn();
@@ -537,67 +492,60 @@ function onMouseWheel(event)
 function onMouseMove(event)
 {
   const canvas = event.target;
-  const norm = screenToNormalized(event.clientX, event.clientY, canvas);
   
-  if (scopeMode)
+  if (scopeMode && document.pointerLockElement === canvas)
   {
-    // Pan scope based on mouse movement
-    const deltaX = norm.x - lastMouseX;
-    const deltaY = norm.y - lastMouseY;
-    
-    // Convert normalized movement to pan amount
-    // Scale by a sensitivity factor
-    const sensitivity = 0.5; // Adjust this to control pan sensitivity
-    if (Math.abs(deltaX) > 0.001)
+    // Pan scope based on relative mouse movement:
+    // 1) pixels → normalized composition delta
+    // 2) normalized delta → yaw/pitch via Scope
+    const deltaX = event.movementX || 0;
+    const deltaY = event.movementY || 0;
+    if (deltaX !== 0 || deltaY !== 0)
     {
-      if (deltaX > 0)
-      {
-        scope.panRight(Math.abs(deltaX) * sensitivity);
-      }
-      else
-      {
-        scope.panLeft(Math.abs(deltaX) * sensitivity);
-      }
-    }
-    
-    if (Math.abs(deltaY) > 0.001)
-    {
-      if (deltaY > 0)
-      {
-        scope.panUp(Math.abs(deltaY) * sensitivity);
-      }
-      else
-      {
-        scope.panDown(Math.abs(deltaY) * sensitivity);
-      }
+      const normDelta = compositionRenderer.movementToNormalized(deltaX, deltaY);
+      const { deltaYaw, deltaPitch } = scope.normalizedDeltaToAngles(normDelta.x, normDelta.y);
+      scope.panBy(deltaYaw, deltaPitch);
     }
   }
-  
-  lastMouseX = norm.x;
-  lastMouseY = norm.y;
 }
 
 function onMouseDown(event)
 {
   const canvas = event.target;
-  const norm = screenToNormalized(event.clientX, event.clientY, canvas);
+  const norm = compositionRenderer.screenToNormalized(event.clientX, event.clientY);
+  const locked = document.pointerLockElement === canvas;
+  // Debug logging to understand scope click behavior
+  console.log('onMouseDown', {
+    button: event.button,
+    locked,
+    normX: norm.x.toFixed(3),
+    normY: norm.y.toFixed(3),
+    insideScope: scope.isPointInside(norm.x, norm.y)
+  });
   
   if (event.button === 0) // Left click
   {
-    if (scopeMode)
+    if (locked)
     {
       // Fire when clicking in scope mode
       fireFromScope();
     }
-    else if (isPointInScope(norm.x, norm.y))
+    else if (scope.isPointInside(norm.x, norm.y))
     {
-      // Enter scope mode when clicking on scope
-      scopeMode = true;
-      canvas.style.cursor = 'crosshair';
-      lastMouseX = norm.x;
-      lastMouseY = norm.y;
+      // Enter scope mode when clicking on scope.
+      // Let pointerlockchange handler update scopeMode.
+      canvas.requestPointerLock();
     }
   }
+}
+
+function onPointerLockChange()
+{
+  const canvas = document.getElementById('steelCanvas');
+  const locked = document.pointerLockElement === canvas;
+  scopeMode = locked;
+  console.log('pointerlockchange', { locked });
+  canvas.style.cursor = locked ? 'none' : 'default';
 }
 
 function onKeyDown(event)
@@ -607,9 +555,7 @@ function onKeyDown(event)
   {
     if (scopeMode)
     {
-      scopeMode = false;
-      const canvas = document.getElementById('steelCanvas');
-      canvas.style.cursor = 'default';
+      document.exitPointerLock();
     }
     return;
   }

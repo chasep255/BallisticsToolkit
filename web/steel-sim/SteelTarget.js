@@ -435,6 +435,18 @@ export class SteelTarget
   }
 
   /**
+   * Enable or disable verbose debug logging in the underlying C++ target.
+   * When enabled, physics state and chain forces are logged to the browser console
+   * on each physics substep for this specific target.
+   * @param {boolean} enabled
+   */
+  setDebug(enabled)
+  {
+    if (!this.steelTarget || typeof this.steelTarget.setDebug !== 'function') return;
+    this.steelTarget.setDebug(!!enabled);
+  }
+
+  /**
    * Clean up all resources (C++ object, Three.js objects)
    */
   dispose()

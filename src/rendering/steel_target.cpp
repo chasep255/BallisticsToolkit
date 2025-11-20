@@ -3,14 +3,20 @@
 #include "math/random.h"
 #include "physics/constants.h"
 #include <cmath>
+#include <iostream>
 #include <stdexcept>
-
-#ifdef __EMSCRIPTEN__
-#include <emscripten/val.h>
-#endif
 
 namespace btk::rendering
 {
+
+#ifdef __EMSCRIPTEN__
+  // Helper to log to the browser console when running under Emscripten.
+  static void logToConsole(const std::string& msg)
+  {
+    emscripten::val console = emscripten::val::global("console");
+    console.call<void>("log", emscripten::val(msg));
+  }
+#endif
 
   SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval)
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(1.0f, 0.0f, 0.0f),
@@ -341,6 +347,23 @@ namespace btk::rendering
         orientation_ = rotation * orientation_;
         orientation_.normalize();
         normal_ = orientation_.rotate(btk::math::Vector3D(1.0f, 0.0f, 0.0f));
+
+#ifdef __EMSCRIPTEN__
+        if(debug_)
+        {
+          // Log basic kinematic state each substep for the debug target
+          std::string msg = "SteelTarget debug - substep " + std::to_string(i) +
+                            " dt=" + std::to_string(substep_dt) +
+                            " angSpeed=" + std::to_string(angular_speed) +
+                            " angVel=(" + std::to_string(angular_velocity_.x) + "," +
+                            std::to_string(angular_velocity_.y) + "," +
+                            std::to_string(angular_velocity_.z) + ")" +
+                            " normal=(" + std::to_string(normal_.x) + "," +
+                            std::to_string(normal_.y) + "," +
+                            std::to_string(normal_.z) + ")";
+          logToConsole(msg);
+        }
+#endif
       }
     }
 
@@ -394,6 +417,18 @@ namespace btk::rendering
 
         // Total force - critically damped system prevents oscillation
         btk::math::Vector3D total_force = spring_force + damping_force;
+
+#ifdef __EMSCRIPTEN__
+        if(debug_)
+        {
+          // Log chain state for the debug target
+          float force_mag = total_force.magnitude();
+          std::string msg = "SteelTarget chain - ext=" + std::to_string(extension) +
+                            " rest=" + std::to_string(anchor.rest_length_) +
+                            " forceMag=" + std::to_string(force_mag);
+          logToConsole(msg);
+        }
+#endif
 
         // Apply force at world_attachment point (handles both linear and angular)
         applyForce(total_force, world_attachment, dt);
