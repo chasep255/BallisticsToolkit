@@ -87,6 +87,11 @@ let raycaster;
 let animationId = null;
 let lastTime = performance.now();
 let landscape = null;
+let scopeMode = false; // Whether mouse is controlling the scope
+let scopeLayer = null; // Store scope layer for bounds checking
+let scopeBounds = null; // Store scope bounds for click detection
+let lastMouseX = 0;
+let lastMouseY = 0;
 
 // ===== COORDINATE CONVERSION UTILITIES =====
 // BTK: X=downrange, Y=crossrange-right, Z=up
@@ -312,11 +317,19 @@ function setupScene()
   const scopeHeightNorm = 1.6; // 80% of vertical span (2)
   const scopeWidthNorm = scopeHeightNorm; // square in virtual units
   const scopeY = -1 + scopeHeightNorm / 2; // bottom + half height
-  const scopeLayer = compositionRenderer.createElement(0, scopeY, scopeWidthNorm, scopeHeightNorm,
+  scopeLayer = compositionRenderer.createElement(0, scopeY, scopeWidthNorm, scopeHeightNorm,
   {
     renderOrder: 1,
     transparent: true
   });
+  
+  // Store scope bounds for click detection
+  scopeBounds = {
+    centerX: 0,
+    centerY: scopeY,
+    width: scopeWidthNorm,
+    height: scopeHeightNorm
+  };
 
   scope = new Scope(
   {
@@ -362,6 +375,8 @@ function setupScene()
   {
     passive: false
   });
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mousedown', onMouseDown);
   window.addEventListener('keydown', onKeyDown);
 }
 
@@ -467,8 +482,47 @@ function setupUI()
 
 // ===== EVENT HANDLERS =====
 
+/**
+ * Convert screen coordinates to normalized composition coordinates
+ */
+function screenToNormalized(x, y, canvas)
+{
+  const rect = canvas.getBoundingClientRect();
+  const aspect = compositionRenderer.getAspect();
+  
+  // Convert screen coords to canvas coords (0 to width/height)
+  const canvasX = x - rect.left;
+  const canvasY = y - rect.top;
+  
+  // Convert to normalized coords
+  // X: 0 to canvasWidth -> -aspect to +aspect
+  // Y: 0 to canvasHeight -> +1 to -1 (flipped)
+  const normX = (canvasX / canvas.width) * (2 * aspect) - aspect;
+  const normY = 1 - (canvasY / canvas.height) * 2;
+  
+  return { x: normX, y: normY };
+}
+
+/**
+ * Check if normalized coordinates are within scope bounds
+ */
+function isPointInScope(normX, normY)
+{
+  if (!scopeBounds) return false;
+  
+  const scopeLeft = scopeBounds.centerX - scopeBounds.width / 2;
+  const scopeRight = scopeBounds.centerX + scopeBounds.width / 2;
+  const scopeBottom = scopeBounds.centerY - scopeBounds.height / 2;
+  const scopeTop = scopeBounds.centerY + scopeBounds.height / 2;
+  
+  return normX >= scopeLeft && normX <= scopeRight &&
+         normY >= scopeBottom && normY <= scopeTop;
+}
+
 function onMouseWheel(event)
 {
+  if (!scopeMode) return; // Only zoom when in scope mode
+  
   event.preventDefault();
   if (event.deltaY < 0)
   {
@@ -480,49 +534,133 @@ function onMouseWheel(event)
   }
 }
 
+function onMouseMove(event)
+{
+  const canvas = event.target;
+  const norm = screenToNormalized(event.clientX, event.clientY, canvas);
+  
+  if (scopeMode)
+  {
+    // Pan scope based on mouse movement
+    const deltaX = norm.x - lastMouseX;
+    const deltaY = norm.y - lastMouseY;
+    
+    // Convert normalized movement to pan amount
+    // Scale by a sensitivity factor
+    const sensitivity = 0.5; // Adjust this to control pan sensitivity
+    if (Math.abs(deltaX) > 0.001)
+    {
+      if (deltaX > 0)
+      {
+        scope.panRight(Math.abs(deltaX) * sensitivity);
+      }
+      else
+      {
+        scope.panLeft(Math.abs(deltaX) * sensitivity);
+      }
+    }
+    
+    if (Math.abs(deltaY) > 0.001)
+    {
+      if (deltaY > 0)
+      {
+        scope.panUp(Math.abs(deltaY) * sensitivity);
+      }
+      else
+      {
+        scope.panDown(Math.abs(deltaY) * sensitivity);
+      }
+    }
+  }
+  
+  lastMouseX = norm.x;
+  lastMouseY = norm.y;
+}
+
+function onMouseDown(event)
+{
+  const canvas = event.target;
+  const norm = screenToNormalized(event.clientX, event.clientY, canvas);
+  
+  if (event.button === 0) // Left click
+  {
+    if (scopeMode)
+    {
+      // Fire when clicking in scope mode
+      fireFromScope();
+    }
+    else if (isPointInScope(norm.x, norm.y))
+    {
+      // Enter scope mode when clicking on scope
+      scopeMode = true;
+      canvas.style.cursor = 'crosshair';
+      lastMouseX = norm.x;
+      lastMouseY = norm.y;
+    }
+  }
+}
+
 function onKeyDown(event)
 {
+  // Exit scope mode with Escape
+  if (event.key === 'Escape')
+  {
+    if (scopeMode)
+    {
+      scopeMode = false;
+      const canvas = document.getElementById('steelCanvas');
+      canvas.style.cursor = 'default';
+    }
+    return;
+  }
+
   // Fire bullet with spacebar (scope reticle aim)
   if (event.key === ' ')
   {
     event.preventDefault();
-    fireFromScope();
+    if (scopeMode)
+    {
+      fireFromScope();
+    }
     return;
   }
 
-  // Zoom controls: +/- or =/- keys
-  if (event.key === '=' || event.key === '+')
+  // Zoom controls: +/- or =/- keys (only when in scope mode)
+  if (scopeMode)
   {
-    event.preventDefault();
-    scope.zoomIn();
-    return;
-  }
-  if (event.key === '-' || event.key === '_')
-  {
-    event.preventDefault();
-    scope.zoomOut();
-    return;
-  }
+    if (event.key === '=' || event.key === '+')
+    {
+      event.preventDefault();
+      scope.zoomIn();
+      return;
+    }
+    if (event.key === '-' || event.key === '_')
+    {
+      event.preventDefault();
+      scope.zoomOut();
+      return;
+    }
 
-  // Pan controls: arrow keys (amount scales with zoom automatically)
-  switch (event.key)
-  {
-    case 'ArrowLeft':
-      event.preventDefault();
-      scope.panLeft();
-      break;
-    case 'ArrowRight':
-      event.preventDefault();
-      scope.panRight();
-      break;
-    case 'ArrowUp':
-      event.preventDefault();
-      scope.panUp();
-      break;
-    case 'ArrowDown':
-      event.preventDefault();
-      scope.panDown();
-      break;
+    // Pan controls: arrow keys (amount scales with zoom automatically)
+    switch (event.key)
+    {
+      case 'ArrowLeft':
+        event.preventDefault();
+        scope.panLeft();
+        break;
+      case 'ArrowRight':
+        event.preventDefault();
+        scope.panRight();
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        scope.panUp();
+        break;
+      case 'ArrowDown':
+        event.preventDefault();
+        scope.panDown();
+        break;
+    }
   }
 }
 
