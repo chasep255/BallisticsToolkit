@@ -378,7 +378,8 @@ class TargetSimulator
     {
       // Fire shot
       const simulatedShot = this.simulator.fireShot();
-      console.log(`Shot ${this.currentShot + 1}/${this.totalShots} (Match ${this.currentMatch}/${this.totalMatches}):`, {
+      console.log(`Shot ${this.currentShot + 1}/${this.totalShots} (Match ${this.currentMatch}/${this.totalMatches}):`,
+      {
         impact_x: simulatedShot.impact_x,
         impact_y: simulatedShot.impact_y,
         impact_x_inches: btk.Conversions.metersToInches(simulatedShot.impact_x),

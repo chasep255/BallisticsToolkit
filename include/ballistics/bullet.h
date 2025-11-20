@@ -40,8 +40,8 @@ namespace btk::ballistics
      * @param drag_function Drag function type (default: G7)
      */
     constexpr Bullet(float weight, float diameter, float length, float bc, DragFunction drag_function = DragFunction::G7)
-      : weight_(weight), diameter_(diameter), length_(length), bc_(bc), drag_function_(drag_function), position_(0.0f, 0.0f, 0.0f), velocity_(0.0f, 0.0f, 0.0f), spin_rate_(0.0f),
-        beta_eq_right_(0.0f), beta_eq_up_(0.0f), has_flight_state_(false)
+      : weight_(weight), diameter_(diameter), length_(length), bc_(bc), drag_function_(drag_function), position_(0.0f, 0.0f, 0.0f), velocity_(0.0f, 0.0f, 0.0f), spin_rate_(0.0f), beta_eq_right_(0.0f),
+        beta_eq_up_(0.0f), has_flight_state_(false)
     {
     }
 
@@ -108,7 +108,7 @@ namespace btk::ballistics
 
     // Crosswind lag state getters and setters (equilibrium lateral angles)
     constexpr float getBetaEqRight() const { return beta_eq_right_; } // rad
-    constexpr float getBetaEqUp() const { return beta_eq_up_; }     // rad
+    constexpr float getBetaEqUp() const { return beta_eq_up_; }       // rad
     void setBetaEqRight(float beta) { beta_eq_right_ = beta; }
     void setBetaEqUp(float beta) { beta_eq_up_ = beta; }
 
@@ -151,11 +151,10 @@ namespace btk::ballistics
 
     constexpr float estimateSpinMomentOfInertia() const
     {
-      constexpr float K_RG = 0.30f;               // radius-of-gyration factor (×diameter)
+      constexpr float K_RG = 0.30f; // radius-of-gyration factor (×diameter)
       float r_eff = K_RG * diameter_;
-      return weight_ * r_eff * r_eff;             // m * (k_rg * d)^2
+      return weight_ * r_eff * r_eff; // m * (k_rg * d)^2
     }
-    
 
     private:
     float weight_;   // kg

@@ -10,12 +10,10 @@
 namespace btk::ballistics
 {
 
-
   constexpr float DEFAULT_LIFT_SLOPE_PER_RAD = 1.27169f;
   constexpr float DEFAULT_RESTORING_MOMENT_SLOPE_PER_RAD = -0.124862f;
   constexpr float DEFAULT_YAW_OF_REPOSE_SCALE = 0.426516f;
   constexpr float DEFAULT_BETA_LAG_SCALE = 0.670554f;
-
 
   /**
    * @brief Result of zeroing calculation
@@ -47,8 +45,8 @@ namespace btk::ballistics
      */
     Simulator()
       : initial_bullet_(0.0f, 0.0f, 0.0f, 0.0f), current_bullet_(0.0f, 0.0f, 0.0f, 0.0f), atmosphere_(), wind_(0.0f, 0.0f, 0.0f), current_time_(0.0f), trajectory_(),
-        lift_slope_per_rad_(DEFAULT_LIFT_SLOPE_PER_RAD), restoring_moment_slope_per_rad_(DEFAULT_RESTORING_MOMENT_SLOPE_PER_RAD), 
-        yaw_of_repose_scale_(DEFAULT_YAW_OF_REPOSE_SCALE), beta_lag_scale_(DEFAULT_BETA_LAG_SCALE)
+        lift_slope_per_rad_(DEFAULT_LIFT_SLOPE_PER_RAD), restoring_moment_slope_per_rad_(DEFAULT_RESTORING_MOMENT_SLOPE_PER_RAD), yaw_of_repose_scale_(DEFAULT_YAW_OF_REPOSE_SCALE),
+        beta_lag_scale_(DEFAULT_BETA_LAG_SCALE)
     {
     }
 

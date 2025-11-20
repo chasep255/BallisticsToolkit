@@ -2,12 +2,30 @@
 import * as THREE from 'three';
 
 // Import BTK
-import { waitForBTK, getBTK, sampleWindAtThreeJsPosition } from './core/btk.js';
+import
+{
+  waitForBTK,
+  getBTK,
+  sampleWindAtThreeJsPosition
+}
+from './core/btk.js';
 
 // Import core logic (no wind module - use BTK directly)
-import { VirtualCoordinates as VC } from './core/virtual-coords.js';
-import { GraphicsPresets } from './core/graphics-presets.js';
-import { SettingsCookies } from './core/settings-cookies.js';
+import
+{
+  VirtualCoordinates as VC
+}
+from './core/virtual-coords.js';
+import
+{
+  GraphicsPresets
+}
+from './core/graphics-presets.js';
+import
+{
+  SettingsCookies
+}
+from './core/settings-cookies.js';
 
 // Import ResourceManager (triggers auto-loading)
 import ResourceManager from './resources/manager.js';
@@ -849,8 +867,9 @@ class FClassSimulator
 
     // Update time at the start of each frame
     ResourceManager.time.update();
-    
-    if (this.windGenerator) {
+
+    if (this.windGenerator)
+    {
       this.windGenerator.advanceTime(ResourceManager.time.getElapsedTime());
     }
 
@@ -1043,16 +1062,16 @@ class FClassSimulator
     const maxCornerX_yd = halfWidth + FClassSimulator.WIND_BOX_PADDING;
     const maxCornerY_yd = FClassSimulator.WIND_BOX_HEIGHT;
     const maxCornerZ_yd = -(this.distance + FClassSimulator.WIND_BOX_PADDING);
-    
+
     const minCorner = new btk.Vector3D(
       btk.Conversions.yardsToMeters(-minCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
-      btk.Conversions.yardsToMeters(minCornerX_yd),   // Three X (crossrange) → BTK Y (crossrange)
-      btk.Conversions.yardsToMeters(minCornerY_yd)    // Three Y (up) → BTK Z (up)
+      btk.Conversions.yardsToMeters(minCornerX_yd), // Three X (crossrange) → BTK Y (crossrange)
+      btk.Conversions.yardsToMeters(minCornerY_yd) // Three Y (up) → BTK Z (up)
     );
     const maxCorner = new btk.Vector3D(
       btk.Conversions.yardsToMeters(-maxCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
-      btk.Conversions.yardsToMeters(maxCornerX_yd),   // Three X (crossrange) → BTK Y (crossrange)
-      btk.Conversions.yardsToMeters(maxCornerY_yd)    // Three Y (up) → BTK Z (up)
+      btk.Conversions.yardsToMeters(maxCornerX_yd), // Three X (crossrange) → BTK Y (crossrange)
+      btk.Conversions.yardsToMeters(maxCornerY_yd) // Three Y (up) → BTK Z (up)
     );
 
     console.log(`[Wind] Creating wind generator: ${this.windPreset}`);
@@ -1123,7 +1142,8 @@ class FClassSimulator
     this.createWindInfoText();
 
     // ===== WIND FIELD HUD =====
-    this.windFieldHUD = new WindFieldHUD({
+    this.windFieldHUD = new WindFieldHUD(
+    {
       compositionScene: this.compositionScene,
       windGenerator: this.windGenerator,
       targetDistance: this.distance,
@@ -1290,30 +1310,30 @@ class FClassSimulator
   pause()
   {
     if (!this.isRunning || this.isPaused) return;
-    
+
     this.isPaused = true;
     ResourceManager.time.pause();
     ResourceManager.audio.pause();
-    
+
     // Update button text
     const btn = document.getElementById('pauseBtn');
     if (btn) btn.textContent = 'Resume';
-    
+
     console.log('[Game] Paused');
   }
 
   resume()
   {
     if (!this.isRunning || !this.isPaused) return;
-    
+
     this.isPaused = false;
     ResourceManager.time.resume();
     ResourceManager.audio.resume();
-    
+
     // Update button text
     const btn = document.getElementById('pauseBtn');
     if (btn) btn.textContent = 'Pause';
-    
+
     console.log('[Game] Resumed');
   }
 
@@ -2044,13 +2064,13 @@ async function initializeApp()
     setupUI();
     lockCanvasSize(); // Lock canvas size once on page load
     populateWindPresetDropdown();
-    
+
     // Load saved settings from cookies (after wind presets are populated)
     SettingsCookies.loadAll();
-    
+
     // Attach auto-save listeners to all settings inputs
     SettingsCookies.attachAutoSave();
-    
+
     setupHelpMenu();
 
     // Show loading message if resources aren't ready yet

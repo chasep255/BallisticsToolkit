@@ -8,10 +8,12 @@ export const GraphicsPresets = {
    * @param {string} name - Preset name: 'High', 'Medium', or 'Low'
    * @returns {Object} Graphics configuration object
    */
-  getPreset(name) {
+  getPreset(name)
+  {
     const normalizedName = name.toLowerCase();
-    
-    switch (normalizedName) {
+
+    switch (normalizedName)
+    {
       case 'high':
         return GraphicsPresets.HIGH;
       case 'medium':
@@ -24,9 +26,14 @@ export const GraphicsPresets = {
     }
   },
 
-  HIGH: {
+  HIGH:
+  {
     shadowsEnabled: true,
-    shadowMapSize: { width: 4096, height: 8192 },
+    shadowMapSize:
+    {
+      width: 4096,
+      height: 8192
+    },
     shadowType: THREE.VSMShadowMap,
     shadowRadius: 3,
     msaaSamples: 4,
@@ -39,9 +46,14 @@ export const GraphicsPresets = {
     flagSegments: 30
   },
 
-  MEDIUM: {
+  MEDIUM:
+  {
     shadowsEnabled: true,
-    shadowMapSize: { width: 2048, height: 4096 },
+    shadowMapSize:
+    {
+      width: 2048,
+      height: 4096
+    },
     shadowType: THREE.PCFSoftShadowMap,
     shadowRadius: 3,
     msaaSamples: 4,
@@ -54,9 +66,14 @@ export const GraphicsPresets = {
     flagSegments: 20
   },
 
-  LOW: {
+  LOW:
+  {
     shadowsEnabled: false,
-    shadowMapSize: { width: 1024, height: 2048 }, // Not used when disabled, but defined for consistency
+    shadowMapSize:
+    {
+      width: 1024,
+      height: 2048
+    }, // Not used when disabled, but defined for consistency
     shadowType: THREE.BasicShadowMap, // Not used when disabled
     shadowRadius: 1, // Not used when disabled
     msaaSamples: 0,
@@ -69,4 +86,3 @@ export const GraphicsPresets = {
     flagSegments: 10
   }
 };
-

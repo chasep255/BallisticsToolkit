@@ -11,7 +11,8 @@ export const SettingsCookies = {
    * @param {string} value - Cookie value
    * @param {number} days - Days until expiration (default: 365)
    */
-  set(name, value, days = 365) {
+  set(name, value, days = 365)
+  {
     const expires = new Date();
     expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
     document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires.toUTCString()};path=/`;
@@ -22,15 +23,19 @@ export const SettingsCookies = {
    * @param {string} name - Cookie name
    * @returns {string|null} Cookie value or null if not found
    */
-  get(name) {
+  get(name)
+  {
     const nameEQ = name + '=';
     const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
+    for (let i = 0; i < cookies.length; i++)
+    {
       let cookie = cookies[i];
-      while (cookie.charAt(0) === ' ') {
+      while (cookie.charAt(0) === ' ')
+      {
         cookie = cookie.substring(1, cookie.length);
       }
-      if (cookie.indexOf(nameEQ) === 0) {
+      if (cookie.indexOf(nameEQ) === 0)
+      {
         return decodeURIComponent(cookie.substring(nameEQ.length, cookie.length));
       }
     }
@@ -42,12 +47,14 @@ export const SettingsCookies = {
    * Automatically finds all inputs, selects, and checkboxes with IDs
    * @returns {Array<HTMLElement>} Array of setting elements
    */
-  getSettingElements() {
+  getSettingElements()
+  {
     // Find all form inputs with IDs (inputs, selects, textareas, checkboxes)
     const inputs = Array.from(document.querySelectorAll('input[id], select[id], textarea[id]'));
-    
+
     // Filter out buttons and submit inputs
-    return inputs.filter(el => {
+    return inputs.filter(el =>
+    {
       const type = el.type?.toLowerCase();
       return type !== 'button' && type !== 'submit' && type !== 'reset' && el.id;
     });
@@ -58,8 +65,10 @@ export const SettingsCookies = {
    * @param {HTMLElement} element - Form element
    * @returns {string} Element value
    */
-  getElementValue(element) {
-    if (element.type === 'checkbox') {
+  getElementValue(element)
+  {
+    if (element.type === 'checkbox')
+    {
       return element.checked ? 'true' : 'false';
     }
     return element.value || '';
@@ -70,10 +79,14 @@ export const SettingsCookies = {
    * @param {HTMLElement} element - Form element
    * @param {string} value - Value to set
    */
-  setElementValue(element, value) {
-    if (element.type === 'checkbox') {
+  setElementValue(element, value)
+  {
+    if (element.type === 'checkbox')
+    {
       element.checked = value === 'true';
-    } else {
+    }
+    else
+    {
       element.value = value;
     }
   },
@@ -81,13 +94,17 @@ export const SettingsCookies = {
   /**
    * Save all current settings to cookies
    */
-  saveAll() {
+  saveAll()
+  {
     const elements = this.getSettingElements();
-    elements.forEach(element => {
+    elements.forEach(element =>
+    {
       const settingName = element.id;
-      if (settingName) {
+      if (settingName)
+      {
         const value = this.getElementValue(element);
-        if (value !== '') {
+        if (value !== '')
+        {
           this.set(`fclass_sim_${settingName}`, value);
         }
       }
@@ -97,13 +114,17 @@ export const SettingsCookies = {
   /**
    * Load all settings from cookies and apply to form
    */
-  loadAll() {
+  loadAll()
+  {
     const elements = this.getSettingElements();
-    elements.forEach(element => {
+    elements.forEach(element =>
+    {
       const settingName = element.id;
-      if (settingName) {
+      if (settingName)
+      {
         const value = this.get(`fclass_sim_${settingName}`);
-        if (value !== null) {
+        if (value !== null)
+        {
           this.setElementValue(element, value);
         }
       }
@@ -113,12 +134,15 @@ export const SettingsCookies = {
   /**
    * Attach change listeners to all settings inputs to auto-save on change
    */
-  attachAutoSave() {
+  attachAutoSave()
+  {
     const elements = this.getSettingElements();
-    elements.forEach(element => {
+    elements.forEach(element =>
+    {
       // Use 'change' event for selects and checkboxes, 'input' for number/text inputs
       const eventType = (element.type === 'checkbox' || element.tagName === 'SELECT') ? 'change' : 'input';
-      element.addEventListener(eventType, () => {
+      element.addEventListener(eventType, () =>
+      {
         this.saveAll();
       });
     });

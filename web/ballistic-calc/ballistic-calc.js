@@ -75,7 +75,7 @@ function calculateTrajectory()
   const zeroWind = new btk.Vector3D(0, 0, 0);
   simulator.setWind(zeroWind);
   zeroWind.delete(); // Dispose Vector3D to prevent memory leak
-  
+
   // Create target position vector (x=downrange, y=crossrange, z=vertical)
   const targetPos = new btk.Vector3D(zeroRange, 0, scopeHeight);
   simulator.computeZero(

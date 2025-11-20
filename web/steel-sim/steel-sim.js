@@ -1,11 +1,35 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 import * as THREE from 'three';
-import { SteelTargetFactory } from './SteelTarget.js';
-import { DustCloudFactory } from './DustCloud.js';
-import { Landscape } from './Landscape.js';
-import { TargetRackFactory } from './TargetRack.js';
-import { CompositionRenderer } from './CompositionRenderer.js';
-import { Scope } from './Scope.js';
+import
+{
+  SteelTargetFactory
+}
+from './SteelTarget.js';
+import
+{
+  DustCloudFactory
+}
+from './DustCloud.js';
+import
+{
+  Landscape
+}
+from './Landscape.js';
+import
+{
+  TargetRackFactory
+}
+from './TargetRack.js';
+import
+{
+  CompositionRenderer
+}
+from './CompositionRenderer.js';
+import
+{
+  Scope
+}
+from './Scope.js';
 
 // ===== CONSTANTS =====
 const SHOOTER_HEIGHT = 1; // yards
@@ -18,11 +42,20 @@ const BULLET_LENGTH = 0.0305; // ~30mm typical
 const BULLET_BC = 0.3;
 const BULLET_SPEED_MPS = 800; // m/s
 
-const WIND_MPH = { x: 1.1, y: 0.0, z: 0.45 }; // Slight crosswind and downrange
+const WIND_MPH = {
+  x: 1.1,
+  y: 0.0,
+  z: 0.45
+}; // Slight crosswind and downrange
 
 const GROUND_DUST_CONFIG = {
   numParticles: 1000,
-  color: { r: 139, g: 115, b: 85 }, // Brown/tan
+  color:
+  {
+    r: 139,
+    g: 115,
+    b: 85
+  }, // Brown/tan
   initialRadius: 0.25, // inches
   growthRate: 0.5, // feet/second
   fadeRate: 0.5,
@@ -31,7 +64,12 @@ const GROUND_DUST_CONFIG = {
 
 const METAL_DUST_CONFIG = {
   numParticles: 1000,
-  color: { r: 192, g: 192, b: 192 }, // Silver/gray
+  color:
+  {
+    r: 192,
+    g: 192,
+    b: 192
+  }, // Silver/gray
   initialRadius: 0.5, // inches
   growthRate: 0.5, // feet/second
   fadeRate: 0.5,
@@ -62,15 +100,16 @@ let landscape = null;
  * @param {btk.Vector3D} btkVec - Position vector in BTK coordinates (meters)
  * @returns {THREE.Vector3} Position vector in Three.js coordinates (yards)
  */
-window.btkToThreeJsPosition = function(btkVec) {
+window.btkToThreeJsPosition = function(btkVec)
+{
   // Coordinate system conversion and meters to yards
   // BTK: X=downrange, Y=crossrange-right, Z=up
   // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
   // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
   return new THREE.Vector3(
-    btk.Conversions.metersToYards(btkVec.y),   // BTK Y (crossrange-right) → Three.js X (right)
-    btk.Conversions.metersToYards(btkVec.z),   // BTK Z (up) → Three.js Y (up)
-    -btk.Conversions.metersToYards(btkVec.x)   // BTK X (downrange) → Three.js -Z (downrange)
+    btk.Conversions.metersToYards(btkVec.y), // BTK Y (crossrange-right) → Three.js X (right)
+    btk.Conversions.metersToYards(btkVec.z), // BTK Z (up) → Three.js Y (up)
+    -btk.Conversions.metersToYards(btkVec.x) // BTK X (downrange) → Three.js -Z (downrange)
   );
 };
 
@@ -79,15 +118,16 @@ window.btkToThreeJsPosition = function(btkVec) {
  * @param {THREE.Vector3|Object} threeVec - Position vector in Three.js coordinates (yards)
  * @returns {btk.Vector3D} Position vector in BTK coordinates (meters)
  */
-window.threeJsToBtkPosition = function(threeVec) {
+window.threeJsToBtkPosition = function(threeVec)
+{
   // Convert yards to meters and coordinate system conversion
   // BTK: X=downrange, Y=crossrange-right, Z=up
   // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
   // Conversion: Three.js (x, y, z) → BTK (-z, x, y)
   return new btk.Vector3D(
     -btk.Conversions.yardsToMeters(threeVec.z), // Three.js Z (downrange) → BTK X (downrange)
-    btk.Conversions.yardsToMeters(threeVec.x),   // Three.js X (right) → BTK Y (crossrange-right)
-    btk.Conversions.yardsToMeters(threeVec.y)    // Three.js Y (up) → BTK Z (up)
+    btk.Conversions.yardsToMeters(threeVec.x), // Three.js X (right) → BTK Y (crossrange-right)
+    btk.Conversions.yardsToMeters(threeVec.y) // Three.js Y (up) → BTK Z (up)
   );
 };
 
@@ -99,15 +139,16 @@ window.threeJsToBtkPosition = function(threeVec) {
  * @param {btk.Vector3D} btkVec - Velocity vector in BTK coordinates (m/s)
  * @returns {THREE.Vector3} Velocity vector in Three.js coordinates (fps)
  */
-window.btkToThreeJsVelocity = function(btkVec) {
+window.btkToThreeJsVelocity = function(btkVec)
+{
   // Coordinate system conversion and m/s to fps
   // BTK: X=downrange, Y=crossrange-right, Z=up
   // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
   // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
   return new THREE.Vector3(
-    btk.Conversions.mpsToFps(btkVec.y),   // BTK Y (crossrange-right) → Three.js X (right)
-    btk.Conversions.mpsToFps(btkVec.z),   // BTK Z (up) → Three.js Y (up)
-    -btk.Conversions.mpsToFps(btkVec.x)   // BTK X (downrange) → Three.js -Z (downrange)
+    btk.Conversions.mpsToFps(btkVec.y), // BTK Y (crossrange-right) → Three.js X (right)
+    btk.Conversions.mpsToFps(btkVec.z), // BTK Z (up) → Three.js Y (up)
+    -btk.Conversions.mpsToFps(btkVec.x) // BTK X (downrange) → Three.js -Z (downrange)
   );
 };
 
@@ -116,15 +157,16 @@ window.btkToThreeJsVelocity = function(btkVec) {
  * @param {THREE.Vector3|Object} threeVec - Velocity vector in Three.js coordinates (fps)
  * @returns {btk.Vector3D} Velocity vector in BTK coordinates (m/s)
  */
-window.threeJsToBtkVelocity = function(threeVec) {
+window.threeJsToBtkVelocity = function(threeVec)
+{
   // Convert fps to m/s and coordinate system conversion
   // BTK: X=downrange, Y=crossrange-right, Z=up
   // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
   // Conversion: Three.js (x, y, z) → BTK (-z, x, y)
   return new btk.Vector3D(
     -btk.Conversions.fpsToMps(threeVec.z), // Three.js Z (downrange) → BTK X (downrange)
-    btk.Conversions.fpsToMps(threeVec.x),  // Three.js X (right) → BTK Y (crossrange-right)
-    btk.Conversions.fpsToMps(threeVec.y)   // Three.js Y (up) → BTK Z (up)
+    btk.Conversions.fpsToMps(threeVec.x), // Three.js X (right) → BTK Y (crossrange-right)
+    btk.Conversions.fpsToMps(threeVec.y) // Three.js Y (up) → BTK Z (up)
   );
 };
 
@@ -133,15 +175,16 @@ window.threeJsToBtkVelocity = function(threeVec) {
  * @param {btk.Vector3D} btkVec - Velocity vector in BTK coordinates (m/s)
  * @returns {THREE.Vector3} Velocity vector in Three.js coordinates (mph)
  */
-window.btkToThreeJsVelocityMph = function(btkVec) {
+window.btkToThreeJsVelocityMph = function(btkVec)
+{
   // Coordinate system conversion and m/s to mph
   // BTK: X=downrange, Y=crossrange-right, Z=up
   // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
   // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
   return new THREE.Vector3(
-    btk.Conversions.mpsToMph(btkVec.y),   // BTK Y (crossrange-right) → Three.js X (right)
-    btk.Conversions.mpsToMph(btkVec.z),   // BTK Z (up) → Three.js Y (up)
-    -btk.Conversions.mpsToMph(btkVec.x)   // BTK X (downrange) → Three.js -Z (downrange)
+    btk.Conversions.mpsToMph(btkVec.y), // BTK Y (crossrange-right) → Three.js X (right)
+    btk.Conversions.mpsToMph(btkVec.z), // BTK Z (up) → Three.js Y (up)
+    -btk.Conversions.mpsToMph(btkVec.x) // BTK X (downrange) → Three.js -Z (downrange)
   );
 };
 
@@ -150,42 +193,45 @@ window.btkToThreeJsVelocityMph = function(btkVec) {
  * @param {THREE.Vector3|Object} threeVec - Velocity vector in Three.js coordinates (mph)
  * @returns {btk.Vector3D} Velocity vector in BTK coordinates (m/s)
  */
-window.threeJsToBtkVelocityMph = function(threeVec) {
+window.threeJsToBtkVelocityMph = function(threeVec)
+{
   // Convert mph to m/s and coordinate system conversion
   // BTK: X=downrange, Y=crossrange-right, Z=up
   // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
   // Conversion: Three.js (x, y, z) → BTK (-z, x, y)
   return new btk.Vector3D(
     -btk.Conversions.mphToMps(threeVec.z), // Three.js Z (downrange) → BTK X (downrange)
-    btk.Conversions.mphToMps(threeVec.x),  // Three.js X (right) → BTK Y (crossrange-right)
-    btk.Conversions.mphToMps(threeVec.y)   // Three.js Y (up) → BTK Z (up)
+    btk.Conversions.mphToMps(threeVec.x), // Three.js X (right) → BTK Y (crossrange-right)
+    btk.Conversions.mphToMps(threeVec.y) // Three.js Y (up) → BTK Z (up)
   );
 };
 
 // ===== INITIALIZATION =====
 
-function lockCanvasSize() {
+function lockCanvasSize()
+{
   const canvas = document.getElementById('steelCanvas');
-  
+
   // Detect mobile devices
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const isTouchOnly = !window.matchMedia('(hover: hover)').matches;
-  
-  if (isMobile || isTouchOnly) {
+
+  if (isMobile || isTouchOnly)
+  {
     console.warn('Mobile device detected - Steel Sim is designed for desktop use');
   }
-  
+
   // Calculate canvas size with max constraints
   const maxWidth = 1600;
   const maxHeightVh = 0.90; // 90vh
-  
+
   const availableWidth = Math.min(canvas.clientWidth, maxWidth);
   const availableHeight = window.innerHeight * maxHeightVh;
-  
+
   // Use smaller of the two to fit on screen
   const canvasWidth = Math.floor(Math.min(availableWidth, canvas.clientWidth));
   const canvasHeight = Math.floor(Math.min(availableHeight, canvas.clientHeight));
-  
+
   // Lock canvas size permanently
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
@@ -195,25 +241,29 @@ function lockCanvasSize() {
   canvas.style.maxHeight = canvasHeight + 'px';
   canvas.style.minWidth = canvasWidth + 'px';
   canvas.style.minHeight = canvasHeight + 'px';
-  
+
   // Store locked dimensions
   canvas.dataset.lockedWidth = canvasWidth;
   canvas.dataset.lockedHeight = canvasHeight;
-  
+
   console.log(`Canvas locked at ${canvasWidth}x${canvasHeight}`);
 }
 
-async function init() {
-  try {
+async function init()
+{
+  try
+  {
     lockCanvasSize();
-    
+
     btk = await BallisticsToolkit();
     window.btk = btk;
-    
+
     setupScene();
     setupUI();
     animate();
-  } catch (e) {
+  }
+  catch (e)
+  {
     console.error('Failed to initialize:', e);
     showError('Failed to load steel simulator. Please refresh the page.');
   }
@@ -221,26 +271,33 @@ async function init() {
 
 // ===== SCENE SETUP =====
 
-function setupScene() {
+function setupScene()
+{
   const canvas = document.getElementById('steelCanvas');
-  
+
   // Create scene
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87ceeb);
-  
+
   // Setup lighting first
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
   directionalLight.position.set(0, 0, 1000);
   scene.add(directionalLight);
-  
+
   // Setup composition renderer
-  compositionRenderer = new CompositionRenderer({ canvas });
-  
+  compositionRenderer = new CompositionRenderer(
+  {
+    canvas
+  });
+
   // Create background 3D scene layer (covers full screen)
   const aspect = compositionRenderer.getAspect();
-  backgroundElement = compositionRenderer.createElement(0, 0, 2 * aspect, 2, { renderOrder: 0 });
-  
+  backgroundElement = compositionRenderer.createElement(0, 0, 2 * aspect, 2,
+  {
+    renderOrder: 0
+  });
+
   // Create fixed background camera (aspect ratio matches render target)
   backgroundCamera = new THREE.PerspectiveCamera(
     CAMERA_FOV,
@@ -250,102 +307,180 @@ function setupScene() {
   );
   backgroundCamera.position.set(0, SHOOTER_HEIGHT, 0);
   backgroundCamera.lookAt(0, 0, -CAMERA_FAR_PLANE);
-  
+
   // Create scope layer (bottom-center, ~80% of screen height)
-  const scopeHeightNorm = 1.6;          // 80% of vertical span (2)
+  const scopeHeightNorm = 1.6; // 80% of vertical span (2)
   const scopeWidthNorm = scopeHeightNorm; // square in virtual units
   const scopeY = -1 + scopeHeightNorm / 2; // bottom + half height
-  const scopeLayer = compositionRenderer.createElement(0, scopeY, scopeWidthNorm, scopeHeightNorm, { renderOrder: 1 });
-  
-  scope = new Scope({
+  const scopeLayer = compositionRenderer.createElement(0, scopeY, scopeWidthNorm, scopeHeightNorm,
+  {
+    renderOrder: 1,
+    transparent: true
+  });
+
+  scope = new Scope(
+  {
     scene,
     renderTarget: scopeLayer.renderTarget,
     renderer: scopeLayer.getRenderer(), // Must use the renderer that created the render target
     initialFOV: 30,
     minFOV: 1,
     maxFOV: 30,
-    cameraPosition: { x: 0, y: SHOOTER_HEIGHT, z: 0 },
-    initialLookAt: { x: 0, y: 0, z: -1000 }
+    cameraPosition:
+    {
+      x: 0,
+      y: SHOOTER_HEIGHT,
+      z: 0
+    },
+    initialLookAt:
+    {
+      x: 0,
+      y: 0,
+      z: -1000
+    }
   });
   camera = scope.getCamera(); // For raycasting
-  
+
   // Create landscape
-  landscape = new Landscape(scene, {
+  landscape = new Landscape(scene,
+  {
     groundWidth: 100,
     groundLength: 2000,
     brownGroundWidth: 500,
     brownGroundLength: 2000,
     slopeAngle: 5
   });
-  
+
   // Create target racks
   createTargetRacks();
-  
+
   // Setup raycaster for scope-based shooting
   raycaster = new THREE.Raycaster();
-  
+
   // Event listeners (no resize - canvas is locked)
-  canvas.addEventListener('wheel', onMouseWheel, { passive: false });
+  canvas.addEventListener('wheel', onMouseWheel,
+  {
+    passive: false
+  });
   window.addEventListener('keydown', onKeyDown);
 }
 
 // ===== TARGET RACK CREATION =====
 
-function addTargetRack(x, z, rackWidth, rackHeight, targets) {
+function addTargetRack(x, z, rackWidth, rackHeight, targets)
+{
   if (!landscape) throw new Error('Landscape must be initialized');
-  
+
   const groundHeight = landscape.getHeightAt(x, z) || 0;
   const halfWidth = rackWidth / 2;
-  
-  const rack = TargetRackFactory.create({
-    bottomLeft: { x: x - halfWidth, y: groundHeight, z },
-    topRight: { x: x + halfWidth, y: groundHeight + rackHeight, z },
+
+  const rack = TargetRackFactory.create(
+  {
+    bottomLeft:
+    {
+      x: x - halfWidth,
+      y: groundHeight,
+      z
+    },
+    topRight:
+    {
+      x: x + halfWidth,
+      y: groundHeight + rackHeight,
+      z
+    },
     scene
   });
-  
+
   targets.forEach(target => rack.addTarget(target));
   return rack;
 }
 
-function createTargetRacks() {
+function createTargetRacks()
+{
   if (!landscape) return;
-  
+
   addTargetRack(0, -10, 6, 1.5, [
-    { width: 12, height: 12, thickness: 0.5, isOval: false },
-    { width: 10, height: 10, thickness: 0.5, isOval: true },
-    { width: 8, height: 8, thickness: 0.5, isOval: false }
-  ]);
-  
+  {
+    width: 12,
+    height: 12,
+    thickness: 0.5,
+    isOval: false
+  },
+  {
+    width: 10,
+    height: 10,
+    thickness: 0.5,
+    isOval: true
+  },
+  {
+    width: 8,
+    height: 8,
+    thickness: 0.5,
+    isOval: false
+  }]);
+
   addTargetRack(15, -25, 8, 2, [
-    { width: 18, height: 18, thickness: 0.5, isOval: false },
-    { width: 16, height: 16, thickness: 0.5, isOval: true },
-    { width: 14, height: 14, thickness: 0.5, isOval: false }
-  ]);
-  
+  {
+    width: 18,
+    height: 18,
+    thickness: 0.5,
+    isOval: false
+  },
+  {
+    width: 16,
+    height: 16,
+    thickness: 0.5,
+    isOval: true
+  },
+  {
+    width: 14,
+    height: 14,
+    thickness: 0.5,
+    isOval: false
+  }]);
+
   addTargetRack(-15, -40, 10, 2, [
-    { width: 24, height: 30, thickness: 0.5, isOval: false },
-    { width: 20, height: 20, thickness: 0.5, isOval: true },
-    { width: 18, height: 24, thickness: 0.5, isOval: false }
-  ]);
+  {
+    width: 24,
+    height: 30,
+    thickness: 0.5,
+    isOval: false
+  },
+  {
+    width: 20,
+    height: 20,
+    thickness: 0.5,
+    isOval: true
+  },
+  {
+    width: 18,
+    height: 24,
+    thickness: 0.5,
+    isOval: false
+  }]);
 }
 
 // ===== UI SETUP =====
 
-function setupUI() {
+function setupUI()
+{
   const resetBtn = document.getElementById('resetBtn');
   const helpBtn = document.getElementById('helpBtn');
   const helpModal = document.getElementById('helpModal');
   const helpClose = document.querySelector('.help-close');
-  
+
   resetBtn.addEventListener('click', resetTarget);
   helpBtn.addEventListener('click', () => helpModal.style.display = 'block');
-  
-  if (helpClose) {
+
+  if (helpClose)
+  {
     helpClose.addEventListener('click', () => helpModal.style.display = 'none');
   }
-  
-  if (helpModal) {
-    helpModal.addEventListener('click', (e) => {
+
+  if (helpModal)
+  {
+    helpModal.addEventListener('click', (e) =>
+    {
       if (e.target === helpModal) helpModal.style.display = 'none';
     });
   }
@@ -353,37 +488,46 @@ function setupUI() {
 
 // ===== EVENT HANDLERS =====
 
-function onMouseWheel(event) {
+function onMouseWheel(event)
+{
   event.preventDefault();
-  if (event.deltaY < 0) {
+  if (event.deltaY < 0)
+  {
     scope.zoomIn();
-  } else {
+  }
+  else
+  {
     scope.zoomOut();
   }
 }
 
-function onKeyDown(event) {
+function onKeyDown(event)
+{
   // Fire bullet with spacebar (scope reticle aim)
-  if (event.key === ' ') {
+  if (event.key === ' ')
+  {
     event.preventDefault();
     fireFromScope();
     return;
   }
-  
+
   // Zoom controls: +/- or =/- keys
-  if (event.key === '=' || event.key === '+') {
+  if (event.key === '=' || event.key === '+')
+  {
     event.preventDefault();
     scope.zoomIn();
     return;
   }
-  if (event.key === '-' || event.key === '_') {
+  if (event.key === '-' || event.key === '_')
+  {
     event.preventDefault();
     scope.zoomOut();
     return;
   }
-  
+
   // Pan controls: arrow keys (amount scales with zoom automatically)
-  switch(event.key) {
+  switch (event.key)
+  {
     case 'ArrowLeft':
       event.preventDefault();
       scope.panLeft();
@@ -403,14 +547,15 @@ function onKeyDown(event) {
   }
 }
 
-function createBullet(impactPoint, shooterPos) {
+function createBullet(impactPoint, shooterPos)
+{
   const direction = impactPoint.clone().sub(shooterPos).normalize();
   const bulletSpeedFps = btk.Conversions.mpsToFps(BULLET_SPEED_MPS);
   const bulletVelThree = direction.multiplyScalar(bulletSpeedFps);
-  
+
   const bulletPos = window.threeJsToBtkPosition(impactPoint);
   const bulletVel = window.threeJsToBtkVelocity(bulletVelThree);
-  
+
   const baseBullet = new btk.Bullet(
     BULLET_MASS,
     BULLET_DIAMETER,
@@ -418,46 +563,51 @@ function createBullet(impactPoint, shooterPos) {
     BULLET_BC,
     btk.DragFunction.G7
   );
-  
+
   const bullet = new btk.Bullet(baseBullet, bulletPos, bulletVel, 0);
-  
+
   // Cleanup base objects
   baseBullet.delete();
   bulletPos.delete();
   bulletVel.delete();
-  
+
   return bullet;
 }
 
-function fireFromScope() {
+function fireFromScope()
+{
   const allTargets = TargetRackFactory.getAllTargets();
   if (allTargets.length === 0) return;
-  
+
   // Cast ray from scope camera center (reticle crosshair)
   const scopeCamera = scope.getCamera();
   raycaster.setFromCamera(new THREE.Vector2(0, 0), scopeCamera);
-  
+
   // Check for target hit
   const intersects = raycaster.intersectObjects(allTargets.map(t => t.mesh));
-  if (intersects.length > 0) {
+  if (intersects.length > 0)
+  {
     const hitTarget = allTargets.find(t => t.mesh === intersects[0].object);
-    if (hitTarget) {
+    if (hitTarget)
+    {
       const impactPoint = intersects[0].point;
       const bullet = createBullet(impactPoint, scopeCamera.position);
-      
+
       hitTarget.hitBullet(bullet);
       hitTarget.updateTexture();
       createMetallicDustCloud(impactPoint);
-      
+
       bullet.delete();
       return;
     }
   }
-  
+
   // No target hit - check landscape
-  if (landscape) {
+  if (landscape)
+  {
     const landscapeIntersect = landscape.intersectRaycaster(raycaster);
-    if (landscapeIntersect) {
+    if (landscapeIntersect)
+    {
       createDustCloud(landscapeIntersect.point);
     }
   }
@@ -465,8 +615,10 @@ function fireFromScope() {
 
 // ===== DUST CLOUD EFFECTS =====
 
-function createDustCloud(impactPointThree) {
-  DustCloudFactory.create({
+function createDustCloud(impactPointThree)
+{
+  DustCloudFactory.create(
+  {
     position: impactPointThree,
     scene,
     numParticles: GROUND_DUST_CONFIG.numParticles,
@@ -479,8 +631,10 @@ function createDustCloud(impactPointThree) {
   });
 }
 
-function createMetallicDustCloud(impactPointThree) {
-  DustCloudFactory.create({
+function createMetallicDustCloud(impactPointThree)
+{
+  DustCloudFactory.create(
+  {
     position: impactPointThree,
     scene,
     numParticles: METAL_DUST_CONFIG.numParticles,
@@ -495,7 +649,8 @@ function createMetallicDustCloud(impactPointThree) {
 
 // ===== RESET =====
 
-function resetTarget() {
+function resetTarget()
+{
   TargetRackFactory.deleteAll();
   DustCloudFactory.deleteAll();
   createTargetRacks();
@@ -503,34 +658,38 @@ function resetTarget() {
 
 // ===== ANIMATION LOOP =====
 
-function animate() {
+function animate()
+{
   animationId = requestAnimationFrame(animate);
-  
+
   const currentTime = performance.now();
-  const dt = Math.min((currentTime - lastTime) / 1000, 1/30);
+  const dt = Math.min((currentTime - lastTime) / 1000, 1 / 30);
   lastTime = currentTime;
-  
+
   SteelTargetFactory.updateAll(dt);
   DustCloudFactory.updateAll(dt);
-  
+
   // Render background scene into element's render target
-  backgroundElement.render(scene, backgroundCamera, {
+  backgroundElement.render(scene, backgroundCamera,
+  {
     clear: true,
     clearColor: 0x87ceeb
   });
-  
+
   // Render scope (composites 3D scene + reticle into its render target)
   scope.render();
-  
+
   // Composite everything to screen
   compositionRenderer.render();
 }
 
 // ===== ERROR HANDLING =====
 
-function showError(message) {
+function showError(message)
+{
   const errorDiv = document.getElementById('error');
-  if (errorDiv) {
+  if (errorDiv)
+  {
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
   }
@@ -539,4 +698,3 @@ function showError(message) {
 // ===== START =====
 
 document.addEventListener('DOMContentLoaded', init);
-

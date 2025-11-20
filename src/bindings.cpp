@@ -6,16 +6,16 @@
 #include "ballistics/simulator.h"
 #include "ballistics/trajectory.h"
 #include "match/match.h"
-#include "rendering/steel_target.h"
-#include "rendering/dust_cloud.h"
-#include "match/targets.h"
 #include "match/simulator.h"
 #include "match/target.h"
+#include "match/targets.h"
 #include "math/conversions.h"
 #include "math/quaternion.h"
 #include "math/vector.h"
 #include "physics/atmosphere.h"
 #include "physics/wind_generator.h"
+#include "rendering/dust_cloud.h"
+#include "rendering/steel_target.h"
 
 using namespace emscripten;
 using namespace btk::ballistics;
@@ -212,10 +212,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   // Removed legacy Hit value_object and AccuracyMetrics/legacy scoring bindings
 
   // Targets
-  class_<btk::match::Targets>("Targets")
-    .class_function("getTarget", &Targets::getTarget)
-    .class_function("listTargets", &Targets::listTargets)
-    .class_function("hasTarget", &Targets::hasTarget);
+  class_<btk::match::Targets>("Targets").class_function("getTarget", &Targets::getTarget).class_function("listTargets", &Targets::listTargets).class_function("hasTarget", &Targets::hasTarget);
 
   // SimulatedShot struct
   value_object<SimulatedShot>("SimulatedShot")

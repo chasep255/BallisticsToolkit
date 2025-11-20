@@ -34,15 +34,17 @@ namespace btk::rendering
      */
     struct ChainAnchor
     {
-      btk::math::Vector3D local_attachment_;  ///< Attachment point in local coordinates (moves with target)
-      btk::math::Vector3D world_fixed_;       ///< Fixed anchor point in world coordinates (never moves)
-      float rest_length_;                     ///< Rest length of chain (recalculated when target moves)
-      float spring_constant_;                 ///< Spring constant (N/m) - very high for rigid chains
-      float damping_coefficient_;             ///< Damping coefficient (N·s/m) - for energy dissipation
+      btk::math::Vector3D local_attachment_; ///< Attachment point in local coordinates (moves with target)
+      btk::math::Vector3D world_fixed_;      ///< Fixed anchor point in world coordinates (never moves)
+      float rest_length_;                    ///< Rest length of chain (recalculated when target moves)
+      float spring_constant_;                ///< Spring constant (N/m) - very high for rigid chains
+      float damping_coefficient_;            ///< Damping coefficient (N·s/m) - for energy dissipation
 
       ChainAnchor() : local_attachment_(0, 0, 0), world_fixed_(0, 0, 0), rest_length_(0), spring_constant_(0), damping_coefficient_(0) {}
-      ChainAnchor(const btk::math::Vector3D& local_attach, const btk::math::Vector3D& world_fixed, float rest_length, float spring_k, float damping) 
-        : local_attachment_(local_attach), world_fixed_(world_fixed), rest_length_(rest_length), spring_constant_(spring_k), damping_coefficient_(damping) {}
+      ChainAnchor(const btk::math::Vector3D& local_attach, const btk::math::Vector3D& world_fixed, float rest_length, float spring_k, float damping)
+        : local_attachment_(local_attach), world_fixed_(world_fixed), rest_length_(rest_length), spring_constant_(spring_k), damping_coefficient_(damping)
+      {
+      }
     };
 
     /**
@@ -56,8 +58,10 @@ namespace btk::rendering
       float timestamp_s_;
 
       Impact() : position_local_(0, 0, 0), velocity_local_(0, 0, 0), bullet_diameter_(0), timestamp_s_(0) {}
-      Impact(const btk::math::Vector3D& local_pos, const btk::math::Vector3D& local_vel, float diameter, float time) 
-        : position_local_(local_pos), velocity_local_(local_vel), bullet_diameter_(diameter), timestamp_s_(time) {}
+      Impact(const btk::math::Vector3D& local_pos, const btk::math::Vector3D& local_vel, float diameter, float time)
+        : position_local_(local_pos), velocity_local_(local_vel), bullet_diameter_(diameter), timestamp_s_(time)
+      {
+      }
     };
 
     /**
@@ -65,13 +69,13 @@ namespace btk::rendering
      */
     struct IntersectionResult
     {
-      bool hit;                              ///< Whether trajectory intersects target
-      btk::math::Vector3D impact_point_;   ///< Impact point in world space
-      btk::math::Vector3D impact_velocity_;  ///< Bullet velocity at impact
-      btk::math::Vector3D surface_normal_;   ///< Surface normal at impact point
-      float impact_time_s_;                  ///< Time of impact
-      float bullet_mass_kg_;                 ///< Bullet mass for momentum transfer
-      float bullet_diameter_;              ///< Bullet diameter for impact recording
+      bool hit;                             ///< Whether trajectory intersects target
+      btk::math::Vector3D impact_point_;    ///< Impact point in world space
+      btk::math::Vector3D impact_velocity_; ///< Bullet velocity at impact
+      btk::math::Vector3D surface_normal_;  ///< Surface normal at impact point
+      float impact_time_s_;                 ///< Time of impact
+      float bullet_mass_kg_;                ///< Bullet mass for momentum transfer
+      float bullet_diameter_;               ///< Bullet diameter for impact recording
 
       IntersectionResult() : hit(false), impact_point_(0, 0, 0), impact_velocity_(0, 0, 0), surface_normal_(0, 0, 0), impact_time_s_(0.0f), bullet_mass_kg_(0.0f), bullet_diameter_(0.0f) {}
     };
@@ -85,7 +89,7 @@ namespace btk::rendering
      * @param is_oval True for oval shape, false for rectangle
      */
     SteelTarget(float width, float height, float thickness, bool is_oval = false);
-    
+
     /**
      * @brief Initialize steel target with position and orientation
      *
@@ -96,20 +100,18 @@ namespace btk::rendering
      * @param position Initial position (center of mass)
      * @param normal Surface normal direction (target faces this direction)
      */
-    SteelTarget(float width, float height, float thickness, bool is_oval,
-                const btk::math::Vector3D& position, const btk::math::Vector3D& normal);
+    SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal);
 
     /**
      * @brief Add a chain anchor constraint
      *
      * @param local_attachment Attachment point in local coordinates (moves with target)
      * @param world_fixed Fixed anchor point in world coordinates (never moves)
-     * 
+     *
      * Rest length is automatically calculated by transforming local_attachment to world space
      * and measuring distance to world_fixed. Spring constant is set to DEFAULT_SPRING_CONSTANT (1000 N/m).
      */
     void addChainAnchor(const btk::math::Vector3D& local_attachment, const btk::math::Vector3D& world_fixed);
-
 
     /**
      * @brief Process bullet hit from trajectory
@@ -140,7 +142,7 @@ namespace btk::rendering
      * @brief Get all recorded impacts
      */
     const std::vector<Impact>& getImpacts() const { return impacts_; }
-    
+
     /**
      * @brief Get all chain anchors
      */
@@ -173,7 +175,7 @@ namespace btk::rendering
 
     /**
      * @brief Transform a point from local coordinates to world coordinates
-     * 
+     *
      * @param local_point Point in local coordinate system
      * @return Point in world coordinate system
      */
@@ -186,7 +188,7 @@ namespace btk::rendering
 
     /**
      * @brief Get vertex buffer as a JS-typed array view for zero-copy access
-     * 
+     *
      * Returns vertices as [x,y,z, x,y,z, ...] in Three.js coordinates.
      * Each 9 consecutive floats form one triangle (3 vertices * 3 components).
      * Buffer is updated by calling updateDisplay() before this.
@@ -200,7 +202,7 @@ namespace btk::rendering
 
     /**
      * @brief Get UV buffer as a JS-typed array view for zero-copy access
-     * 
+     *
      * Returns UVs as [u,v, u,v, ...] for texture mapping.
      * Each 6 consecutive floats form one triangle (3 vertices * 2 components).
      * Buffer is updated by calling updateDisplay() before this.
@@ -213,11 +215,11 @@ namespace btk::rendering
 
     /**
      * @brief Get texture buffer as memory view for zero-copy access
-     * 
+     *
      * Returns RGBA texture data as [r,g,b,a, r,g,b,a, ...] ready for WebGL texture.
      * Texture shows paint color with bullet impacts revealing metal underneath.
      * Buffer is updated by calling updateTexture().
-     * 
+     *
      * @return Memory view of texture buffer (RGBA bytes)
      */
 #ifdef __EMSCRIPTEN__
@@ -234,10 +236,10 @@ namespace btk::rendering
 
     /**
      * @brief Initialize texture with paint color
-     * 
+     *
      * Creates the initial texture filled with paint color.
      * Call this once during setup or when resetting the target.
-     * 
+     *
      * @param texture_width Texture width in pixels (default 512)
      * @param texture_height Texture height in pixels (default 512)
      */
@@ -245,7 +247,7 @@ namespace btk::rendering
 
     /**
      * @brief Set paint and metal colors
-     * 
+     *
      * @param paint_r Paint red (0-255)
      * @param paint_g Paint green (0-255)
      * @param paint_b Paint blue (0-255)
@@ -253,8 +255,7 @@ namespace btk::rendering
      * @param metal_g Metal green (0-255, default 128)
      * @param metal_b Metal blue (0-255, default 128)
      */
-    void setColors(uint8_t paint_r, uint8_t paint_g, uint8_t paint_b,
-                   uint8_t metal_r = 128, uint8_t metal_g = 128, uint8_t metal_b = 128);
+    void setColors(uint8_t paint_r, uint8_t paint_g, uint8_t paint_b, uint8_t metal_r = 128, uint8_t metal_g = 128, uint8_t metal_b = 128);
 
     /**
      * @brief Get target mass
@@ -264,7 +265,8 @@ namespace btk::rendering
     /**
      * @brief Clear all recorded impacts and reset texture to clean paint
      */
-    void clearImpacts() { 
+    void clearImpacts()
+    {
       impacts_.clear();
       initializeTexture(texture_width_, texture_height_);
     }
@@ -272,20 +274,20 @@ namespace btk::rendering
     private:
     // Steel density constant (kg/m³)
     static constexpr float STEEL_DENSITY = 7850.0f;
-    
+
     // Default spring constant for chain anchors (N/m) - very high for rigid chains
     static constexpr float DEFAULT_SPRING_CONSTANT = 10000.0f;
-    
+
     // Default chain damping coefficient (N·s/m) - critically damped to prevent bouncing
     // Chains dissipate energy and don't bounce back - they just stop
     static constexpr float DEFAULT_CHAIN_DAMPING = 200.0f;
-    
+
     // Default damping coefficients (fraction remaining after 1 second)
-    static constexpr float DEFAULT_LINEAR_DAMPING = 0.75f;  // 75% velocity remains after 1 second
-    static constexpr float DEFAULT_ANGULAR_DAMPING = 0.1f;  // 10% angular velocity remains after 1 second
+    static constexpr float DEFAULT_LINEAR_DAMPING = 0.75f; // 75% velocity remains after 1 second
+    static constexpr float DEFAULT_ANGULAR_DAMPING = 0.1f; // 10% angular velocity remains after 1 second
 
     // Velocity thresholds for "done moving" detection
-    static constexpr float VELOCITY_THRESHOLD = 0.01f; // m/s
+    static constexpr float VELOCITY_THRESHOLD = 0.01f;         // m/s
     static constexpr float ANGULAR_VELOCITY_THRESHOLD = 0.01f; // rad/s
 
     // Shape definition (in YZ plane, normal in +X direction)
@@ -315,16 +317,16 @@ namespace btk::rendering
     float angular_damping_;
 
     // Display buffer
-    std::vector<float> vertices_buffer_;  // Flat array: x,y,z,x,y,z,... in Three.js coordinates
-    std::vector<float> uvs_buffer_;       // Flat array: u,v,u,v,... for texture mapping
-    int segments_per_circle_;             // Number of segments for circular shapes
-    
+    std::vector<float> vertices_buffer_; // Flat array: x,y,z,x,y,z,... in Three.js coordinates
+    std::vector<float> uvs_buffer_;      // Flat array: u,v,u,v,... for texture mapping
+    int segments_per_circle_;            // Number of segments for circular shapes
+
     // Texture buffer (RGBA format) - single texture with front on left half, back on right half
-    std::vector<uint8_t> texture_buffer_;       // Combined texture: r,g,b,a,r,g,b,a,...
-    int texture_width_;                         // Total texture width in pixels (2x target aspect)
-    int texture_height_;                        // Texture height in pixels
-    uint8_t paint_color_[3];                    // RGB paint color
-    uint8_t metal_color_[3];                    // RGB metal color
+    std::vector<uint8_t> texture_buffer_; // Combined texture: r,g,b,a,r,g,b,a,...
+    int texture_width_;                   // Total texture width in pixels (2x target aspect)
+    int texture_height_;                  // Texture height in pixels
+    uint8_t paint_color_[3];              // RGB paint color
+    uint8_t metal_color_[3];              // RGB metal color
 
     /**
      * @brief Calculate mass and moment of inertia from shape
@@ -358,24 +360,22 @@ namespace btk::rendering
 
     /**
      * @brief Record an impact for visualization and update texture
-     * 
+     *
      * Converts bullet data to local coordinates, stores the impact,
      * and incrementally updates the texture with the new splatter mark.
      */
     void recordImpact(const btk::ballistics::Bullet& bullet);
-    
+
     /**
      * @brief Draw a single impact splatter on the texture
-     * 
+     *
      * Draws the splatter mark for one impact with random spikes radiating outward.
-     * 
+     *
      * @param local_position Impact position in local coordinates
      * @param bullet_diameter Bullet diameter in meters
      * @param is_front_face True to draw on front texture, false for back texture
      */
-    void drawImpactOnTexture(const btk::math::Vector3D& local_position, 
-                             float bullet_diameter,
-                             bool is_front_face);
+    void drawImpactOnTexture(const btk::math::Vector3D& local_position, float bullet_diameter, bool is_front_face);
 
     /**
      * @brief Test if point is inside any component (2D)
@@ -389,4 +389,3 @@ namespace btk::rendering
   };
 
 } // namespace btk::rendering
-

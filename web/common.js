@@ -13,10 +13,17 @@
     document.head.appendChild(gtagScript);
 
     window.dataLayer = window.dataLayer || [];
-    function gtag(){ dataLayer.push(arguments); }
+
+    function gtag()
+    {
+      dataLayer.push(arguments);
+    }
     window.gtag = gtag;
     gtag('js', new Date());
-    gtag('config', GA_MEASUREMENT_ID, { 'anonymize_ip': true });
+    gtag('config', GA_MEASUREMENT_ID,
+    {
+      'anonymize_ip': true
+    });
   }
 })();
 
@@ -29,7 +36,7 @@ function setActiveNavLink()
 {
   const body = document.body;
   if (!body) return;
-  
+
   const currentPageName = body.dataset.page || 'index';
   const navLinks = document.querySelectorAll('.nav-links a');
 
@@ -49,7 +56,7 @@ function setActiveNavLink()
     // Remove path prefix for comparison (../ or empty)
     const cleanHref = href.replace(/^\.\.\//, '');
     const expectedHref = pageNavMap[currentPageName];
-    
+
     if (expectedHref && cleanHref === expectedHref)
     {
       link.classList.add('active');

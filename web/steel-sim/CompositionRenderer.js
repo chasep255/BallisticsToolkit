@@ -23,15 +23,15 @@ export class CompositionLayer
     this._compositionRenderer = compositionRenderer;
     this.handle = handle;
     this.renderTarget = renderTarget;
-    this.width = width;           // Normalized width
-    this.height = height;         // Normalized height
+    this.width = width; // Normalized width
+    this.height = height; // Normalized height
     this.pixelWidth = pixelWidth; // Pixel width
     this.pixelHeight = pixelHeight; // Pixel height
     this.renderOrder = renderOrder;
     this._mesh = mesh;
     this._material = material;
   }
-  
+
   /**
    * Get the renderer used by this layer (for rendering into render targets)
    * @returns {THREE.WebGLRenderer}
@@ -40,7 +40,7 @@ export class CompositionLayer
   {
     return this._compositionRenderer.renderer;
   }
-  
+
   /**
    * Render a Three.js scene with a camera into this element's render target
    * @param {THREE.Scene} scene - Scene to render
@@ -51,12 +51,15 @@ export class CompositionLayer
    */
   render(scene, camera, options = {})
   {
-    const { clear = true, clearColor = null } = options;
+    const
+    {
+      clear = true, clearColor = null
+    } = options;
     const renderer = this._compositionRenderer.renderer;
     const prevTarget = renderer.getRenderTarget();
-    
+
     renderer.setRenderTarget(this.renderTarget);
-    
+
     if (clear)
     {
       if (clearColor !== null)
@@ -66,11 +69,11 @@ export class CompositionLayer
       }
       renderer.clear();
     }
-    
+
     renderer.render(scene, camera);
     renderer.setRenderTarget(prevTarget);
   }
-  
+
   /**
    * Set the texture shown by this element in the composition scene.
    * This does NOT render into the renderTarget; it simply changes the
@@ -92,31 +95,32 @@ export class CompositionRenderer
     this.canvasWidth = canvas.clientWidth;
     this.canvasHeight = canvas.clientHeight;
     this.aspect = this.canvasWidth / this.canvasHeight;
-    
+
     // Create renderer
-    this.renderer = new THREE.WebGLRenderer({ 
-      canvas, 
+    this.renderer = new THREE.WebGLRenderer(
+    {
+      canvas,
       antialias: true,
       powerPreference: "high-performance"
     });
     this.renderer.setSize(this.canvasWidth, this.canvasHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor(0x87ceeb, 1.0); // Sky blue background
-    
+
     // Create composition scene (2D orthographic, aspect-aware)
     this.compositionScene = new THREE.Scene();
     this.compositionCamera = new THREE.OrthographicCamera(
-      -this.aspect, this.aspect,  // left, right
-      1, -1,                      // top, bottom
+      -this.aspect, this.aspect, // left, right
+      1, -1, // top, bottom
       0, 10
     );
     this.compositionCamera.position.z = 5;
-    
+
     // Track elements by handle
     this.elements = new Map();
     this.nextHandle = 1;
   }
-  
+
   /**
    * Get the aspect ratio (canvasWidth / canvasHeight) of the composition
    * Callers should use this instead of recomputing from the canvas.
@@ -125,7 +129,7 @@ export class CompositionRenderer
   {
     return this.aspect;
   }
-  
+
   /**
    * Get the virtual viewport size in normalized units.
    * X spans [-aspect, +aspect] → width = 2 * aspect
@@ -133,9 +137,12 @@ export class CompositionRenderer
    */
   getVirtualSize()
   {
-    return { width: 2 * this.aspect, height: 2 };
+    return {
+      width: 2 * this.aspect,
+      height: 2
+    };
   }
-  
+
   /**
    * Create a layer in the composition scene
    * Creates a render target and returns a CompositionLayer instance
@@ -146,18 +153,22 @@ export class CompositionRenderer
    * @param {number} height - Height in normalized coordinates (full screen = 2)
    * @param {Object} options - Options
    * @param {number} options.renderOrder - Render order (lower renders first, default 1)
+   * @param {boolean} options.transparent - Whether the layer should support alpha transparency (default false)
    * @returns {CompositionLayer} CompositionLayer instance with render target and render method
    */
   createElement(x, y, width, height, options = {})
   {
-    const { renderOrder = 1 } = options;
-    
+    const
+    {
+      renderOrder = 1, transparent = false
+    } = options;
+
     // Convert normalized size to pixels
     // Horizontal span is [-aspect, +aspect] => width 2 * aspect
     const pixelWidth = Math.floor((width / (2 * this.aspect)) * this.canvasWidth);
     // Vertical span is [-1, +1] => height 2
     const pixelHeight = Math.floor((height / 2) * this.canvasHeight);
-    
+
     // Apply 2x supersampling for better quality
     const supersampleFactor = 2;
     const renderTarget = new THREE.WebGLRenderTarget(
@@ -170,40 +181,42 @@ export class CompositionRenderer
         samples: 4 // MSAA
       }
     );
-    
+
     // Create mesh with render target texture (size in normalized coordinates)
     const geometry = new THREE.PlaneGeometry(width, height);
-    const material = new THREE.MeshBasicMaterial({
+    const material = new THREE.MeshBasicMaterial(
+    {
       map: renderTarget.texture,
-      transparent: false,
+      transparent: transparent,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
       side: THREE.FrontSide
     });
-    
+
     const mesh = new THREE.Mesh(geometry, material);
     // Position in normalized space, z based on renderOrder
     const z = 1 + renderOrder * 0.1;
     mesh.position.set(x, y, z);
     mesh.renderOrder = renderOrder;
     mesh.frustumCulled = false;
-    
+
     this.compositionScene.add(mesh);
-    
+
     // Store element with handle
     const handle = this.nextHandle++;
-    this.elements.set(handle, {
+    this.elements.set(handle,
+    {
       mesh,
       geometry,
       material,
       renderTarget
     });
-    
+
     // Return CompositionLayer instance
     return new CompositionLayer(this, handle, renderTarget, width, height, pixelWidth, pixelHeight, renderOrder, mesh, material);
   }
-  
+
   /**
    * @deprecated Use createElement instead
    */
@@ -211,7 +224,7 @@ export class CompositionRenderer
   {
     return this.createElement(x, y, width, height, options);
   }
-  
+
   /**
    * Remove a layer from the composition scene
    * @param {CompositionLayer|number} layerOrHandle - CompositionLayer instance or handle
@@ -221,15 +234,15 @@ export class CompositionRenderer
     const handle = layerOrHandle instanceof CompositionLayer ? layerOrHandle.handle : layerOrHandle;
     const element = this.elements.get(handle);
     if (!element) return;
-    
+
     this.compositionScene.remove(element.mesh);
     element.geometry.dispose();
     element.material.dispose();
     element.renderTarget.dispose();
-    
+
     this.elements.delete(handle);
   }
-  
+
   /**
    * Render the composition to screen
    */
@@ -239,7 +252,7 @@ export class CompositionRenderer
     this.renderer.clear();
     this.renderer.render(this.compositionScene, this.compositionCamera);
   }
-  
+
   /**
    * Handle window resize
    * @param {number} width - New canvas width
@@ -250,10 +263,10 @@ export class CompositionRenderer
     this.canvasWidth = width;
     this.canvasHeight = height;
     this.aspect = this.canvasWidth / this.canvasHeight;
-    
+
     // Update renderer
     this.renderer.setSize(width, height);
-    
+
     // Update composition camera to maintain aspect-aware coordinates
     this.compositionCamera.left = -this.aspect;
     this.compositionCamera.right = this.aspect;
@@ -261,7 +274,7 @@ export class CompositionRenderer
     this.compositionCamera.bottom = -1;
     this.compositionCamera.updateProjectionMatrix();
   }
-  
+
   /**
    * Dispose of resources
    */
@@ -274,9 +287,8 @@ export class CompositionRenderer
       element.material.dispose();
       element.renderTarget.dispose();
     }
-    
+
     this.elements.clear();
     this.renderer.dispose();
   }
 }
-

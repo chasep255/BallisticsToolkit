@@ -398,7 +398,6 @@ namespace btk::math
      * @return Interpolated vector
      */
     constexpr Vector3D lerp(const Vector3D& other, float t) const { return Vector3D(x + t * (other.x - x), y + t * (other.y - y), z + t * (other.z - z)); }
-  
   };
 
   // Friend operators for scalar operations from left

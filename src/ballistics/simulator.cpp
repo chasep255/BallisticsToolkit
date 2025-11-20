@@ -110,7 +110,7 @@ namespace btk::ballistics
     btk::math::Vector3D tHat = v.magnitude() > 1e-6f ? (v / v.magnitude()) : (u / V);
 
     // Normal-plane basis (ensure right ≈ +Y for tHat ≈ +X, upInPl ≈ +Z)
-    btk::math::Vector3D worldUp = btk::math::Vector3D(0.0f, 0.0f, 1.0f);                      // or -gravity.normalized()
+    btk::math::Vector3D worldUp = btk::math::Vector3D(0.0f, 0.0f, 1.0f); // or -gravity.normalized()
     btk::math::Vector3D right = safe_norm(worldUp.cross(tHat), btk::math::Vector3D(1.0f, 0.0f, 0.0f));
     btk::math::Vector3D upInPl = safe_norm(tHat.cross(right), btk::math::Vector3D(0.0f, 0.0f, 1.0f)); // already unit
 
@@ -217,7 +217,7 @@ namespace btk::ballistics
   const Bullet& Simulator::computeZero(float muzzle_velocity, const btk::math::Vector3D& target_position, float dt, int max_iterations, float tolerance, float spin_rate)
   {
     float best_pitch = 0.01f; // Start with reasonable elevation guess (about 0.57 degrees)
-    float best_yaw = 0.0f;   // azimuth/windage (rad)
+    float best_yaw = 0.0f;    // azimuth/windage (rad)
 
     for(int i = 0; i < max_iterations; ++i)
     {
@@ -226,9 +226,9 @@ namespace btk::ballistics
       float sinPitch = std::sin(best_pitch);
       float cosYaw = std::cos(best_yaw);
       float sinYaw = std::sin(best_yaw);
-      btk::math::Vector3D velocity_init(muzzle_velocity * cosPitch * cosYaw,   // x (downrange)
-                                        muzzle_velocity * cosPitch * sinYaw,   // y (crossrange)
-                                        muzzle_velocity * sinPitch);           // z (vertical)
+      btk::math::Vector3D velocity_init(muzzle_velocity * cosPitch * cosYaw, // x (downrange)
+                                        muzzle_velocity * cosPitch * sinYaw, // y (crossrange)
+                                        muzzle_velocity * sinPitch);         // z (vertical)
 
       // Start at bore height (z=0)
       btk::math::Vector3D position_init(0.0f, 0.0f, 0.0f);
@@ -251,8 +251,8 @@ namespace btk::ballistics
 
       // Calculate error at target plane; ignore downrange (x) interpolation residue
       btk::math::Vector3D error = point_at_target->getState().getPosition() - target_position;
-      float lateral_error = error.y;   // crossrange
-      float vertical_error = error.z;  // vertical
+      float lateral_error = error.y;  // crossrange
+      float vertical_error = error.z; // vertical
       float yz_error_magnitude = std::sqrt(lateral_error * lateral_error + vertical_error * vertical_error);
 
       // Check if we're close enough
@@ -263,11 +263,11 @@ namespace btk::ballistics
 
       // Vertical (pitch) correction from z error; Horizontal (yaw) from y error
       float pitch_correction = -std::atan2(vertical_error, target_position.x);
-      float yaw_correction   = -std::atan2(lateral_error, target_position.x);
+      float yaw_correction = -std::atan2(lateral_error, target_position.x);
 
       // Damped updates for stability (matches JS damping = 0.5)
       best_pitch += 0.5f * pitch_correction;
-      best_yaw   += 0.5f * yaw_correction;
+      best_yaw += 0.5f * yaw_correction;
     }
 
     // Create final initial state at bore height (z=0)
@@ -275,9 +275,7 @@ namespace btk::ballistics
     float sinPitchF = std::sin(best_pitch);
     float cosYawF = std::cos(best_yaw);
     float sinYawF = std::sin(best_yaw);
-    btk::math::Vector3D velocity_final(muzzle_velocity * cosPitchF * cosYawF,
-                                       muzzle_velocity * cosPitchF * sinYawF,
-                                       muzzle_velocity * sinPitchF);
+    btk::math::Vector3D velocity_final(muzzle_velocity * cosPitchF * cosYawF, muzzle_velocity * cosPitchF * sinYawF, muzzle_velocity * sinPitchF);
     btk::math::Vector3D position_final(0.0f, 0.0f, 0.0f);
     Bullet initial_state(initial_bullet_, position_final, velocity_final, spin_rate);
 
@@ -316,7 +314,7 @@ namespace btk::ballistics
     float y = current_bullet_.getPositionY();
     float z = current_bullet_.getPositionZ();
     wind_ = wind_gen(x, y, z);
-    
+
     // Add initial point with wind
     trajectory_.addPoint(current_time_, current_bullet_, wind_);
 
@@ -330,7 +328,7 @@ namespace btk::ballistics
       float y = current_bullet_.getPositionY();
       float z = current_bullet_.getPositionZ();
       wind_ = wind_gen(x, y, z);
-      
+
       // Step forward (uses wind_ for acceleration calculation)
       timeStep(dt);
 

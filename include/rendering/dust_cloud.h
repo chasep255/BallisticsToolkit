@@ -26,12 +26,11 @@ namespace btk::rendering
      */
     struct Particle
     {
-      btk::math::Vector3D relative_position_;  ///< Relative position from cloud center (normalized, scaled by radius)
-      uint8_t color_[3];                       ///< RGB color with random jitter
+      btk::math::Vector3D relative_position_; ///< Relative position from cloud center (normalized, scaled by radius)
+      uint8_t color_[3];                      ///< RGB color with random jitter
 
       Particle() : relative_position_(0, 0, 0), color_{0, 0, 0} {}
-      Particle(const btk::math::Vector3D& rel_pos, uint8_t r, uint8_t g, uint8_t b)
-        : relative_position_(rel_pos), color_{r, g, b} {}
+      Particle(const btk::math::Vector3D& rel_pos, uint8_t r, uint8_t g, uint8_t b) : relative_position_(rel_pos), color_{r, g, b} {}
     };
 
     /**
@@ -54,14 +53,8 @@ namespace btk::rendering
      * @param fade_rate Alpha fade rate per second (default 0.5 = e^(-0.5t))
      * @param particle_diameter Particle diameter in meters (default 0.006m = 6mm)
      */
-    DustCloud(int num_particles,
-              const btk::math::Vector3D& position,
-              const btk::math::Vector3D& wind,
-              uint8_t color_r, uint8_t color_g, uint8_t color_b,
-              float initial_radius = 0.1f,
-              float growth_rate = 0.5f,
-              float fade_rate = 0.5f,
-              float particle_diameter = 0.006f);
+    DustCloud(int num_particles, const btk::math::Vector3D& position, const btk::math::Vector3D& wind, uint8_t color_r, uint8_t color_g, uint8_t color_b, float initial_radius = 0.1f,
+              float growth_rate = 0.5f, float fade_rate = 0.5f, float particle_diameter = 0.006f);
 
     /**
      * @brief Advance simulation by time step
@@ -117,19 +110,19 @@ namespace btk::rendering
     private:
     static constexpr float ALPHA_THRESHOLD = 0.01f; ///< Alpha threshold for particle visibility
 
-    std::vector<Particle> particles_;      ///< All particles
-    btk::math::Vector3D wind_;             ///< Constant wind vector (advects cloud center)
-    btk::math::Vector3D center_position_;  ///< Current cloud center position
-    float initial_radius_;                 ///< Initial cloud radius in meters
-    float growth_rate_;                    ///< Cloud radius growth rate in m/s
-    float fade_rate_;                      ///< Alpha fade rate per second (exponential decay)
-    float radius_;                         ///< Current cloud radius in meters
-    float particle_diameter_;              ///< Particle diameter in meters
-    float alpha_;                          ///< Current alpha (shared by all particles, fades exponentially over time)
-    float elapsed_time_;                   ///< Elapsed time since creation (for independent alpha fade)
+    std::vector<Particle> particles_;     ///< All particles
+    btk::math::Vector3D wind_;            ///< Constant wind vector (advects cloud center)
+    btk::math::Vector3D center_position_; ///< Current cloud center position
+    float initial_radius_;                ///< Initial cloud radius in meters
+    float growth_rate_;                   ///< Cloud radius growth rate in m/s
+    float fade_rate_;                     ///< Alpha fade rate per second (exponential decay)
+    float radius_;                        ///< Current cloud radius in meters
+    float particle_diameter_;             ///< Particle diameter in meters
+    float alpha_;                         ///< Current alpha (shared by all particles, fades exponentially over time)
+    float elapsed_time_;                  ///< Elapsed time since creation (for independent alpha fade)
 
     // Display buffers (updated each timeStep)
-    std::vector<float> matrices_buffer_;    ///< Flat array: 16 floats per matrix (column-major) for InstancedMesh
+    std::vector<float> matrices_buffer_; ///< Flat array: 16 floats per matrix (column-major) for InstancedMesh
 
     /**
      * @brief Update display buffers from particle data
@@ -138,4 +131,3 @@ namespace btk::rendering
   };
 
 } // namespace btk::rendering
-

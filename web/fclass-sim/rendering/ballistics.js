@@ -2,7 +2,17 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
-import { waitForBTK, getBTK, btkToThreeJsPosition, threeJsToBtkPosition, btkToThreeJsVelocity, threeJsToBtkVelocity, sampleWindAtThreeJsPosition } from '../core/btk.js';
+import
+{
+  waitForBTK,
+  getBTK,
+  btkToThreeJsPosition,
+  threeJsToBtkPosition,
+  btkToThreeJsVelocity,
+  threeJsToBtkVelocity,
+  sampleWindAtThreeJsPosition
+}
+from '../core/btk.js';
 
 const LOG_PREFIX_ENGINE = '[BallisticsEngine]';
 const LOG_PREFIX_SHOT = '[Shot]';
@@ -116,9 +126,9 @@ export class BallisticsEngine
 
       // Convert Three.js coordinates to BTK coordinates
       const targetPos = threeJsToBtkPosition(
-        targetCenter.x,   // Three.js X (crossrange)
-        targetCenter.y,   // Three.js Y (vertical)
-        targetCenter.z    // Three.js Z (downrange, negative)
+        targetCenter.x, // Three.js X (crossrange)
+        targetCenter.y, // Three.js Y (vertical)
+        targetCenter.z // Three.js Z (downrange, negative)
       );
 
       console.log(`${LOG_PREFIX_ENGINE} Zeroing: MV=${this.nominalMV.toFixed(1)}fps, Range=${this.distance}yd, Target=(${targetCenter.x.toFixed(3)}, ${targetCenter.y.toFixed(3)}, ${targetCenter.z.toFixed(1)}) yards`);
@@ -300,7 +310,7 @@ export class BallisticsEngine
       const bulletPos = btkToThreeJsPosition(bulletPosBtk); // Three.js coords in yards
       const bulletVel = btkToThreeJsVelocity(bulletVelBtk); // Three.js coords in fps
       const impactVelocityFps = Math.sqrt(bulletVel.x ** 2 + bulletVel.y ** 2 + bulletVel.z ** 2); // fps
-      
+
       // Dispose BTK vectors
       bulletPosBtk.delete();
       bulletVelBtk.delete();

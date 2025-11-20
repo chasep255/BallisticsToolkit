@@ -41,7 +41,8 @@ namespace btk::math
      * @param angle Rotation angle in radians
      * @return Quaternion representing the rotation
      */
-    static Quaternion fromAxisAngle(const Vector3D& axis, float angle) {
+    static Quaternion fromAxisAngle(const Vector3D& axis, float angle)
+    {
       float half_angle = angle * 0.5f;
       float s = std::sin(half_angle);
       float c = std::cos(half_angle);
@@ -51,9 +52,7 @@ namespace btk::math
     /**
      * @brief Create identity quaternion (no rotation)
      */
-    static constexpr Quaternion identity() {
-      return Quaternion(1.0f, 0.0f, 0.0f, 0.0f);
-    }
+    static constexpr Quaternion identity() { return Quaternion(1.0f, 0.0f, 0.0f, 0.0f); }
 
     /**
      * @brief Quaternion multiplication
@@ -61,19 +60,17 @@ namespace btk::math
      * @param other Quaternion to multiply with
      * @return Product quaternion
      */
-    Quaternion operator*(const Quaternion& other) const {
-      return Quaternion(
-        w * other.w - x * other.x - y * other.y - z * other.z,
-        w * other.x + x * other.w + y * other.z - z * other.y,
-        w * other.y - x * other.z + y * other.w + z * other.x,
-        w * other.z + x * other.y - y * other.x + z * other.w
-      );
+    Quaternion operator*(const Quaternion& other) const
+    {
+      return Quaternion(w * other.w - x * other.x - y * other.y - z * other.z, w * other.x + x * other.w + y * other.z - z * other.y, w * other.y - x * other.z + y * other.w + z * other.x,
+                        w * other.z + x * other.y - y * other.x + z * other.w);
     }
 
     /**
      * @brief Compound multiplication
      */
-    Quaternion& operator*=(const Quaternion& other) {
+    Quaternion& operator*=(const Quaternion& other)
+    {
       *this = *this * other;
       return *this;
     }
@@ -81,23 +78,21 @@ namespace btk::math
     /**
      * @brief Calculate magnitude (norm)
      */
-    float magnitude() const {
-      return std::sqrt(w * w + x * x + y * y + z * z);
-    }
+    float magnitude() const { return std::sqrt(w * w + x * x + y * y + z * z); }
 
     /**
      * @brief Calculate squared magnitude
      */
-    constexpr float magnitudeSquared() const {
-      return w * w + x * x + y * y + z * z;
-    }
+    constexpr float magnitudeSquared() const { return w * w + x * x + y * y + z * z; }
 
     /**
      * @brief Normalize quaternion to unit length
      */
-    void normalize() {
+    void normalize()
+    {
       float mag = magnitude();
-      if (mag > 1e-8f) {
+      if(mag > 1e-8f)
+      {
         float inv_mag = 1.0f / mag;
         w *= inv_mag;
         x *= inv_mag;
@@ -109,7 +104,8 @@ namespace btk::math
     /**
      * @brief Return normalized copy
      */
-    Quaternion normalized() const {
+    Quaternion normalized() const
+    {
       Quaternion result = *this;
       result.normalize();
       return result;
@@ -118,9 +114,7 @@ namespace btk::math
     /**
      * @brief Calculate conjugate (inverse rotation for unit quaternions)
      */
-    constexpr Quaternion conjugate() const {
-      return Quaternion(w, -x, -y, -z);
-    }
+    constexpr Quaternion conjugate() const { return Quaternion(w, -x, -y, -z); }
 
     /**
      * @brief Rotate a vector by this quaternion
@@ -128,7 +122,8 @@ namespace btk::math
      * @param v Vector to rotate
      * @return Rotated vector
      */
-    Vector3D rotate(const Vector3D& v) const {
+    Vector3D rotate(const Vector3D& v) const
+    {
       // Using the formula: v' = q * v * q^-1
       // Optimized version without creating intermediate quaternions
       Vector3D qvec(x, y, z);
@@ -142,7 +137,8 @@ namespace btk::math
      *
      * @param matrix Output 9-element array (column-major order)
      */
-    void toRotationMatrix(float matrix[9]) const {
+    void toRotationMatrix(float matrix[9]) const
+    {
       float xx = x * x;
       float xy = x * y;
       float xz = x * z;
@@ -176,12 +172,14 @@ namespace btk::math
      * @param t Interpolation parameter [0, 1]
      * @return Interpolated quaternion
      */
-    Quaternion slerp(const Quaternion& other, float t) const {
+    Quaternion slerp(const Quaternion& other, float t) const
+    {
       float dot = w * other.w + x * other.x + y * other.y + z * other.z;
 
       // Handle negative dot (shortest path)
       Quaternion target = other;
-      if (dot < 0.0f) {
+      if(dot < 0.0f)
+      {
         target.w = -target.w;
         target.x = -target.x;
         target.y = -target.y;
@@ -190,13 +188,9 @@ namespace btk::math
       }
 
       // If quaternions are very close, use linear interpolation
-      if (dot > 0.9995f) {
-        return Quaternion(
-          w + t * (target.w - w),
-          x + t * (target.x - x),
-          y + t * (target.y - y),
-          z + t * (target.z - z)
-        ).normalized();
+      if(dot > 0.9995f)
+      {
+        return Quaternion(w + t * (target.w - w), x + t * (target.x - x), y + t * (target.y - y), z + t * (target.z - z)).normalized();
       }
 
       // Calculate slerp
@@ -208,12 +202,7 @@ namespace btk::math
       float s0 = std::cos(theta) - dot * sin_theta / sin_theta_0;
       float s1 = sin_theta / sin_theta_0;
 
-      return Quaternion(
-        s0 * w + s1 * target.w,
-        s0 * x + s1 * target.x,
-        s0 * y + s1 * target.y,
-        s0 * z + s1 * target.z
-      );
+      return Quaternion(s0 * w + s1 * target.w, s0 * x + s1 * target.x, s0 * y + s1 * target.y, s0 * z + s1 * target.z);
     }
 
     /**
@@ -222,10 +211,12 @@ namespace btk::math
      * @param angular_velocity Angular velocity in rad/s
      * @param dt Time step in seconds
      */
-    void integrateAngularVelocity(const Vector3D& angular_velocity, float dt) {
+    void integrateAngularVelocity(const Vector3D& angular_velocity, float dt)
+    {
       // Create quaternion from angular velocity
       float angle = angular_velocity.magnitude() * dt;
-      if (angle > 1e-8f) {
+      if(angle > 1e-8f)
+      {
         Vector3D axis = angular_velocity / angular_velocity.magnitude();
         Quaternion delta = fromAxisAngle(axis, angle);
         *this = delta * (*this);
@@ -235,4 +226,3 @@ namespace btk::math
   };
 
 } // namespace btk::math
-

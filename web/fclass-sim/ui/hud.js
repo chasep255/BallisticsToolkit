@@ -1,7 +1,11 @@
 // hud-system.js - HUD system using canvas textures for F-Class simulator
 
 import * as THREE from 'three';
-import { VirtualCoordinates as VC } from '../core/virtual-coords.js';
+import
+{
+  VirtualCoordinates as VC
+}
+from '../core/virtual-coords.js';
 
 export class HudOverlay
 {
@@ -26,11 +30,11 @@ export class HudOverlay
     const startX = VC.fromRight(margin);
     const startY = VC.fromTop(margin);
     const lineHeight = 4.5; // Virtual units between lines
-    
+
     // Canvas texture dimensions (pixels - internal resolution)
     const textureCanvasWidth = 180;
     const textureCanvasHeight = 28;
-    
+
     // Display dimensions (virtual units - how big they appear on screen)
     const displayWidth = 30; // Increased from 24
     const displayHeight = 4.5; // Increased from 3.5

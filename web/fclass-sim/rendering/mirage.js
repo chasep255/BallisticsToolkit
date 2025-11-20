@@ -11,7 +11,11 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
-import { sampleWindAtThreeJsPosition } from '../core/btk.js';
+import
+{
+  sampleWindAtThreeJsPosition
+}
+from '../core/btk.js';
 
 export class MirageEffect
 {

@@ -38,9 +38,9 @@ export function btkToThreeJsPosition(btkVec)
 {
   if (!btk) throw new Error('BTK not loaded yet');
   return {
-    x: btk.Conversions.metersToYards(btkVec.y),  // BTK Y (crossrange) → Three X (right)
-    y: btk.Conversions.metersToYards(btkVec.z),  // BTK Z (up) → Three Y (up)
-    z: -btk.Conversions.metersToYards(btkVec.x)  // BTK -X (downrange) → Three Z (downrange)
+    x: btk.Conversions.metersToYards(btkVec.y), // BTK Y (crossrange) → Three X (right)
+    y: btk.Conversions.metersToYards(btkVec.z), // BTK Z (up) → Three Y (up)
+    z: -btk.Conversions.metersToYards(btkVec.x) // BTK -X (downrange) → Three Z (downrange)
   };
 }
 
@@ -54,8 +54,8 @@ export function threeJsToBtkPosition(x_yd, y_yd, z_yd)
   if (!btk) throw new Error('BTK not loaded yet');
   return new btk.Vector3D(
     btk.Conversions.yardsToMeters(-z_yd), // Three Z (downrange) → BTK X (downrange)
-    btk.Conversions.yardsToMeters(x_yd),  // Three X (crossrange) → BTK Y (crossrange)
-    btk.Conversions.yardsToMeters(y_yd)   // Three Y (up) → BTK Z (up)
+    btk.Conversions.yardsToMeters(x_yd), // Three X (crossrange) → BTK Y (crossrange)
+    btk.Conversions.yardsToMeters(y_yd) // Three Y (up) → BTK Z (up)
   );
 }
 
@@ -94,9 +94,9 @@ export function btkWindToThreeJs(windBtk)
 {
   if (!btk) throw new Error('BTK not loaded yet');
   return {
-    x: btk.Conversions.mpsToMph(windBtk.y),  // BTK Y (crossrange) → Three X (horizontal)
-    y: btk.Conversions.mpsToMph(windBtk.z),  // BTK Z (up) → Three Y (vertical)
-    z: btk.Conversions.mpsToMph(-windBtk.x)  // BTK -X (downrange) → Three Z (downrange)
+    x: btk.Conversions.mpsToMph(windBtk.y), // BTK Y (crossrange) → Three X (horizontal)
+    y: btk.Conversions.mpsToMph(windBtk.z), // BTK Z (up) → Three Y (vertical)
+    z: btk.Conversions.mpsToMph(-windBtk.x) // BTK -X (downrange) → Three Z (downrange)
   };
 }
 
@@ -111,20 +111,25 @@ export function btkWindToThreeJs(windBtk)
 export function sampleWindAtThreeJsPosition(generator, x_yd, y_yd, z_yd)
 {
   if (!btk) throw new Error('BTK not loaded yet');
-  if (!generator) {
-    return { x: 0, y: 0, z: 0 };
+  if (!generator)
+  {
+    return {
+      x: 0,
+      y: 0,
+      z: 0
+    };
   }
-  
+
   // Convert Three.js coords (yards) to BTK coords (meters) and sample
   const windBtk = generator.sample(
     btk.Conversions.yardsToMeters(-z_yd), // Three Z (downrange) → BTK X (downrange)
-    btk.Conversions.yardsToMeters(x_yd),  // Three X (crossrange) → BTK Y (crossrange)
-    btk.Conversions.yardsToMeters(y_yd)   // Three Y (up) → BTK Z (up)
+    btk.Conversions.yardsToMeters(x_yd), // Three X (crossrange) → BTK Y (crossrange)
+    btk.Conversions.yardsToMeters(y_yd) // Three Y (up) → BTK Z (up)
   );
-  
+
   // Convert BTK wind (m/s) to Three.js coords (mph)
   const wind = btkWindToThreeJs(windBtk);
   windBtk.delete(); // Dispose Vector3D to prevent memory leak
-  
+
   return wind;
 }

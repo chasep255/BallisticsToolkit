@@ -9,8 +9,16 @@ import
   MirageEffect
 }
 from './mirage.js';
-import { sampleWindAtThreeJsPosition } from '../core/btk.js';
-import { VirtualCoordinates as VC } from '../core/virtual-coords.js';
+import
+{
+  sampleWindAtThreeJsPosition
+}
+from '../core/btk.js';
+import
+{
+  VirtualCoordinates as VC
+}
+from '../core/virtual-coords.js';
 
 export class Scope
 {
@@ -54,7 +62,7 @@ export class Scope
     const availableHeight = VC.HEIGHT - (VC.MARGIN_SMALL * 2);
     const maxScopeSize = Math.min(availableWidth, availableHeight);
     this.scopeSizeVirtual = maxScopeSize * config.sizeFraction; // Size in virtual units
-    
+
     // Calculate render target size in pixels based on canvas dimensions
     // Use canvas height to determine pixel density
     const pixelsPerVirtualUnit = this.canvasHeight / VC.HEIGHT;

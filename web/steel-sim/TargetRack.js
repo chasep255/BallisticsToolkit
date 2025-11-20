@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { SteelTarget, SteelTargetFactory } from './SteelTarget.js';
+import
+{
+  SteelTarget,
+  SteelTargetFactory
+}
+from './SteelTarget.js';
 
 /**
  * Wrapper class for managing a rack of steel targets with beam and support posts
@@ -9,7 +14,8 @@ import { SteelTarget, SteelTargetFactory } from './SteelTarget.js';
  * 
  * Requires window.btk to be initialized (loaded by main application).
  */
-export class TargetRack {
+export class TargetRack
+{
 
   /**
    * Create a new target rack defined by two corners in yards
@@ -20,8 +26,10 @@ export class TargetRack {
    * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (default 0)
    * @param {THREE.Scene} options.scene - Three.js scene to add meshes to (required)
    */
-  constructor(options) {
-    const {
+  constructor(options)
+  {
+    const
+    {
       bottomLeft,
       topRight,
       outwardOffset = 0, // Default 0 meters
@@ -38,8 +46,12 @@ export class TargetRack {
     this.scene = scene;
 
     // Store corners
-    this.bottomLeft = { ...bottomLeft };
-    this.topRight = { ...topRight };
+    this.bottomLeft = {
+      ...bottomLeft
+    };
+    this.topRight = {
+      ...topRight
+    };
 
     // Derived rack dimensions
     this.width = this.topRight.x - this.bottomLeft.x;
@@ -49,7 +61,7 @@ export class TargetRack {
       y: (this.bottomLeft.y + this.topRight.y) / 2,
       z: (this.bottomLeft.z + this.topRight.z) / 2
     };
-    
+
     // Beam height (top of rack)
     this.beamY = this.topRight.y;
 
@@ -70,8 +82,10 @@ export class TargetRack {
    * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (defaults to rack's outwardOffset)
    * @returns {SteelTarget} The created target instance
    */
-  addTarget(options) {
-    const {
+  addTarget(options)
+  {
+    const
+    {
       width,
       height,
       thickness = 0.5,
@@ -83,7 +97,8 @@ export class TargetRack {
     if (height === undefined || height === null) throw new Error('Height is required');
 
     // Store target configuration for later positioning
-    this.targets.push({
+    this.targets.push(
+    {
       width,
       height,
       thickness,
@@ -103,37 +118,47 @@ export class TargetRack {
    * Deletes and recreates all targets to ensure correct positioning
    * @private
    */
-  repositionTargets() {
+  repositionTargets()
+  {
     const totalTargets = this.targets.length;
     if (totalTargets === 0) return;
 
     // Delete all existing steel targets
-    for (const targetConfig of this.targets) {
-      if (targetConfig.steelTarget) {
+    for (const targetConfig of this.targets)
+    {
+      if (targetConfig.steelTarget)
+      {
         targetConfig.steelTarget.dispose();
         targetConfig.steelTarget = null;
       }
     }
 
     // Position each target evenly spaced across the full width (in yards)
-    for (let i = 0; i < totalTargets; i++) {
+    for (let i = 0; i < totalTargets; i++)
+    {
       const targetConfig = this.targets[i];
-      
-        // Evenly distribute centers across the rack width
-        const fraction = (i + 0.5) / totalTargets;
-        const targetX = this.bottomLeft.x + fraction * (this.topRight.x - this.bottomLeft.x);
 
-        // Create target at correct position using factory
-        targetConfig.steelTarget = SteelTargetFactory.create({
-          position: { x: targetX, y: this.center.y, z: this.center.z },
-          width: targetConfig.width,
-          height: targetConfig.height,
-          thickness: targetConfig.thickness,
-          isOval: targetConfig.isOval,
-          beamHeight: this.beamY,
-          outwardOffset: targetConfig.outwardOffset,
-          scene: this.scene
-        });
+      // Evenly distribute centers across the rack width
+      const fraction = (i + 0.5) / totalTargets;
+      const targetX = this.bottomLeft.x + fraction * (this.topRight.x - this.bottomLeft.x);
+
+      // Create target at correct position using factory
+      targetConfig.steelTarget = SteelTargetFactory.create(
+      {
+        position:
+        {
+          x: targetX,
+          y: this.center.y,
+          z: this.center.z
+        },
+        width: targetConfig.width,
+        height: targetConfig.height,
+        thickness: targetConfig.thickness,
+        isOval: targetConfig.isOval,
+        beamHeight: this.beamY,
+        outwardOffset: targetConfig.outwardOffset,
+        scene: this.scene
+      });
     }
 
     // Update beam and posts to span all targets
@@ -144,10 +169,12 @@ export class TargetRack {
    * Update beam and support posts to span all targets
    * @private
    */
-  updateBeamAndPosts() {
+  updateBeamAndPosts()
+  {
     const btk = window.btk;
-    
-    if (this.targets.length === 0) {
+
+    if (this.targets.length === 0)
+    {
       // No targets, remove beam and posts if they exist
       this.removeBeamAndPosts();
       return;
@@ -160,27 +187,29 @@ export class TargetRack {
     // Convert inches to yards for Three.js
     const beamRadius = btk.Conversions.inchesToYards(2) / 2;
     const beamGeometry = new THREE.CylinderGeometry(beamRadius, beamRadius, this.width, 16);
-    const beamMaterial = new THREE.MeshStandardMaterial({
+    const beamMaterial = new THREE.MeshStandardMaterial(
+    {
       color: 0xaaaaaa, // Light gray steel
       metalness: 0.6,
       roughness: 0.5
     });
     this.beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
-    
+
     // Rotate to horizontal (cylinder is vertical by default)
     this.beamMesh.rotation.z = Math.PI / 2;
     // Beam is at the top of the rack
     this.beamMesh.position.set(this.center.x, this.beamY, this.center.z);
     this.beamMesh.castShadow = true;
     this.beamMesh.receiveShadow = true;
-    
+
     this.scene.add(this.beamMesh);
 
     // Create support posts (vertical posts spanning from bottom to top, 2" diameter)
     // Convert inches to yards for Three.js
     const postRadius = btk.Conversions.inchesToYards(2) / 2;
     const postGeometry = new THREE.CylinderGeometry(postRadius, postRadius, this.height, 16);
-    const postMaterial = new THREE.MeshStandardMaterial({
+    const postMaterial = new THREE.MeshStandardMaterial(
+    {
       color: 0xaaaaaa, // Light gray steel
       metalness: 0.6,
       roughness: 0.5
@@ -209,22 +238,26 @@ export class TargetRack {
    * Remove beam and posts from scene
    * @private
    */
-  removeBeamAndPosts() {
-    if (this.beamMesh) {
+  removeBeamAndPosts()
+  {
+    if (this.beamMesh)
+    {
       this.scene.remove(this.beamMesh);
       if (this.beamMesh.geometry) this.beamMesh.geometry.dispose();
       if (this.beamMesh.material) this.beamMesh.material.dispose();
       this.beamMesh = null;
     }
 
-    if (this.leftPostMesh) {
+    if (this.leftPostMesh)
+    {
       this.scene.remove(this.leftPostMesh);
       if (this.leftPostMesh.geometry) this.leftPostMesh.geometry.dispose();
       if (this.leftPostMesh.material) this.leftPostMesh.material.dispose();
       this.leftPostMesh = null;
     }
 
-    if (this.rightPostMesh) {
+    if (this.rightPostMesh)
+    {
       this.scene.remove(this.rightPostMesh);
       if (this.rightPostMesh.geometry) this.rightPostMesh.geometry.dispose();
       if (this.rightPostMesh.material) this.rightPostMesh.material.dispose();
@@ -236,7 +269,8 @@ export class TargetRack {
    * Get all targets in this rack
    * @returns {SteelTarget[]} Array of all targets
    */
-  getTargets() {
+  getTargets()
+  {
     return this.targets.map(t => t.steelTarget).filter(t => t !== null);
   }
 
@@ -244,17 +278,21 @@ export class TargetRack {
    * Get total rack width in yards
    * @returns {number} Width in yards
    */
-  getWidth() {
+  getWidth()
+  {
     return this.width;
   }
 
   /**
    * Clean up all resources (beam, posts, targets)
    */
-  dispose() {
+  dispose()
+  {
     // Dispose all targets and remove from factory
-    for (const targetConfig of this.targets) {
-      if (targetConfig.steelTarget) {
+    for (const targetConfig of this.targets)
+    {
+      if (targetConfig.steelTarget)
+      {
         SteelTargetFactory.delete(targetConfig.steelTarget);
       }
     }
@@ -268,7 +306,8 @@ export class TargetRack {
 /**
  * Factory class for managing collections of target racks
  */
-export class TargetRackFactory {
+export class TargetRackFactory
+{
   /**
    * Static collection of all active target racks
    * @type {TargetRack[]}
@@ -280,7 +319,8 @@ export class TargetRackFactory {
    * @param {Object} options - Configuration options for TargetRack
    * @returns {TargetRack} The created rack instance
    */
-  static create(options) {
+  static create(options)
+  {
     const rack = new TargetRack(options);
     TargetRackFactory.racks.push(rack);
     return rack;
@@ -289,8 +329,10 @@ export class TargetRackFactory {
   /**
    * Delete all target racks
    */
-  static deleteAll() {
-    for (const rack of TargetRackFactory.racks) {
+  static deleteAll()
+  {
+    for (const rack of TargetRackFactory.racks)
+    {
       rack.dispose();
     }
     TargetRackFactory.racks = [];
@@ -301,9 +343,11 @@ export class TargetRackFactory {
    * @param {TargetRack} rack - The rack instance to delete
    * @returns {boolean} True if rack was found and deleted, false otherwise
    */
-  static delete(rack) {
+  static delete(rack)
+  {
     const index = TargetRackFactory.racks.indexOf(rack);
-    if (index !== -1) {
+    if (index !== -1)
+    {
       rack.dispose();
       TargetRackFactory.racks.splice(index, 1);
       return true;
@@ -315,7 +359,8 @@ export class TargetRackFactory {
    * Get all target racks
    * @returns {TargetRack[]} Array of all active racks
    */
-  static getAll() {
+  static getAll()
+  {
     return TargetRackFactory.racks;
   }
 
@@ -323,7 +368,8 @@ export class TargetRackFactory {
    * Get number of active racks
    * @returns {number} Number of racks
    */
-  static getCount() {
+  static getCount()
+  {
     return TargetRackFactory.racks.length;
   }
 
@@ -331,12 +377,13 @@ export class TargetRackFactory {
    * Get all targets from all racks
    * @returns {SteelTarget[]} Array of all targets from all racks
    */
-  static getAllTargets() {
+  static getAllTargets()
+  {
     const allTargets = [];
-    for (const rack of TargetRackFactory.racks) {
+    for (const rack of TargetRackFactory.racks)
+    {
       allTargets.push(...rack.getTargets());
     }
     return allTargets;
   }
 }
-

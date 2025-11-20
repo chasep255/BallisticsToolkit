@@ -2,7 +2,11 @@
 
 import * as THREE from 'three';
 import ResourceManager from '../resources/manager.js';
-import { getBTK } from '../core/btk.js';
+import
+{
+  getBTK
+}
+from '../core/btk.js';
 
 const LOG_PREFIX_SCORING = '[Scoring]';
 const LOG_PREFIX_TARGET = '[Target]';

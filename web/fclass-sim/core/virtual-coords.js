@@ -16,20 +16,20 @@
 export class VirtualCoordinates
 {
   // Virtual viewport dimensions
-  static WIDTH = 200;  // -100 to +100
+  static WIDTH = 200; // -100 to +100
   static HEIGHT = 150; // -75 to +75 (maintains 4:3 aspect ratio)
-  
+
   // Edge positions
   static RIGHT = 100;
   static LEFT = -100;
   static TOP = 75;
   static BOTTOM = -75;
-  
+
   // Standard margins (in virtual units)
   static MARGIN_SMALL = 2;
   static MARGIN_MEDIUM = 4;
   static MARGIN_LARGE = 8;
-  
+
   /**
    * Calculate X position from right edge
    * @param {number} offset - Offset from right edge in virtual units
@@ -39,7 +39,7 @@ export class VirtualCoordinates
   {
     return this.RIGHT - offset;
   }
-  
+
   /**
    * Calculate X position from left edge
    * @param {number} offset - Offset from left edge in virtual units
@@ -49,7 +49,7 @@ export class VirtualCoordinates
   {
     return this.LEFT + offset;
   }
-  
+
   /**
    * Calculate Y position from top edge
    * @param {number} offset - Offset from top edge in virtual units
@@ -59,7 +59,7 @@ export class VirtualCoordinates
   {
     return this.TOP - offset;
   }
-  
+
   /**
    * Calculate Y position from bottom edge
    * @param {number} offset - Offset from bottom edge in virtual units
@@ -70,4 +70,3 @@ export class VirtualCoordinates
     return this.BOTTOM + offset;
   }
 }
-
