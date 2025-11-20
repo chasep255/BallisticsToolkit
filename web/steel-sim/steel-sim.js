@@ -514,14 +514,6 @@ function onMouseDown(event)
   const canvas = event.target;
   const norm = compositionRenderer.screenToNormalized(event.clientX, event.clientY);
   const locked = document.pointerLockElement === canvas;
-  // Debug logging to understand scope click behavior
-  console.log('onMouseDown', {
-    button: event.button,
-    locked,
-    normX: norm.x.toFixed(3),
-    normY: norm.y.toFixed(3),
-    insideScope: scope.isPointInside(norm.x, norm.y)
-  });
   
   if (event.button === 0) // Left click
   {
@@ -544,7 +536,6 @@ function onPointerLockChange()
   const canvas = document.getElementById('steelCanvas');
   const locked = document.pointerLockElement === canvas;
   scopeMode = locked;
-  console.log('pointerlockchange', { locked });
   canvas.style.cursor = locked ? 'none' : 'default';
 }
 

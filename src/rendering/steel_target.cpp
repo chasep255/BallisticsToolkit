@@ -325,7 +325,7 @@ namespace btk::rendering
     dt = std::min(dt, 1.0f);
 
     // Subdivide into smaller steps if needed for stability
-    constexpr float MAX_SUBSTEP_DT = 0.001f; // 5ms maximum substep (can be smaller)
+    constexpr float MAX_SUBSTEP_DT = 0.001f; // 1ms maximum substep (can be smaller)
 
     // Subdivide into smaller steps if needed
     int num_substeps = static_cast<int>(std::ceil(dt / MAX_SUBSTEP_DT));
@@ -353,7 +353,7 @@ namespace btk::rendering
 
       // Angular velocity integration
       float angular_speed = angular_velocity_.magnitude();
-      if(angular_speed > 0.0f)
+      if(angular_speed > 1e-5f)
       {
         float angle = angular_speed * substep_dt;
         btk::math::Vector3D axis = angular_velocity_ / angular_speed;
