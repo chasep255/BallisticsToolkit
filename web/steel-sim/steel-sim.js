@@ -406,12 +406,12 @@ function createTargetRacks()
   {
     const distanceYards = 100 + (i * 100); // 100, 200, 300, ..., 1000
     const crossrangeOffset = crossrangeOffsets[i];
-    
+
     // Target sizes scale with distance for appropriate difficulty
     // At 100 yards: 6-12 inch targets
     // At 1000 yards: 36 inch (1 yard) targets
     const baseSize = 6 + (distanceYards / 1000) * 30; // Linear scaling from 6" to 36"
-    
+
     const targets = [
     {
       width: baseSize * 1.5,
@@ -492,7 +492,7 @@ function onMouseWheel(event)
 function onMouseMove(event)
 {
   const canvas = event.target;
-  
+
   if (scopeMode && document.pointerLockElement === canvas)
   {
     // Pan scope based on relative mouse movement:
@@ -503,7 +503,11 @@ function onMouseMove(event)
     if (deltaX !== 0 || deltaY !== 0)
     {
       const normDelta = compositionRenderer.movementToNormalized(deltaX, deltaY);
-      const { deltaYaw, deltaPitch } = scope.normalizedDeltaToAngles(normDelta.x, normDelta.y);
+      const
+      {
+        deltaYaw,
+        deltaPitch
+      } = scope.normalizedDeltaToAngles(normDelta.x, normDelta.y);
       scope.panBy(deltaYaw, deltaPitch);
     }
   }
@@ -514,7 +518,7 @@ function onMouseDown(event)
   const canvas = event.target;
   const norm = compositionRenderer.screenToNormalized(event.clientX, event.clientY);
   const locked = document.pointerLockElement === canvas;
-  
+
   if (event.button === 0) // Left click
   {
     if (locked)

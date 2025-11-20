@@ -286,7 +286,10 @@ export class Scope
     const sensitivity = this.getFovRad() / 2;
     const deltaYaw = -deltaNormX * sensitivity;
     const deltaPitch = -deltaNormY * sensitivity;
-    return { deltaYaw, deltaPitch };
+    return {
+      deltaYaw,
+      deltaPitch
+    };
   }
 
   /**

@@ -191,7 +191,10 @@ export class CompositionRenderer
     const normX = (canvasX / this.canvasWidth) * (2 * this.aspect) - this.aspect;
     const normY = 1 - (canvasY / this.canvasHeight) * 2;
 
-    return { x: normX, y: normY };
+    return {
+      x: normX,
+      y: normY
+    };
   }
 
   /**
@@ -203,7 +206,10 @@ export class CompositionRenderer
     const scale = this.pixelToNormScale;
     const normDx = deltaPixelsX * scale;
     const normDy = deltaPixelsY * scale;
-    return { x: normDx, y: normDy };
+    return {
+      x: normDx,
+      y: normDy
+    };
   }
 
   /**
@@ -221,10 +227,11 @@ export class CompositionRenderer
    */
   createElement(x, y, width, height, options = {})
   {
-    const {
+    const
+    {
       renderOrder = 1,
-      transparent = false,
-      supersampleFactor = 2
+        transparent = false,
+        supersampleFactor = 2
     } = options;
 
     // Convert normalized size to pixels

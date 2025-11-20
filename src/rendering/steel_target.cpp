@@ -299,10 +299,7 @@ namespace btk::rendering
     btk::math::Vector3D torque_local = r_local.cross(F_local);
 
     // 4) Angular acceleration in local space using diagonal inertia tensor
-    btk::math::Vector3D ang_acc_local(
-      torque_local.x / inertia_tensor_.x,
-      torque_local.y / inertia_tensor_.y,
-      torque_local.z / inertia_tensor_.z);
+    btk::math::Vector3D ang_acc_local(torque_local.x / inertia_tensor_.x, torque_local.y / inertia_tensor_.y, torque_local.z / inertia_tensor_.z);
 
     // 5) Convert angular acceleration back to world space and accumulate
     btk::math::Vector3D ang_acc_world = orientation_.rotate(ang_acc_local);
@@ -366,15 +363,9 @@ namespace btk::rendering
         if(debug_)
         {
           // Log basic kinematic state each substep for the debug target
-          std::string msg = "SteelTarget debug - substep " + std::to_string(i) +
-                            " dt=" + std::to_string(substep_dt) +
-                            " angSpeed=" + std::to_string(angular_speed) +
-                            " angVel=(" + std::to_string(angular_velocity_.x) + "," +
-                            std::to_string(angular_velocity_.y) + "," +
-                            std::to_string(angular_velocity_.z) + ")" +
-                            " normal=(" + std::to_string(normal_.x) + "," +
-                            std::to_string(normal_.y) + "," +
-                            std::to_string(normal_.z) + ")";
+          std::string msg = "SteelTarget debug - substep " + std::to_string(i) + " dt=" + std::to_string(substep_dt) + " angSpeed=" + std::to_string(angular_speed) + " angVel=(" +
+                            std::to_string(angular_velocity_.x) + "," + std::to_string(angular_velocity_.y) + "," + std::to_string(angular_velocity_.z) + ")" + " normal=(" +
+                            std::to_string(normal_.x) + "," + std::to_string(normal_.y) + "," + std::to_string(normal_.z) + ")";
           logToConsole(msg);
         }
 #endif
@@ -437,9 +428,7 @@ namespace btk::rendering
         {
           // Log chain state for the debug target
           float force_mag = total_force.magnitude();
-          std::string msg = "SteelTarget chain - ext=" + std::to_string(extension) +
-                            " rest=" + std::to_string(anchor.rest_length_) +
-                            " forceMag=" + std::to_string(force_mag);
+          std::string msg = "SteelTarget chain - ext=" + std::to_string(extension) + " rest=" + std::to_string(anchor.rest_length_) + " forceMag=" + std::to_string(force_mag);
           logToConsole(msg);
         }
 #endif
