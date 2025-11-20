@@ -399,65 +399,44 @@ function createTargetRacks()
 {
   if (!landscape) return;
 
-  addTargetRack(0, -10, 6, 1.5, [
-  {
-    width: 12,
-    height: 12,
-    thickness: 0.5,
-    isOval: false
-  },
-  {
-    width: 10,
-    height: 10,
-    thickness: 0.5,
-    isOval: true
-  },
-  {
-    width: 8,
-    height: 8,
-    thickness: 0.5,
-    isOval: false
-  }]);
+  // Create target racks every 100 yards from 100 to 1000 yards
+  // Use alternating crossrange offsets to spread them out visually
+  const crossrangeOffsets = [0, 20, -20, 30, -30, 25, -25, 15, -15, 0]; // Pattern for 10 racks
 
-  addTargetRack(15, -25, 8, 2, [
+  for (let i = 0; i < 10; i++)
   {
-    width: 18,
-    height: 18,
-    thickness: 0.5,
-    isOval: false
-  },
-  {
-    width: 16,
-    height: 16,
-    thickness: 0.5,
-    isOval: true
-  },
-  {
-    width: 14,
-    height: 14,
-    thickness: 0.5,
-    isOval: false
-  }]);
+    const distanceYards = 100 + (i * 100); // 100, 200, 300, ..., 1000
+    const crossrangeOffset = crossrangeOffsets[i];
+    
+    // Target sizes scale with distance for appropriate difficulty
+    // At 100 yards: 6-12 inch targets
+    // At 1000 yards: 36 inch (1 yard) targets
+    const baseSize = 6 + (distanceYards / 1000) * 30; // Linear scaling from 6" to 36"
+    
+    const targets = [
+    {
+      width: baseSize * 1.5,
+      height: baseSize * 1.5,
+      thickness: 0.5,
+      isOval: false
+    },
+    {
+      width: baseSize,
+      height: baseSize,
+      thickness: 0.5,
+      isOval: true
+    },
+    {
+      width: baseSize * 0.75,
+      height: baseSize * 0.75,
+      thickness: 0.5,
+      isOval: false
+    }];
 
-  addTargetRack(-15, -40, 10, 2, [
-  {
-    width: 24,
-    height: 30,
-    thickness: 0.5,
-    isOval: false
-  },
-  {
-    width: 20,
-    height: 20,
-    thickness: 0.5,
-    isOval: true
-  },
-  {
-    width: 18,
-    height: 24,
-    thickness: 0.5,
-    isOval: false
-  }]);
+    // Rack width scales with number of targets, height stays consistent
+    const rackWidth = 8 + (i * 0.5); // Slightly wider racks for longer distances
+    addTargetRack(crossrangeOffset, -distanceYards, rackWidth, 2, targets);
+  }
 }
 
 // ===== UI SETUP =====

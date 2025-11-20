@@ -178,7 +178,8 @@ export class CompositionRenderer
         minFilter: THREE.LinearFilter,
         magFilter: THREE.LinearFilter,
         format: THREE.RGBAFormat,
-        samples: 4 // MSAA
+        samples: 4, // MSAA
+        stencilBuffer: true
       }
     );
 

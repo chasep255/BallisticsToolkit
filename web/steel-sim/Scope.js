@@ -7,6 +7,32 @@
 
 import * as THREE from 'three';
 
+// Approximate mapping between HUD units and mrad, based on the previous shader:
+// mradPerUnit = (fovDeg * 1000.0) / 60.0
+// This keeps FFP behavior when combined with reticleGroup scaling.
+const MRAD_PER_UNIT_COEFF = 1000.0 / 60.0;
+
+// Real-world scope spec (FOV in feet @ 100 yards)
+const SCOPE_MIN_ZOOM_X = 4.5;
+const SCOPE_MAX_ZOOM_X = 30.0;
+const SCOPE_LOW_FOV_FEET = 24.7; // at 4.5X
+const SCOPE_HIGH_FOV_FEET = 3.7; // at 30X
+const SCOPE_DISTANCE_FEET = 100 * 3; // 100 yards in feet
+
+function fovDegFromFeetAt100Yards(widthFeet)
+{
+  const halfAngle = Math.atan((widthFeet / 2) / SCOPE_DISTANCE_FEET);
+  return THREE.MathUtils.radToDeg(2 * halfAngle);
+}
+
+const SCOPE_LOW_FOV_DEG = fovDegFromFeetAt100Yards(SCOPE_LOW_FOV_FEET);
+const SCOPE_HIGH_FOV_DEG = fovDegFromFeetAt100Yards(SCOPE_HIGH_FOV_FEET);
+
+// Fit FOV(X) = a / X + b through the two spec endpoints
+const FOV_A = (SCOPE_LOW_FOV_DEG - SCOPE_HIGH_FOV_DEG) /
+  (1 / SCOPE_MIN_ZOOM_X - 1 / SCOPE_MAX_ZOOM_X);
+const FOV_B = SCOPE_LOW_FOV_DEG - FOV_A / SCOPE_MIN_ZOOM_X;
+
 export class Scope
 {
   constructor(config)
@@ -19,10 +45,14 @@ export class Scope
     const renderWidth = this.outputRenderTarget.width;
     const renderHeight = this.outputRenderTarget.height;
 
-    // FOV settings
-    this.currentFOV = config.initialFOV || 30;
-    this.minFOV = config.minFOV || 1;
-    this.maxFOV = config.maxFOV || 30;
+    // Zoom/FOV settings based on real scope spec
+    this.minZoomX = SCOPE_MIN_ZOOM_X;
+    this.maxZoomX = SCOPE_MAX_ZOOM_X;
+    this.currentZoomX = 10.0; // reasonable mid-range starting zoom
+
+    this.currentFOV = this.getFovForZoomX(this.currentZoomX);
+    this.minFOVDeg = this.getFovForZoomX(this.minZoomX);
+    this.maxFOVDeg = this.getFovForZoomX(this.maxZoomX);
     this.initialFOV = this.currentFOV;
 
     // Camera aim (yaw/pitch in radians)
@@ -114,11 +144,13 @@ export class Scope
     this.internalCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
     this.internalCamera.position.z = 5;
 
-    // Black housing disc (background)
+    // Black housing disc (background) - rendered as dark metal
     const housingGeom = new THREE.CircleGeometry(1.0, 128);
-    const housingMat = new THREE.MeshBasicMaterial(
+    const housingMat = new THREE.MeshStandardMaterial(
     {
       color: 0x000000,
+      metalness: 0.9,
+      roughness: 0.35,
       depthTest: false,
       depthWrite: false,
       toneMapped: false
@@ -128,7 +160,8 @@ export class Scope
     this.internalScene.add(housingMesh);
 
     // Main scope view: circle mapped with lit 3D scene texture
-    const scopeGeom = new THREE.CircleGeometry(0.98, 128);
+    const scopeRadius = 0.98;
+    const scopeGeom = new THREE.CircleGeometry(scopeRadius, 128);
     const scopeMat = new THREE.MeshBasicMaterial(
     {
       map: this.sceneRenderTarget.texture,
@@ -141,48 +174,257 @@ export class Scope
     scopeMesh.position.set(0, 0, 0.01);
     this.internalScene.add(scopeMesh);
 
-    // Simple crosshair using thin bars
-    const barThickness = 0.01;
-    const barLength = 1.8;
-    const barMat = new THREE.MeshBasicMaterial(
+    // Stencil mask: defines circular aperture for reticle elements
+    const maskGeom = new THREE.CircleGeometry(scopeRadius, 128);
+    const maskMat = new THREE.MeshBasicMaterial(
     {
-      color: 0xffffff,
+      colorWrite: false,
+      depthWrite: false,
+      depthTest: false,
+      stencilWrite: true,
+      stencilRef: 1,
+      stencilFunc: THREE.AlwaysStencilFunc,
+      stencilZPass: THREE.ReplaceStencilOp
+    });
+    const maskMesh = new THREE.Mesh(maskGeom, maskMat);
+    maskMesh.position.set(0, 0, 0.015);
+    this.internalScene.add(maskMesh);
+
+    // Reticle group built in MRAD space, then mapped into HUD units
+    this.reticleGroup = new THREE.Group();
+    this.reticleGroup.position.set(0, 0, 0.02);
+    this.internalScene.add(this.reticleGroup);
+
+    // Shared metallic material for reticle elements
+    const reticleMaterial = new THREE.MeshStandardMaterial(
+    {
+      color: 0x050505, // very dark, reads as black but allows specular
+      metalness: 0.9,
+      roughness: 0.25,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
-      transparent: true
+      stencilWrite: true,
+      stencilRef: 1,
+      stencilFunc: THREE.EqualStencilFunc,
+      stencilZPass: THREE.KeepStencilOp
     });
+    this.reticleMaterial = reticleMaterial;
 
-    const vertGeom = new THREE.PlaneGeometry(barThickness, barLength);
-    const horizGeom = new THREE.PlaneGeometry(barLength, barThickness);
+    // Build reticle using MRAD-space helpers
+    this.buildReticle();
 
-    const vertBar = new THREE.Mesh(vertGeom, barMat);
-    vertBar.position.set(0, 0, 0.02);
-    this.internalScene.add(vertBar);
+    // Apply initial FFP scaling (and map from [-0.5,0.5] reticle space to [-1,1] HUD space)
+    this.updateReticleScale();
 
-    const horizBar = new THREE.Mesh(horizGeom, barMat);
-    horizBar.position.set(0, 0, 0.02);
-    this.internalScene.add(horizBar);
+    // Local lighting for metallic look on housing + reticle
+    const ambient = new THREE.AmbientLight(0xffffff, 0.15);
+    this.internalScene.add(ambient);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+    dirLight.position.set(0.4, 0.8, 1.0).normalize();
+    this.internalScene.add(dirLight);
   }
 
-  setFOV(fov)
+  /**
+   * Convert a MRAD distance into local reticle units at a given FOV.
+   * Matches the previous shader behavior: mradPerUnit = fovDeg * 1000 / 60.
+   */
+  mradToReticleUnitsAtFov(mrad, fovDeg)
   {
-    this.currentFOV = Math.max(this.minFOV, Math.min(this.maxFOV, fov));
+    const mradPerUnit = fovDeg * MRAD_PER_UNIT_COEFF;
+    return mrad / mradPerUnit;
+  }
+
+  /**
+   * Get camera FOV (degrees) for a given zoom X using the fitted model.
+   */
+  getFovForZoomX(zoomX)
+  {
+    return FOV_A / zoomX + FOV_B;
+  }
+
+  /**
+   * Set zoom level in X (e.g. 4.5–30X) and update camera + reticle scaling.
+   */
+  setZoomX(zoomX)
+  {
+    const clamped = THREE.MathUtils.clamp(zoomX, this.minZoomX, this.maxZoomX);
+    this.currentZoomX = clamped;
+    this.currentFOV = this.getFovForZoomX(this.currentZoomX);
+
     this.camera.fov = this.currentFOV;
     this.camera.updateProjectionMatrix();
-    this.reticleMaterial.uniforms.fov.value = this.currentFOV;
+    this.updateReticleScale();
   }
 
-  zoomIn(delta = 1)
+  getZoomX()
   {
-    const zoomFactor = 0.9;
-    this.setFOV(this.currentFOV * zoomFactor);
+    return this.currentZoomX;
   }
 
-  zoomOut(delta = 1)
+  /**
+   * Add a line segment defined in MRAD space to the reticle group.
+   */
+  addLineMrad(x1Mrad, y1Mrad, x2Mrad, y2Mrad, thicknessMrad)
+  {
+    const x1 = this.mradToReticleUnitsAtFov(x1Mrad, this.initialFOV);
+    const y1 = this.mradToReticleUnitsAtFov(y1Mrad, this.initialFOV);
+    const x2 = this.mradToReticleUnitsAtFov(x2Mrad, this.initialFOV);
+    const y2 = this.mradToReticleUnitsAtFov(y2Mrad, this.initialFOV);
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    if (length <= 0.0) return;
+
+    const thickness = this.mradToReticleUnitsAtFov(thicknessMrad, this.initialFOV);
+
+    const geom = new THREE.PlaneGeometry(length, thickness);
+    const mesh = new THREE.Mesh(geom, this.reticleMaterial);
+
+    const angle = Math.atan2(dy, dx);
+    mesh.position.set((x1 + x2) * 0.5, (y1 + y2) * 0.5, 0);
+    mesh.rotation.z = angle;
+    this.reticleGroup.add(mesh);
+  }
+
+  /**
+   * Add a ring (annulus) defined in MRAD space to the reticle group.
+   */
+  addRingMrad(centerXMrad, centerYMrad, radiusMrad, thicknessMrad, segments = 96)
+  {
+    const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
+    const thicknessUnits = this.mradToReticleUnitsAtFov(thicknessMrad, this.initialFOV);
+    const innerRadius = Math.max(radiusUnits - thicknessUnits * 0.5, 0.0);
+    const outerRadius = radiusUnits + thicknessUnits * 0.5;
+
+    const ringGeom = new THREE.RingGeometry(innerRadius, outerRadius, segments);
+    const ringMesh = new THREE.Mesh(ringGeom, this.reticleMaterial);
+
+    const cx = this.mradToReticleUnitsAtFov(centerXMrad, this.initialFOV);
+    const cy = this.mradToReticleUnitsAtFov(centerYMrad, this.initialFOV);
+    ringMesh.position.set(cx, cy, 0);
+
+    this.reticleGroup.add(ringMesh);
+  }
+
+  /**
+   * Add a solid dot in MRAD space (implemented as a filled circle).
+   */
+  addDotMrad(centerXMrad, centerYMrad, radiusMrad, segments = 48)
+  {
+    const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
+    const geom = new THREE.CircleGeometry(radiusUnits, segments);
+    const mesh = new THREE.Mesh(geom, this.reticleMaterial);
+
+    const cx = this.mradToReticleUnitsAtFov(centerXMrad, this.initialFOV);
+    const cy = this.mradToReticleUnitsAtFov(centerYMrad, this.initialFOV);
+    mesh.position.set(cx, cy, 0);
+
+    this.reticleGroup.add(mesh);
+  }
+
+  /**
+   * Build the reticle pattern in MRAD space.
+   * This can be extended later for a full Christmas-tree grid.
+   */
+  buildReticle()
+  {
+    const maxExtentMrad = 10.0; // how far ticks extend from center in mrad
+
+    const mainLineThicknessMrad = 0.1;
+    const minorLineThicknessMrad = 0.05;
+
+    // Main crosshair lines (through center)
+    this.addLineMrad(-maxExtentMrad, 0, maxExtentMrad, 0, mainLineThicknessMrad);
+    this.addLineMrad(0, -maxExtentMrad, 0, maxExtentMrad, mainLineThicknessMrad);
+
+    // Major ticks every 1 mrad, minor ticks every 0.5 mrad
+    const majorStep = 1.0;
+    const minorStep = 0.5;
+
+    const majorTickLengthMrad = 0.6;
+    const minorTickLengthMrad = 0.3;
+
+    // Horizontal axis ticks
+    for (let m = minorStep; m <= maxExtentMrad; m += minorStep)
+    {
+      const isMajor = Math.abs(m % majorStep) < 1e-4;
+      const lengthMrad = isMajor ? majorTickLengthMrad : minorTickLengthMrad;
+      const thicknessMrad = isMajor ? mainLineThicknessMrad : minorLineThicknessMrad;
+
+      // +X
+      this.addLineMrad(
+        m,
+        -lengthMrad * 0.5,
+        m,
+        lengthMrad * 0.5,
+        thicknessMrad
+      );
+
+      // -X
+      this.addLineMrad(
+        -m,
+        -lengthMrad * 0.5,
+        -m,
+        lengthMrad * 0.5,
+        thicknessMrad
+      );
+    }
+
+    // Vertical axis ticks
+    for (let m = minorStep; m <= maxExtentMrad; m += minorStep)
+    {
+      const isMajor = Math.abs(m % majorStep) < 1e-4;
+      const lengthMrad = isMajor ? majorTickLengthMrad : minorTickLengthMrad;
+      const thicknessMrad = isMajor ? mainLineThicknessMrad : minorLineThicknessMrad;
+
+      // +Y
+      this.addLineMrad(
+        -lengthMrad * 0.5,
+        m,
+        lengthMrad * 0.5,
+        m,
+        thicknessMrad
+      );
+
+      // -Y
+      this.addLineMrad(
+        -lengthMrad * 0.5,
+        -m,
+        lengthMrad * 0.5,
+        -m,
+        thicknessMrad
+      );
+    }
+  }
+
+  /**
+   * Update the reticle scale for FFP behavior.
+   * Geometry is built at initialFOV; scale changes with currentFOV.
+   */
+  updateReticleScale()
+  {
+    if (!this.reticleGroup) return;
+
+    const fovScale = this.initialFOV / this.currentFOV;
+    // Factor 2 maps internal reticle space [-0.5,0.5] to HUD space [-1,1]
+    const baseScale = 2.0;
+    const s = baseScale * fovScale;
+    this.reticleGroup.scale.set(s, s, 1);
+  }
+
+  zoomIn()
+  {
+    const zoomFactor = 1.1; // 10% increase in magnification per step
+    this.setZoomX(this.currentZoomX * zoomFactor);
+  }
+
+  zoomOut()
   {
     const zoomFactor = 1.1;
-    this.setFOV(this.currentFOV * zoomFactor);
+    this.setZoomX(this.currentZoomX / zoomFactor);
   }
 
   /**
@@ -191,34 +433,35 @@ export class Scope
    */
   getScaledPanAmount(baseAmount)
   {
-    // Scale pan amount proportionally to FOV
-    // At maxFOV (30°), use full amount
-    // At minFOV (1°), use 1/30th of the amount
-    return baseAmount * (this.currentFOV / this.maxFOV);
+    // Scale pan amount inversely with zoom:
+    // - At min zoom (4.5X), use full amount
+    // - At max zoom (30X), use much smaller steps for fine control
+    const zoomRatio = this.currentZoomX / this.minZoomX;
+    return baseAmount / zoomRatio;
   }
 
-  panLeft(baseAmount = 0.005)
+  panLeft(baseAmount = 0.001)
   {
     const amount = this.getScaledPanAmount(baseAmount);
     this.yaw += amount;
     this.updateCameraLookAt();
   }
 
-  panRight(baseAmount = 0.005)
+  panRight(baseAmount = 0.001)
   {
     const amount = this.getScaledPanAmount(baseAmount);
     this.yaw -= amount;
     this.updateCameraLookAt();
   }
 
-  panUp(baseAmount = 0.005)
+  panUp(baseAmount = 0.001)
   {
     const amount = this.getScaledPanAmount(baseAmount);
     this.pitch += amount;
     this.updateCameraLookAt();
   }
 
-  panDown(baseAmount = 0.005)
+  panDown(baseAmount = 0.001)
   {
     const amount = this.getScaledPanAmount(baseAmount);
     this.pitch -= amount;
