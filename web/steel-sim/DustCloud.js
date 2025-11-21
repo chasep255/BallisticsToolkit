@@ -19,7 +19,7 @@ export class DustCloud
    * @param {number} options.numParticles - Number of particles (required)
    * @param {Object} options.color - RGB color {r, g, b} 0-255 (required)
    *                                 Each particle gets random color jitter (±20%)
-   * @param {Object} options.wind - Wind vector in mph, Three.js coordinates (required)
+   * @param {btk.WindGenerator} options.windGenerator - Wind generator instance (required)
    * @param {number} options.initialRadius - Initial cloud radius in yards (required)
    * @param {number} options.growthRate - Cloud radius growth rate in feet/second (required)
    * @param {number} options.particleDiameter - Particle diameter in yards (required)
@@ -33,7 +33,7 @@ export class DustCloud
       scene,
       numParticles,
       color,
-      wind,
+      windGenerator,
       initialRadius,
       growthRate,
       particleDiameter
@@ -41,39 +41,35 @@ export class DustCloud
 
     if (!scene) throw new Error('Scene is required');
     if (!position) throw new Error('Position is required');
+    if (!windGenerator) throw new Error('WindGenerator is required');
 
     // Use BTK from window (must be initialized by main application)
     const btk = window.btk;
 
     this.scene = scene;
+    this.windGenerator = windGenerator; // Store for dynamic wind sampling
 
     // Convert impact point (yards, Three.js coords) to BTK coordinates (meters)
     const impactPos = window.threeJsToBtkPosition(position);
-
-    // Convert wind vector (mph, Three.js coords) to BTK coordinates (m/s)
-    const windMph = new THREE.Vector3(wind.x, wind.y, wind.z);
-    const windBtk = window.threeJsToBtkVelocityMph(windMph);
 
     // Convert parameters from yards/fps to meters/mps for BTK
     const initialRadiusMeters = btk.Conversions.yardsToMeters(initialRadius);
     const growthRateMps = btk.Conversions.fpsToMps(growthRate);
 
-    // Create C++ dust cloud
+    // Create C++ dust cloud (wind sampled dynamically each update)
     // Particles have relative positions from cloud center (Gaussian distribution)
     // Cloud radius grows linearly over time
-    // Cloud center advects with wind
+    // Cloud center advects with wind (sampled at cloud center each frame)
     // Alpha decays with volume: alpha = (initial_radius / current_radius)³
     this.dustCloud = new btk.DustCloud(
       numParticles,
       impactPos,
-      windBtk,
       initialRadiusMeters,
       growthRateMps
     );
 
     // Cleanup temporary BTK objects
     impactPos.delete();
-    windBtk.delete();
 
     // Store particle diameter for material sizing
     this.particleDiameter = particleDiameter;
@@ -148,14 +144,25 @@ export class DustCloud
 
   /**
    * Update physics and rendering
+   * @param {btk.WindGenerator} windGenerator - Wind generator for sampling wind at cloud center
    * @param {number} dt - Time step in seconds
    */
-  update(dt)
+  update(windGenerator, dt)
   {
     if (!this.dustCloud) return;
+    if (!windGenerator) return;
 
-    // Step physics
-    this.dustCloud.timeStep(dt);
+    // Get current cloud center position in BTK coordinates
+    const centerPosBtk = this.dustCloud.getCenterPosition();
+
+    // Sample wind at cloud center position
+    const windBtk = windGenerator.sample(centerPosBtk.x, centerPosBtk.y, centerPosBtk.z);
+
+    // Step physics with sampled wind
+    this.dustCloud.timeStep(dt, windBtk);
+
+    // Cleanup temporary BTK object
+    windBtk.delete();
 
     // Get positions from C++
     const positions = this.dustCloud.getPositions();
@@ -309,9 +316,10 @@ export class DustCloudFactory
   /**
    * Update all dust clouds (physics and rendering)
    * Automatically disposes clouds when animation is complete
+   * @param {btk.WindGenerator} windGenerator - Wind generator for sampling wind
    * @param {number} dt - Time step in seconds
    */
-  static updateAll(dt)
+  static updateAll(windGenerator, dt)
   {
     // Iterate backwards to safely remove items while iterating
     for (let i = DustCloudFactory.clouds.length - 1; i >= 0; i--)
@@ -319,7 +327,7 @@ export class DustCloudFactory
       const cloud = DustCloudFactory.clouds[i];
 
       // Update physics and rendering
-      cloud.update(dt);
+      cloud.update(windGenerator, dt);
 
       // Check if animation is complete and auto-dispose
       if (cloud.isDone())

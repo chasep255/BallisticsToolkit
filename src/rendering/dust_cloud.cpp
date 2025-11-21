@@ -11,9 +11,9 @@
 namespace btk::rendering
 {
 
-  DustCloud::DustCloud(int num_particles, const btk::math::Vector3D& position, const btk::math::Vector3D& wind, float initial_radius,
+  DustCloud::DustCloud(int num_particles, const btk::math::Vector3D& position, float initial_radius,
                        float growth_rate)
-    : wind_(wind), center_position_(position), initial_radius_(initial_radius), growth_rate_(growth_rate), radius_(initial_radius),
+    : center_position_(position), initial_radius_(initial_radius), growth_rate_(growth_rate), radius_(initial_radius),
       alpha_(1.0f)
   {
     // Initialize particles with relative positions using Gaussian distribution (denser at center)
@@ -34,7 +34,7 @@ namespace btk::rendering
     updateBuffers();
   }
 
-  void DustCloud::timeStep(float dt)
+  void DustCloud::timeStep(float dt, const btk::math::Vector3D& wind)
   {
     // Grow radius linearly over time
     radius_ += growth_rate_ * dt;
@@ -55,8 +55,8 @@ namespace btk::rendering
       alpha_ = 0.0f;
     }
 
-    // Advect cloud center with wind
-    center_position_ += wind_ * dt;
+    // Advect cloud center with wind (negate to move in direction wind is blowing TO)
+    center_position_ -= wind * dt;
 
     // Update display buffers
     updateBuffers();
@@ -114,6 +114,11 @@ namespace btk::rendering
   {
     // Return all particles if cloud is visible, 0 if faded
     return (alpha_ >= ALPHA_THRESHOLD) ? static_cast<int>(particles_.size()) : 0;
+  }
+
+  btk::math::Vector3D DustCloud::getCenterPosition() const
+  {
+    return center_position_;
   }
 
 #ifdef __EMSCRIPTEN__

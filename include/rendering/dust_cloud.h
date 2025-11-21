@@ -37,28 +37,29 @@ namespace btk::rendering
      *
      * Particles have relative positions from cloud center, distributed using Gaussian distribution.
      * Cloud radius grows linearly over time.
-     * Cloud center advects with wind.
+     * Cloud center advects with wind (wind sampled dynamically each timeStep).
      * Alpha decays inversely with radius: alpha = initial_radius / current_radius
      * As the cloud expands, alpha decreases proportionally to 1/radius.
      * Cloud disappears when alpha < 0.01.
      *
      * @param num_particles Initial number of particles
      * @param position Initial cloud center position
-     * @param wind Wind vector (m/s) - advects cloud center
      * @param initial_radius Initial cloud radius in meters (default 0.1m = 10cm)
      * @param growth_rate Cloud radius growth rate in m/s (default 0.5 m/s)
      */
-    DustCloud(int num_particles, const btk::math::Vector3D& position, const btk::math::Vector3D& wind, float initial_radius = 0.1f,
+    DustCloud(int num_particles, const btk::math::Vector3D& position, float initial_radius = 0.1f,
               float growth_rate = 0.5f);
 
     /**
      * @brief Advance simulation by time step
      *
      * Updates particle positions with wind, ages particles, and fades alpha.
+     * Wind is sampled dynamically at cloud center position each frame.
      *
      * @param dt Time step in seconds
+     * @param wind Wind vector (m/s) at cloud center position - advects cloud center
      */
-    void timeStep(float dt);
+    void timeStep(float dt, const btk::math::Vector3D& wind);
 
     /**
      * @brief Get positions buffer as JS-typed array view for zero-copy access
@@ -96,12 +97,18 @@ namespace btk::rendering
      */
     int getParticleCount() const;
 
+    /**
+     * @brief Get current cloud center position
+     *
+     * @return Cloud center position in BTK coordinates (meters)
+     */
+    btk::math::Vector3D getCenterPosition() const;
+
 
     private:
     static constexpr float ALPHA_THRESHOLD = 0.01f; ///< Alpha threshold for particle visibility
 
     std::vector<Particle> particles_;     ///< All particles
-    btk::math::Vector3D wind_;            ///< Constant wind vector (advects cloud center)
     btk::math::Vector3D center_position_; ///< Current cloud center position
     float initial_radius_;                ///< Initial cloud radius in meters
     float growth_rate_;                   ///< Cloud radius growth rate in m/s

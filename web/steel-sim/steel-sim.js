@@ -30,6 +30,11 @@ import
   Scope
 }
 from './Scope.js';
+import
+{
+  WindFlagFactory
+}
+from './WindFlag.js';
 import * as Config from './config.js';
 
 // ===== GLOBAL STATE =====
@@ -45,6 +50,8 @@ let lastTime = performance.now();
 let landscape = null;
 let scopeMode = false; // Whether mouse is controlling the scope
 let scopeLayer = null; // Store scope layer for bounds checking
+let windGenerator = null; // BTK WindGenerator instance
+let windStartTime = null; // Track elapsed time for wind generator
 
 // ===== COORDINATE CONVERSION UTILITIES =====
 // BTK: X=downrange, Y=crossrange-right, Z=up
@@ -164,6 +171,59 @@ window.threeJsToBtkVelocityMph = function(threeVec)
   );
 };
 
+// ===== WIND CONVERSIONS =====
+
+/**
+ * Convert BTK wind vector (m/s, BTK coords) to Three.js wind vector (mph, Three.js coords)
+ * @param {btk.Vector3D} windBtk - Wind vector in BTK coordinates (m/s)
+ * @returns {Object} Wind vector {x, y, z} in mph (Three.js coords)
+ */
+window.btkWindToThreeJs = function(windBtk)
+{
+  // BTK: X=downrange, Y=crossrange-right, Z=up
+  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
+  // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
+  return {
+    x: btk.Conversions.mpsToMph(windBtk.y), // BTK Y (crossrange) → Three.js X (crosswind)
+    y: btk.Conversions.mpsToMph(windBtk.z), // BTK Z (up) → Three.js Y (vertical)
+    z: -btk.Conversions.mpsToMph(windBtk.x) // BTK -X (downrange) → Three.js Z (downrange wind)
+  };
+};
+
+/**
+ * Sample wind at Three.js position and return in Three.js coords (mph)
+ * @param {btk.WindGenerator} generator - Wind generator instance
+ * @param {number} x_yd - X coordinate in yards (crossrange)
+ * @param {number} y_yd - Y coordinate in yards (vertical)
+ * @param {number} z_yd - Z coordinate in yards (downrange, negative = downrange)
+ * @returns {Object} Wind vector {x, y, z} in mph (Three.js coords)
+ */
+window.sampleWindAtThreeJsPosition = function(generator, x_yd, y_yd, z_yd)
+{
+  if (!btk) throw new Error('BTK not loaded yet');
+  if (!generator)
+  {
+    return {
+      x: 0,
+      y: 0,
+      z: 0
+    };
+  }
+
+  // Convert Three.js coords (yards) to BTK coords (meters) and sample
+  const windBtk = generator.sample(
+    btk.Conversions.yardsToMeters(-z_yd), // Three Z (downrange) → BTK X (downrange)
+    btk.Conversions.yardsToMeters(x_yd), // Three X (crossrange) → BTK Y (crossrange)
+    btk.Conversions.yardsToMeters(y_yd) // Three Y (up) → BTK Z (up)
+  );
+
+  // Convert BTK wind (m/s) to Three.js coords (mph)
+  const wind = window.btkWindToThreeJs(windBtk);
+  windBtk.delete(); // Dispose Vector3D to prevent memory leak
+
+  return wind;
+};
+
 // ===== INITIALIZATION =====
 
 async function init()
@@ -225,6 +285,66 @@ function setupScene()
 
   // Create landscape (uses Config.LANDSCAPE_CONFIG defaults)
   landscape = new Landscape(scene);
+
+  // Initialize wind generator
+  const halfWidth = Config.LANDSCAPE_CONFIG.groundWidth / 2;
+
+  // Calculate wind box corners in Three.js coordinates (yards)
+  const minCornerX_yd = -halfWidth - Config.WIND_CONFIG.boxPadding;
+  const minCornerY_yd = 0;
+  const minCornerZ_yd = Config.WIND_CONFIG.boxPadding; // Near edge (positive Z = towards camera)
+  const maxCornerX_yd = halfWidth + Config.WIND_CONFIG.boxPadding;
+  const maxCornerY_yd = Config.WIND_CONFIG.boxHeight;
+  const maxCornerZ_yd = -(Config.LANDSCAPE_CONFIG.groundLength + Config.WIND_CONFIG.boxPadding); // Far edge (negative Z = downrange)
+
+  // Convert to BTK coordinates (meters)
+  const minCorner = new btk.Vector3D(
+    btk.Conversions.yardsToMeters(-minCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
+    btk.Conversions.yardsToMeters(minCornerX_yd), // Three X (crossrange) → BTK Y (crossrange)
+    btk.Conversions.yardsToMeters(minCornerY_yd) // Three Y (up) → BTK Z (up)
+  );
+  const maxCorner = new btk.Vector3D(
+    btk.Conversions.yardsToMeters(-maxCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
+    btk.Conversions.yardsToMeters(maxCornerX_yd), // Three X (crossrange) → BTK Y (crossrange)
+    btk.Conversions.yardsToMeters(maxCornerY_yd) // Three Y (up) → BTK Z (up)
+  );
+
+  // Get available wind presets and use configured default (or first available)
+  if (!btk.WindPresets)
+  {
+    minCorner.delete();
+    maxCorner.delete();
+    throw new Error('WindPresets not available in BTK module');
+  }
+
+  const presetList = btk.WindPresets.listPresets();
+  const presetNames = [];
+  for (let i = 0; i < presetList.size(); i++)
+  {
+    presetNames.push(presetList.get(i));
+  }
+  if (presetNames.length === 0)
+  {
+    minCorner.delete();
+    maxCorner.delete();
+    throw new Error('No wind presets available');
+  }
+
+  const windPresetName = presetNames.includes(Config.WIND_CONFIG.defaultPreset) ? Config.WIND_CONFIG.defaultPreset : presetNames[0];
+  windGenerator = btk.WindPresets.getPreset(windPresetName, minCorner, maxCorner);
+  windStartTime = performance.now() / 1000; // Track start time in seconds
+
+  // Clean up temporary vectors
+  minCorner.delete();
+  maxCorner.delete();
+
+  // Create wind flags along the range
+  WindFlagFactory.createFlags(scene, landscape,
+  {
+    maxRange: Config.LANDSCAPE_CONFIG.groundLength,
+    interval: 100,
+    sideOffset: Config.LANDSCAPE_CONFIG.groundWidth / 2
+  });
 
   // Create target racks first to determine max range
   createTargetRacks();
@@ -574,7 +694,7 @@ function createDustCloud(impactPointThree)
     scene,
     numParticles: Config.GROUND_DUST_CONFIG.numParticles,
     color: Config.GROUND_DUST_CONFIG.color,
-    wind: Config.WIND_MPH,
+    windGenerator: windGenerator,
     initialRadius: btk.Conversions.inchesToYards(Config.GROUND_DUST_CONFIG.initialRadius),
     growthRate: Config.GROUND_DUST_CONFIG.growthRate,
     particleDiameter: btk.Conversions.inchesToYards(Config.GROUND_DUST_CONFIG.particleDiameter)
@@ -589,7 +709,7 @@ function createMetallicDustCloud(impactPointThree)
     scene,
     numParticles: Config.METAL_DUST_CONFIG.numParticles,
     color: Config.METAL_DUST_CONFIG.color,
-    wind: Config.WIND_MPH,
+    windGenerator: windGenerator,
     initialRadius: btk.Conversions.inchesToYards(Config.METAL_DUST_CONFIG.initialRadius),
     growthRate: Config.METAL_DUST_CONFIG.growthRate,
     particleDiameter: btk.Conversions.inchesToYards(Config.METAL_DUST_CONFIG.particleDiameter)
@@ -615,8 +735,16 @@ function animate()
   const dt = Math.min((currentTime - lastTime) / 1000, 1 / 30);
   lastTime = currentTime;
 
+  // Advance wind generator time
+  if (windGenerator && windStartTime !== null)
+  {
+    const elapsedTime = (currentTime / 1000) - windStartTime;
+    windGenerator.advanceTime(elapsedTime);
+  }
+
   SteelTargetFactory.updateAll(dt);
-  DustCloudFactory.updateAll(dt);
+  DustCloudFactory.updateAll(windGenerator, dt);
+  WindFlagFactory.updateAll(windGenerator, dt);
 
   // Render background scene into element's render target
   backgroundElement.render(scene, backgroundCamera,

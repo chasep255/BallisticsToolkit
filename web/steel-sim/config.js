@@ -15,13 +15,6 @@ export const BULLET_LENGTH = 0.0305; // meters - ~30mm typical
 export const BULLET_BC = 0.3; // Ballistic coefficient
 export const BULLET_SPEED_MPS = 800; // m/s - Muzzle velocity
 
-// ===== WIND CONSTANTS =====
-export const WIND_MPH = {
-  x: 1.1, // Crosswind
-  y: 0.0, // Vertical wind
-  z: 0.45 // Downrange wind
-};
-
 // ===== DUST CLOUD CONFIGURATIONS =====
 export const GROUND_DUST_CONFIG = {
   numParticles: 1000,
@@ -53,6 +46,13 @@ export const LANDSCAPE_CONFIG = {
   groundLength: 2000, // yards - Green ground length
   brownGroundWidth: 1000, // yards - Brown ground width
   brownGroundLength: 2500 // yards - Extended to cover mountains (up to 2400 yards)
+};
+
+// ===== WIND GENERATOR CONFIGURATION =====
+export const WIND_CONFIG = {
+  boxPadding: 50, // yards - padding on all sides of wind sampling box
+  boxHeight: 100, // yards - height for elevated sampling
+  defaultPreset: 'Moderate' // Default wind preset name
 };
 
 // ===== ENVIRONMENT CONFIGURATIONS =====

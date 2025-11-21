@@ -16,6 +16,7 @@
 #include "physics/wind_generator.h"
 #include "rendering/dust_cloud.h"
 #include "rendering/steel_target.h"
+#include "rendering/wind_flag.h"
 
 using namespace emscripten;
 using namespace btk::ballistics;
@@ -361,10 +362,22 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Dust Cloud class
   class_<DustCloud>("DustCloud")
-    .constructor<int, const btk::math::Vector3D&, const btk::math::Vector3D&, float, float>()
+    .constructor<int, const btk::math::Vector3D&, float, float>()
     .function("timeStep", &DustCloud::timeStep)
     .function("getPositions", &DustCloud::getPositions)
     .function("getAlpha", &DustCloud::getAlpha)
     .function("isDone", &DustCloud::isDone)
-    .function("getParticleCount", &DustCloud::getParticleCount);
+    .function("getParticleCount", &DustCloud::getParticleCount)
+    .function("getCenterPosition", &DustCloud::getCenterPosition);
+
+  // Wind Flag class
+  class_<btk::rendering::WindFlag>("WindFlag")
+    .constructor<float, float, float, float, int, float, float, float, float, float, float, float, float, float>()
+    .function("setPosition", &btk::rendering::WindFlag::setPosition)
+    .function("getPosition", &btk::rendering::WindFlag::getPosition)
+    .function("update", &btk::rendering::WindFlag::update)
+    .function("updateDisplay", &btk::rendering::WindFlag::updateDisplay)
+    .function("getVertices", &btk::rendering::WindFlag::getVertices)
+    .function("getUVs", &btk::rendering::WindFlag::getUVs)
+    .function("getIndices", &btk::rendering::WindFlag::getIndices);
 }
