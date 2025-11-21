@@ -32,7 +32,7 @@ import
 from './Scope.js';
 
 // ===== CONSTANTS =====
-const SHOOTER_HEIGHT = 1; // yards
+const SHOOTER_HEIGHT = 10; // yards - elevated shooter overlooking the landscape
 const CAMERA_FOV = 50;
 const CAMERA_FAR_PLANE = 3000; // Must be > ground length (2000 yards)
 
