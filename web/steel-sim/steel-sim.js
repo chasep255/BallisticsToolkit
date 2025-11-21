@@ -56,14 +56,13 @@ const GROUND_DUST_CONFIG = {
     g: 115,
     b: 85
   }, // Brown/tan
-  initialRadius: 0.25, // inches
-  growthRate: 0.5, // feet/second
-  fadeRate: 0.5,
+  initialRadius: 2, // inches (realistic bullet impact dust cloud)
+  growthRate: 0.1, // feet/second
   particleDiameter: 0.2 // inches
 };
 
 const METAL_DUST_CONFIG = {
-  numParticles: 1000,
+  numParticles: 250,
   color:
   {
     r: 192,
@@ -71,8 +70,7 @@ const METAL_DUST_CONFIG = {
     b: 192
   }, // Silver/gray
   initialRadius: 0.5, // inches
-  growthRate: 0.5, // feet/second
-  fadeRate: 0.5,
+  growthRate: 1.0, // feet/second
   particleDiameter: 0.2 // inches
 };
 
@@ -273,8 +271,7 @@ function setupScene()
     groundWidth: 100,
     groundLength: 2000,
     brownGroundWidth: 500,
-    brownGroundLength: 2000,
-    slopeAngle: 5
+    brownGroundLength: 2000
   });
 
   // Compute 1000-yard target center height for initial scope aim
@@ -456,7 +453,7 @@ function createTargetRacks()
     }
   ]);
 
-    addTargetRack(5, -500, 1.5, 1,
+  addTargetRack(5, -500, 1.5, 1,
   [
     {
       width: 10,
@@ -480,66 +477,43 @@ function createTargetRacks()
   ]);
 
   addTargetRack(-5, -1000, 2, 1,
-    [
-      {
-        width: 20,
-        height: 20,
-        thickness: 0.25,
-        isOval: true
-      },
-      {
-        width: 15,
-        height: 15,
-        thickness: 0.25,
-        isOval: true
-      },
-  
-      {
-        width: 10,
-        height: 10,
-        thickness: 0.25,
-        isOval: true
-      }
-    ]);
+  [
+    {
+      width: 20,
+      height: 20,
+      thickness: 0.25,
+      isOval: true
+    },
+    {
+      width: 15,
+      height: 15,
+      thickness: 0.25,
+      isOval: true
+    },
 
-  // // Create target racks every 100 yards from 100 to 1000 yards
-  // // Use alternating crossrange offsets to spread them out visually
-  // const crossrangeOffsets = [0, 20, -20, 30, -30, 25, -25, 15, -15, 0]; // Pattern for 10 racks
+    {
+      width: 10,
+      height: 10,
+      thickness: 0.25,
+      isOval: true
+    }
+  ]);
 
-  // for (let i = 0; i < 10; i++)
-  // {
-  //   const distanceYards = 100 + (i * 100); // 100, 200, 300, ..., 1000
-  //   const crossrangeOffset = crossrangeOffsets[i];
-
-  //   // Target sizes scale with distance for appropriate difficulty
-  //   // At 100 yards: 6-12 inch targets
-  //   // At 1000 yards: 36 inch (1 yard) targets
-  //   const baseSize = 6 + (distanceYards / 1000) * 30; // Linear scaling from 6" to 36"
-
-  //   const targets = [
-  //   {
-  //     width: baseSize * 1.5,
-  //     height: baseSize * 1.5,
-  //     thickness: 0.25,
-  //     isOval: false
-  //   },
-  //   {
-  //     width: baseSize,
-  //     height: baseSize,
-  //     thickness: 0.25,
-  //     isOval: true
-  //   },
-  //   {
-  //     width: baseSize * 0.75,
-  //     height: baseSize * 0.75,
-  //     thickness: 0.25,
-  //     isOval: false
-  //   }];
-
-  //   // Rack width scales with number of targets, height stays consistent
-  //   const rackWidth = 8 + (i * 0.5); // Slightly wider racks for longer distances
-  //   addTargetRack(crossrangeOffset, -distanceYards, rackWidth, 2, targets);
-  // }
+  addTargetRack(-5, -1760, 3, 2,
+  [
+    {
+      width: 40,
+      height: 40,
+      thickness: 0.25,
+      isOval: true
+    },
+    {
+      width: 20,
+      height: 20,
+      thickness: 0.25,
+      isOval: true
+    }
+  ]);
 }
 
 // ===== UI SETUP =====
@@ -756,7 +730,6 @@ function createDustCloud(impactPointThree)
     wind: WIND_MPH,
     initialRadius: btk.Conversions.inchesToYards(GROUND_DUST_CONFIG.initialRadius),
     growthRate: GROUND_DUST_CONFIG.growthRate,
-    fadeRate: GROUND_DUST_CONFIG.fadeRate,
     particleDiameter: btk.Conversions.inchesToYards(GROUND_DUST_CONFIG.particleDiameter)
   });
 }
@@ -772,7 +745,6 @@ function createMetallicDustCloud(impactPointThree)
     wind: WIND_MPH,
     initialRadius: btk.Conversions.inchesToYards(METAL_DUST_CONFIG.initialRadius),
     growthRate: METAL_DUST_CONFIG.growthRate,
-    fadeRate: METAL_DUST_CONFIG.fadeRate,
     particleDiameter: btk.Conversions.inchesToYards(METAL_DUST_CONFIG.particleDiameter)
   });
 }

@@ -361,11 +361,10 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Dust Cloud class
   class_<DustCloud>("DustCloud")
-    .constructor<int, const btk::math::Vector3D&, const btk::math::Vector3D&, uint8_t, uint8_t, uint8_t, float, float, float, float>()
+    .constructor<int, const btk::math::Vector3D&, const btk::math::Vector3D&, float, float>()
     .function("timeStep", &DustCloud::timeStep)
-    .function("getInstanceMatrices", &DustCloud::getInstanceMatrices)
+    .function("getPositions", &DustCloud::getPositions)
     .function("getAlpha", &DustCloud::getAlpha)
     .function("isDone", &DustCloud::isDone)
-    .function("getParticleCount", &DustCloud::getParticleCount)
-    .function("getParticleDiameter", &DustCloud::getParticleDiameter);
+    .function("getParticleCount", &DustCloud::getParticleCount);
 }

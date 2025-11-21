@@ -11,10 +11,10 @@
 namespace btk::rendering
 {
 
-  DustCloud::DustCloud(int num_particles, const btk::math::Vector3D& position, const btk::math::Vector3D& wind, uint8_t color_r, uint8_t color_g, uint8_t color_b, float initial_radius,
-                       float growth_rate, float fade_rate, float particle_diameter)
-    : wind_(wind), center_position_(position), initial_radius_(initial_radius), growth_rate_(growth_rate), fade_rate_(fade_rate), radius_(initial_radius), particle_diameter_(particle_diameter),
-      alpha_(1.0f), elapsed_time_(0.0f)
+  DustCloud::DustCloud(int num_particles, const btk::math::Vector3D& position, const btk::math::Vector3D& wind, float initial_radius,
+                       float growth_rate)
+    : wind_(wind), center_position_(position), initial_radius_(initial_radius), growth_rate_(growth_rate), radius_(initial_radius),
+      alpha_(1.0f)
   {
     // Initialize particles with relative positions using Gaussian distribution (denser at center)
     // Scale relative positions by initial radius so they represent actual positions in meters
@@ -27,12 +27,7 @@ namespace btk::rendering
       btk::math::Vector3D relative_position(btk::math::Random::normal(0.0f, 1.0f) * initial_radius_, btk::math::Random::normal(0.0f, 1.0f) * initial_radius_,
                                             btk::math::Random::normal(0.0f, 1.0f) * initial_radius_);
 
-      // Add random color jitter (±20% variation)
-      uint8_t jitter_r = static_cast<uint8_t>(std::max(0, std::min(255, static_cast<int>(color_r + btk::math::Random::normal(0.0f, color_r * 0.2f)))));
-      uint8_t jitter_g = static_cast<uint8_t>(std::max(0, std::min(255, static_cast<int>(color_g + btk::math::Random::normal(0.0f, color_g * 0.2f)))));
-      uint8_t jitter_b = static_cast<uint8_t>(std::max(0, std::min(255, static_cast<int>(color_b + btk::math::Random::normal(0.0f, color_b * 0.2f)))));
-
-      particles_.emplace_back(relative_position, jitter_r, jitter_g, jitter_b);
+      particles_.emplace_back(relative_position);
     }
 
     // Initialize buffers
@@ -41,16 +36,20 @@ namespace btk::rendering
 
   void DustCloud::timeStep(float dt)
   {
-    // Grow radius linearly over time (accumulate growth, independent of alpha)
+    // Grow radius linearly over time
     radius_ += growth_rate_ * dt;
 
-    // Update elapsed time for independent alpha fade
-    elapsed_time_ += dt;
-
-    // Calculate alpha exponentially over time (independent of radius growth)
-    // alpha = e^(-fade_rate * t)
-    alpha_ = std::exp(-fade_rate_ * elapsed_time_);
-    if(alpha_ < 0.0f)
+    // Calculate alpha inversely proportional to radius: alpha = initial_radius / current_radius
+    // As the cloud expands, alpha decreases proportionally to 1/radius
+    if(radius_ > 0.0f)
+    {
+      alpha_ = initial_radius_ / radius_;
+      if(alpha_ < 0.0f)
+      {
+        alpha_ = 0.0f;
+      }
+    }
+    else
     {
       alpha_ = 0.0f;
     }
@@ -64,7 +63,7 @@ namespace btk::rendering
 
   void DustCloud::updateBuffers()
   {
-    matrices_buffer_.clear();
+    positions_buffer_.clear();
 
     // Skip if cloud is fully faded
     if(alpha_ < ALPHA_THRESHOLD)
@@ -91,25 +90,10 @@ namespace btk::rendering
       float y = btk::math::Conversions::metersToYards(world_position.z);  // BTK Z → Three Y (yards)
       float z = -btk::math::Conversions::metersToYards(world_position.x); // BTK -X → Three Z (yards)
 
-      // Create identity scale and translation matrix (column-major order for Three.js)
-      // Three.js Matrix4 layout: [col0, col1, col2, col3] = [m0-m3, m4-m7, m8-m11, m12-m15]
-      // Identity scale matrix: 1.0 on diagonal, translation in last column
-      matrices_buffer_.push_back(1.0f); // m0 (scale X)
-      matrices_buffer_.push_back(0.0f); // m1
-      matrices_buffer_.push_back(0.0f); // m2
-      matrices_buffer_.push_back(0.0f); // m3
-      matrices_buffer_.push_back(0.0f); // m4
-      matrices_buffer_.push_back(1.0f); // m5 (scale Y)
-      matrices_buffer_.push_back(0.0f); // m6
-      matrices_buffer_.push_back(0.0f); // m7
-      matrices_buffer_.push_back(0.0f); // m8
-      matrices_buffer_.push_back(0.0f); // m9
-      matrices_buffer_.push_back(1.0f); // m10 (scale Z)
-      matrices_buffer_.push_back(0.0f); // m11
-      matrices_buffer_.push_back(x);    // m12 (translation X)
-      matrices_buffer_.push_back(y);    // m13 (translation Y)
-      matrices_buffer_.push_back(z);    // m14 (translation Z)
-      matrices_buffer_.push_back(1.0f); // m15
+      // Store position (3 floats: x, y, z)
+      positions_buffer_.push_back(x);
+      positions_buffer_.push_back(y);
+      positions_buffer_.push_back(z);
     }
   }
 
@@ -132,14 +116,14 @@ namespace btk::rendering
   }
 
 #ifdef __EMSCRIPTEN__
-  emscripten::val DustCloud::getInstanceMatrices() const
+  emscripten::val DustCloud::getPositions() const
   {
     using namespace emscripten;
-    if(matrices_buffer_.empty())
+    if(positions_buffer_.empty())
     {
       return val::global("Float32Array").new_(0);
     }
-    return val(typed_memory_view(matrices_buffer_.size(), matrices_buffer_.data()));
+    return val(typed_memory_view(positions_buffer_.size(), positions_buffer_.data()));
   }
 #endif
 

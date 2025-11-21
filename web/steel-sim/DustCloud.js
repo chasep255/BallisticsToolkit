@@ -16,14 +16,14 @@ export class DustCloud
    * @param {Object} options - Configuration options
    * @param {THREE.Vector3} options.position - Initial cloud center position in Three.js coordinates (required)
    * @param {THREE.Scene} options.scene - Three.js scene to add mesh to (required)
-   * @param {number} options.numParticles - Number of particles (default 1000)
-   * @param {Object} options.color - RGB color {r, g, b} 0-255 (default brown: {r: 139, g: 115, b: 85})
+   * @param {number} options.numParticles - Number of particles (required)
+   * @param {Object} options.color - RGB color {r, g, b} 0-255 (required)
    *                                 Each particle gets random color jitter (±20%)
-   * @param {Object} options.wind - Wind vector in mph, Three.js coordinates (default {x: 0, y: 0, z: 0})
-   * @param {number} options.initialRadius - Initial cloud radius in yards (default 0.25 inches)
-   * @param {number} options.growthRate - Cloud radius growth rate in feet/second (default 0.05 ft/s)
-   * @param {number} options.fadeRate - Alpha fade rate per second (default 0.25 = e^(-0.25t))
-   * @param {number} options.particleDiameter - Particle diameter in yards (default ~0.011 yards = 1cm)
+   * @param {Object} options.wind - Wind vector in mph, Three.js coordinates (required)
+   * @param {number} options.initialRadius - Initial cloud radius in yards (required)
+   * @param {number} options.growthRate - Cloud radius growth rate in feet/second (required)
+   * @param {number} options.particleDiameter - Particle diameter in yards (required)
+   * Note: Alpha decays automatically with volume growth (no separate fade rate)
    */
   constructor(options)
   {
@@ -31,21 +31,12 @@ export class DustCloud
     {
       position,
       scene,
-      numParticles = 1000,
-      color = {
-        r: 139,
-        g: 115,
-        b: 85
-      },
-      wind = {
-        x: 0,
-        y: 0,
-        z: 0
-      }, // Default: no wind (mph)
-      initialRadius = btk.Conversions.inchesToYards(0.25), // Default 0.25 inches
-      growthRate = 0.05, // Default 0.05 feet/second
-      fadeRate = 0.25, // Exponential fade rate (e^(-0.25t))
-      particleDiameter = btk.Conversions.inchesToYards(0.5) // Default 0.5 inches (~0.014 yards)
+      numParticles,
+      color,
+      wind,
+      initialRadius,
+      growthRate,
+      particleDiameter
     } = options;
 
     if (!scene) throw new Error('Scene is required');
@@ -66,66 +57,93 @@ export class DustCloud
     // Convert parameters from yards/fps to meters/mps for BTK
     const initialRadiusMeters = btk.Conversions.yardsToMeters(initialRadius);
     const growthRateMps = btk.Conversions.fpsToMps(growthRate);
-    const particleDiameterMeters = btk.Conversions.yardsToMeters(particleDiameter);
 
     // Create C++ dust cloud
     // Particles have relative positions from cloud center (Gaussian distribution)
-    // Cloud radius grows linearly over time (independent of alpha fade)
+    // Cloud radius grows linearly over time
     // Cloud center advects with wind
-    // Alpha fades exponentially over time (independent of radius growth)
+    // Alpha decays with volume: alpha = (initial_radius / current_radius)³
     this.dustCloud = new btk.DustCloud(
       numParticles,
       impactPos,
       windBtk,
-      color.r,
-      color.g,
-      color.b,
       initialRadiusMeters,
-      growthRateMps,
-      fadeRate,
-      particleDiameterMeters
+      growthRateMps
     );
 
     // Cleanup temporary BTK objects
     impactPos.delete();
     windBtk.delete();
 
-    // Create Three.js instanced mesh for rendering
-    this.instancedMesh = this.createInstancedMesh(numParticles, color, particleDiameter);
-    this.scene.add(this.instancedMesh);
+    // Store particle diameter for material sizing
+    this.particleDiameter = particleDiameter;
+
+    // Generate colors once (with jitter for variation)
+    this.particleColors = this.generateColors(numParticles, color);
+
+    // Create Three.js points for rendering
+    this.points = this.createPoints(numParticles, particleDiameter);
+    this.scene.add(this.points);
   }
 
   /**
-   * Create Three.js instanced mesh for dust particles
+   * Generate colors for particles with random jitter
    * @private
    */
-  createInstancedMesh(numParticles, color, particleDiameter)
+  generateColors(numParticles, baseColor)
   {
-    // particleDiameter is already in yards
-    // Create sphere geometry for particles (radius = diameter / 2)
-    const particleRadius = particleDiameter / 2;
-    this.sphereGeometry = new THREE.SphereGeometry(particleRadius, 6, 6);
+    const colors = new Float32Array(numParticles * 3);
+    const baseR = baseColor.r / 255.0;
+    const baseG = baseColor.g / 255.0;
+    const baseB = baseColor.b / 255.0;
 
-    // Create material with dust color
-    this.sphereMaterial = new THREE.MeshStandardMaterial(
+    for(let i = 0; i < numParticles; ++i)
     {
-      color: new THREE.Color(color.r / 255, color.g / 255, color.b / 255),
+      // Add random color jitter (±20% variation)
+      const jitterR = baseR + (Math.random() - 0.5) * baseR * 0.4;
+      const jitterG = baseG + (Math.random() - 0.5) * baseG * 0.4;
+      const jitterB = baseB + (Math.random() - 0.5) * baseB * 0.4;
+
+      colors[i * 3 + 0] = Math.max(0, Math.min(1, jitterR));
+      colors[i * 3 + 1] = Math.max(0, Math.min(1, jitterG));
+      colors[i * 3 + 2] = Math.max(0, Math.min(1, jitterB));
+    }
+
+    return colors;
+  }
+
+  /**
+   * Create Three.js points for dust particles
+   * @private
+   */
+  createPoints(numParticles, particleDiameter)
+  {
+    // Create buffer geometry for points
+    this.pointsGeometry = new THREE.BufferGeometry();
+
+    // Initialize position and color attributes
+    const positions = new Float32Array(numParticles * 3);
+    const colors = this.particleColors; // Use pre-generated colors
+
+    this.pointsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    this.pointsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    // Create material for points
+    // Size is in world units (yards)
+    this.pointsMaterial = new THREE.PointsMaterial(
+    {
+      size: particleDiameter, // Size in yards (world units)
+      vertexColors: true,
       transparent: true,
       opacity: 1.0,
-      roughness: 0.8,
-      metalness: 0.1
+      sizeAttenuation: true
     });
 
-    // Create instanced mesh
-    const instancedMesh = new THREE.InstancedMesh(
-      this.sphereGeometry,
-      this.sphereMaterial,
-      numParticles
-    );
-    instancedMesh.castShadow = true;
-    instancedMesh.receiveShadow = false;
+    // Create points object
+    const points = new THREE.Points(this.pointsGeometry, this.pointsMaterial);
+    points.frustumCulled = false;
 
-    return instancedMesh;
+    return points;
   }
 
   /**
@@ -139,38 +157,37 @@ export class DustCloud
     // Step physics
     this.dustCloud.timeStep(dt);
 
-    // Get instance matrices from C++
-    const matrices = this.dustCloud.getInstanceMatrices();
+    // Get positions from C++
+    const positions = this.dustCloud.getPositions();
 
     // Check if any particles are still visible
-    if (matrices.length > 0)
+    if (positions.length > 0)
     {
-      const numParticles = matrices.length / 16; // 16 floats per matrix
+      const numParticles = positions.length / 3; // 3 floats per position
 
       // Get global alpha for the cloud
       const alpha = this.dustCloud.getAlpha();
 
-      // Copy matrices directly into instanceMatrix buffer (bulk copy from WASM memory view)
-      const instanceMatrixArray = this.instancedMesh.instanceMatrix.array;
-      instanceMatrixArray.set(matrices);
+      // Get position attribute
+      const positionAttr = this.pointsGeometry.attributes.position;
 
-      // Update instance count
-      this.instancedMesh.count = numParticles;
-      this.instancedMesh.instanceMatrix.needsUpdate = true;
+      // Copy positions directly into buffer attribute (bulk copy from WASM memory view)
+      positionAttr.array.set(positions);
+
+      // Mark attribute as needing update
+      positionAttr.needsUpdate = true;
 
       // Update material opacity with global alpha
-      this.sphereMaterial.opacity = alpha;
+      this.pointsMaterial.opacity = alpha;
 
-      // Always cast shadows while particles are being rendered
-      // Note: Three.js shadow maps don't support gradual fading, so shadows will
-      // be visible until particles fade completely. This is a limitation of shadow maps.
-      this.instancedMesh.castShadow = true;
+      // Update point count
+      this.pointsGeometry.setDrawRange(0, numParticles);
     }
     else
     {
-      // No particles visible - disable shadows and set opacity to 0
-      this.instancedMesh.castShadow = false;
-      this.sphereMaterial.opacity = 0.0;
+      // No particles visible - set opacity to 0 and draw range to 0
+      this.pointsMaterial.opacity = 0.0;
+      this.pointsGeometry.setDrawRange(0, 0);
     }
   }
 
@@ -195,26 +212,25 @@ export class DustCloud
       this.dustCloud = null;
     }
 
-    // Clean up instanced mesh
-    if (this.instancedMesh)
+    // Clean up points
+    if (this.points)
     {
-      this.scene.remove(this.instancedMesh);
-      this.instancedMesh.dispose();
-      this.instancedMesh = null;
+      this.scene.remove(this.points);
+      this.points = null;
     }
 
     // Clean up geometry
-    if (this.sphereGeometry)
+    if (this.pointsGeometry)
     {
-      this.sphereGeometry.dispose();
-      this.sphereGeometry = null;
+      this.pointsGeometry.dispose();
+      this.pointsGeometry = null;
     }
 
     // Clean up material
-    if (this.sphereMaterial)
+    if (this.pointsMaterial)
     {
-      this.sphereMaterial.dispose();
-      this.sphereMaterial = null;
+      this.pointsMaterial.dispose();
+      this.pointsMaterial = null;
     }
   }
 }
