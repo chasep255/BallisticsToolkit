@@ -44,6 +44,7 @@ namespace btk::rendering
     if(radius_ > 0.0f)
     {
       alpha_ = initial_radius_ / radius_;
+      alpha_ = alpha_ * alpha_ * alpha_;
       if(alpha_ < 0.0f)
       {
         alpha_ = 0.0f;

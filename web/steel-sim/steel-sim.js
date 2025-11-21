@@ -56,7 +56,7 @@ const GROUND_DUST_CONFIG = {
     g: 115,
     b: 85
   }, // Brown/tan
-  initialRadius: 2, // inches (realistic bullet impact dust cloud)
+  initialRadius: 3, // inches (realistic bullet impact dust cloud)
   growthRate: 0.1, // feet/second
   particleDiameter: 0.2 // inches
 };
@@ -69,7 +69,7 @@ const METAL_DUST_CONFIG = {
     g: 192,
     b: 192
   }, // Silver/gray
-  initialRadius: 0.5, // inches
+  initialRadius: 1, // inches
   growthRate: 1.0, // feet/second
   particleDiameter: 0.2 // inches
 };
