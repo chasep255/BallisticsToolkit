@@ -37,12 +37,10 @@ namespace btk::rendering
       btk::math::Vector3D local_attachment_; ///< Attachment point in local coordinates (moves with target)
       btk::math::Vector3D world_fixed_;      ///< Fixed anchor point in world coordinates (never moves)
       float rest_length_;                    ///< Rest length of chain (recalculated when target moves)
-      float spring_constant_;                ///< Spring constant (N/m) - very high for rigid chains
-      float damping_coefficient_;            ///< Damping coefficient (N·s/m) - for energy dissipation
 
-      ChainAnchor() : local_attachment_(0, 0, 0), world_fixed_(0, 0, 0), rest_length_(0), spring_constant_(0), damping_coefficient_(0) {}
-      ChainAnchor(const btk::math::Vector3D& local_attach, const btk::math::Vector3D& world_fixed, float rest_length, float spring_k, float damping)
-        : local_attachment_(local_attach), world_fixed_(world_fixed), rest_length_(rest_length), spring_constant_(spring_k), damping_coefficient_(damping)
+      ChainAnchor() : local_attachment_(0, 0, 0), world_fixed_(0, 0, 0), rest_length_(0) {}
+      ChainAnchor(const btk::math::Vector3D& local_attach, const btk::math::Vector3D& world_fixed, float rest_length)
+        : local_attachment_(local_attach), world_fixed_(world_fixed), rest_length_(rest_length)
       {
       }
     };
@@ -284,20 +282,26 @@ namespace btk::rendering
     // Steel density constant (kg/m³)
     static constexpr float STEEL_DENSITY = 7850.0f;
 
-    // Default spring constant for chain anchors (N/m) - very high for rigid chains
-    static constexpr float DEFAULT_SPRING_CONSTANT = 10000.0f;
+    // Spring constant for chain anchors (N/m) - very high for rigid chains
+    static constexpr float SPRING_CONSTANT = 10000.0f;
 
-    // Default chain damping coefficient (N·s/m) - critically damped to prevent bouncing
+    // Chain damping coefficient (N·s/m) - critically damped to prevent bouncing
     // Chains dissipate energy and don't bounce back - they just stop
-    static constexpr float DEFAULT_CHAIN_DAMPING = 200.0f;
+    static constexpr float CHAIN_DAMPING = 200.0f;
 
-    // Default damping coefficients (fraction remaining after 1 second)
-    static constexpr float DEFAULT_LINEAR_DAMPING = 0.75f; // 75% velocity remains after 1 second
-    static constexpr float DEFAULT_ANGULAR_DAMPING = 0.1f; // 10% angular velocity remains after 1 second
+    // Minimum mass for stability (prevents very light targets from becoming unstable)
+    static constexpr float MIN_MASS = 1.0f; // kg
+
+    // Damping coefficients (fraction remaining after 1 second)
+    static constexpr float LINEAR_DAMPING = 0.5f; // 50% velocity remains after 1 second
+    static constexpr float ANGULAR_DAMPING = 0.5f; // 50% angular velocity remains after 1 second
 
     // Velocity thresholds for "done moving" detection
     static constexpr float VELOCITY_THRESHOLD = 0.01f;         // m/s
     static constexpr float ANGULAR_VELOCITY_THRESHOLD = 0.01f; // rad/s
+
+    // Maximum acceleration to prevent numerical instability
+    static constexpr float MAX_ACCELERATION = 50.0f; // m/s²
 
     // Shape definition (in YZ plane, normal in +X direction)
     float width_;
@@ -321,10 +325,6 @@ namespace btk::rendering
     // Constraints and impacts
     std::vector<ChainAnchor> anchors_;
     std::vector<Impact> impacts_;
-
-    // Damping
-    float linear_damping_;
-    float angular_damping_;
 
     // Display buffer
     std::vector<float> vertices_buffer_; // Flat array: x,y,z,x,y,z,... in Three.js coordinates

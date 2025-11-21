@@ -2,6 +2,7 @@
 #include "math/conversions.h"
 #include "math/random.h"
 #include "physics/constants.h"
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -22,7 +23,7 @@ namespace btk::rendering
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(1.0f, 0.0f, 0.0f),
       orientation_(btk::math::Quaternion()),                                                 // Identity orientation (no rotation)
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
-      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), linear_damping_(DEFAULT_LINEAR_DAMPING), angular_damping_(DEFAULT_ANGULAR_DAMPING), segments_per_circle_(32), texture_width_(512),
+      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512),
       texture_height_(512)
   {
     // Default colors: bright red paint, gray metal
@@ -41,7 +42,7 @@ namespace btk::rendering
   SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal)
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(position), normal_(normal.normalized()), orientation_(btk::math::Quaternion()),
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
-      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), linear_damping_(DEFAULT_LINEAR_DAMPING), angular_damping_(DEFAULT_ANGULAR_DAMPING), segments_per_circle_(32), texture_width_(512),
+      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512),
       texture_height_(512)
   {
     // Default colors: bright red paint, gray metal
@@ -84,7 +85,7 @@ namespace btk::rendering
     // Calculate rest length as distance from world_fixed to world_attachment
     float rest_length = (world_fixed - world_attachment).magnitude();
 
-    anchors_.emplace_back(local_attachment, world_fixed, rest_length, DEFAULT_SPRING_CONSTANT, DEFAULT_CHAIN_DAMPING);
+    anchors_.emplace_back(local_attachment, world_fixed, rest_length);
   }
 
   btk::math::Vector3D SteelTarget::localToWorld(const btk::math::Vector3D& local_point) const
@@ -151,25 +152,30 @@ namespace btk::rendering
       area = width_ * height_;
     }
 
-    // Calculate mass
-    mass_kg_ = area * thickness_ * STEEL_DENSITY;
+    // Calculate mass from geometry
+    float calculated_mass = area * thickness_ * STEEL_DENSITY;
+    
+    // Apply minimum mass for stability
+    mass_kg_ = std::max(calculated_mass, MIN_MASS);
 
     // Calculate moment of inertia (shape is in YZ plane, centered at origin)
+    // Use calculated mass for geometric properties, then scale by actual mass ratio
+    float mass_ratio = (calculated_mass > 0.0f) ? (mass_kg_ / calculated_mass) : 1.0f;
     if(is_oval_)
     {
-      // Oval inertia
+      // Oval inertia (calculated with geometric mass, then scaled)
       float a = width_ / 2.0f;
       float b = height_ / 2.0f;
-      inertia_tensor_.x = 0.25f * mass_kg_ * b * b;
-      inertia_tensor_.y = 0.25f * mass_kg_ * a * a;
-      inertia_tensor_.z = 0.25f * mass_kg_ * (a * a + b * b);
+      inertia_tensor_.x = 0.25f * calculated_mass * b * b * mass_ratio;
+      inertia_tensor_.y = 0.25f * calculated_mass * a * a * mass_ratio;
+      inertia_tensor_.z = 0.25f * calculated_mass * (a * a + b * b) * mass_ratio;
     }
     else
     {
-      // Rectangle inertia
-      inertia_tensor_.x = mass_kg_ * height_ * height_ / 12.0f;
-      inertia_tensor_.y = mass_kg_ * width_ * width_ / 12.0f;
-      inertia_tensor_.z = mass_kg_ * (width_ * width_ + height_ * height_) / 12.0f;
+      // Rectangle inertia (calculated with geometric mass, then scaled)
+      inertia_tensor_.x = calculated_mass * height_ * height_ / 12.0f * mass_ratio;
+      inertia_tensor_.y = calculated_mass * width_ * width_ / 12.0f * mass_ratio;
+      inertia_tensor_.z = calculated_mass * (width_ * width_ + height_ * height_) / 12.0f * mass_ratio;
     }
   }
 
@@ -322,7 +328,7 @@ namespace btk::rendering
     dt = std::min(dt, 1.0f);
 
     // Subdivide into smaller steps if needed for stability
-    constexpr float MAX_SUBSTEP_DT = 0.001f; // 1ms maximum substep (can be smaller)
+    constexpr float MAX_SUBSTEP_DT = 0.001f; // 1ms maximum substep
 
     // Subdivide into smaller steps if needed
     int num_substeps = static_cast<int>(std::ceil(dt / MAX_SUBSTEP_DT));
@@ -340,8 +346,8 @@ namespace btk::rendering
       // Apply damping proportional to dt
       // Convert damping coefficients to per-second rates
       // damping_factor = damping_coefficient^dt
-      float linear_damping_factor = std::pow(linear_damping_, substep_dt);
-      float angular_damping_factor = std::pow(angular_damping_, substep_dt);
+      float linear_damping_factor = std::pow(LINEAR_DAMPING, substep_dt);
+      float angular_damping_factor = std::pow(ANGULAR_DAMPING, substep_dt);
       velocity_ms_ = velocity_ms_ * linear_damping_factor;
       angular_velocity_ = angular_velocity_ * angular_damping_factor;
 
@@ -410,14 +416,14 @@ namespace btk::rendering
         float velocity_along_chain = attachment_velocity.dot(direction);
 
         // Spring force: F = -k * x (restoring force)
-        btk::math::Vector3D spring_force = direction * (anchor.spring_constant_ * extension);
+        btk::math::Vector3D spring_force = direction * (SPRING_CONSTANT * extension);
 
         // Damping force: F = -c * v (dissipates energy, prevents bouncing)
         // Only apply when extending (velocity > 0) - chains don't resist going slack
         btk::math::Vector3D damping_force(0.0f, 0.0f, 0.0f);
         if(velocity_along_chain > 0.0f)
         {
-          damping_force = direction * (-anchor.damping_coefficient_ * velocity_along_chain);
+          damping_force = direction * (-CHAIN_DAMPING * velocity_along_chain);
         }
 
         // Total force - critically damped system prevents oscillation

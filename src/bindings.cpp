@@ -306,8 +306,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
   value_object<btk::rendering::SteelTarget::ChainAnchor>("ChainAnchor")
     .field("localAttachment", &btk::rendering::SteelTarget::ChainAnchor::local_attachment_)
     .field("worldFixed", &btk::rendering::SteelTarget::ChainAnchor::world_fixed_)
-    .field("restLength", &btk::rendering::SteelTarget::ChainAnchor::rest_length_)
-    .field("springConstant", &btk::rendering::SteelTarget::ChainAnchor::spring_constant_);
+    .field("restLength", &btk::rendering::SteelTarget::ChainAnchor::rest_length_);
 
   // Steel Target - Impact
   value_object<btk::rendering::SteelTarget::Impact>("SteelTargetImpact")

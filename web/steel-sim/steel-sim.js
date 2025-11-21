@@ -398,44 +398,125 @@ function createTargetRacks()
 {
   if (!landscape) return;
 
-  // Create target racks every 100 yards from 100 to 1000 yards
-  // Use alternating crossrange offsets to spread them out visually
-  const crossrangeOffsets = [0, 20, -20, 30, -30, 25, -25, 15, -15, 0]; // Pattern for 10 racks
-
-  for (let i = 0; i < 10; i++)
-  {
-    const distanceYards = 100 + (i * 100); // 100, 200, 300, ..., 1000
-    const crossrangeOffset = crossrangeOffsets[i];
-
-    // Target sizes scale with distance for appropriate difficulty
-    // At 100 yards: 6-12 inch targets
-    // At 1000 yards: 36 inch (1 yard) targets
-    const baseSize = 6 + (distanceYards / 1000) * 30; // Linear scaling from 6" to 36"
-
-    const targets = [
+  addTargetRack(0, -200, 1.5, 1,
+  [
     {
-      width: baseSize * 1.5,
-      height: baseSize * 1.5,
+      width: 5,
+      height: 5,
       thickness: 0.25,
       isOval: false
     },
     {
-      width: baseSize,
-      height: baseSize,
+      width: 4,
+      height: 4,
+      thickness: 0.25,
+      isOval: false
+    },
+
+    {
+      width: 3,
+      height: 3,
+      thickness: 0.25,
+      isOval: false
+    },
+    {
+      width: 2,
+      height: 2,
+      thickness: 0.25,
+      isOval: false
+    }
+  ]);
+
+  addTargetRack(10, -225, 1.5, 1,
+  [
+    {
+      width: 5,
+      height: 6,
       thickness: 0.25,
       isOval: true
     },
     {
-      width: baseSize * 0.75,
-      height: baseSize * 0.75,
+      width: 4,
+      height: 6,
       thickness: 0.25,
-      isOval: false
-    }];
+      isOval: true
+    },
 
-    // Rack width scales with number of targets, height stays consistent
-    const rackWidth = 8 + (i * 0.5); // Slightly wider racks for longer distances
-    addTargetRack(crossrangeOffset, -distanceYards, rackWidth, 2, targets);
-  }
+    {
+      width: 3,
+      height: 6,
+      thickness: 0.25,
+      isOval: true
+    },
+    {
+      width: 2,
+      height: 6,
+      thickness: 0.25,
+      isOval: true
+    }
+  ]);
+
+  addTargetRack(-5, -1000, 2, 1,
+    [
+      {
+        width: 20,
+        height: 20,
+        thickness: 0.25,
+        isOval: true
+      },
+      {
+        width: 15,
+        height: 15,
+        thickness: 0.25,
+        isOval: true
+      },
+  
+      {
+        width: 10,
+        height: 10,
+        thickness: 0.25,
+        isOval: true
+      }
+    ]);
+
+  // // Create target racks every 100 yards from 100 to 1000 yards
+  // // Use alternating crossrange offsets to spread them out visually
+  // const crossrangeOffsets = [0, 20, -20, 30, -30, 25, -25, 15, -15, 0]; // Pattern for 10 racks
+
+  // for (let i = 0; i < 10; i++)
+  // {
+  //   const distanceYards = 100 + (i * 100); // 100, 200, 300, ..., 1000
+  //   const crossrangeOffset = crossrangeOffsets[i];
+
+  //   // Target sizes scale with distance for appropriate difficulty
+  //   // At 100 yards: 6-12 inch targets
+  //   // At 1000 yards: 36 inch (1 yard) targets
+  //   const baseSize = 6 + (distanceYards / 1000) * 30; // Linear scaling from 6" to 36"
+
+  //   const targets = [
+  //   {
+  //     width: baseSize * 1.5,
+  //     height: baseSize * 1.5,
+  //     thickness: 0.25,
+  //     isOval: false
+  //   },
+  //   {
+  //     width: baseSize,
+  //     height: baseSize,
+  //     thickness: 0.25,
+  //     isOval: true
+  //   },
+  //   {
+  //     width: baseSize * 0.75,
+  //     height: baseSize * 0.75,
+  //     thickness: 0.25,
+  //     isOval: false
+  //   }];
+
+  //   // Rack width scales with number of targets, height stays consistent
+  //   const rackWidth = 8 + (i * 0.5); // Slightly wider racks for longer distances
+  //   addTargetRack(crossrangeOffset, -distanceYards, rackWidth, 2, targets);
+  // }
 }
 
 // ===== UI SETUP =====
