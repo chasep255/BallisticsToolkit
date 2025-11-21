@@ -4,8 +4,8 @@
  */
 
 // ===== CAMERA & SCENE CONSTANTS =====
-export const SHOOTER_HEIGHT = 10; // yards - elevated shooter overlooking the landscape
-export const CAMERA_FOV = 50; // degrees
+export const SHOOTER_HEIGHT = 5; // yards - elevated shooter overlooking the landscape
+export const CAMERA_FOV = 35; // degrees
 export const CAMERA_FAR_PLANE = 2500; // yards - Tightened for better depth precision (landscape is 2000, targets max at ~1760)
 
 // ===== BULLET CONSTANTS =====
@@ -60,16 +60,16 @@ export const MOUNTAIN_CONFIG = {
   count: 16,
   heightMin: 50, // yards
   heightMax: 150, // yards
-  distanceMin: 2000, // yards
+  distanceMin: 2200, // yards - pushed back to avoid intersecting range end
   distanceMax: 2500 // yards
 };
 
 export const TREE_CONFIG = {
-  sideMinDistance: 30, // yards from center
+  sideMinDistance: 60, // yards from center - increased to keep trees away from wind flags (flags at ±50 yards)
   sideMaxDistance: 110, // yards from center
   behindTargetWidth: 80, // yards
   behindTargetMin: 10, // yards behind targets
-  behindTargetMax: 130, // yards behind targets
+  behindTargetMax: 100, // yards behind targets - reduced to prevent trees in mountain area
   countSides: 160,
   countBehind: 80
 };
@@ -154,7 +154,7 @@ export const TARGET_RACKS_CONFIG = [
     ]
   },
   {
-    x: 20,
+    x: 30,
     z: -1760,
     rackWidth: 3,
     rackHeight: 3,
