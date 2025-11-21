@@ -430,27 +430,50 @@ function createTargetRacks()
   addTargetRack(10, -225, 1.5, 1,
   [
     {
-      width: 5,
+      width: 6,
       height: 6,
       thickness: 0.25,
       isOval: true
     },
     {
-      width: 4,
-      height: 6,
+      width: 5,
+      height: 5,
       thickness: 0.25,
       isOval: true
     },
 
     {
-      width: 3,
-      height: 6,
+      width: 4,
+      height: 4,
       thickness: 0.25,
       isOval: true
     },
     {
-      width: 2,
-      height: 6,
+      width: 3,
+      height: 3,
+      thickness: 0.25,
+      isOval: true
+    }
+  ]);
+
+    addTargetRack(5, -500, 1.5, 1,
+  [
+    {
+      width: 10,
+      height: 10,
+      thickness: 0.25,
+      isOval: true
+    },
+
+    {
+      width: 5,
+      height: 5,
+      thickness: 0.25,
+      isOval: true
+    },
+    {
+      width: 3,
+      height: 3,
       thickness: 0.25,
       isOval: true
     }

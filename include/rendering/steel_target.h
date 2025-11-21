@@ -290,7 +290,7 @@ namespace btk::rendering
     static constexpr float CHAIN_DAMPING = 200.0f;
 
     // Minimum mass for stability (prevents very light targets from becoming unstable)
-    static constexpr float MIN_MASS = 1.0f; // kg
+    static constexpr float MIN_MASS = 2.0f; // kg
 
     // Damping coefficients (fraction remaining after 1 second)
     static constexpr float LINEAR_DAMPING = 0.5f; // 50% velocity remains after 1 second
