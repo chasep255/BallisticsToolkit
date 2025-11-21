@@ -30,49 +30,7 @@ import
   Scope
 }
 from './Scope.js';
-
-// ===== CONSTANTS =====
-const SHOOTER_HEIGHT = 10; // yards - elevated shooter overlooking the landscape
-const CAMERA_FOV = 50;
-const CAMERA_FAR_PLANE = 3000; // Must be > ground length (2000 yards)
-
-const BULLET_MASS = 0.00907; // 140 grains in kg
-const BULLET_DIAMETER = 0.00762; // .308 caliber in meters
-const BULLET_LENGTH = 0.0305; // ~30mm typical
-const BULLET_BC = 0.3;
-const BULLET_SPEED_MPS = 800; // m/s
-
-const WIND_MPH = {
-  x: 1.1,
-  y: 0.0,
-  z: 0.45
-}; // Slight crosswind and downrange
-
-const GROUND_DUST_CONFIG = {
-  numParticles: 1000,
-  color:
-  {
-    r: 139,
-    g: 115,
-    b: 85
-  }, // Brown/tan
-  initialRadius: 3, // inches (realistic bullet impact dust cloud)
-  growthRate: 0.1, // feet/second
-  particleDiameter: 0.2 // inches
-};
-
-const METAL_DUST_CONFIG = {
-  numParticles: 250,
-  color:
-  {
-    r: 192,
-    g: 192,
-    b: 192
-  }, // Silver/gray
-  initialRadius: 1, // inches
-  growthRate: 1.0, // feet/second
-  particleDiameter: 0.2 // inches
-};
+import * as Config from './config.js';
 
 // ===== GLOBAL STATE =====
 let btk = null;
@@ -257,28 +215,33 @@ function setupScene()
 
   // Create fixed background camera (aspect ratio matches render target)
   backgroundCamera = new THREE.PerspectiveCamera(
-    CAMERA_FOV,
+    Config.CAMERA_FOV,
     backgroundElement.pixelWidth / backgroundElement.pixelHeight,
     0.1,
-    CAMERA_FAR_PLANE
+    Config.CAMERA_FAR_PLANE
   );
-  backgroundCamera.position.set(0, SHOOTER_HEIGHT, 0);
-  backgroundCamera.lookAt(0, 0, -CAMERA_FAR_PLANE);
+  backgroundCamera.position.set(0, Config.SHOOTER_HEIGHT, 0);
+  backgroundCamera.lookAt(0, 0, -Config.CAMERA_FAR_PLANE);
 
-  // Create landscape
-  landscape = new Landscape(scene,
+  // Create landscape (uses Config.LANDSCAPE_CONFIG defaults)
+  landscape = new Landscape(scene);
+
+  // Create target racks first to determine max range
+  createTargetRacks();
+
+  // Find furthest target rack position (most negative Z = furthest downrange)
+  const allRacks = TargetRackFactory.getAll();
+  let maxRangeDistance = 0;
+  let maxRangeRackHeight = 2; // Default rack height
+  if (allRacks.length > 0)
   {
-    groundWidth: 100,
-    groundLength: 2000,
-    brownGroundWidth: 500,
-    brownGroundLength: 2000
-  });
+    maxRangeDistance = Math.min(...allRacks.map(rack => rack.center.z)); // Most negative Z
+    maxRangeRackHeight = Math.max(...allRacks.map(rack => rack.height)); // Use tallest rack height
+  }
 
-  // Compute 1000-yard target center height for initial scope aim
-  const THOUSAND_YARDS = 1000;
-  const THOUSAND_RACK_HEIGHT = 2; // matches createTargetRacks
-  const thousandGroundHeight = landscape.getHeightAt(0, -THOUSAND_YARDS) || 0;
-  const thousandTargetCenterY = thousandGroundHeight + THOUSAND_RACK_HEIGHT / 2;
+  // Compute max range target center height for initial scope aim
+  const maxRangeGroundHeight = landscape.getHeightAt(0, maxRangeDistance) || 0;
+  const maxRangeTargetCenterY = maxRangeGroundHeight + maxRangeRackHeight / 2;
 
   // Create scope layer (bottom-center, ~80% of screen height)
   const scopeHeightNorm = 1.6; // 80% of vertical span (2)
@@ -295,20 +258,21 @@ function setupScene()
     scene,
     renderTarget: scopeLayer.renderTarget,
     renderer: scopeLayer.getRenderer(), // Must use the renderer that created the render target
-    initialFOV: 30,
-    minFOV: 1,
-    maxFOV: 30,
+    // Scope optical spec (4–40x, 25 ft @ 100 yd at 4x)
+    minZoomX: 4.0,
+    maxZoomX: 40.0,
+    lowFovFeet: 25,
     cameraPosition:
     {
       x: 0,
-      y: SHOOTER_HEIGHT,
+      y: Config.SHOOTER_HEIGHT,
       z: 0
     },
     initialLookAt:
     {
       x: 0,
-      y: thousandTargetCenterY,
-      z: -THOUSAND_YARDS
+      y: maxRangeTargetCenterY,
+      z: maxRangeDistance
     },
     centerNormalized:
     {
@@ -325,9 +289,6 @@ function setupScene()
   {
     scope.resizeRenderTargets(w, h);
   });
-
-  // Create target racks
-  createTargetRacks();
 
   // Setup raycaster for scope-based shooting
   raycaster = new THREE.Raycaster();
@@ -395,125 +356,11 @@ function createTargetRacks()
 {
   if (!landscape) return;
 
-  addTargetRack(0, -200, 1.5, 1,
-  [
-    {
-      width: 5,
-      height: 5,
-      thickness: 0.25,
-      isOval: false
-    },
-    {
-      width: 4,
-      height: 4,
-      thickness: 0.25,
-      isOval: false
-    },
-
-    {
-      width: 3,
-      height: 3,
-      thickness: 0.25,
-      isOval: false
-    },
-    {
-      width: 2,
-      height: 2,
-      thickness: 0.25,
-      isOval: false
-    }
-  ]);
-
-  addTargetRack(10, -225, 1.5, 1,
-  [
-    {
-      width: 6,
-      height: 6,
-      thickness: 0.25,
-      isOval: true
-    },
-    {
-      width: 5,
-      height: 5,
-      thickness: 0.25,
-      isOval: true
-    },
-
-    {
-      width: 4,
-      height: 4,
-      thickness: 0.25,
-      isOval: true
-    },
-    {
-      width: 3,
-      height: 3,
-      thickness: 0.25,
-      isOval: true
-    }
-  ]);
-
-  addTargetRack(5, -500, 1.5, 1,
-  [
-    {
-      width: 10,
-      height: 10,
-      thickness: 0.25,
-      isOval: true
-    },
-
-    {
-      width: 5,
-      height: 5,
-      thickness: 0.25,
-      isOval: true
-    },
-    {
-      width: 3,
-      height: 3,
-      thickness: 0.25,
-      isOval: true
-    }
-  ]);
-
-  addTargetRack(-5, -1000, 2, 1,
-  [
-    {
-      width: 20,
-      height: 20,
-      thickness: 0.25,
-      isOval: true
-    },
-    {
-      width: 15,
-      height: 15,
-      thickness: 0.25,
-      isOval: true
-    },
-
-    {
-      width: 10,
-      height: 10,
-      thickness: 0.25,
-      isOval: true
-    }
-  ]);
-
-  addTargetRack(-5, -1760, 3, 2,
-  [
-    {
-      width: 40,
-      height: 40,
-      thickness: 0.25,
-      isOval: true
-    },
-    {
-      width: 20,
-      height: 20,
-      thickness: 0.25,
-      isOval: true
-    }
-  ]);
+  // Create target racks from configuration
+  for (const rackConfig of Config.TARGET_RACKS_CONFIG)
+  {
+    addTargetRack(rackConfig.x, rackConfig.z, rackConfig.rackWidth, rackConfig.rackHeight, rackConfig.targets);
+  }
 }
 
 // ===== UI SETUP =====
@@ -654,17 +501,17 @@ function onKeyDown(event)
 function createBullet(impactPoint, shooterPos)
 {
   const direction = impactPoint.clone().sub(shooterPos).normalize();
-  const bulletSpeedFps = btk.Conversions.mpsToFps(BULLET_SPEED_MPS);
+  const bulletSpeedFps = btk.Conversions.mpsToFps(Config.BULLET_SPEED_MPS);
   const bulletVelThree = direction.multiplyScalar(bulletSpeedFps);
 
   const bulletPos = window.threeJsToBtkPosition(impactPoint);
   const bulletVel = window.threeJsToBtkVelocity(bulletVelThree);
 
   const baseBullet = new btk.Bullet(
-    BULLET_MASS,
-    BULLET_DIAMETER,
-    BULLET_LENGTH,
-    BULLET_BC,
+    Config.BULLET_MASS,
+    Config.BULLET_DIAMETER,
+    Config.BULLET_LENGTH,
+    Config.BULLET_BC,
     btk.DragFunction.G7
   );
 
@@ -725,12 +572,12 @@ function createDustCloud(impactPointThree)
   {
     position: impactPointThree,
     scene,
-    numParticles: GROUND_DUST_CONFIG.numParticles,
-    color: GROUND_DUST_CONFIG.color,
-    wind: WIND_MPH,
-    initialRadius: btk.Conversions.inchesToYards(GROUND_DUST_CONFIG.initialRadius),
-    growthRate: GROUND_DUST_CONFIG.growthRate,
-    particleDiameter: btk.Conversions.inchesToYards(GROUND_DUST_CONFIG.particleDiameter)
+    numParticles: Config.GROUND_DUST_CONFIG.numParticles,
+    color: Config.GROUND_DUST_CONFIG.color,
+    wind: Config.WIND_MPH,
+    initialRadius: btk.Conversions.inchesToYards(Config.GROUND_DUST_CONFIG.initialRadius),
+    growthRate: Config.GROUND_DUST_CONFIG.growthRate,
+    particleDiameter: btk.Conversions.inchesToYards(Config.GROUND_DUST_CONFIG.particleDiameter)
   });
 }
 
@@ -740,12 +587,12 @@ function createMetallicDustCloud(impactPointThree)
   {
     position: impactPointThree,
     scene,
-    numParticles: METAL_DUST_CONFIG.numParticles,
-    color: METAL_DUST_CONFIG.color,
-    wind: WIND_MPH,
-    initialRadius: btk.Conversions.inchesToYards(METAL_DUST_CONFIG.initialRadius),
-    growthRate: METAL_DUST_CONFIG.growthRate,
-    particleDiameter: btk.Conversions.inchesToYards(METAL_DUST_CONFIG.particleDiameter)
+    numParticles: Config.METAL_DUST_CONFIG.numParticles,
+    color: Config.METAL_DUST_CONFIG.color,
+    wind: Config.WIND_MPH,
+    initialRadius: btk.Conversions.inchesToYards(Config.METAL_DUST_CONFIG.initialRadius),
+    growthRate: Config.METAL_DUST_CONFIG.growthRate,
+    particleDiameter: btk.Conversions.inchesToYards(Config.METAL_DUST_CONFIG.particleDiameter)
   });
 }
 

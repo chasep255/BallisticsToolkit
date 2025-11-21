@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as Config from './config.js';
 
 /**
  * Landscape class for managing ground planes and terrain
@@ -10,27 +11,33 @@ export class Landscape
   /**
    * Create a new Landscape instance
    * @param {THREE.Scene} scene - Three.js scene to add ground to
-   * @param {Object} options - Configuration options
-   * @param {number} options.groundWidth - Width of ground in yards (default 100)
-   * @param {number} options.groundLength - Length of ground in yards (default 2000)
-   * @param {number} options.brownGroundWidth - Width of brown background ground in yards (default 500)
-   * @param {number} options.brownGroundLength - Length of brown background ground in yards (default 2000)
+   * @param {Object} options - Optional configuration overrides (defaults to Config.LANDSCAPE_CONFIG)
+   * @param {number} options.groundWidth - Width of ground in yards
+   * @param {number} options.groundLength - Length of ground in yards
+   * @param {number} options.brownGroundWidth - Width of brown background ground in yards
+   * @param {number} options.brownGroundLength - Length of brown background ground in yards
    */
   constructor(scene, options = {})
   {
     this.scene = scene;
     const
     {
-      groundWidth = 100, // yards
-        groundLength = 2000, // yards
-        brownGroundWidth = 500, // yards
-        brownGroundLength = 2000 // yards
+      groundWidth = Config.LANDSCAPE_CONFIG.groundWidth,
+      groundLength = Config.LANDSCAPE_CONFIG.groundLength,
+      brownGroundWidth = Config.LANDSCAPE_CONFIG.brownGroundWidth,
+      brownGroundLength = Config.LANDSCAPE_CONFIG.brownGroundLength
     } = options;
 
     this.groundWidth = groundWidth;
     this.groundLength = groundLength;
     this.brownGroundWidth = brownGroundWidth;
     this.brownGroundLength = brownGroundLength;
+
+    // Environment object arrays
+    this.mountains = [];
+    this.trees = [];
+    this.rocks = [];
+    this.markers = [];
 
     // Create green ground plane (flat)
     // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
@@ -63,6 +70,9 @@ export class Landscape
     this.brownGroundMesh.receiveShadow = true;
     this.brownGroundMesh.material.side = THREE.DoubleSide;
     scene.add(this.brownGroundMesh);
+
+    // Create environment features
+    this.createEnvironment();
   }
 
   /**
@@ -129,12 +139,298 @@ export class Landscape
     return this.brownGroundMesh;
   }
 
+  /**
+   * Create all environment features (mountains, trees, rocks, markers)
+   */
+  createEnvironment()
+  {
+    this.createMountains();
+    this.createTrees();
+    this.createRocks();
+    this.createMarkers();
+  }
+
+  /**
+   * Create distant mountain peaks
+   */
+  createMountains()
+  {
+    // Create shared mountain texture (brown base with white snow cap)
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Vertical gradient: brown at bottom, white at top
+    const gradient = ctx.createLinearGradient(0, 256, 0, 0);
+    gradient.addColorStop(0, '#6b5d4f'); // Brown base
+    gradient.addColorStop(0.6, '#8b7d6b'); // Lighter brown
+    gradient.addColorStop(0.8, '#c0c0c0'); // Gray
+    gradient.addColorStop(1, '#ffffff'); // White snow cap
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 256);
+
+    const mountainTexture = new THREE.CanvasTexture(canvas);
+
+    // Create mountains
+    for (let i = 0; i < Config.MOUNTAIN_CONFIG.count; i++)
+    {
+      const x = (Math.random() - 0.5) * 3000;
+      const height = Config.MOUNTAIN_CONFIG.heightMin + Math.random() * (Config.MOUNTAIN_CONFIG.heightMax - Config.MOUNTAIN_CONFIG.heightMin);
+      const z = -(Config.MOUNTAIN_CONFIG.distanceMin + Math.random() * (Config.MOUNTAIN_CONFIG.distanceMax - Config.MOUNTAIN_CONFIG.distanceMin));
+      const radius = height * 1.8; // Radius proportional to height
+
+      const geometry = new THREE.ConeGeometry(radius, height, 8);
+      const material = new THREE.MeshLambertMaterial(
+      {
+        map: mountainTexture,
+        side: THREE.FrontSide
+      });
+
+      const mountain = new THREE.Mesh(geometry, material);
+      // Position so base aligns with brown ground at y = -0.1
+      // ConeGeometry base is at y = 0 relative to geometry center, so position at -0.1
+      mountain.position.set(x, -0.1, z);
+      mountain.castShadow = true;
+      mountain.receiveShadow = true;
+
+      this.scene.add(mountain);
+      this.mountains.push(mountain);
+    }
+
+    // Store texture reference for cleanup
+    this.mountainTexture = mountainTexture;
+  }
+
+  /**
+   * Create trees along sides and behind targets
+   */
+  createTrees()
+  {
+    const treeCount = Config.TREE_CONFIG.countSides + Config.TREE_CONFIG.countBehind;
+
+    // Trunk material - dark brown
+    const trunkMaterial = new THREE.MeshStandardMaterial(
+    {
+      color: 0x4a3728, // Dark brown
+      roughness: 1.0,
+      metalness: 0.0
+    });
+
+    // Foliage material - dark green
+    const foliageMaterial = new THREE.MeshStandardMaterial(
+    {
+      color: 0x2d5016, // Dark green
+      roughness: 0.9,
+      metalness: 0.0,
+      side: THREE.DoubleSide
+    });
+
+    // Cache tree geometries - multiple sizes
+    const trunkGeometries = [];
+    const foliageGeometries = [];
+
+    for (let i = 0; i < 3; i++)
+    {
+      const trunkRadius = 0.2 + i * 0.1;
+      const trunkHeight = 3 + i * 0.5;
+      const trunkGeo = new THREE.CylinderGeometry(trunkRadius, trunkRadius * 1.2, trunkHeight, 8);
+      trunkGeometries.push(trunkGeo);
+
+      const foliageRadius = 2 + i * 0.5;
+      const foliageHeight = 5 + i * 1;
+      const foliageGeo = new THREE.ConeGeometry(foliageRadius, foliageHeight, 8);
+      foliageGeometries.push(foliageGeo);
+    }
+
+    // Create trees
+    for (let i = 0; i < treeCount; i++)
+    {
+      let x, z;
+
+      // Trees along both sides of the range
+      if (i < Config.TREE_CONFIG.countSides)
+      {
+        // Dense trees along both sides
+        const side = (i % 2 === 0) ? -1 : 1;
+        x = side * (Config.TREE_CONFIG.sideMinDistance + Math.random() * (Config.TREE_CONFIG.sideMaxDistance - Config.TREE_CONFIG.sideMinDistance));
+        z = -50 - Math.random() * (this.groundLength + 200);
+      }
+      else
+      {
+        // Behind targets - dense backdrop
+        x = (Math.random() - 0.5) * Config.TREE_CONFIG.behindTargetWidth;
+        z = -(this.groundLength + Config.TREE_CONFIG.behindTargetMin + Math.random() * (Config.TREE_CONFIG.behindTargetMax - Config.TREE_CONFIG.behindTargetMin));
+      }
+
+      // Get ground height at this position
+      const groundHeight = this.getHeightAt(x, z) || 0;
+
+      // Vary tree size
+      const sizeVariant = Math.floor(Math.random() * 3);
+      const trunkGeo = trunkGeometries[sizeVariant];
+      const foliageGeo = foliageGeometries[sizeVariant];
+
+      const actualTrunkHeight = 3 + sizeVariant * 0.5;
+      const actualFoliageHeight = 5 + sizeVariant * 1;
+
+      // Create trunk - positioned so bottom is at ground
+      const trunk = new THREE.Mesh(trunkGeo, trunkMaterial);
+      trunk.position.set(x, groundHeight + actualTrunkHeight / 2, z);
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+      this.scene.add(trunk);
+      this.trees.push(trunk);
+
+      // Create foliage - positioned so base overlaps with top of trunk
+      const foliage = new THREE.Mesh(foliageGeo, foliageMaterial);
+      foliage.position.set(x, groundHeight + actualTrunkHeight + actualFoliageHeight / 2 - actualFoliageHeight * 0.25, z);
+      foliage.castShadow = true;
+      foliage.receiveShadow = true;
+      this.scene.add(foliage);
+      this.trees.push(foliage);
+    }
+  }
+
+  /**
+   * Create rocks scattered on the range
+   */
+  createRocks()
+  {
+    // Rock material - gray/brown
+    const rockMaterial = new THREE.MeshStandardMaterial(
+    {
+      color: 0x6b5d4f, // Brown-gray
+      roughness: 0.9,
+      metalness: 0.1
+    });
+
+    for (let i = 0; i < Config.ROCK_CONFIG.count; i++)
+    {
+      // Random position within range bounds
+      const x = (Math.random() - 0.5) * this.groundWidth * 0.8; // Stay within 80% of range width
+      const z = -Math.random() * this.groundLength * 0.95; // 0 to 95% downrange
+
+      // Get ground height at this position
+      const groundHeight = this.getHeightAt(x, z) || 0;
+
+      const rockSize = Config.ROCK_CONFIG.sizeMin + Math.random() * (Config.ROCK_CONFIG.sizeMax - Config.ROCK_CONFIG.sizeMin);
+      const geometry = new THREE.SphereGeometry(rockSize, 8, 6);
+      // Squash it a bit to make it look more like a rock
+      geometry.scale(1, 0.6, 1);
+
+      const rock = new THREE.Mesh(geometry, rockMaterial.clone());
+      rock.position.set(x, groundHeight + rockSize * 0.3, z);
+      rock.rotation.set(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI
+      );
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+
+      this.scene.add(rock);
+      this.rocks.push(rock);
+    }
+  }
+
+  /**
+   * Create range marker posts
+   */
+  createMarkers()
+  {
+    // Marker material - orange
+    const markerMaterial = new THREE.MeshStandardMaterial(
+    {
+      color: 0xffa500, // Orange
+      roughness: 0.7,
+      metalness: 0.1
+    });
+
+    const postRadius = 0.05; // 0.05 yards (about 2 inches)
+
+    for (let i = 0; i < Config.MARKER_CONFIG.count; i++)
+    {
+      // Random position within range bounds
+      const x = (Math.random() - 0.5) * this.groundWidth * 0.8; // Stay within 80% of range width
+      const z = -Math.random() * this.groundLength * 0.95; // 0 to 95% downrange
+
+      // Get ground height at this position
+      const groundHeight = this.getHeightAt(x, z) || 0;
+
+      const postHeight = Config.MARKER_CONFIG.heightMin + Math.random() * (Config.MARKER_CONFIG.heightMax - Config.MARKER_CONFIG.heightMin);
+      const geometry = new THREE.CylinderGeometry(postRadius, postRadius, postHeight, 8);
+
+      const post = new THREE.Mesh(geometry, markerMaterial.clone());
+      post.position.set(x, groundHeight + postHeight / 2, z);
+      post.castShadow = true;
+      post.receiveShadow = true;
+
+      this.scene.add(post);
+      this.markers.push(post);
+    }
+  }
+
 
   /**
    * Clean up and dispose of all resources
    */
   dispose()
   {
+    // Remove mountains
+    for (const mountain of this.mountains)
+    {
+      this.scene.remove(mountain);
+      mountain.geometry.dispose();
+      mountain.material.dispose();
+    }
+    // Dispose shared mountain texture
+    if (this.mountainTexture)
+    {
+      this.mountainTexture.dispose();
+      this.mountainTexture = null;
+    }
+
+    // Remove trees
+    for (const tree of this.trees)
+    {
+      this.scene.remove(tree);
+      tree.geometry.dispose();
+      if (tree.material)
+      {
+        tree.material.dispose();
+      }
+    }
+
+    // Remove rocks
+    for (const rock of this.rocks)
+    {
+      this.scene.remove(rock);
+      rock.geometry.dispose();
+      if (rock.material)
+      {
+        rock.material.dispose();
+      }
+    }
+
+    // Remove markers
+    for (const marker of this.markers)
+    {
+      this.scene.remove(marker);
+      marker.geometry.dispose();
+      if (marker.material)
+      {
+        marker.material.dispose();
+      }
+    }
+
+    // Clear arrays
+    this.mountains = [];
+    this.trees = [];
+    this.rocks = [];
+    this.markers = [];
+
     if (this.greenGroundMesh)
     {
       this.scene.remove(this.greenGroundMesh);

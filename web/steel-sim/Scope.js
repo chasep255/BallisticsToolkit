@@ -7,31 +7,27 @@
 
 import * as THREE from 'three';
 
-// Approximate mapping between HUD units and mrad, based on the previous shader:
-// mradPerUnit = (fovDeg * 1000.0) / 60.0
-// This keeps FFP behavior when combined with reticleGroup scaling.
-const MRAD_PER_UNIT_COEFF = 1000.0 / 60.0;
+// Reticle mapping constant.
+// In the original shader-based implementation, the relationship between
+// FOV (degrees), reticle "units" (the local reticle geometry space) and
+// milliradians was:
+//   mradPerUnit = fovDeg * (1000.0 / 60.0)
+// The 1000/60 factor was tuned so that at ~60° FOV, one reticle unit
+// corresponds to roughly 1 mrad at 1000 yards. We keep the same slope here
+// so this geometry-based reticle matches the old visual behavior.
+const MRAD_PER_UNIT_SLOPE = 1000.0 / 60.0;
 
-// Real-world scope spec (FOV in feet @ 100 yards)
-const SCOPE_MIN_ZOOM_X = 4.5;
-const SCOPE_MAX_ZOOM_X = 30.0;
-const SCOPE_LOW_FOV_FEET = 24.7; // at 4.5X
-const SCOPE_HIGH_FOV_FEET = 3.7; // at 30X
-const SCOPE_DISTANCE_FEET = 100 * 3; // 100 yards in feet
+// Scope FOV specs are always quoted "width in feet at 100 yards".
+// Keep the 100 yards and 3 ft/yd factors explicit so there are no magic numbers.
+const SCOPE_SPEC_DISTANCE_YARDS = 100;
+const FEET_PER_YARD = 3;
 
-function fovDegFromFeetAt100Yards(widthFeet)
+function fovDegFromFeetAtSpecDistance(widthFeet)
 {
-  const halfAngle = Math.atan((widthFeet / 2) / SCOPE_DISTANCE_FEET);
+  const widthYards = widthFeet / FEET_PER_YARD;
+  const halfAngle = Math.atan((widthYards / 2) / SCOPE_SPEC_DISTANCE_YARDS);
   return THREE.MathUtils.radToDeg(2 * halfAngle);
 }
-
-const SCOPE_LOW_FOV_DEG = fovDegFromFeetAt100Yards(SCOPE_LOW_FOV_FEET);
-const SCOPE_HIGH_FOV_DEG = fovDegFromFeetAt100Yards(SCOPE_HIGH_FOV_FEET);
-
-// Fit FOV(X) = a / X + b through the two spec endpoints
-const FOV_A = (SCOPE_LOW_FOV_DEG - SCOPE_HIGH_FOV_DEG) /
-  (1 / SCOPE_MIN_ZOOM_X - 1 / SCOPE_MAX_ZOOM_X);
-const FOV_B = SCOPE_LOW_FOV_DEG - FOV_A / SCOPE_MIN_ZOOM_X;
 
 export class Scope
 {
@@ -40,14 +36,34 @@ export class Scope
     this.scene = config.scene;
     this.outputRenderTarget = config.renderTarget; // Render target from CompositionLayer
     this.renderer = config.renderer; // Must use the renderer that created the render target
+    // Scope specifications - these define what scope this instance is.
+    if (config.minZoomX === undefined) throw new Error('Scope config requires minZoomX');
+    if (config.maxZoomX === undefined) throw new Error('Scope config requires maxZoomX');
+    if (config.lowFovFeet === undefined) throw new Error('Scope config requires lowFovFeet');
+
+    this.minZoomX = config.minZoomX;
+    this.maxZoomX = config.maxZoomX;
+    this.lowFovFeet = config.lowFovFeet;
+
+    // Derive high FOV feet from low FOV feet using linear magnification relationship:
+    //   FOV_width ∝ 1 / magnification
+    // => highFovFeet = (lowFovFeet * minZoomX) / maxZoomX
+    this.highFovFeet = (this.lowFovFeet * this.minZoomX) / this.maxZoomX;
+
+    // Calculate FOV values from feet specifications
+    this.lowFovDeg = fovDegFromFeetAtSpecDistance(this.lowFovFeet);
+    this.highFovDeg = fovDegFromFeetAtSpecDistance(this.highFovFeet);
+
+    // Fit FOV(X) = a / X + b through the two spec endpoints
+    this.fovA = (this.lowFovDeg - this.highFovDeg) /
+      (1 / this.minZoomX - 1 / this.maxZoomX);
+    this.fovB = this.lowFovDeg - this.fovA / this.minZoomX;
 
     // Get render target dimensions
     const renderWidth = this.outputRenderTarget.width;
     const renderHeight = this.outputRenderTarget.height;
 
     // Zoom/FOV settings based on real scope spec
-    this.minZoomX = SCOPE_MIN_ZOOM_X;
-    this.maxZoomX = SCOPE_MAX_ZOOM_X;
     this.currentZoomX = this.minZoomX; // Start fully zoomed out
 
     this.currentFOV = this.getFovForZoomX(this.currentZoomX);
@@ -111,11 +127,13 @@ export class Scope
 
   createCamera()
   {
+    // Use tighter far plane for better depth precision (matches main camera)
+    const FAR_PLANE = 2500; // yards
     this.camera = new THREE.PerspectiveCamera(
       this.currentFOV,
       this.outputRenderTarget.width / this.outputRenderTarget.height,
       0.1,
-      3000
+      FAR_PLANE
     );
     this.camera.position.set(
       this.cameraPosition.x,
@@ -271,7 +289,7 @@ export class Scope
    */
   mradToReticleUnitsAtFov(mrad, fovDeg)
   {
-    const mradPerUnit = fovDeg * MRAD_PER_UNIT_COEFF;
+    const mradPerUnit = fovDeg * MRAD_PER_UNIT_SLOPE;
     return mrad / mradPerUnit;
   }
 
@@ -297,7 +315,7 @@ export class Scope
    */
   getFovForZoomX(zoomX)
   {
-    return FOV_A / zoomX + FOV_B;
+    return this.fovA / zoomX + this.fovB;
   }
 
   /**

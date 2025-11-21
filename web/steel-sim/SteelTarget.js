@@ -198,13 +198,21 @@ export class SteelTarget
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
 
-    // Create material with texture
+    // Create material with texture.
+    // Render both sides so the back of the plate is visible when it swings,
+    // but apply a small polygon offset so the plate as a whole wins the depth
+    // test against the background terrain (reduces flicker/see-through).
     const material = new THREE.MeshStandardMaterial(
     {
       map: texture,
       metalness: 0.3,
       roughness: 0.7,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      depthTest: true,
+      depthWrite: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
 
     // Create mesh
