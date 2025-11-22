@@ -363,7 +363,9 @@ namespace btk::rendering
         btk::math::Quaternion rotation = btk::math::Quaternion::fromAxisAngle(axis, angle);
         orientation_ = rotation * orientation_;
         orientation_.normalize();
-        normal_ = orientation_.rotate(btk::math::Vector3D(1.0f, 0.0f, 0.0f));
+        // Recompute surface normal from orientation.
+        // Local default normal is (0, 0, -1) (uprange), so rotate that into world space.
+        normal_ = orientation_.rotate(btk::math::Vector3D(0.0f, 0.0f, -1.0f));
 
 #ifdef __EMSCRIPTEN__
         if(debug_)
