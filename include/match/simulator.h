@@ -19,15 +19,15 @@ namespace btk::match
    */
   struct SimulatedShot
   {
-    float impact_x;        // Horizontal impact position in m (positive = right)
-    float impact_y;        // Vertical impact position in m (positive = up)
+    float impact_x;        // Horizontal impact position in m (positive = right, X=crossrange)
+    float impact_y;        // Vertical impact position in m (positive = up, Y=vertical)
     int score;             // Shot score (0-10)
     bool is_x;             // Whether shot is in X-ring
     float actual_mv;       // Actual muzzle velocity in m/s for this shot
     float actual_bc;       // Actual ballistic coefficient for this shot
-    float wind_downrange;  // Head/tail wind component in m/s (positive = tailwind)
-    float wind_crossrange; // Crosswind component in m/s (positive = from left)
-    float wind_vertical;   // Up/down draft component in m/s (positive = updraft)
+    float wind_downrange;  // Head/tail wind component in m/s (positive = tailwind, wind in -Z direction)
+    float wind_crossrange; // Crosswind component in m/s (positive = from right, wind in +X direction)
+    float wind_vertical;   // Up/down draft component in m/s (positive = updraft, wind in +Y direction)
     float release_angle_h; // Horizontal release angle in rad
     float release_angle_v; // Vertical release angle in rad
     float impact_velocity; // Velocity at target impact in m/s
