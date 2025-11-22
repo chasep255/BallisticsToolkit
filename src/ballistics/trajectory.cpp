@@ -164,7 +164,7 @@ namespace btk
       float max_height = 0.0f;
       for(const auto& point : points_)
       {
-        float height = point.getState().getPositionZ();
+        float height = point.getState().getPositionY();
         if(height > max_height)
         {
           max_height = height;
@@ -188,11 +188,12 @@ namespace btk
         return 0.0f;
 
       const Bullet& impact_state = points_.back().getState();
-      float vx = impact_state.getVelocityX();
+      float vy = impact_state.getVelocityY();
       float vz = impact_state.getVelocityZ();
 
       // Impact angle is the angle below horizontal
-      float angle_rad = std::atan2(-vz, vx); // Negative vz because it's downward
+      // vz is -downrange, vy is vertical (downward is negative)
+      float angle_rad = std::atan2(-vy, -vz); // Negative vz because it's -downrange, negative vy because it's downward
       return angle_rad;
     }
 

@@ -20,7 +20,7 @@ namespace btk::rendering
 #endif
 
   SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval)
-    : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(1.0f, 0.0f, 0.0f),
+    : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(0.0f, 0.0f, -1.0f),
       orientation_(btk::math::Quaternion()),                                                 // Identity orientation (no rotation)
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
       mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512),
@@ -54,13 +54,13 @@ namespace btk::rendering
     metal_color_[2] = 140;
 
     // Calculate orientation from normal
-    btk::math::Vector3D default_normal(1.0f, 0.0f, 0.0f);
+    btk::math::Vector3D default_normal(0.0f, 0.0f, -1.0f);
     float dot = normal_.dot(default_normal);
 
     if(dot < -0.9999f)
     {
-      // Opposite direction: 180° rotation around Z
-      btk::math::Vector3D axis(0.0f, 0.0f, 1.0f);
+      // Opposite direction: 180° rotation around Y
+      btk::math::Vector3D axis(0.0f, 1.0f, 0.0f);
       orientation_ = btk::math::Quaternion::fromAxisAngle(axis, 3.14159265359f);
     }
     else if(dot < 0.9999f)
@@ -181,28 +181,28 @@ namespace btk::rendering
 
   bool SteelTarget::isPointInTarget(const btk::math::Vector3D& point) const
   {
-    // Shape is in YZ plane, centered at position_
+    // Shape is in XY plane, centered at position_
+    float dx = point.x - position_.x;
     float dy = point.y - position_.y;
-    float dz = point.z - position_.z;
 
     if(is_oval_)
     {
       // Oval (ellipse) test
       float a = width_ / 2.0f;
       float b = height_ / 2.0f;
-      return (dy * dy) / (a * a) + (dz * dz) / (b * b) <= 1.0f;
+      return (dx * dx) / (a * a) + (dy * dy) / (b * b) <= 1.0f;
     }
     else
     {
       // Rectangle test
-      return std::abs(dy) <= width_ / 2.0f && std::abs(dz) <= height_ / 2.0f;
+      return std::abs(dx) <= width_ / 2.0f && std::abs(dy) <= height_ / 2.0f;
     }
   }
 
   std::optional<SteelTarget::IntersectionResult> SteelTarget::checkTrajectoryIntersection(const btk::ballistics::Trajectory& trajectory) const
   {
-    // Target's downrange distance (position.x in ballistics coordinate system)
-    float target_distance_m = position_.x;
+    // Target's downrange distance (position.z in ballistics coordinate system, negative because downrange is -Z)
+    float target_distance_m = -position_.z;
 
     // Get trajectory point at target distance
     auto traj_point = trajectory.atDistance(target_distance_m);
@@ -336,8 +336,8 @@ namespace btk::rendering
 
     for(int i = 0; i < num_substeps; ++i)
     {
-      // Apply gravity (BTK: Z is up, so gravity is in -Z direction)
-      btk::math::Vector3D gravity_force(0.0f, 0.0f, -btk::physics::Constants::GRAVITY * mass_kg_);
+      // Apply gravity (BTK: Y is up, so gravity is in -Y direction)
+      btk::math::Vector3D gravity_force(0.0f, -btk::physics::Constants::GRAVITY * mass_kg_, 0.0f);
       applyForce(gravity_force, position_, substep_dt);
 
       // Apply chain tension forces
@@ -453,9 +453,9 @@ namespace btk::rendering
     btk::math::Vector3D local_pos_rotated = inv_orientation.rotate(local_pos);
     btk::math::Vector3D local_vel_rotated = inv_orientation.rotate(bullet.getVelocity());
 
-    // Determine which face was hit based on local X coordinate
-    // In local frame: +X is front face, -X is back face
-    bool is_front_face = local_pos_rotated.x > 0.0f;
+    // Determine which face was hit based on local Z coordinate
+    // In local frame: -Z is front face (facing downrange), +Z is back face
+    bool is_front_face = local_pos_rotated.z < 0.0f;
 
     // Store impact in local coordinates
     impacts_.emplace_back(local_pos_rotated, local_vel_rotated, bullet.getDiameter(), 0.0f);
@@ -469,13 +469,13 @@ namespace btk::rendering
     uvs_buffer_.clear();
     float halfThickness = thickness_ / 2.0f;
 
-    // Use full orientation quaternion to rotate from local (+X-normal) frame to world
+    // Use full orientation quaternion to rotate from local (-Z-normal) frame to world
     btk::math::Quaternion rotation_quat = orientation_;
 
     if(is_oval_)
     {
       // Oval with thickness: front face, back face, and edge
-      // Shape is in YZ plane with normal in +X direction (before rotation)
+      // Shape is in XY plane with normal in -Z direction (before rotation)
       float rx = width_ / 2.0f;
       float ry = height_ / 2.0f;
 
@@ -488,14 +488,14 @@ namespace btk::rendering
         float cos1 = std::cos(angle1), sin1 = std::sin(angle1);
         float cos2 = std::cos(angle2), sin2 = std::sin(angle2);
 
-        // Generate vertices in local space (relative to position_, normal in +X)
-        btk::math::Vector3D centerFront_local(halfThickness, 0.0f, 0.0f);
-        btk::math::Vector3D v1Front_local(halfThickness, rx * cos1, ry * sin1);
-        btk::math::Vector3D v2Front_local(halfThickness, rx * cos2, ry * sin2);
+        // Generate vertices in local space (relative to position_, normal in -Z)
+        btk::math::Vector3D centerFront_local(0.0f, 0.0f, -halfThickness);
+        btk::math::Vector3D v1Front_local(rx * cos1, ry * sin1, -halfThickness);
+        btk::math::Vector3D v2Front_local(rx * cos2, ry * sin2, -halfThickness);
 
-        btk::math::Vector3D centerBack_local(-halfThickness, 0.0f, 0.0f);
-        btk::math::Vector3D v1Back_local(-halfThickness, rx * cos1, ry * sin1);
-        btk::math::Vector3D v2Back_local(-halfThickness, rx * cos2, ry * sin2);
+        btk::math::Vector3D centerBack_local(0.0f, 0.0f, halfThickness);
+        btk::math::Vector3D v1Back_local(rx * cos1, ry * sin1, halfThickness);
+        btk::math::Vector3D v2Back_local(rx * cos2, ry * sin2, halfThickness);
 
         // Rotate vertices by current orientation (in BTK space)
         btk::math::Vector3D centerFront = position_ + rotation_quat.rotate(centerFront_local);
@@ -506,20 +506,20 @@ namespace btk::rendering
         btk::math::Vector3D v2Back = position_ + rotation_quat.rotate(v2Back_local);
 
         // Helper lambda to convert BTK coords (meters) to Three.js coords (yards) and push to buffer
-        // BTK: X=downrange, Y=crossrange-right, Z=up (meters)
+        // BTK now matches Three.js: X=crossrange, Y=up, Z=-downrange (meters)
         // Three.js: X=right, Y=up, Z=towards-camera (yards)
         auto pushVertex = [&](const btk::math::Vector3D& btk)
         {
-          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.y));  // BTK Y → Three X (yards)
-          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.z));  // BTK Z → Three Y (yards)
-          vertices_buffer_.push_back(-btk::math::Conversions::metersToYards(btk.x)); // BTK -X → Three Z (yards)
+          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.x));  // BTK X → Three X (yards)
+          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.y));  // BTK Y → Three Y (yards)
+          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.z)); // BTK Z → Three Z (yards)
         };
 
         // Helper lambda to push UV coordinates for FRONT face (left half of texture)
         auto pushUVFront = [&](const btk::math::Vector3D& local)
         {
-          float u = 0.5f + local.y / width_;  // Y maps to U [0, 1]
-          float v = 0.5f + local.z / height_; // Z maps to V [0, 1]
+          float u = 0.5f + local.x / width_;  // X maps to U [0, 1]
+          float v = 0.5f + local.y / height_; // Y maps to V [0, 1]
           u = u * 0.5f;                       // Scale to left half [0, 0.5]
           uvs_buffer_.push_back(u);
           uvs_buffer_.push_back(v);
@@ -528,8 +528,8 @@ namespace btk::rendering
         // Helper lambda to push UV coordinates for BACK face (right half of texture)
         auto pushUVBack = [&](const btk::math::Vector3D& local)
         {
-          float u = 0.5f + local.y / width_;  // Y maps to U [0, 1]
-          float v = 0.5f + local.z / height_; // Z maps to V [0, 1]
+          float u = 0.5f + local.x / width_;  // X maps to U [0, 1]
+          float v = 0.5f + local.y / height_; // Y maps to V [0, 1]
           u = u * 0.5f + 0.5f;                // Scale to right half [0.5, 1.0]
           uvs_buffer_.push_back(u);
           uvs_buffer_.push_back(v);
@@ -577,19 +577,19 @@ namespace btk::rendering
     else
     {
       // Rectangle with thickness: front face, back face, and 4 edge faces
-      // Shape is in YZ plane with normal in +X direction (before rotation)
+      // Shape is in XY plane with normal in -Z direction (before rotation)
       float hw = width_ / 2.0f;
       float hh = height_ / 2.0f;
 
-      // Generate corners in local space (relative to position_, normal in +X)
-      btk::math::Vector3D v0_local(-halfThickness, -hw, -hh);
-      btk::math::Vector3D v1_local(-halfThickness, +hw, -hh);
-      btk::math::Vector3D v2_local(-halfThickness, +hw, +hh);
-      btk::math::Vector3D v3_local(-halfThickness, -hw, +hh);
-      btk::math::Vector3D v4_local(+halfThickness, -hw, -hh);
-      btk::math::Vector3D v5_local(+halfThickness, +hw, -hh);
-      btk::math::Vector3D v6_local(+halfThickness, +hw, +hh);
-      btk::math::Vector3D v7_local(+halfThickness, -hw, +hh);
+      // Generate corners in local space (relative to position_, normal in -Z)
+      btk::math::Vector3D v0_local(-hw, -hh, -halfThickness);
+      btk::math::Vector3D v1_local(+hw, -hh, -halfThickness);
+      btk::math::Vector3D v2_local(+hw, +hh, -halfThickness);
+      btk::math::Vector3D v3_local(-hw, +hh, -halfThickness);
+      btk::math::Vector3D v4_local(-hw, -hh, +halfThickness);
+      btk::math::Vector3D v5_local(+hw, -hh, +halfThickness);
+      btk::math::Vector3D v6_local(+hw, +hh, +halfThickness);
+      btk::math::Vector3D v7_local(-hw, +hh, +halfThickness);
 
       // Rotate to world space using full orientation (in BTK space)
       btk::math::Vector3D v0 = position_ + rotation_quat.rotate(v0_local);
@@ -602,20 +602,20 @@ namespace btk::rendering
       btk::math::Vector3D v7 = position_ + rotation_quat.rotate(v7_local);
 
       // Helper lambda to convert BTK coords (meters) to Three.js coords (yards) and push to buffer
-      // BTK: X=downrange, Y=crossrange-right, Z=up (meters)
+      // BTK now matches Three.js: X=crossrange, Y=up, Z=-downrange (meters)
       // Three.js: X=right, Y=up, Z=towards-camera (yards)
       auto pushVertex = [&](const btk::math::Vector3D& btk)
       {
-        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.y));  // BTK Y → Three X (yards)
-        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.z));  // BTK Z → Three Y (yards)
-        vertices_buffer_.push_back(-btk::math::Conversions::metersToYards(btk.x)); // BTK -X → Three Z (yards)
+        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.x));  // BTK X → Three X (yards)
+        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.y));  // BTK Y → Three Y (yards)
+        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.z)); // BTK Z → Three Z (yards)
       };
 
       // Helper lambda to push UV coordinates for FRONT face (left half of texture)
       auto pushUVFront = [&](const btk::math::Vector3D& local)
       {
-        float u = 0.5f + local.y / width_;  // Y maps to U [0, 1]
-        float v = 0.5f + local.z / height_; // Z maps to V [0, 1]
+        float u = 0.5f + local.x / width_;  // X maps to U [0, 1]
+        float v = 0.5f + local.y / height_; // Y maps to V [0, 1]
         u = u * 0.5f;                       // Scale to left half [0, 0.5]
         uvs_buffer_.push_back(u);
         uvs_buffer_.push_back(v);
@@ -624,8 +624,8 @@ namespace btk::rendering
       // Helper lambda to push UV coordinates for BACK face (right half of texture)
       auto pushUVBack = [&](const btk::math::Vector3D& local)
       {
-        float u = 0.5f + local.y / width_;  // Y maps to U [0, 1]
-        float v = 0.5f + local.z / height_; // Z maps to V [0, 1]
+        float u = 0.5f + local.x / width_;  // X maps to U [0, 1]
+        float v = 0.5f + local.y / height_; // Y maps to V [0, 1]
         u = u * 0.5f + 0.5f;                // Scale to right half [0.5, 1.0]
         uvs_buffer_.push_back(u);
         uvs_buffer_.push_back(v);
@@ -800,10 +800,10 @@ namespace btk::rendering
 
   void SteelTarget::drawImpactOnTexture(const btk::math::Vector3D& local_position, float bullet_diameter, bool is_front_face)
   {
-    // In local frame, target is in YZ plane (X is normal)
-    // Map Y and Z to UV coordinates [0, 1]
-    float u = 0.5f + local_position.y / width_;
-    float v = 0.5f + local_position.z / height_;
+    // In local frame, target is in XY plane (Z is normal)
+    // Map X and Y to UV coordinates [0, 1]
+    float u = 0.5f + local_position.x / width_;
+    float v = 0.5f + local_position.y / height_;
 
     // Offset U coordinate based on which face: front = left half (0-0.5), back = right half (0.5-1.0)
     // Since texture_width_ is 2x the target aspect, we need to map to the correct half

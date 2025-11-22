@@ -109,10 +109,10 @@ namespace btk::ballistics
       return btk::math::Vector3D(0.0f, 0.0f, 0.0f);
     btk::math::Vector3D tHat = v.magnitude() > 1e-6f ? (v / v.magnitude()) : (u / V);
 
-    // Normal-plane basis (ensure right ≈ +Y for tHat ≈ +X, upInPl ≈ +Z)
-    btk::math::Vector3D worldUp = btk::math::Vector3D(0.0f, 0.0f, 1.0f); // or -gravity.normalized()
-    btk::math::Vector3D right = safe_norm(worldUp.cross(tHat), btk::math::Vector3D(1.0f, 0.0f, 0.0f));
-    btk::math::Vector3D upInPl = safe_norm(tHat.cross(right), btk::math::Vector3D(0.0f, 0.0f, 1.0f)); // already unit
+    // Normal-plane basis (ensure right ≈ +X for tHat ≈ -Z, upInPl ≈ +Y)
+    btk::math::Vector3D worldUp = btk::math::Vector3D(0.0f, 1.0f, 0.0f);
+    btk::math::Vector3D right = safe_norm(tHat.cross(worldUp), btk::math::Vector3D(1.0f, 0.0f, 0.0f));
+    btk::math::Vector3D upInPl = safe_norm(tHat.cross(right), btk::math::Vector3D(0.0f, 1.0f, 0.0f));
 
     // Aero scalars
     float rho = atmosphere_.getAirDensity();
@@ -130,7 +130,7 @@ namespace btk::ballistics
 
     // --- Spin drift (yaw-of-repose from gravity)
     btk::math::Vector3D gPerp = gravity - tHat * gravity.dot(tHat);
-    btk::math::Vector3D tXg = tHat.cross(gPerp); // direction in plane
+    btk::math::Vector3D tXg = gPerp.cross(tHat); // direction in plane (reversed for new coordinate system)
     float yor = (alignRate > 1e-6f) ? yaw_of_repose_scale_ * (tXg.magnitude() / (V * alignRate)) : 0.0f;
     // use the component along "right", signed by twist hand
     int hand = (s.getSpinRate() >= 0.0f) ? +1 : -1;
@@ -156,7 +156,7 @@ namespace btk::ballistics
 
     // 90° rotation around tHat; sign by twist hand
     float jumpR = yaw_of_repose_scale_ * (hand * (-hpU));
-    float jumpU = yaw_of_repose_scale_ * (hand * (hpR));
+    float jumpU = yaw_of_repose_scale_ * (hand * (-hpR));
 
     // Convert tiny angles -> acceleration with lift slope
     float gain = (qDyn * Sref * lift_slope_per_rad_) / s.getWeight();
@@ -172,7 +172,7 @@ namespace btk::ballistics
     btk::math::Vector3D v_rel = s.getVelocity() - wind_;
     float v_rel_mag = v_rel.magnitude();
 
-    btk::math::Vector3D gravity(0.0f, 0.0f, -btk::physics::Constants::GRAVITY);
+    btk::math::Vector3D gravity(0.0f, -btk::physics::Constants::GRAVITY, 0.0f);
     if(v_rel_mag <= 0.0f)
       return gravity;
 
@@ -226,22 +226,22 @@ namespace btk::ballistics
       float sinPitch = std::sin(best_pitch);
       float cosYaw = std::cos(best_yaw);
       float sinYaw = std::sin(best_yaw);
-      btk::math::Vector3D velocity_init(muzzle_velocity * cosPitch * cosYaw, // x (downrange)
-                                        muzzle_velocity * cosPitch * sinYaw, // y (crossrange)
-                                        muzzle_velocity * sinPitch);         // z (vertical)
+      btk::math::Vector3D velocity_init(muzzle_velocity * cosPitch * sinYaw, // x (crossrange)
+                                        muzzle_velocity * sinPitch,           // y (vertical)
+                                        -muzzle_velocity * cosPitch * cosYaw); // z (-downrange)
 
       // Start at bore height (z=0)
       btk::math::Vector3D position_init(0.0f, 0.0f, 0.0f);
       Bullet test_state(initial_bullet_, position_init, velocity_init, spin_rate);
 
       // Simulate slightly past target distance to ensure we can interpolate
-      float sim_dist = target_position.x * 1.1f;
+      float sim_dist = -target_position.z * 1.1f;
       setInitialBullet(test_state);
       current_time_ = 0.0f; // Reset clock for each trial
       Trajectory trajectory = simulate(sim_dist, dt, 5.0f);
 
       // Get state at target distance using interpolation
-      std::optional<TrajectoryPoint> point_at_target = trajectory.atDistance(target_position.x);
+      std::optional<TrajectoryPoint> point_at_target = trajectory.atDistance(-target_position.z);
 
       // Check if the point is valid
       if(!point_at_target)
@@ -249,21 +249,21 @@ namespace btk::ballistics
         break;
       }
 
-      // Calculate error at target plane; ignore downrange (x) interpolation residue
+      // Calculate error at target plane; ignore downrange (z) interpolation residue
       btk::math::Vector3D error = point_at_target->getState().getPosition() - target_position;
-      float lateral_error = error.y;  // crossrange
-      float vertical_error = error.z; // vertical
-      float yz_error_magnitude = std::sqrt(lateral_error * lateral_error + vertical_error * vertical_error);
+      float lateral_error = error.x;  // crossrange
+      float vertical_error = error.y; // vertical
+      float xy_error_magnitude = std::sqrt(lateral_error * lateral_error + vertical_error * vertical_error);
 
       // Check if we're close enough
-      if(yz_error_magnitude < tolerance)
+      if(xy_error_magnitude < tolerance)
       {
         break;
       }
 
-      // Vertical (pitch) correction from z error; Horizontal (yaw) from y error
-      float pitch_correction = -std::atan2(vertical_error, target_position.x);
-      float yaw_correction = -std::atan2(lateral_error, target_position.x);
+      // Vertical (pitch) correction from y error; Horizontal (yaw) from x error
+      float pitch_correction = -std::atan2(vertical_error, -target_position.z);
+      float yaw_correction = -std::atan2(lateral_error, -target_position.z);
 
       // Damped updates for stability (matches JS damping = 0.5)
       best_pitch += 0.5f * pitch_correction;
@@ -275,7 +275,7 @@ namespace btk::ballistics
     float sinPitchF = std::sin(best_pitch);
     float cosYawF = std::cos(best_yaw);
     float sinYawF = std::sin(best_yaw);
-    btk::math::Vector3D velocity_final(muzzle_velocity * cosPitchF * cosYawF, muzzle_velocity * cosPitchF * sinYawF, muzzle_velocity * sinPitchF);
+    btk::math::Vector3D velocity_final(muzzle_velocity * cosPitchF * sinYawF, muzzle_velocity * sinPitchF, -muzzle_velocity * cosPitchF * cosYawF);
     btk::math::Vector3D position_final(0.0f, 0.0f, 0.0f);
     Bullet initial_state(initial_bullet_, position_final, velocity_final, spin_rate);
 
@@ -299,7 +299,7 @@ namespace btk::ballistics
     while(current_time_ < max_sim_time)
     {
       timeStep(dt);
-      if(current_bullet_.getPositionX() > max_distance)
+      if(-current_bullet_.getPositionZ() > max_distance)
         break;
     }
 
@@ -309,7 +309,7 @@ namespace btk::ballistics
   // Simulate trajectory with wind generator sampling
   const Trajectory& Simulator::simulate(float max_distance, float dt, float max_time, const btk::physics::WindGenerator& wind_gen)
   {
-    // Sample wind at initial position
+    // Sample wind at initial position (wind_gen expects: crossrange, vertical, -downrange)
     float x = current_bullet_.getPositionX();
     float y = current_bullet_.getPositionY();
     float z = current_bullet_.getPositionZ();
@@ -323,7 +323,7 @@ namespace btk::ballistics
 
     while(current_time_ < max_sim_time)
     {
-      // Sample wind at current position (before stepping)
+      // Sample wind at current position (before stepping) (wind_gen expects: crossrange, vertical, -downrange)
       float x = current_bullet_.getPositionX();
       float y = current_bullet_.getPositionY();
       float z = current_bullet_.getPositionZ();
@@ -332,7 +332,7 @@ namespace btk::ballistics
       // Step forward (uses wind_ for acceleration calculation)
       timeStep(dt);
 
-      if(current_bullet_.getPositionX() > max_distance)
+      if(-current_bullet_.getPositionZ() > max_distance)
         break;
     }
 
@@ -366,7 +366,7 @@ namespace btk::ballistics
   }
 
   // State queries
-  float Simulator::getCurrentDistance() const { return current_bullet_.getPositionX(); }
+  float Simulator::getCurrentDistance() const { return -current_bullet_.getPositionZ(); }
 
   float Simulator::getCurrentTime() const { return current_time_; }
 

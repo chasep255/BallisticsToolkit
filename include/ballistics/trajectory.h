@@ -31,7 +31,7 @@ namespace btk::ballistics
     /**
      * @brief Get distance traveled at this point
      */
-    float getDistance() const { return state_.getPositionX(); } // m
+    float getDistance() const { return -state_.getPositionZ(); } // m
 
     /**
      * @brief Get position at this point

@@ -13,8 +13,9 @@ namespace btk::physics
   WindGenerator::WindGenerator() : current_time_(0.0f)
   {
     // Initialize sample corners to reasonable defaults
-    sample_corners_[0] = btk::math::Vector3D(0.0f, -100.0f, 0.0f);
-    sample_corners_[1] = btk::math::Vector3D(1000.0f, 100.0f, 100.0f);
+    // In new coordinate system: X=crossrange, Y=up, Z=-downrange
+    sample_corners_[0] = btk::math::Vector3D(-100.0f, 0.0f, 0.0f); // crossrange min, vertical min, downrange max (z=0 means -downrange=0)
+    sample_corners_[1] = btk::math::Vector3D(100.0f, 100.0f, -1000.0f); // crossrange max, vertical max, downrange min (z=-1000 means -downrange=-1000, so downrange=1000)
   }
 
   void WindGenerator::addComponent(float strength, float downrange_scale, float crossrange_scale, float temporal_scale, float exponent, float sigmoid_threshold)
@@ -169,12 +170,13 @@ namespace btk::physics
     const float epsilon = 0.01f; // Dimensionless step in scaled space
 
     // Use global advection offset
-    float x = position.x - global_advection_offset_.x;
-    float y = position.y - global_advection_offset_.y;
+    // In new coordinate system: position.x = crossrange, position.y = vertical, position.z = -downrange
+    float downrange = -position.z - (-global_advection_offset_.z); // downrange is -Z
+    float crossrange = position.x - global_advection_offset_.x; // crossrange is X
 
     // Scale coordinates by spatial scales (larger scale => slower spatial variation)
-    float scaled_x = x / component.downrange_scale;
-    float scaled_y = y / component.crossrange_scale;
+    float scaled_x = downrange / component.downrange_scale;
+    float scaled_y = crossrange / component.crossrange_scale;
 
     // Scale time by temporal scale (use explicit time parameter)
     float scaled_time = time / component.temporal_scale;
@@ -214,12 +216,13 @@ namespace btk::physics
 
       for(int j = 0; j < num_samples; ++j)
       {
-        // Random (x, y) within pattern window: 1000x spatial scales, centered at advection_offset
-        float offset_x = btk::math::Random::uniform(-1000.0f, 1000.0f) * component.downrange_scale;
-        float offset_y = btk::math::Random::uniform(-1000.0f, 1000.0f) * component.crossrange_scale;
+        // Random (crossrange, downrange) within pattern window: 1000x spatial scales, centered at advection_offset
+        // In new coordinate system: X=crossrange, Y=up, Z=-downrange
+        float offset_crossrange = btk::math::Random::uniform(-1000.0f, 1000.0f) * component.crossrange_scale;
+        float offset_downrange = btk::math::Random::uniform(-1000.0f, 1000.0f) * component.downrange_scale;
         float time_offset = btk::math::Random::uniform(-1000.0f, 1000.0f) * component.temporal_scale;
 
-        btk::math::Vector3D sample_pos = btk::math::Vector3D(offset_x, offset_y, 0.0f);
+        btk::math::Vector3D sample_pos = btk::math::Vector3D(offset_crossrange, 0.0f, -offset_downrange);
         float sample_time = current_time_ + time_offset;
 
         // Compute curl vector and get magnitude
@@ -280,11 +283,13 @@ namespace btk::physics
     final_magnitude = std::min(final_magnitude, 2.0f * component.strength);
 
     // Convert back to cartesian coordinates
-    float curl_x = final_magnitude * std::cos(angle);
-    float curl_y = final_magnitude * std::sin(angle);
+    // curl_x is downrange component, curl_y is crossrange component (in old 2D curl space)
+    float curl_downrange = final_magnitude * std::cos(angle);
+    float curl_crossrange = final_magnitude * std::sin(angle);
 
-    // Return curl field as (x, y, 0) - no vertical component
-    return btk::math::Vector3D(curl_x, curl_y, 0.0f);
+    // Convert to new coordinate system: X=crossrange, Y=up, Z=-downrange
+    // Return as (crossrange, 0, -downrange) - no vertical component from 2D curl
+    return btk::math::Vector3D(curl_crossrange, 0.0f, -curl_downrange);
   }
 
   btk::math::Vector3D WindGenerator::sample(const btk::math::Vector3D& pos) const

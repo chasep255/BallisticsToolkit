@@ -56,16 +56,15 @@ namespace btk::rendering
   void WindFlag::update(float deltaTime, const btk::math::Vector3D& wind_btk)
   {
     // Convert wind from BTK coords (m/s) to horizontal wind speed (mph) and direction
-    // BTK: X=downrange (head/tail), Y=crossrange (crosswind), Z=up
-    // For flags, we care about horizontal wind (X and Y components)
-    float windX_mps = wind_btk.x; // head/tail wind (BTK X = downrange)
-    float windY_mps = wind_btk.y; // crosswind (BTK Y = crossrange)
+    // BTK: X=crossrange, Y=up, Z=-downrange
+    // For flags, we care about horizontal wind (X and Z components)
+    float windX_mps = wind_btk.x; // crosswind (BTK X = crossrange)
+    float windY_mps = -wind_btk.z; // head/tail wind (BTK Z = -downrange, so negate)
     float windHoriz_mps = std::sqrt(windX_mps * windX_mps + windY_mps * windY_mps);
     float windHoriz_mph = btk::math::Conversions::mpsToMph(windHoriz_mps);
 
     // Wind direction in ground plane (BTK space)
-    // atan2(head/tail, crosswind) matches fclass flags.js pattern: atan2(windZ, windX)
-    // where windZ = head/tail and windX = crosswind in Three.js coords
+    // atan2(crosswind, head/tail) - windX is crosswind, windY is head/tail
     // Wind generator returns wind FROM direction, so flag points opposite (wind blows FROM flag direction)
     float targetDirection = windHoriz_mps > 1e-6f ? std::atan2(windX_mps, windY_mps) + M_PI : current_direction_;
 
@@ -161,26 +160,27 @@ namespace btk::rendering
       // Flag is vertical (in XY plane), with top/bottom in Y direction
       // Front/back faces are offset in Z direction (thickness)
       // 4 vertices per segment: topFront, bottomFront, topBack, bottomBack
+      // Convert from meters (BTK) to yards (Three.js) - coordinates already match
 
       // Top front vertex
-      vertices_buffer_.push_back(position_.x + segX);
-      vertices_buffer_.push_back(position_.y + segY + halfWidth);
-      vertices_buffer_.push_back(position_.z + segZ + halfThickness);
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.x + segX));
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.y + segY + halfWidth));
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.z + segZ + halfThickness));
 
       // Bottom front vertex
-      vertices_buffer_.push_back(position_.x + segX);
-      vertices_buffer_.push_back(position_.y + segY - halfWidth);
-      vertices_buffer_.push_back(position_.z + segZ + halfThickness);
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.x + segX));
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.y + segY - halfWidth));
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.z + segZ + halfThickness));
 
       // Top back vertex
-      vertices_buffer_.push_back(position_.x + segX);
-      vertices_buffer_.push_back(position_.y + segY + halfWidth);
-      vertices_buffer_.push_back(position_.z + segZ - halfThickness);
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.x + segX));
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.y + segY + halfWidth));
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.z + segZ - halfThickness));
 
       // Bottom back vertex
-      vertices_buffer_.push_back(position_.x + segX);
-      vertices_buffer_.push_back(position_.y + segY - halfWidth);
-      vertices_buffer_.push_back(position_.z + segZ - halfThickness);
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.x + segX));
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.y + segY - halfWidth));
+      vertices_buffer_.push_back(btk::math::Conversions::metersToYards(position_.z + segZ - halfThickness));
 
       // UV coordinates (red top, yellow bottom) for both faces
       const float t = static_cast<float>(i) / static_cast<float>(flag_segments_ - 1);

@@ -70,7 +70,7 @@ namespace btk::rendering
      * @brief Update flag physics state based on wind
      *
      * @param deltaTime Time step in seconds
-     * @param wind_btk Wind vector in BTK coordinates (m/s): X=downrange, Y=crossrange, Z=up
+     * @param wind_btk Wind vector in BTK coordinates (m/s): X=crossrange, Y=up, Z=-downrange
      */
     void update(float deltaTime, const btk::math::Vector3D& wind_btk);
 
