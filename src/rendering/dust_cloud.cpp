@@ -55,8 +55,8 @@ namespace btk::rendering
       alpha_ = 0.0f;
     }
 
-    // Advect cloud center with wind (negate to move in direction wind is blowing TO)
-    center_position_ -= wind * dt;
+    // Advect cloud center with wind (move with the air velocity)
+    center_position_ += wind * dt;
 
     // Update display buffers
     updateBuffers();
@@ -76,25 +76,18 @@ namespace btk::rendering
     // Since relative positions are already in meters (scaled by initial_radius), we scale by radius ratio
     float radius_scale = radius_ / initial_radius_;
 
-    // BTK coordinates: X=downrange, Y=crossrange, Z=up
-    // Three.js coordinates: X=right, Y=up, Z=towards camera
+    // BTK coordinates: X=crossrange, Y=up, Z=-downrange (meters)
+    // Three.js scene also uses meters now, so we push world-space positions directly.
     for(const auto& particle : particles_)
     {
       // Calculate world position: center + scaled relative position
       // relative_position_ is already in meters (scaled by initial_radius), so scale by radius ratio
       btk::math::Vector3D world_position = center_position_ + particle.relative_position_ * radius_scale;
 
-      // Convert BTK coordinates (meters) to Three.js coordinates (yards)
-      // BTK: X=downrange, Y=crossrange-right, Z=up (meters)
-      // Three.js: X=right, Y=up, Z=towards-camera (yards)
-      float x = btk::math::Conversions::metersToYards(world_position.y);  // BTK Y → Three X (yards)
-      float y = btk::math::Conversions::metersToYards(world_position.z);  // BTK Z → Three Y (yards)
-      float z = -btk::math::Conversions::metersToYards(world_position.x); // BTK -X → Three Z (yards)
-
       // Store position (3 floats: x, y, z)
-      positions_buffer_.push_back(x);
-      positions_buffer_.push_back(y);
-      positions_buffer_.push_back(z);
+      positions_buffer_.push_back(world_position.x);
+      positions_buffer_.push_back(world_position.y);
+      positions_buffer_.push_back(world_position.z);
     }
   }
 

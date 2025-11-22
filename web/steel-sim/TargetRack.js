@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Config } from './config.js';
 import
 {
   SteelTarget,
@@ -18,11 +19,11 @@ export class TargetRack
 {
 
   /**
-   * Create a new target rack defined by two corners in yards
+   * Create a new target rack defined by two corners in meters
    *
    * @param {Object} options - Configuration options
-   * @param {{x:number,y:number,z:number}} options.bottomLeft - Bottom-left corner in yards
-   * @param {{x:number,y:number,z:number}} options.topRight - Top-right corner in yards
+   * @param {{x:number,y:number,z:number}} options.bottomLeft - Bottom-left corner in meters
+   * @param {{x:number,y:number,z:number}} options.topRight - Top-right corner in meters
    * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (default 0)
    * @param {THREE.Scene} options.scene - Three.js scene to add meshes to (required)
    */
@@ -75,9 +76,9 @@ export class TargetRack
   /**
    * Add a target to the rack with automatic positioning
    * @param {Object} options - Target configuration
-   * @param {number} options.width - Width in inches (required)
-   * @param {number} options.height - Height in inches (required)
-   * @param {number} options.thickness - Thickness in inches (default 0.5)
+   * @param {number} options.width - Width in meters (required)
+   * @param {number} options.height - Height in meters (required)
+   * @param {number} options.thickness - Thickness in meters (default from config, already converted)
    * @param {boolean} options.isOval - True for oval shape, false for rectangle (default false)
    * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (defaults to rack's outwardOffset)
    * @returns {SteelTarget} The created target instance
@@ -184,8 +185,8 @@ export class TargetRack
     this.removeBeamAndPosts();
 
     // Create beam (2" diameter)
-    // Convert inches to yards for Three.js
-    const beamRadius = btk.Conversions.inchesToYards(2) / 2;
+    // Beam radius from config (already in meters)
+    const beamRadius = Config.TARGET_CONFIG.beamRadius;
     const beamGeometry = new THREE.CylinderGeometry(beamRadius, beamRadius, this.width, 16);
     const beamMaterial = new THREE.MeshStandardMaterial(
     {
@@ -205,8 +206,8 @@ export class TargetRack
     this.scene.add(this.beamMesh);
 
     // Create support posts (vertical posts spanning from bottom to top, 2" diameter)
-    // Convert inches to yards for Three.js
-    const postRadius = btk.Conversions.inchesToYards(2) / 2;
+    // Post radius from config (already in meters)
+    const postRadius = Config.TARGET_CONFIG.postRadius;
     const postGeometry = new THREE.CylinderGeometry(postRadius, postRadius, this.height, 16);
     const postMaterial = new THREE.MeshStandardMaterial(
     {
@@ -275,8 +276,8 @@ export class TargetRack
   }
 
   /**
-   * Get total rack width in yards
-   * @returns {number} Width in yards
+   * Get total rack width in meters
+   * @returns {number} Width in meters
    */
   getWidth()
   {

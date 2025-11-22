@@ -14,15 +14,15 @@ export class DustCloud
   /**
    * Create a new dust cloud
    * @param {Object} options - Configuration options
-   * @param {THREE.Vector3} options.position - Initial cloud center position in Three.js coordinates (required)
+   * @param {THREE.Vector3} options.position - Initial cloud center position in meters (SI units) (required)
    * @param {THREE.Scene} options.scene - Three.js scene to add mesh to (required)
    * @param {number} options.numParticles - Number of particles (required)
    * @param {Object} options.color - RGB color {r, g, b} 0-255 (required)
    *                                 Each particle gets random color jitter (±20%)
    * @param {btk.WindGenerator} options.windGenerator - Wind generator instance (required)
-   * @param {number} options.initialRadius - Initial cloud radius in yards (required)
-   * @param {number} options.growthRate - Cloud radius growth rate in feet/second (required)
-   * @param {number} options.particleDiameter - Particle diameter in yards (required)
+   * @param {number} options.initialRadius - Initial cloud radius in meters (required)
+   * @param {number} options.growthRate - Cloud radius growth rate in m/s (required)
+   * @param {number} options.particleDiameter - Particle diameter in meters (required)
    * Note: Alpha decays automatically with volume growth (no separate fade rate)
    */
   constructor(options)
@@ -49,12 +49,16 @@ export class DustCloud
     this.scene = scene;
     this.windGenerator = windGenerator; // Store for dynamic wind sampling
 
-    // Convert impact point (yards, Three.js coords) to BTK coordinates (meters)
-    const impactPos = window.threeJsToBtkPosition(position);
+    // Three.js scene is in meters - convert THREE.Vector3 to btk.Vector3D (same coordinate system, same units)
+    const impactPos = new btk.Vector3D(
+      position.x,
+      position.y,
+      position.z
+    );
 
-    // Convert parameters from yards/fps to meters/mps for BTK
-    const initialRadiusMeters = btk.Conversions.yardsToMeters(initialRadius);
-    const growthRateMps = btk.Conversions.fpsToMps(growthRate);
+    // Parameters are already in meters/m/s from config
+    const initialRadiusMeters = initialRadius;
+    const growthRateMps = growthRate;
 
     // Create C++ dust cloud (wind sampled dynamically each update)
     // Particles have relative positions from cloud center (Gaussian distribution)
@@ -125,10 +129,10 @@ export class DustCloud
     this.pointsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     // Create material for points
-    // Size is in world units (yards)
+    // Size is in world units (meters)
     this.pointsMaterial = new THREE.PointsMaterial(
     {
-      size: particleDiameter, // Size in yards (world units)
+      size: particleDiameter, // Size in meters (world units)
       vertexColors: true,
       transparent: true,
       opacity: 1.0,

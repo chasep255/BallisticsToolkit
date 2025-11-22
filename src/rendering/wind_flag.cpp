@@ -53,21 +53,21 @@ namespace btk::rendering
     position_ = btk::math::Vector3D(x, y, z);
   }
 
-  void WindFlag::update(float deltaTime, const btk::math::Vector3D& wind_btk)
+  void WindFlag::update(float deltaTime, const btk::math::Vector3D& wind)
   {
-    // Convert wind from BTK coords (m/s) to horizontal wind speed (mph) and direction
-    // BTK: X=downrange (head/tail), Y=crossrange (crosswind), Z=up
-    // For flags, we care about horizontal wind (X and Y components)
-    float windX_mps = wind_btk.x; // head/tail wind (BTK X = downrange)
-    float windY_mps = wind_btk.y; // crosswind (BTK Y = crossrange)
-    float windHoriz_mps = std::sqrt(windX_mps * windX_mps + windY_mps * windY_mps);
+    // Extract horizontal wind components (m/s)
+    // BTK: X=crossrange (right), Y=up, Z=-downrange
+    float crossrange_mps = wind.x;     // +X = wind blowing to the right
+    float downrange_mps = -wind.z;     // Z=-downrange, so -wind.z = +downrange (tailwind toward targets)
+    float windHoriz_mps = std::sqrt(crossrange_mps * crossrange_mps + downrange_mps * downrange_mps);
     float windHoriz_mph = btk::math::Conversions::mpsToMph(windHoriz_mps);
 
-    // Wind direction in ground plane (BTK space)
-    // atan2(head/tail, crosswind) matches fclass flags.js pattern: atan2(windZ, windX)
-    // where windZ = head/tail and windX = crosswind in Three.js coords
-    // Wind generator returns wind FROM direction, so flag points opposite (wind blows FROM flag direction)
-    float targetDirection = windHoriz_mps > 1e-6f ? std::atan2(windX_mps, windY_mps) + M_PI : current_direction_;
+    // Wind direction in ground plane (BTK space).
+    // Treat (crossrange_mps, downrange_mps) as a 2D vector:
+    //  - X = crossrange (right)
+    //  - Y = downrange (toward targets)
+    // direction is measured from +X toward +downrange.
+    float targetDirection = windHoriz_mps > 1e-6f ? std::atan2(downrange_mps, crossrange_mps) : current_direction_;
 
     // Nonlinear angle response: angle = min + span * (1 - exp(-K * v_h^2))
     float span = flag_max_angle_ - flag_min_angle_;
@@ -119,25 +119,24 @@ namespace btk::rendering
     const float cosPitch = std::cos(angleRad);
     const float sinPitch = std::sin(angleRad);
 
-    // In Three.js coords: X=right, Y=up, Z=towards camera (negative Z = downrange)
-    // Flag extends from pole: 0° = hanging down, 90° = horizontal
-    // Wind angle determines how much the flag lifts (0° = hanging down, 90° = straight out)
-    // direction parameter is the wind direction angle (0° = right, 90° = up, 180° = left, 270° = down)
-
-    const float segmentX = cosDir * sinPitch * flag_length_ * t; // Horizontal extension in wind direction
-    const float segmentY = -cosPitch * flag_length_ * t;         // Vertical droop (negative Y = down)
-    const float segmentZ = sinDir * sinPitch * flag_length_ * t; // Depth extension in wind direction
+    // BTK / Three.js coords: X=crossrange (right), Y=up, Z=-downrange.
+    // direction is measured from +X toward +downrange, so the horizontal
+    // wind direction vector is:
+    //   h = (cosDir, 0, -sinDir)
+    const float segmentX = cosDir * sinPitch * flag_length_ * t;   // Horizontal extension in wind direction (X)
+    const float segmentY = -cosPitch * flag_length_ * t;           // Vertical droop (negative Y = down)
+    const float segmentZ = -sinDir * sinPitch * flag_length_ * t;  // Depth extension in wind direction (Z)
 
     // Flapping animation - flag waves in the wind
     const float wavePosition = t * flag_wave_length_;
     const float waveOffset = std::sin(flapPhase + wavePosition * 2.0f * M_PI) * flag_flap_amplitude_;
     const float flapAmplitude = waveOffset * t;
 
-    // Flapping perpendicular to wind direction (makes flag visible from all angles)
-    // When wind blows right (0°), flag flaps in Z (depth)
-    // When wind blows downrange (90°), flag flaps in X (horizontal)
-    const float flapX = -sinDir * flapAmplitude; // Horizontal flapping
-    const float flapZ = cosDir * flapAmplitude; // Depth flapping
+    // Flapping perpendicular to wind direction (makes flag visible from all angles).
+    // Perpendicular horizontal vector to h = (cosDir, 0, -sinDir) is:
+    //   p = (sinDir, 0, cosDir)
+    const float flapX = sinDir * flapAmplitude;  // Horizontal flapping
+    const float flapZ = cosDir * flapAmplitude;  // Depth flapping
 
     outX = segmentX + flapX;
     outY = segmentY;
@@ -158,9 +157,11 @@ namespace btk::rendering
       float segX, segY, segZ, halfWidth;
       calculateFlagSegmentPosition(i, current_angle_, current_direction_, flap_phase_, segX, segY, segZ, halfWidth);
 
-      // Flag is vertical (in XY plane), with top/bottom in Y direction
-      // Front/back faces are offset in Z direction (thickness)
-      // 4 vertices per segment: topFront, bottomFront, topBack, bottomBack
+      // Flag is vertical (in XY plane), with top/bottom in Y direction.
+      // Front/back faces are offset in Z direction (thickness).
+      // 4 vertices per segment: topFront, bottomFront, topBack, bottomBack.
+      // All coordinates are in BTK world space (meters), which now matches the
+      // Three.js scene units, so we push them directly.
 
       // Top front vertex
       vertices_buffer_.push_back(position_.x + segX);

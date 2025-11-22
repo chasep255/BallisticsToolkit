@@ -76,8 +76,8 @@ function calculateTrajectory()
   simulator.setWind(zeroWind);
   zeroWind.delete(); // Dispose Vector3D to prevent memory leak
 
-  // Create target position vector (x=downrange, y=crossrange, z=vertical)
-  const targetPos = new btk.Vector3D(zeroRange, 0, scopeHeight);
+  // Create target position vector (x=crossrange, y=vertical, z=-downrange)
+  const targetPos = new btk.Vector3D(0, scopeHeight, -zeroRange);
   simulator.computeZero(
     muzzleVelocity,
     targetPos,
@@ -88,9 +88,12 @@ function calculateTrajectory()
   );
   targetPos.delete(); // Dispose Vector3D to prevent memory leak
 
-  const windX = -windSpeed * Math.cos(windDirection); // Downrange component (negative = headwind, positive = tailwind)
-  const windY = windSpeed * Math.sin(windDirection); // Crossrange component (positive = from right, negative = from left)
-  const windZ = 0.0; // No vertical component for now
+  // Wind vector in new coordinate system: X=crossrange, Y=up, Z=-downrange
+  // windDirection is o'clock format: 12=tailwind, 3=from right, 6=headwind, 9=from left
+  // Note: oclockToRadians maps 12 o'clock→π, 6 o'clock→0, 3 o'clock→π/2, 9 o'clock→3π/2
+  const windX = windSpeed * Math.sin(windDirection); // Crossrange component (positive = from right, negative = from left)
+  const windY = 0.0; // No vertical component
+  const windZ = windSpeed * Math.cos(windDirection); // Downrange component (12 o'clock: cos(π)=-1, so negative = tailwind)
 
   const windVector = new btk.Vector3D(windX, windY, windZ);
   simulator.setWind(windVector);
@@ -114,12 +117,13 @@ function calculateTrajectory()
     const position = state.getPosition();
 
     // Calculate drop relative to scope height
-    const bulletHeight = position.z;
+    // In new coordinate system: X=crossrange, Y=up, Z=-downrange
+    const bulletHeight = position.y; // Vertical component is now Y
     const dropMeters = bulletHeight - scopeHeight;
     const dropMrad = range > 0 ? (dropMeters / range) * 1000 : 0;
 
     // Calculate drift (crosswind component)
-    const driftMeters = position.y;
+    const driftMeters = position.x; // Crossrange component is now X
     const driftMrad = range > 0 ? (driftMeters / range) * 1000 : 0;
 
     trajectory.push(

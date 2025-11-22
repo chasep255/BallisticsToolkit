@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Config } from './config.js';
 
 /**
  * Wrapper class for C++ WindFlag that manages Three.js rendering resources
@@ -11,7 +12,7 @@ export class WindFlag
   /**
    * Create a new wind flag
    * @param {Object} options - Configuration options
-   * @param {Object} options.position - Position in yards {x, y, z} (required)
+   * @param {Object} options.position - Position in meters (SI units) {x, y, z} (required)
    * @param {THREE.Scene} options.scene - Three.js scene to add pole/flag to (required)
    * @param {Object} options.config - Optional flag configuration (uses defaults if not provided)
    */
@@ -30,22 +31,22 @@ export class WindFlag
     const btk = window.btk;
     this.scene = scene;
 
-    // Provide defaults matching flags.js constants
+    // Use config defaults, allow overrides
     const flagConfig = {
-      flagBaseWidth: config.flagBaseWidth ?? (60.0 / 36.0),
-      flagTipWidth: config.flagTipWidth ?? (24.0 / 36.0),
-      flagLength: config.flagLength ?? (16.0 / 3.0),
-      flagThickness: config.flagThickness ?? 0.05,
-      flagSegments: config.flagSegments ?? 10,
-      flagMinAngle: config.flagMinAngle ?? 1.0,
-      flagMaxAngle: config.flagMaxAngle ?? 90.0,
-      flagAngleResponseK: config.flagAngleResponseK ?? 0.0205,
-      flagAngleInterpolationSpeed: config.flagAngleInterpolationSpeed ?? 30.0,
-      flagDirectionInterpolationSpeed: config.flagDirectionInterpolationSpeed ?? 1.0,
-      flagFlapFrequencyBase: config.flagFlapFrequencyBase ?? 0.5,
-      flagFlapFrequencyScale: config.flagFlapFrequencyScale ?? 0.25,
-      flagFlapAmplitude: config.flagFlapAmplitude ?? 0.3,
-      flagWaveLength: config.flagWaveLength ?? 1.5
+      flagBaseWidth: config.flagBaseWidth ?? Config.WIND_FLAG_CONFIG.flagBaseWidth,
+      flagTipWidth: config.flagTipWidth ?? Config.WIND_FLAG_CONFIG.flagTipWidth,
+      flagLength: config.flagLength ?? Config.WIND_FLAG_CONFIG.flagLength,
+      flagThickness: config.flagThickness ?? Config.WIND_FLAG_CONFIG.flagThickness,
+      flagSegments: config.flagSegments ?? Config.WIND_FLAG_CONFIG.flagSegments,
+      flagMinAngle: config.flagMinAngle ?? Config.WIND_FLAG_CONFIG.flagMinAngle,
+      flagMaxAngle: config.flagMaxAngle ?? Config.WIND_FLAG_CONFIG.flagMaxAngle,
+      flagAngleResponseK: config.flagAngleResponseK ?? Config.WIND_FLAG_CONFIG.flagAngleResponseK,
+      flagAngleInterpolationSpeed: config.flagAngleInterpolationSpeed ?? Config.WIND_FLAG_CONFIG.flagAngleInterpolationSpeed,
+      flagDirectionInterpolationSpeed: config.flagDirectionInterpolationSpeed ?? Config.WIND_FLAG_CONFIG.flagDirectionInterpolationSpeed,
+      flagFlapFrequencyBase: config.flagFlapFrequencyBase ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyBase,
+      flagFlapFrequencyScale: config.flagFlapFrequencyScale ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyScale,
+      flagFlapAmplitude: config.flagFlapAmplitude ?? Config.WIND_FLAG_CONFIG.flagFlapAmplitude,
+      flagWaveLength: config.flagWaveLength ?? Config.WIND_FLAG_CONFIG.flagWaveLength
     };
 
     // Create C++ WindFlag instance with configurable parameters
@@ -66,14 +67,18 @@ export class WindFlag
       flagConfig.flagWaveLength
     );
 
-    // Store pole height for flag positioning
-    this.poleHeight = 12.0; // yards
-    this.flagBaseWidth = flagConfig.flagBaseWidth;
+    // Store pole height for flag positioning (meters - Three.js scene is in meters)
+    this.poleHeight = Config.WIND_FLAG_CONFIG.poleHeight; // meters
+    this.flagBaseWidth = flagConfig.flagBaseWidth; // meters from C++
 
     // Flag attaches at pole top minus half flag base width
-    // Set C++ flag position (flag center position)
+    // Position is in meters (Three.js scene is in meters)
     const flagY = position.y + this.poleHeight - this.flagBaseWidth / 2;
-    this.windFlag.setPosition(position.x, flagY, position.z);
+    this.windFlag.setPosition(
+      position.x,
+      flagY,
+      position.z
+    );
 
     // Create pole
     this.pole = this.createPole();
@@ -104,7 +109,7 @@ export class WindFlag
    */
   createPole()
   {
-    const poleThickness = 0.1; // yards
+    const poleThickness = Config.WIND_FLAG_CONFIG.poleThickness;
     const baseY = this.windFlag.getPosition().y - this.poleHeight + this.flagBaseWidth / 2;
 
     const poleGeometry = new THREE.BoxGeometry(poleThickness, this.poleHeight, poleThickness);
@@ -222,11 +227,11 @@ export class WindFlag
     const btk = window.btk;
     const pos = this.windFlag.getPosition();
 
-    // Convert Three.js position (yards) to BTK position (meters)
+    // Convert Three.js position (meters) to BTK position (meters) - same coordinate system, same units
     const posBtk = new btk.Vector3D(
-      btk.Conversions.yardsToMeters(-pos.z), // Three Z (downrange) → BTK X (downrange)
-      btk.Conversions.yardsToMeters(pos.x),  // Three X (crossrange) → BTK Y (crossrange)
-      btk.Conversions.yardsToMeters(pos.y)   // Three Y (up) → BTK Z (up)
+      pos.x, // X = crossrange
+      pos.y, // Y = up
+      pos.z  // Z = -downrange
     );
 
     // Sample wind in BTK coordinates (m/s)
@@ -303,32 +308,34 @@ export class WindFlagFactory
    * Create all flags along the range
    * @param {THREE.Scene} scene - Three.js scene
    * @param {Landscape} landscape - Landscape instance for height queries
-   * @param {Object} options - Optional configuration
-   * @param {number} options.maxRange - Maximum range in yards (default: 2000)
-   * @param {number} options.interval - Flag interval in yards (default: 100)
-   * @param {number} options.sideOffset - Distance from center to flag positions in yards (default: 50)
+   * @param {Object} options - Optional configuration (all in meters, SI units)
+   * @param {number} options.maxRange - Maximum range in meters
+   * @param {number} options.interval - Flag interval in meters
+   * @param {number} options.sideOffset - Distance from center to flag positions in meters
    * @param {Object} options.config - Flag configuration overrides
    */
   static createFlags(scene, landscape, options = {})
   {
+    const btk = window.btk;
     const
     {
-      maxRange = 2000,
-      interval = 100,
-      sideOffset = 50,
+      maxRange = Config.LANDSCAPE_CONFIG.groundLength,
+      interval = Config.WIND_FLAG_CONFIG.interval,
+      sideOffset = Config.LANDSCAPE_CONFIG.groundWidth / 2,
       config = {}
     } = options;
 
     // Clear existing flags
     this.deleteAll();
 
-    // Create flags every interval yards from interval to maxRange
+    // All values are in meters - Three.js scene is in meters
+    // Create flags every interval from interval to maxRange
     for (let distance = interval; distance <= maxRange; distance += interval)
     {
-      const z = -distance; // Negative Z = downrange
+      const z = -distance; // Negative Z = downrange (meters)
 
       // Left side flag
-      const leftX = -sideOffset;
+      const leftX = -sideOffset; // meters
       const leftY = landscape.getHeightAt(leftX, z) || 0;
       const leftFlag = new WindFlag(
       {
@@ -339,7 +346,7 @@ export class WindFlagFactory
       this.flags.push(leftFlag);
 
       // Right side flag
-      const rightX = sideOffset;
+      const rightX = sideOffset; // meters
       const rightY = landscape.getHeightAt(rightX, z) || 0;
       const rightFlag = new WindFlag(
       {
