@@ -124,11 +124,11 @@ export class BallisticsEngine
         throw new Error('Cannot compute zero: user target not available');
       }
 
-      // Convert Three.js coordinates to BTK coordinates
+      // Convert yards to meters (same coordinate system)
       const targetPos = threeJsToBtkPosition(
-        targetCenter.x, // Three.js X (crossrange)
-        targetCenter.y, // Three.js Y (vertical)
-        targetCenter.z // Three.js Z (downrange, negative)
+        targetCenter.x,
+        targetCenter.y,
+        targetCenter.z
       );
 
       console.log(`${LOG_PREFIX_ENGINE} Zeroing: MV=${this.nominalMV.toFixed(1)}fps, Range=${this.distance}yd, Target=(${targetCenter.x.toFixed(3)}, ${targetCenter.y.toFixed(3)}, ${targetCenter.z.toFixed(1)}) yards`);
@@ -154,7 +154,7 @@ export class BallisticsEngine
       const zeroVelBtk = this.zeroedBullet.getVelocity();
       const zeroVel = btkToThreeJsVelocity(zeroVelBtk);
       const zeroVelMag = Math.sqrt(zeroVel.x * zeroVel.x + zeroVel.y * zeroVel.y + zeroVel.z * zeroVel.z);
-      // Calculate angles from velocity components (Three.js coords: X=right, Y=up, Z=downrange-negative)
+      // Calculate angles from velocity components (X=right, Y=up, Z=towards-camera where negative Z=downrange)
       const elevationRad = Math.asin(zeroVel.y / zeroVelMag);
       const windageRad = Math.atan2(zeroVel.x, -zeroVel.z);
       const elevationMoa = btk.Conversions.radiansToMoa(elevationRad);
@@ -303,12 +303,12 @@ export class BallisticsEngine
         return null;
       }
 
-      // Get bullet position and velocity at target (convert to Three.js coords, yards)
+      // Get bullet position and velocity at target (convert units: meters→yards, m/s→fps)
       const bulletState = pointAtTarget.getState();
       const bulletPosBtk = bulletState.getPosition();
       const bulletVelBtk = bulletState.getVelocity();
-      const bulletPos = btkToThreeJsPosition(bulletPosBtk); // Three.js coords in yards
-      const bulletVel = btkToThreeJsVelocity(bulletVelBtk); // Three.js coords in fps
+      const bulletPos = btkToThreeJsPosition(bulletPosBtk); // Convert meters to yards
+      const bulletVel = btkToThreeJsVelocity(bulletVelBtk); // Convert m/s to fps
       const impactVelocityFps = Math.sqrt(bulletVel.x ** 2 + bulletVel.y ** 2 + bulletVel.z ** 2); // fps
 
       // Dispose BTK vectors
@@ -471,7 +471,7 @@ export class BallisticsEngine
     if (optPoint0 !== undefined)
     {
       const posBtk = optPoint0.getState().getPosition();
-      const pos = btkToThreeJsPosition(posBtk); // Convert to Three.js coords, yards
+      const pos = btkToThreeJsPosition(posBtk); // Convert meters to yards
       this.bulletMesh.position.set(pos.x, pos.y, pos.z);
       posBtk.delete();
       optPoint0.delete(); // Dispose TrajectoryPoint to prevent memory leak
@@ -504,7 +504,7 @@ export class BallisticsEngine
     if (optPoint !== undefined)
     {
       const posBtk = optPoint.getState().getPosition();
-      const pos = btkToThreeJsPosition(posBtk); // Convert to Three.js coords, yards
+      const pos = btkToThreeJsPosition(posBtk); // Convert meters to yards
       this.bulletMesh.position.set(pos.x, pos.y, pos.z);
       this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
       posBtk.delete();

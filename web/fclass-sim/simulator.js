@@ -6,7 +6,8 @@ import
 {
   waitForBTK,
   getBTK,
-  sampleWindAtThreeJsPosition
+  sampleWindAtThreeJsPosition,
+  threeJsToBtkPosition
 }
 from './core/btk.js';
 
@@ -1053,9 +1054,9 @@ class FClassSimulator
 
     // Wind box extends from behind shooter to past target, with padding on all sides
     // Three.js coords: minCorner: behind shooter (positive Z), left edge (-X), at ground level (-Y)
-    // Three.js coords: maxCorner: past target (-negative Z), right edge (+X), above ground (+Y)
-    // Convert to BTK coordinates (meters, BTK coords)
-    const btk = await waitForBTK();
+    // Three.js coords: maxCorner: past target (negative Z), right edge (+X), above ground (+Y)
+    // BTK and Three.js use the same coordinate system, so we just convert units
+    await waitForBTK();
     const minCornerX_yd = -halfWidth - FClassSimulator.WIND_BOX_PADDING;
     const minCornerY_yd = 0;
     const minCornerZ_yd = FClassSimulator.WIND_BOX_PADDING;
@@ -1063,16 +1064,8 @@ class FClassSimulator
     const maxCornerY_yd = FClassSimulator.WIND_BOX_HEIGHT;
     const maxCornerZ_yd = -(this.distance + FClassSimulator.WIND_BOX_PADDING);
 
-    const minCorner = new btk.Vector3D(
-      btk.Conversions.yardsToMeters(-minCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
-      btk.Conversions.yardsToMeters(minCornerX_yd), // Three X (crossrange) → BTK Y (crossrange)
-      btk.Conversions.yardsToMeters(minCornerY_yd) // Three Y (up) → BTK Z (up)
-    );
-    const maxCorner = new btk.Vector3D(
-      btk.Conversions.yardsToMeters(-maxCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
-      btk.Conversions.yardsToMeters(maxCornerX_yd), // Three X (crossrange) → BTK Y (crossrange)
-      btk.Conversions.yardsToMeters(maxCornerY_yd) // Three Y (up) → BTK Z (up)
-    );
+    const minCorner = threeJsToBtkPosition(minCornerX_yd, minCornerY_yd, minCornerZ_yd);
+    const maxCorner = threeJsToBtkPosition(maxCornerX_yd, maxCornerY_yd, maxCornerZ_yd);
 
     console.log(`[Wind] Creating wind generator: ${this.windPreset}`);
     this.windGenerator = btk.WindPresets.getPreset(this.windPreset, minCorner, maxCorner);
