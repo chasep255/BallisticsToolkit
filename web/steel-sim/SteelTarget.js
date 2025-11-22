@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Config } from './config.js';
 
 /**
  * Wrapper class for C++ SteelTarget that manages Three.js rendering resources
@@ -14,12 +15,12 @@ export class SteelTarget
   /**
    * Create a new steel target
    * @param {Object} options - Configuration options
-   * @param {Object} options.position - Position in yards {x, y, z} (required)
-   * @param {number} options.width - Width in inches (required)
-   * @param {number} options.height - Height in inches (required)
-   * @param {number} options.thickness - Thickness in inches (default 0.5)
+   * @param {Object} options.position - Position in meters (SI units) {x, y, z} (required)
+   * @param {number} options.width - Width in meters (required)
+   * @param {number} options.height - Height in meters (required)
+   * @param {number} options.thickness - Thickness in meters (default from config, already converted)
    * @param {boolean} options.isOval - True for oval shape, false for rectangle (default false)
-   * @param {number} options.beamHeight - Height of overhead beam in yards (default ~2.73 yards = 2.5m)
+   * @param {number} options.beamHeight - Height of overhead beam in meters (default from Config.TARGET_CONFIG.defaultBeamHeight)
    * @param {number} options.attachmentAngle - Angle in radians for oval attachment point (default Math.PI / 4 = 45°)
    * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (default 0)
    * @param {THREE.Scene} options.scene - Three.js scene to add mesh/chain lines to (required)
@@ -31,9 +32,9 @@ export class SteelTarget
       position,
       width,
       height,
-      thickness = 0.5,
+      thickness,
       isOval = false,
-      beamHeight = 2.5, // Default 2.5 yards
+      beamHeight = Config.TARGET_CONFIG.defaultBeamHeight, // meters from config
       attachmentAngle = Math.PI / 4, // 45 degrees
       outwardOffset = 0, // Default 0 meters
       scene
@@ -52,57 +53,51 @@ export class SteelTarget
 
     this.lastUpdateTime = performance.now();
 
-    // Convert all inputs to meters using BTK conversions
-    const width_m = btk.Conversions.inchesToMeters(width);
-    const height_m = btk.Conversions.inchesToMeters(height);
-    const thickness_m = btk.Conversions.inchesToMeters(thickness);
-
     // Calculate attachment points based on shape
-    let attachmentY, attachmentZ;
+    // In new coordinate system: X=crossrange (width), Y=up (height), Z=thickness (normal direction)
+    let attachmentX, attachmentY;
     if (isOval)
     {
       // For circles, attach at specified angle from vertical on the circle edge
-      const radius = width_m / 2;
-      attachmentY = radius * Math.sin(attachmentAngle);
-      attachmentZ = radius * Math.cos(attachmentAngle);
+      const radius = width / 2;
+      attachmentX = radius * Math.sin(attachmentAngle);
+      attachmentY = radius * Math.cos(attachmentAngle);
     }
     else
     {
       // For rectangles, attach at top corners
-      attachmentY = width_m / 3;
-      attachmentZ = height_m / 2;
+      attachmentX = width / 3;  // 1/3 width from center (left/right)
+      attachmentY = height / 2; // Top of target
     }
 
     // Create BTK steel target
-    // Convert position from Three.js (yards) to BTK (meters) using conversion function
-    const positionThree = new THREE.Vector3(position.x, position.y, position.z);
-    const initialPos = window.threeJsToBtkPosition(positionThree);
-    const defaultNormal = new btk.Vector3D(1, 0, 0);
-    this.steelTarget = new btk.SteelTarget(width_m, height_m, thickness_m, isOval, initialPos, defaultNormal);
+    // Position and dimensions are in meters (SI units)
+    const initialPos = new btk.Vector3D(position.x, position.y, position.z);
+    const defaultNormal = new btk.Vector3D(0, 0, -1); // Facing uprange (towards shooter)
+    this.steelTarget = new btk.SteelTarget(width, height, thickness, isOval, initialPos, defaultNormal);
     initialPos.delete();
     defaultNormal.delete();
 
-    // Add chain anchors
-    const leftLocalAttach = new btk.Vector3D(thickness_m / 2, attachmentY, attachmentZ);
-    const rightLocalAttach = new btk.Vector3D(thickness_m / 2, -attachmentY, attachmentZ);
+    // Add chain anchors - attach at top corners on front face
+    // X = ± crossrange (left/right), Y = up (top), Z = -thickness/2 (front face)
+    const leftLocalAttach = new btk.Vector3D(-attachmentX, attachmentY, -thickness / 2);
+    const rightLocalAttach = new btk.Vector3D(+attachmentX, attachmentY, -thickness / 2);
 
     // Transform local attachments to world space
     const leftWorldAttach = this.steelTarget.localToWorld(leftLocalAttach);
     const rightWorldAttach = this.steelTarget.localToWorld(rightLocalAttach);
 
-    // Convert beamHeight from yards to meters for BTK
-    const beamHeightMeters = btk.Conversions.yardsToMeters(beamHeight);
-
     // Place fixed anchors above and slightly outward from attachment points
+    // X=crossrange, Y=up (beam height), Z=-downrange
     const leftWorldFixed = new btk.Vector3D(
-      leftWorldAttach.x,
-      leftWorldAttach.y + this.outwardOffset,
-      beamHeightMeters
+      leftWorldAttach.x + this.outwardOffset,
+      beamHeight,
+      leftWorldAttach.z
     );
     const rightWorldFixed = new btk.Vector3D(
-      rightWorldAttach.x,
-      rightWorldAttach.y - this.outwardOffset,
-      beamHeightMeters
+      rightWorldAttach.x - this.outwardOffset,
+      beamHeight,
+      rightWorldAttach.z
     );
 
     this.steelTarget.addChainAnchor(leftLocalAttach, leftWorldFixed);
@@ -220,7 +215,9 @@ export class SteelTarget
     targetMesh.castShadow = true;
     targetMesh.receiveShadow = true;
     targetMesh.userData.texture = texture; // Store texture reference
+    // Vertices from C++ are already in world space, so leave mesh at origin
     this.scene.add(targetMesh);
+    
 
     return targetMesh;
   }
@@ -231,10 +228,8 @@ export class SteelTarget
    */
   createChainLines()
   {
-    const btk = window.btk;
-
-    // Chain radius: 1/2" diameter = 0.25" radius
-    const chainRadius = btk.Conversions.inchesToYards(0.25);
+    // Chain radius from config (already in meters)
+    const chainRadius = Config.TARGET_CONFIG.chainRadius;
 
     // Create cylinder geometry for chains (will be resized in updateChainLines)
     // Use many segments (128) for very smooth appearance on thin cylinders
@@ -332,14 +327,15 @@ export class SteelTarget
 
     // Get actual anchor data from C++ physics engine (already updated by simulation)
     const anchors = this.steelTarget.getAnchors();
+    
     if (anchors.size() === 0)
     {
       anchors.delete();
       return;
     }
 
-    const btk = window.btk;
-    const chainRadius = btk.Conversions.inchesToYards(0.25);
+    // Chain radius from config (already in meters)
+    const chainRadius = Config.TARGET_CONFIG.chainRadius;
 
     // Update each chain cylinder for each anchor
     const numAnchors = anchors.size();
@@ -352,9 +348,17 @@ export class SteelTarget
       // Transform local attachment to world space
       const attachWorld = this.steelTarget.localToWorld(anchor.localAttachment);
 
-      // Convert BTK positions (meters) to Three.js (yards) for rendering
-      const fixed = window.btkToThreeJsPosition(anchor.worldFixed);
-      const attach = window.btkToThreeJsPosition(attachWorld);
+      // Convert BTK positions (meters) to Three.js (meters) - same coordinate system, same units
+      const fixed = new THREE.Vector3(
+        anchor.worldFixed.x,
+        anchor.worldFixed.y,
+        anchor.worldFixed.z
+      );
+      const attach = new THREE.Vector3(
+        attachWorld.x,
+        attachWorld.y,
+        attachWorld.z
+      );
 
       // Calculate chain length and direction
       const chainDirection = new THREE.Vector3();

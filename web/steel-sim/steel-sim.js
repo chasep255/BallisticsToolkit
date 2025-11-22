@@ -35,7 +35,7 @@ import
   WindFlagFactory
 }
 from './WindFlag.js';
-import * as Config from './config.js';
+import { Config, initConfig } from './config.js';
 
 // ===== GLOBAL STATE =====
 let btk = null;
@@ -53,176 +53,10 @@ let scopeLayer = null; // Store scope layer for bounds checking
 let windGenerator = null; // BTK WindGenerator instance
 let windStartTime = null; // Track elapsed time for wind generator
 
-// ===== COORDINATE CONVERSION UTILITIES =====
-// BTK: X=downrange, Y=crossrange-right, Z=up
-// Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-
-// ===== POSITION CONVERSIONS (Distance) =====
-// Positions: BTK uses meters, Three.js uses yards
-
-/**
- * Convert BTK Vector3D position (meters, BTK coords) to THREE.Vector3 (yards, Three.js coords)
- * @param {btk.Vector3D} btkVec - Position vector in BTK coordinates (meters)
- * @returns {THREE.Vector3} Position vector in Three.js coordinates (yards)
- */
-window.btkToThreeJsPosition = function(btkVec)
-{
-  // Coordinate system conversion and meters to yards
-  // BTK: X=downrange, Y=crossrange-right, Z=up
-  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-  // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
-  return new THREE.Vector3(
-    btk.Conversions.metersToYards(btkVec.y), // BTK Y (crossrange-right) → Three.js X (right)
-    btk.Conversions.metersToYards(btkVec.z), // BTK Z (up) → Three.js Y (up)
-    -btk.Conversions.metersToYards(btkVec.x) // BTK X (downrange) → Three.js -Z (downrange)
-  );
-};
-
-/**
- * Convert THREE.Vector3 position (yards, Three.js coords) to BTK Vector3D (meters, BTK coords)
- * @param {THREE.Vector3|Object} threeVec - Position vector in Three.js coordinates (yards)
- * @returns {btk.Vector3D} Position vector in BTK coordinates (meters)
- */
-window.threeJsToBtkPosition = function(threeVec)
-{
-  // Convert yards to meters and coordinate system conversion
-  // BTK: X=downrange, Y=crossrange-right, Z=up
-  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-  // Conversion: Three.js (x, y, z) → BTK (-z, x, y)
-  return new btk.Vector3D(
-    -btk.Conversions.yardsToMeters(threeVec.z), // Three.js Z (downrange) → BTK X (downrange)
-    btk.Conversions.yardsToMeters(threeVec.x), // Three.js X (right) → BTK Y (crossrange-right)
-    btk.Conversions.yardsToMeters(threeVec.y) // Three.js Y (up) → BTK Z (up)
-  );
-};
-
-// ===== VELOCITY CONVERSIONS =====
-// Velocities: BTK uses m/s, Three.js uses fps or mph
-
-/**
- * Convert BTK Vector3D velocity (m/s, BTK coords) to THREE.Vector3 (fps, Three.js coords)
- * @param {btk.Vector3D} btkVec - Velocity vector in BTK coordinates (m/s)
- * @returns {THREE.Vector3} Velocity vector in Three.js coordinates (fps)
- */
-window.btkToThreeJsVelocity = function(btkVec)
-{
-  // Coordinate system conversion and m/s to fps
-  // BTK: X=downrange, Y=crossrange-right, Z=up
-  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-  // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
-  return new THREE.Vector3(
-    btk.Conversions.mpsToFps(btkVec.y), // BTK Y (crossrange-right) → Three.js X (right)
-    btk.Conversions.mpsToFps(btkVec.z), // BTK Z (up) → Three.js Y (up)
-    -btk.Conversions.mpsToFps(btkVec.x) // BTK X (downrange) → Three.js -Z (downrange)
-  );
-};
-
-/**
- * Convert THREE.Vector3 velocity (fps, Three.js coords) to BTK Vector3D (m/s, BTK coords)
- * @param {THREE.Vector3|Object} threeVec - Velocity vector in Three.js coordinates (fps)
- * @returns {btk.Vector3D} Velocity vector in BTK coordinates (m/s)
- */
-window.threeJsToBtkVelocity = function(threeVec)
-{
-  // Convert fps to m/s and coordinate system conversion
-  // BTK: X=downrange, Y=crossrange-right, Z=up
-  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-  // Conversion: Three.js (x, y, z) → BTK (-z, x, y)
-  return new btk.Vector3D(
-    -btk.Conversions.fpsToMps(threeVec.z), // Three.js Z (downrange) → BTK X (downrange)
-    btk.Conversions.fpsToMps(threeVec.x), // Three.js X (right) → BTK Y (crossrange-right)
-    btk.Conversions.fpsToMps(threeVec.y) // Three.js Y (up) → BTK Z (up)
-  );
-};
-
-/**
- * Convert BTK Vector3D velocity (m/s, BTK coords) to THREE.Vector3 (mph, Three.js coords)
- * @param {btk.Vector3D} btkVec - Velocity vector in BTK coordinates (m/s)
- * @returns {THREE.Vector3} Velocity vector in Three.js coordinates (mph)
- */
-window.btkToThreeJsVelocityMph = function(btkVec)
-{
-  // Coordinate system conversion and m/s to mph
-  // BTK: X=downrange, Y=crossrange-right, Z=up
-  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-  // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
-  return new THREE.Vector3(
-    btk.Conversions.mpsToMph(btkVec.y), // BTK Y (crossrange-right) → Three.js X (right)
-    btk.Conversions.mpsToMph(btkVec.z), // BTK Z (up) → Three.js Y (up)
-    -btk.Conversions.mpsToMph(btkVec.x) // BTK X (downrange) → Three.js -Z (downrange)
-  );
-};
-
-/**
- * Convert THREE.Vector3 velocity (mph, Three.js coords) to BTK Vector3D (m/s, BTK coords)
- * @param {THREE.Vector3|Object} threeVec - Velocity vector in Three.js coordinates (mph)
- * @returns {btk.Vector3D} Velocity vector in BTK coordinates (m/s)
- */
-window.threeJsToBtkVelocityMph = function(threeVec)
-{
-  // Convert mph to m/s and coordinate system conversion
-  // BTK: X=downrange, Y=crossrange-right, Z=up
-  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-  // Conversion: Three.js (x, y, z) → BTK (-z, x, y)
-  return new btk.Vector3D(
-    -btk.Conversions.mphToMps(threeVec.z), // Three.js Z (downrange) → BTK X (downrange)
-    btk.Conversions.mphToMps(threeVec.x), // Three.js X (right) → BTK Y (crossrange-right)
-    btk.Conversions.mphToMps(threeVec.y) // Three.js Y (up) → BTK Z (up)
-  );
-};
-
-// ===== WIND CONVERSIONS =====
-
-/**
- * Convert BTK wind vector (m/s, BTK coords) to Three.js wind vector (mph, Three.js coords)
- * @param {btk.Vector3D} windBtk - Wind vector in BTK coordinates (m/s)
- * @returns {Object} Wind vector {x, y, z} in mph (Three.js coords)
- */
-window.btkWindToThreeJs = function(windBtk)
-{
-  // BTK: X=downrange, Y=crossrange-right, Z=up
-  // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
-  // Conversion: BTK (x, y, z) → Three.js (y, z, -x)
-  return {
-    x: btk.Conversions.mpsToMph(windBtk.y), // BTK Y (crossrange) → Three.js X (crosswind)
-    y: btk.Conversions.mpsToMph(windBtk.z), // BTK Z (up) → Three.js Y (vertical)
-    z: -btk.Conversions.mpsToMph(windBtk.x) // BTK -X (downrange) → Three.js Z (downrange wind)
-  };
-};
-
-/**
- * Sample wind at Three.js position and return in Three.js coords (mph)
- * @param {btk.WindGenerator} generator - Wind generator instance
- * @param {number} x_yd - X coordinate in yards (crossrange)
- * @param {number} y_yd - Y coordinate in yards (vertical)
- * @param {number} z_yd - Z coordinate in yards (downrange, negative = downrange)
- * @returns {Object} Wind vector {x, y, z} in mph (Three.js coords)
- */
-window.sampleWindAtThreeJsPosition = function(generator, x_yd, y_yd, z_yd)
-{
-  if (!btk) throw new Error('BTK not loaded yet');
-  if (!generator)
-  {
-    return {
-      x: 0,
-      y: 0,
-      z: 0
-    };
-  }
-
-  // Convert Three.js coords (yards) to BTK coords (meters) and sample
-  const windBtk = generator.sample(
-    btk.Conversions.yardsToMeters(-z_yd), // Three Z (downrange) → BTK X (downrange)
-    btk.Conversions.yardsToMeters(x_yd), // Three X (crossrange) → BTK Y (crossrange)
-    btk.Conversions.yardsToMeters(y_yd) // Three Y (up) → BTK Z (up)
-  );
-
-  // Convert BTK wind (m/s) to Three.js coords (mph)
-  const wind = window.btkWindToThreeJs(windBtk);
-  windBtk.delete(); // Dispose Vector3D to prevent memory leak
-
-  return wind;
-};
+// ===== COORDINATE SYSTEM =====
+// BTK and Three.js use the SAME coordinate system:
+// X=crossrange (positive = right), Y=up, Z=-downrange (negative = downrange)
+// All internal values are in SI units (meters, m/s, kg, radians)
 
 // ===== INITIALIZATION =====
 
@@ -232,6 +66,9 @@ async function init()
   {
     btk = await BallisticsToolkit();
     window.btk = btk;
+    
+    // Initialize config with SI unit values
+    initConfig();
 
     setupScene();
     setupUI();
@@ -287,26 +124,19 @@ function setupScene()
   landscape = new Landscape(scene);
 
   // Initialize wind generator
+  // All config values are in meters (SI units)
   const halfWidth = Config.LANDSCAPE_CONFIG.groundWidth / 2;
 
-  // Calculate wind box corners in Three.js coordinates (yards)
-  const minCornerX_yd = -halfWidth - Config.WIND_CONFIG.boxPadding;
-  const minCornerY_yd = 0;
-  const minCornerZ_yd = Config.WIND_CONFIG.boxPadding; // Near edge (positive Z = towards camera)
-  const maxCornerX_yd = halfWidth + Config.WIND_CONFIG.boxPadding;
-  const maxCornerY_yd = Config.WIND_CONFIG.boxHeight;
-  const maxCornerZ_yd = -(Config.LANDSCAPE_CONFIG.groundLength + Config.WIND_CONFIG.boxPadding); // Far edge (negative Z = downrange)
-
-  // Convert to BTK coordinates (meters)
+  // Calculate wind box corners in BTK coordinates (meters) - same coordinate system as Three.js
   const minCorner = new btk.Vector3D(
-    btk.Conversions.yardsToMeters(-minCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
-    btk.Conversions.yardsToMeters(minCornerX_yd), // Three X (crossrange) → BTK Y (crossrange)
-    btk.Conversions.yardsToMeters(minCornerY_yd) // Three Y (up) → BTK Z (up)
+    -Config.WIND_CONFIG.boxPadding, // X = crossrange (left edge)
+    0, // Y = up (ground level)
+    Config.WIND_CONFIG.boxPadding // Z = -downrange (near edge, positive = towards camera)
   );
   const maxCorner = new btk.Vector3D(
-    btk.Conversions.yardsToMeters(-maxCornerZ_yd), // Three Z (downrange) → BTK X (downrange)
-    btk.Conversions.yardsToMeters(maxCornerX_yd), // Three X (crossrange) → BTK Y (crossrange)
-    btk.Conversions.yardsToMeters(maxCornerY_yd) // Three Y (up) → BTK Z (up)
+    halfWidth + Config.WIND_CONFIG.boxPadding, // X = crossrange (right edge)
+    Config.WIND_CONFIG.boxHeight, // Y = up (top of box)
+    -(Config.LANDSCAPE_CONFIG.groundLength + Config.WIND_CONFIG.boxPadding) // Z = -downrange (far edge, negative = downrange)
   );
 
   // Get available wind presets and use configured default (or first available)
@@ -339,29 +169,13 @@ function setupScene()
   maxCorner.delete();
 
   // Create wind flags along the range
+  // All values in meters (SI units) - conversion to yards happens inside createFlags
   WindFlagFactory.createFlags(scene, landscape,
   {
-    maxRange: Config.LANDSCAPE_CONFIG.groundLength,
-    interval: 100,
-    sideOffset: Config.LANDSCAPE_CONFIG.groundWidth / 2
+    maxRange: Config.LANDSCAPE_CONFIG.groundLength, // meters
+    interval: Config.WIND_FLAG_CONFIG.interval, // meters
+    sideOffset: Config.LANDSCAPE_CONFIG.groundWidth / 2 // meters
   });
-
-  // Create target racks first to determine max range
-  createTargetRacks();
-
-  // Find furthest target rack position (most negative Z = furthest downrange)
-  const allRacks = TargetRackFactory.getAll();
-  let maxRangeDistance = 0;
-  let maxRangeRackHeight = 2; // Default rack height
-  if (allRacks.length > 0)
-  {
-    maxRangeDistance = Math.min(...allRacks.map(rack => rack.center.z)); // Most negative Z
-    maxRangeRackHeight = Math.max(...allRacks.map(rack => rack.height)); // Use tallest rack height
-  }
-
-  // Compute max range target center height for initial scope aim
-  const maxRangeGroundHeight = landscape.getHeightAt(0, maxRangeDistance) || 0;
-  const maxRangeTargetCenterY = maxRangeGroundHeight + maxRangeRackHeight / 2;
 
   // Create scope layer (bottom-center, ~80% of screen height)
   const scopeHeightNorm = 1.6; // 80% of vertical span (2)
@@ -391,8 +205,8 @@ function setupScene()
     initialLookAt:
     {
       x: 0,
-      y: maxRangeTargetCenterY,
-      z: maxRangeDistance
+      y: 0,
+      z: -Config.LANDSCAPE_CONFIG.groundLength
     },
     centerNormalized:
     {
@@ -402,6 +216,9 @@ function setupScene()
     heightNormalized: scopeHeightNorm
   });
   camera = scope.getCamera(); // For raycasting
+  
+  // Create target racks (independent of scope setup)
+  createTargetRacks();
 
   // When the scope layer's render target is resized by the composition
   // renderer, update the scope's internal render targets and camera aspect.
@@ -590,6 +407,16 @@ function onPointerLockChange()
 
 function onKeyDown(event)
 {
+  // Toggle scope display with S key
+  if (event.key === 's' || event.key === 'S')
+  {
+    if (scopeLayer && scopeLayer._mesh)
+    {
+      scopeLayer._mesh.visible = !scopeLayer._mesh.visible;
+    }
+    return;
+  }
+
   // Exit scope mode with Escape
   if (event.key === 'Escape')
   {
@@ -620,12 +447,21 @@ function onKeyDown(event)
 
 function createBullet(impactPoint, shooterPos)
 {
-  const direction = impactPoint.clone().sub(shooterPos).normalize();
-  const bulletSpeedFps = btk.Conversions.mpsToFps(Config.BULLET_SPEED_MPS);
-  const bulletVelThree = direction.multiplyScalar(bulletSpeedFps);
+  // All positions are btk.Vector3D (SI units)
+  const direction = new btk.Vector3D(
+    impactPoint.x - shooterPos.x,
+    impactPoint.y - shooterPos.y,
+    impactPoint.z - shooterPos.z
+  );
+  const directionNorm = direction.normalized();
+  // Velocity is already in m/s from Config, just scale direction vector
+  const bulletVel = new btk.Vector3D(
+    directionNorm.x * Config.BULLET_SPEED_MPS,
+    directionNorm.y * Config.BULLET_SPEED_MPS,
+    directionNorm.z * Config.BULLET_SPEED_MPS
+  );
 
-  const bulletPos = window.threeJsToBtkPosition(impactPoint);
-  const bulletVel = window.threeJsToBtkVelocity(bulletVelThree);
+  const bulletPos = new btk.Vector3D(impactPoint.x, impactPoint.y, impactPoint.z);
 
   const baseBullet = new btk.Bullet(
     Config.BULLET_MASS,
@@ -637,38 +473,51 @@ function createBullet(impactPoint, shooterPos)
 
   const bullet = new btk.Bullet(baseBullet, bulletPos, bulletVel, 0);
 
-  // Cleanup base objects
+  // Cleanup temporary objects (bullet owns bulletPos and bulletVel)
   baseBullet.delete();
-  bulletPos.delete();
-  bulletVel.delete();
+  direction.delete();
+  directionNorm.delete();
 
   return bullet;
 }
 
 function fireFromScope()
 {
-  const allTargets = TargetRackFactory.getAllTargets();
-  if (allTargets.length === 0) return;
-
   // Cast ray from scope camera center (reticle crosshair)
   const scopeCamera = scope.getCamera();
   raycaster.setFromCamera(new THREE.Vector2(0, 0), scopeCamera);
 
   // Check for target hit
-  const intersects = raycaster.intersectObjects(allTargets.map(t => t.mesh));
+  const allTargets = TargetRackFactory.getAllTargets();
+  const intersects = allTargets.length > 0 ? raycaster.intersectObjects(allTargets.map(t => t.mesh)) : [];
   if (intersects.length > 0)
   {
     const hitTarget = allTargets.find(t => t.mesh === intersects[0].object);
     if (hitTarget)
     {
-      const impactPoint = intersects[0].point;
-      const bullet = createBullet(impactPoint, scopeCamera.position);
+      // Three.js scene is in meters (SI units) - no conversion needed
+      const impactPointThree = intersects[0].point;
+      const impactPoint = new btk.Vector3D(
+        impactPointThree.x,
+        impactPointThree.y,
+        impactPointThree.z
+      );
+      const shooterPos = new btk.Vector3D(
+        scopeCamera.position.x,
+        scopeCamera.position.y,
+        scopeCamera.position.z
+      );
+      
+      const bullet = createBullet(impactPoint, shooterPos);
 
       hitTarget.hitBullet(bullet);
       hitTarget.updateTexture();
       createMetallicDustCloud(impactPoint);
 
+      // Cleanup
       bullet.delete();
+      impactPoint.delete();
+      shooterPos.delete();
       return;
     }
   }
@@ -686,33 +535,47 @@ function fireFromScope()
 
 // ===== DUST CLOUD EFFECTS =====
 
-function createDustCloud(impactPointThree)
+function createDustCloud(impactPoint)
 {
+  // Three.js scene is in meters - convert btk.Vector3D to THREE.Vector3
+  const impactPointThree = new THREE.Vector3(
+    impactPoint.x,
+    impactPoint.y,
+    impactPoint.z
+  );
+  
   DustCloudFactory.create(
   {
-    position: impactPointThree,
+    position: impactPointThree, // Already in meters
     scene,
     numParticles: Config.GROUND_DUST_CONFIG.numParticles,
     color: Config.GROUND_DUST_CONFIG.color,
     windGenerator: windGenerator,
-    initialRadius: btk.Conversions.inchesToYards(Config.GROUND_DUST_CONFIG.initialRadius),
-    growthRate: Config.GROUND_DUST_CONFIG.growthRate,
-    particleDiameter: btk.Conversions.inchesToYards(Config.GROUND_DUST_CONFIG.particleDiameter)
+    initialRadius: Config.GROUND_DUST_CONFIG.initialRadius, // Already in meters from config
+    growthRate: Config.GROUND_DUST_CONFIG.growthRate, // Already in m/s from config
+    particleDiameter: Config.GROUND_DUST_CONFIG.particleDiameter // Already in meters from config
   });
 }
 
-function createMetallicDustCloud(impactPointThree)
+function createMetallicDustCloud(impactPoint)
 {
+  // Three.js scene is in meters - convert btk.Vector3D to THREE.Vector3
+  const impactPointThree = new THREE.Vector3(
+    impactPoint.x,
+    impactPoint.y,
+    impactPoint.z
+  );
+  
   DustCloudFactory.create(
   {
-    position: impactPointThree,
+    position: impactPointThree, // Already in meters
     scene,
     numParticles: Config.METAL_DUST_CONFIG.numParticles,
     color: Config.METAL_DUST_CONFIG.color,
     windGenerator: windGenerator,
-    initialRadius: btk.Conversions.inchesToYards(Config.METAL_DUST_CONFIG.initialRadius),
-    growthRate: Config.METAL_DUST_CONFIG.growthRate,
-    particleDiameter: btk.Conversions.inchesToYards(Config.METAL_DUST_CONFIG.particleDiameter)
+    initialRadius: Config.METAL_DUST_CONFIG.initialRadius, // Already in meters from config
+    growthRate: Config.METAL_DUST_CONFIG.growthRate, // Already in m/s from config
+    particleDiameter: Config.METAL_DUST_CONFIG.particleDiameter // Already in meters from config
   });
 }
 

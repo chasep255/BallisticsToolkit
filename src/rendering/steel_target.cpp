@@ -505,14 +505,14 @@ namespace btk::rendering
         btk::math::Vector3D v1Back = position_ + rotation_quat.rotate(v1Back_local);
         btk::math::Vector3D v2Back = position_ + rotation_quat.rotate(v2Back_local);
 
-        // Helper lambda to convert BTK coords (meters) to Three.js coords (yards) and push to buffer
-        // BTK now matches Three.js: X=crossrange, Y=up, Z=-downrange (meters)
-        // Three.js: X=right, Y=up, Z=towards-camera (yards)
-        auto pushVertex = [&](const btk::math::Vector3D& btk)
+        // Helper lambda to push world-space vertices (meters) directly.
+        // BTK now matches Three.js: X=crossrange, Y=up, Z=-downrange (meters),
+        // and the Three.js scene is also in meters.
+        auto pushVertex = [&](const btk::math::Vector3D& v)
         {
-          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.x));  // BTK X → Three X (yards)
-          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.y));  // BTK Y → Three Y (yards)
-          vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.z)); // BTK Z → Three Z (yards)
+          vertices_buffer_.push_back(v.x);
+          vertices_buffer_.push_back(v.y);
+          vertices_buffer_.push_back(v.z);
         };
 
         // Helper lambda to push UV coordinates for FRONT face (left half of texture)
@@ -577,15 +577,18 @@ namespace btk::rendering
     else
     {
       // Rectangle with thickness: front face, back face, and 4 edge faces
-      // Shape is in XY plane with normal in -Z direction (before rotation)
+      // In new coordinate system: X=crossrange (width), Y=up (height), Z=-downrange (normal direction)
+      // Local space with normal pointing uprange (-Z): plate is vertical in XY plane
       float hw = width_ / 2.0f;
       float hh = height_ / 2.0f;
 
-      // Generate corners in local space (relative to position_, normal in -Z)
+      // Generate corners in local space (X=crossrange, Y=up, Z=thickness/normal)
+      // Front face (facing uprange, Z=-halfThickness)
       btk::math::Vector3D v0_local(-hw, -hh, -halfThickness);
       btk::math::Vector3D v1_local(+hw, -hh, -halfThickness);
       btk::math::Vector3D v2_local(+hw, +hh, -halfThickness);
       btk::math::Vector3D v3_local(-hw, +hh, -halfThickness);
+      // Back face (facing downrange, Z=+halfThickness)
       btk::math::Vector3D v4_local(-hw, -hh, +halfThickness);
       btk::math::Vector3D v5_local(+hw, -hh, +halfThickness);
       btk::math::Vector3D v6_local(+hw, +hh, +halfThickness);
@@ -601,14 +604,14 @@ namespace btk::rendering
       btk::math::Vector3D v6 = position_ + rotation_quat.rotate(v6_local);
       btk::math::Vector3D v7 = position_ + rotation_quat.rotate(v7_local);
 
-      // Helper lambda to convert BTK coords (meters) to Three.js coords (yards) and push to buffer
-      // BTK now matches Three.js: X=crossrange, Y=up, Z=-downrange (meters)
-      // Three.js: X=right, Y=up, Z=towards-camera (yards)
-      auto pushVertex = [&](const btk::math::Vector3D& btk)
+      // Helper lambda to push world-space vertices (meters) directly.
+      // BTK now matches Three.js: X=crossrange, Y=up, Z=-downrange (meters),
+      // and the Three.js scene is also in meters.
+      auto pushVertex = [&](const btk::math::Vector3D& v)
       {
-        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.x));  // BTK X → Three X (yards)
-        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.y));  // BTK Y → Three Y (yards)
-        vertices_buffer_.push_back(btk::math::Conversions::metersToYards(btk.z)); // BTK Z → Three Z (yards)
+        vertices_buffer_.push_back(v.x);
+        vertices_buffer_.push_back(v.y);
+        vertices_buffer_.push_back(v.z);
       };
 
       // Helper lambda to push UV coordinates for FRONT face (left half of texture)
@@ -638,33 +641,35 @@ namespace btk::rendering
         uvs_buffer_.push_back(-1.0f);
       };
 
-      // Front face (X = +halfThickness) - maps to left half of texture
-      pushVertex(v4);
-      pushUVFront(v4_local);
-      pushVertex(v5);
-      pushUVFront(v5_local);
-      pushVertex(v6);
-      pushUVFront(v6_local);
-      pushVertex(v4);
-      pushUVFront(v4_local);
-      pushVertex(v6);
-      pushUVFront(v6_local);
-      pushVertex(v7);
-      pushUVFront(v7_local);
-
-      // Back face (X = -halfThickness) - maps to right half of texture
+      // Front face (Z = -halfThickness) - maps to left half of texture
+      // Use v0–v3 (local Z = -halfThickness)
       pushVertex(v0);
-      pushUVBack(v0_local);
-      pushVertex(v2);
-      pushUVBack(v2_local);
+      pushUVFront(v0_local);
       pushVertex(v1);
-      pushUVBack(v1_local);
-      pushVertex(v0);
-      pushUVBack(v0_local);
-      pushVertex(v3);
-      pushUVBack(v3_local);
+      pushUVFront(v1_local);
       pushVertex(v2);
-      pushUVBack(v2_local);
+      pushUVFront(v2_local);
+      pushVertex(v0);
+      pushUVFront(v0_local);
+      pushVertex(v2);
+      pushUVFront(v2_local);
+      pushVertex(v3);
+      pushUVFront(v3_local);
+
+      // Back face (Z = +halfThickness) - maps to right half of texture
+      // Use v4–v7 (local Z = +halfThickness)
+      pushVertex(v4);
+      pushUVBack(v4_local);
+      pushVertex(v6);
+      pushUVBack(v6_local);
+      pushVertex(v5);
+      pushUVBack(v5_local);
+      pushVertex(v4);
+      pushUVBack(v4_local);
+      pushVertex(v7);
+      pushUVBack(v7_local);
+      pushVertex(v6);
+      pushUVBack(v6_local);
 
       // Edge faces (4 sides) - no texture
       // Bottom edge

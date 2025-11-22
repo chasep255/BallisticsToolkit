@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import { Config } from './config.js';
 
 // Reticle mapping constant.
 // In the original shader-based implementation, the relationship between
@@ -127,13 +128,12 @@ export class Scope
 
   createCamera()
   {
-    // Use tighter far plane for better depth precision (matches main camera)
-    const FAR_PLANE = 2500; // yards
+    // Use tighter far plane for better depth precision (from config, in meters)
     this.camera = new THREE.PerspectiveCamera(
       this.currentFOV,
       this.outputRenderTarget.width / this.outputRenderTarget.height,
       0.1,
-      FAR_PLANE
+      Config.CAMERA_FAR_PLANE
     );
     this.camera.position.set(
       this.cameraPosition.x,
@@ -286,6 +286,7 @@ export class Scope
   /**
    * Convert a MRAD distance into local reticle units at a given FOV.
    * Matches the previous shader behavior: mradPerUnit = fovDeg * 1000 / 60.
+   * Scope is circular (1:1 aspect), so horizontal FOV = vertical FOV.
    */
   mradToReticleUnitsAtFov(mrad, fovDeg)
   {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import * as Config from './config.js';
+import { Config } from './config.js';
 
 /**
  * Landscape class for managing ground planes and terrain
@@ -12,10 +12,10 @@ export class Landscape
    * Create a new Landscape instance
    * @param {THREE.Scene} scene - Three.js scene to add ground to
    * @param {Object} options - Optional configuration overrides (defaults to Config.LANDSCAPE_CONFIG)
-   * @param {number} options.groundWidth - Width of ground in yards
-   * @param {number} options.groundLength - Length of ground in yards
-   * @param {number} options.brownGroundWidth - Width of brown background ground in yards
-   * @param {number} options.brownGroundLength - Length of brown background ground in yards
+   * @param {number} options.groundWidth - Width of ground in meters
+   * @param {number} options.groundLength - Length of ground in meters
+   * @param {number} options.brownGroundWidth - Width of brown background ground in meters
+   * @param {number} options.brownGroundLength - Length of brown background ground in meters
    */
   constructor(scene, options = {})
   {
@@ -77,9 +77,9 @@ export class Landscape
 
   /**
    * Get the height (Y coordinate) at a given point in the XZ plane
-   * @param {number} x - X coordinate in yards (crossrange, centered at 0)
-   * @param {number} z - Z coordinate in yards (downrange, negative Z = downrange)
-   * @returns {number|null} Height in yards, or null if point is outside ground bounds
+   * @param {number} x - X coordinate in meters (crossrange, centered at 0)
+   * @param {number} z - Z coordinate in meters (downrange, negative Z = downrange)
+   * @returns {number|null} Height in meters, or null if point is outside ground bounds
    */
   getHeightAt(x, z)
   {
@@ -348,7 +348,7 @@ export class Landscape
       metalness: 0.1
     });
 
-    const postRadius = 0.05; // 0.05 yards (about 2 inches)
+    const postRadius = Config.MARKER_CONFIG.postRadius; // meters from config
 
     for (let i = 0; i < Config.MARKER_CONFIG.count; i++)
     {

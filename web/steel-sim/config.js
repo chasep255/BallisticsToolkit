@@ -1,167 +1,203 @@
 /**
  * Configuration module for Steel Target Simulator
  * Centralized constants used throughout the application
+ * 
+ * All values are in SI units (meters, m/s, kg, radians) internally
+ * Call initConfig() after BTK loads to populate these values
  */
 
-// ===== CAMERA & SCENE CONSTANTS =====
-export const SHOOTER_HEIGHT = 5; // yards - elevated shooter overlooking the landscape
-export const CAMERA_FOV = 35; // degrees
-export const CAMERA_FAR_PLANE = 2500; // yards - Tightened for better depth precision (landscape is 2000, targets max at ~1760)
+// Export config object that will be populated after BTK loads
+export const Config = {};
 
-// ===== BULLET CONSTANTS =====
-export const BULLET_MASS = 0.00907; // kg - 140 grains
-export const BULLET_DIAMETER = 0.00762; // meters - .308 caliber
-export const BULLET_LENGTH = 0.0305; // meters - ~30mm typical
-export const BULLET_BC = 0.3; // Ballistic coefficient
-export const BULLET_SPEED_MPS = 800; // m/s - Muzzle velocity
+/**
+ * Initialize config with SI unit values after BTK loads
+ * Uses window.btk.Conversions for unit conversion
+ */
+export function initConfig() {
+  const btk = window.btk;
+  
+  // ===== CAMERA & SCENE CONSTANTS =====
+  Config.SHOOTER_HEIGHT = btk.Conversions.yardsToMeters(5); // 5 yards
+  Config.CAMERA_FOV = 35; // degrees (Three.js uses degrees)
+  Config.CAMERA_FAR_PLANE = btk.Conversions.yardsToMeters(2500); // 2500 yards
 
-// ===== DUST CLOUD CONFIGURATIONS =====
-export const GROUND_DUST_CONFIG = {
-  numParticles: 1000,
-  color: {
-    r: 139,
-    g: 115,
-    b: 85
-  }, // Brown/tan
-  initialRadius: 3, // inches - realistic bullet impact dust cloud
-  growthRate: 0.1, // feet/second
-  particleDiameter: 0.2 // inches
-};
+  // ===== BULLET CONSTANTS =====
+  Config.BULLET_MASS = 0.00907; // kg - 140 grains (already SI)
+  Config.BULLET_DIAMETER = 0.00762; // meters - .308 caliber (already SI)
+  Config.BULLET_LENGTH = 0.0305; // meters - ~30mm typical (already SI)
+  Config.BULLET_BC = 0.3; // Ballistic coefficient (dimensionless)
+  Config.BULLET_SPEED_MPS = 800; // m/s - Muzzle velocity (already SI)
 
-export const METAL_DUST_CONFIG = {
-  numParticles: 250,
-  color: {
-    r: 192,
-    g: 192,
-    b: 192
-  }, // Silver/gray
-  initialRadius: 1, // inches
-  growthRate: 1.0, // feet/second
-  particleDiameter: 0.2 // inches
-};
+  // ===== TARGET CONSTANTS =====
+  Config.TARGET_CONFIG = {
+    defaultBeamHeight: btk.Conversions.yardsToMeters(2.5), // 2.5 yards - default overhead beam height
+    chainRadius: btk.Conversions.inchesToMeters(0.25),     // 1/2" diameter chains
+    beamRadius: btk.Conversions.inchesToMeters(1.0),       // 2" diameter beams
+    postRadius: btk.Conversions.inchesToMeters(1.0)        // 2" diameter posts
+  };
 
-// ===== LANDSCAPE CONFIGURATION =====
-export const LANDSCAPE_CONFIG = {
-  groundWidth: 100, // yards - Green ground width
-  groundLength: 2000, // yards - Green ground length
-  brownGroundWidth: 1000, // yards - Brown ground width
-  brownGroundLength: 2500 // yards - Extended to cover mountains (up to 2400 yards)
-};
+  // ===== DUST CLOUD CONFIGURATIONS =====
+  Config.GROUND_DUST_CONFIG = {
+    numParticles: 1000,
+    color: { r: 139, g: 115, b: 85 }, // Brown/tan
+    initialRadius: btk.Conversions.inchesToMeters(3), // 3 inches
+    growthRate: btk.Conversions.feetToMeters(0.1), // 0.1 feet/second
+    particleDiameter: btk.Conversions.inchesToMeters(0.2) // 0.2 inches
+  };
 
-// ===== WIND GENERATOR CONFIGURATION =====
-export const WIND_CONFIG = {
-  boxPadding: 50, // yards - padding on all sides of wind sampling box
-  boxHeight: 100, // yards - height for elevated sampling
-  defaultPreset: 'Moderate' // Default wind preset name
-};
+  Config.METAL_DUST_CONFIG = {
+    numParticles: 250,
+    color: { r: 192, g: 192, b: 192 }, // Silver/gray
+    initialRadius: btk.Conversions.inchesToMeters(1), // 1 inch
+    growthRate: btk.Conversions.feetToMeters(1.0), // 1.0 feet/second
+    particleDiameter: btk.Conversions.inchesToMeters(0.2) // 0.2 inches
+  };
 
-// ===== ENVIRONMENT CONFIGURATIONS =====
-export const MOUNTAIN_CONFIG = {
-  count: 16,
-  heightMin: 50, // yards
-  heightMax: 150, // yards
-  distanceMin: 2200, // yards - pushed back to avoid intersecting range end
-  distanceMax: 2500 // yards
-};
+  // ===== LANDSCAPE CONFIGURATION =====
+  Config.LANDSCAPE_CONFIG = {
+    groundWidth: btk.Conversions.yardsToMeters(100), // 100 yards
+    groundLength: btk.Conversions.yardsToMeters(2000), // 2000 yards
+    brownGroundWidth: btk.Conversions.yardsToMeters(1000), // 1000 yards
+    brownGroundLength: btk.Conversions.yardsToMeters(2500) // 2500 yards
+  };
 
-export const TREE_CONFIG = {
-  sideMinDistance: 60, // yards from center - increased to keep trees away from wind flags (flags at ±50 yards)
-  sideMaxDistance: 110, // yards from center
-  behindTargetWidth: 80, // yards
-  behindTargetMin: 10, // yards behind targets
-  behindTargetMax: 100, // yards behind targets - reduced to prevent trees in mountain area
-  countSides: 160,
-  countBehind: 80
-};
+  // ===== WIND GENERATOR CONFIGURATION =====
+  Config.WIND_CONFIG = {
+    boxPadding: btk.Conversions.yardsToMeters(50), // 50 yards
+    boxHeight: btk.Conversions.yardsToMeters(100), // 100 yards
+    defaultPreset: 'Moderate'
+  };
 
-export const ROCK_CONFIG = {
-  count: 40,
-  sizeMin: 0.2, // yards
-  sizeMax: 0.6 // yards
-};
+  // ===== WIND FLAG CONFIGURATION =====
+  Config.WIND_FLAG_CONFIG = {
+    interval: btk.Conversions.yardsToMeters(100), // 100 yards - spacing between flags
+    poleHeight: btk.Conversions.yardsToMeters(12.0), // 12 yards - pole height
+    poleThickness: btk.Conversions.yardsToMeters(0.1), // 0.1 yards - pole thickness
+    flagBaseWidth: btk.Conversions.yardsToMeters(60.0 / 36.0), // 60 inches = 1.67 yards
+    flagTipWidth: btk.Conversions.yardsToMeters(24.0 / 36.0), // 24 inches = 0.67 yards
+    flagLength: btk.Conversions.yardsToMeters(16.0 / 3.0), // 16 feet = 5.33 yards
+    flagThickness: btk.Conversions.yardsToMeters(0.05), // 0.05 yards
+    flagSegments: 10,
+    flagMinAngle: 1.0, // degrees
+    flagMaxAngle: 90.0, // degrees
+    flagAngleResponseK: 0.0205,
+    flagAngleInterpolationSpeed: 30.0, // deg/s
+    flagDirectionInterpolationSpeed: 1.0, // rad/s
+    flagFlapFrequencyBase: 0.5, // Hz
+    flagFlapFrequencyScale: 0.25, // Hz/mph
+    flagFlapAmplitude: btk.Conversions.yardsToMeters(0.3), // 0.3 yards
+    flagWaveLength: 1.5
+  };
 
-export const MARKER_CONFIG = {
-  count: 15,
-  heightMin: 1.0, // yards
-  heightMax: 1.5 // yards
-};
+  // ===== ENVIRONMENT CONFIGURATIONS =====
+  Config.MOUNTAIN_CONFIG = {
+    count: 16,
+    heightMin: btk.Conversions.yardsToMeters(50), // 50 yards
+    heightMax: btk.Conversions.yardsToMeters(150), // 150 yards
+    distanceMin: btk.Conversions.yardsToMeters(2200), // 2200 yards
+    distanceMax: btk.Conversions.yardsToMeters(2500) // 2500 yards
+  };
 
-// ===== TARGET RACK CONFIGURATIONS =====
-export const TARGET_RACKS_CONFIG = [
-  {
-    x: 0,
-    z: -200,
-    rackWidth: 1.5,
-    rackHeight: 1,
-    targets: [
-      { width: 5, height: 5, thickness: 0.5, isOval: false },
-      { width: 4, height: 4, thickness: 0.5, isOval: false },
-      { width: 3, height: 3, thickness: 0.5, isOval: false },
-      { width: 2, height: 2, thickness: 0.5, isOval: false }
-    ]
-  },
-  {
-    x: 10,
-    z: -225,
-    rackWidth: 1.5,
-    rackHeight: 1,
-    targets: [
-      { width: 6, height: 6, thickness: 0.5, isOval: true },
-      { width: 5, height: 5, thickness: 0.5, isOval: true },
-      { width: 4, height: 4, thickness: 0.5, isOval: true },
-      { width: 3, height: 3, thickness: 0.5, isOval: true }
-    ]
-  },
-  {
-    x: 5,
-    z: -500,
-    rackWidth: 1.5,
-    rackHeight: 1,
-    targets: [
-      { width: 10, height: 10, thickness: 0.5, isOval: true },
-      { width: 5, height: 5, thickness: 0.5, isOval: true },
-      { width: 3, height: 3, thickness: 0.5, isOval: true }
-    ]
-  },
-  {
-    x: -5,
-    z: -1000,
-    rackWidth: 2,
-    rackHeight: 1,
-    targets: [
-      { width: 20, height: 20, thickness: 0.5, isOval: true },
-      { width: 15, height: 15, thickness: 0.5, isOval: true },
-      { width: 10, height: 10, thickness: 0.5, isOval: true }
-    ]
-  },
-  {
-    x: 10,
-    z: -1000,
-    rackWidth: 3,
-    rackHeight: 3,
-    targets: [
-      { width: 12 * 6, height: 12 * 6, thickness: 0.5, isOval: false },
-    ]
-  },
-  {
-    x: -10,
-    z: -1760,
-    rackWidth: 3,
-    rackHeight: 2,
-    targets: [
-      { width: 40, height: 40, thickness: 0.5, isOval: true },
-      { width: 20, height: 20, thickness: 0.5, isOval: true }
-    ]
-  },
-  {
-    x: 30,
-    z: -1760,
-    rackWidth: 3,
-    rackHeight: 3,
-    targets: [
-      { width: 12 * 6, height: 12 * 6, thickness: 0.5, isOval: false },
-    ]
-  }
-];
+  Config.TREE_CONFIG = {
+    sideMinDistance: btk.Conversions.yardsToMeters(60), // 60 yards
+    sideMaxDistance: btk.Conversions.yardsToMeters(110), // 110 yards
+    behindTargetWidth: btk.Conversions.yardsToMeters(80), // 80 yards
+    behindTargetMin: btk.Conversions.yardsToMeters(10), // 10 yards
+    behindTargetMax: btk.Conversions.yardsToMeters(100), // 100 yards
+    countSides: 160,
+    countBehind: 80
+  };
 
+  Config.ROCK_CONFIG = {
+    count: 40,
+    sizeMin: btk.Conversions.yardsToMeters(0.2), // 0.2 yards
+    sizeMax: btk.Conversions.yardsToMeters(0.6) // 0.6 yards
+  };
 
+  Config.MARKER_CONFIG = {
+    count: 15,
+    heightMin: btk.Conversions.yardsToMeters(1.0), // 1.0 yards
+    heightMax: btk.Conversions.yardsToMeters(1.5), // 1.5 yards
+    postRadius: btk.Conversions.yardsToMeters(0.05) // 0.05 yards (~2 inches)
+  };
+
+  // ===== TARGET RACK CONFIGURATIONS =====
+  // All positions in meters, all dimensions in meters
+  Config.TARGET_RACKS_CONFIG = [
+
+    {
+      x: 0,
+      z: btk.Conversions.yardsToMeters(-200), // -200 yards
+      rackWidth: btk.Conversions.yardsToMeters(1.5), // 1.5 yards
+      rackHeight: btk.Conversions.yardsToMeters(1), // 1 yard
+      targets: [
+        { width: btk.Conversions.inchesToMeters(5), height: btk.Conversions.inchesToMeters(5), thickness: btk.Conversions.inchesToMeters(0.5), isOval: false },
+        { width: btk.Conversions.inchesToMeters(4), height: btk.Conversions.inchesToMeters(4), thickness: btk.Conversions.inchesToMeters(0.5), isOval: false },
+        { width: btk.Conversions.inchesToMeters(3), height: btk.Conversions.inchesToMeters(3), thickness: btk.Conversions.inchesToMeters(0.5), isOval: false },
+        { width: btk.Conversions.inchesToMeters(2), height: btk.Conversions.inchesToMeters(2), thickness: btk.Conversions.inchesToMeters(0.5), isOval: false }
+      ]
+    },
+    {
+      x: btk.Conversions.yardsToMeters(10), // 10 yards
+      z: btk.Conversions.yardsToMeters(-225), // -225 yards
+      rackWidth: btk.Conversions.yardsToMeters(1.5),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+        { width: btk.Conversions.inchesToMeters(6), height: btk.Conversions.inchesToMeters(6), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true },
+        { width: btk.Conversions.inchesToMeters(5), height: btk.Conversions.inchesToMeters(5), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true },
+        { width: btk.Conversions.inchesToMeters(4), height: btk.Conversions.inchesToMeters(4), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true },
+        { width: btk.Conversions.inchesToMeters(3), height: btk.Conversions.inchesToMeters(3), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true }
+      ]
+    },
+    {
+      x: btk.Conversions.yardsToMeters(5), // 5 yards
+      z: btk.Conversions.yardsToMeters(-500), // -500 yards
+      rackWidth: btk.Conversions.yardsToMeters(1.5),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+        { width: btk.Conversions.inchesToMeters(10), height: btk.Conversions.inchesToMeters(10), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true },
+        { width: btk.Conversions.inchesToMeters(5), height: btk.Conversions.inchesToMeters(5), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true },
+        { width: btk.Conversions.inchesToMeters(3), height: btk.Conversions.inchesToMeters(3), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true }
+      ]
+    },
+    {
+      x: btk.Conversions.yardsToMeters(-5), // -5 yards
+      z: btk.Conversions.yardsToMeters(-1000), // -1000 yards
+      rackWidth: btk.Conversions.yardsToMeters(2),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+        { width: btk.Conversions.inchesToMeters(20), height: btk.Conversions.inchesToMeters(20), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true },
+        { width: btk.Conversions.inchesToMeters(15), height: btk.Conversions.inchesToMeters(15), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true },
+        { width: btk.Conversions.inchesToMeters(10), height: btk.Conversions.inchesToMeters(10), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true }
+      ]
+    },
+    {
+      x: btk.Conversions.yardsToMeters(10), // 10 yards
+      z: btk.Conversions.yardsToMeters(-1000), // -1000 yards
+      rackWidth: btk.Conversions.yardsToMeters(3),
+      rackHeight: btk.Conversions.yardsToMeters(3),
+      targets: [
+        { width: btk.Conversions.inchesToMeters(12 * 6), height: btk.Conversions.inchesToMeters(12 * 6), thickness: btk.Conversions.inchesToMeters(0.5), isOval: false }
+      ]
+    },
+    {
+      x: btk.Conversions.yardsToMeters(-10), // -10 yards
+      z: btk.Conversions.yardsToMeters(-1760), // -1760 yards
+      rackWidth: btk.Conversions.yardsToMeters(3),
+      rackHeight: btk.Conversions.yardsToMeters(2),
+      targets: [
+        { width: btk.Conversions.inchesToMeters(40), height: btk.Conversions.inchesToMeters(40), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true },
+        { width: btk.Conversions.inchesToMeters(20), height: btk.Conversions.inchesToMeters(20), thickness: btk.Conversions.inchesToMeters(0.5), isOval: true }
+      ]
+    },
+    {
+      x: btk.Conversions.yardsToMeters(30), // 30 yards
+      z: btk.Conversions.yardsToMeters(-1760), // -1760 yards
+      rackWidth: btk.Conversions.yardsToMeters(3),
+      rackHeight: btk.Conversions.yardsToMeters(3),
+      targets: [
+        { width: btk.Conversions.inchesToMeters(12 * 6), height: btk.Conversions.inchesToMeters(12 * 6), thickness: btk.Conversions.inchesToMeters(0.5), isOval: false }
+      ]
+    }
+  ];
+}
