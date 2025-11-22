@@ -242,27 +242,35 @@ class WindFieldVisualization
 
     for (let idx = 0, n = positions.length / 2; idx < n; ++idx)
     {
+      // Grid coordinates are in yards:
+      // x_yd: downrange distance (0 → 1000 yards)
+      // y_yd: crossrange position (-100 → +100 yards, left to right)
       const x_yd = positions[idx * 2 + 0];
       const y_yd = positions[idx * 2 + 1];
-      const x_m = btk.Conversions.yardsToMeters(x_yd);
-      // Convert display coordinates to BTK coordinates:
-      // Display: Y=-100 (top/left) to Y=+100 (bottom/right) when looking downrange
-      // BTK: Y is crossrange, positive = LEFT when looking downrange
-      // Your debug shows BTK Y=50-75 should be on left side, so we need to flip
-      // Display Y=-100 (left) should map to BTK Y=+100 (left in BTK)
-      // Display Y=+100 (right) should map to BTK Y=-100 (right in BTK)
-      // So: BTK_y = -display_y
-      const y_m = btk.Conversions.yardsToMeters(-y_yd);
 
-      // Sample wind using the provided sampling function
-      const wv = this.samplingFunction(x_m, y_m, 0);
+      // Embed 2D (downrange, crossrange) into world coordinates (meters):
+      // World / BTK: X = crossrange-right, Y = up, Z = towards camera (negative Z = downrange)
+      const downrange_m = btk.Conversions.yardsToMeters(x_yd);
+      const crossrange_m = btk.Conversions.yardsToMeters(y_yd);
+      const worldX_m = crossrange_m;
+      const worldY_m = 0.0;
+      const worldZ_m = -downrange_m;
 
-      // Arrow points in wind direction (downwind), not against it
-      // BTK: wv.x = headwind (downrange), wv.y = crosswind (positive = LEFT)
-      // Three.js display: X = downrange, Y = crossrange (positive = DOWN/RIGHT)
-      // Need to flip Y to convert from BTK (left positive) to display (right positive)
-      const theta = Math.atan2(-wv.y, wv.x);
-      const speedMph = btk.Conversions.mpsToMph(Math.sqrt(wv.x * wv.x + wv.y * wv.y));
+      // Sample wind using the provided sampling function in world coordinates
+      const wv = this.samplingFunction(worldX_m, worldY_m, worldZ_m);
+
+      // Project wind into the ground plane:
+      // Downrange component is along -Z (toward target), crossrange along +X (right)
+      const down = -wv.z;
+      const cross = wv.x;
+
+      // Arrow points in wind direction (downwind) in display coordinates:
+      // X-axis = downrange (right), Y-axis = crossrange (up/down)
+      const theta = Math.atan2(cross, down);
+
+      // Speed for stats and color ramp (horizontal wind only)
+      const speedMps = Math.sqrt(down * down + cross * cross);
+      const speedMph = btk.Conversions.mpsToMph(speedMps);
 
       // Update frame statistics
       frameStats.sampleCount++;
@@ -693,18 +701,20 @@ function updateComponentDetails()
   if (globalAdvectionOffsetEl)
   {
     const offset = wind.getGlobalAdvectionOffset();
-    const offsetX = offset.x * 1.094; // m to yards
-    const offsetY = offset.y * 1.094; // m to yards
-    globalAdvectionOffsetEl.textContent = `(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`;
+    // Offset lives in the ground plane: X=crossrange, Z=downrange (negative Z = toward target)
+    const offsetCross_yd = btk.Conversions.metersToYards(offset.x);
+    const offsetDown_yd = btk.Conversions.metersToYards(offset.z);
+    globalAdvectionOffsetEl.textContent = `(${offsetDown_yd.toFixed(1)}, ${offsetCross_yd.toFixed(1)})`;
     offset.delete();
   }
 
   if (globalAdvectionSpeedEl)
   {
     const velocity = wind.getGlobalAdvectionVelocity();
-    const velX = velocity.x * 2.237; // m/s to mph
-    const velY = velocity.y * 2.237; // m/s to mph
-    const speed = Math.sqrt(velX * velX + velY * velY);
+    // Global advection speed is horizontal only: X=crossrange, Z=downrange
+    const velCross_mph = btk.Conversions.mpsToMph(velocity.x);
+    const velDown_mph = btk.Conversions.mpsToMph(velocity.z);
+    const speed = Math.sqrt(velCross_mph * velCross_mph + velDown_mph * velDown_mph);
     globalAdvectionSpeedEl.textContent = speed.toFixed(1);
     velocity.delete();
   }

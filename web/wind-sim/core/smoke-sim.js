@@ -180,17 +180,29 @@ export class SmokeSimulation
 
       if (!particle.active) continue;
 
-      // Sample wind at particle position
+      // Particle position is stored in a 2D ground plane (meters):
+      // particle.position.x = downrange distance (0 → maxX_m)
+      // particle.position.y = crossrange position (minY_m → maxY_m, left to right)
+      // Embed into world / BTK coordinates:
+      // World: X = crossrange-right, Y = up, Z = towards camera (negative Z = downrange)
+      const downrange_m = particle.position.x;
+      const crossrange_m = particle.position.y;
+      const worldX_m = crossrange_m;
+      const worldY_m = 0.0;
+      const worldZ_m = -downrange_m;
+
+      // Sample wind at this world position
       const wind = this.windGenerator.sample(
-        particle.position.x,
-        particle.position.y,
-        particle.position.z
+        worldX_m,
+        worldY_m,
+        worldZ_m
       );
 
-      // Update velocity from wind
-      particle.velocity.x = wind.x;
-      particle.velocity.y = wind.y;
-      particle.velocity.z = wind.z;
+      // Convert world wind vector into (downrange, crossrange) components in the simulation plane
+      // Downrange component is along -Z (toward target), crossrange along +X (right)
+      particle.velocity.x = -wind.z; // downrange velocity
+      particle.velocity.y = wind.x;  // crossrange velocity
+      particle.velocity.z = 0.0;
 
       // Clean up WASM object
       wind.delete();
@@ -231,12 +243,11 @@ export class SmokeSimulation
 
       if (particle.active)
       {
-        // Convert positions from meters to yards and fix coordinate system
-        // BTK: Y is crossrange, positive = LEFT when looking downrange
-        // Display: Y positive = DOWN/RIGHT on screen
-        // Need to negate Y to match wind arrow display
+        // Convert simulation-plane meters to yards for display:
+        // particle.position.x = downrange (meters), particle.position.y = crossrange-right (meters)
+        // Display: X increases downrange (right), Y increases downward; negate crossrange for screen Y
         positions[i * 3] = particle.position.x * this.METERS_TO_YARDS; // X: downrange
-        positions[i * 3 + 1] = -particle.position.y * this.METERS_TO_YARDS; // Y: negate and convert (crossrange)
+        positions[i * 3 + 1] = -particle.position.y * this.METERS_TO_YARDS; // Y: screen-space crossrange
         positions[i * 3 + 2] = particle.position.z; // Z: unchanged
 
         // Calculate color based on speed (m/s)
