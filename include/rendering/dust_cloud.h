@@ -47,8 +47,7 @@ namespace btk::rendering
      * @param initial_radius Initial cloud radius in meters (default 0.1m = 10cm)
      * @param growth_rate Cloud radius growth rate in m/s (default 0.5 m/s)
      */
-    DustCloud(int num_particles, const btk::math::Vector3D& position, float initial_radius = 0.1f,
-              float growth_rate = 0.5f);
+    DustCloud(int num_particles, const btk::math::Vector3D& position, float initial_radius = 0.1f, float growth_rate = 0.5f);
 
     /**
      * @brief Advance simulation by time step
@@ -73,7 +72,6 @@ namespace btk::rendering
 #else
     const std::vector<float>& getPositions() const { return positions_buffer_; }
 #endif
-
 
     /**
      * @brief Get global alpha for the dust cloud
@@ -103,7 +101,6 @@ namespace btk::rendering
      * @return Cloud center position in BTK coordinates (meters)
      */
     btk::math::Vector3D getCenterPosition() const;
-
 
     private:
     static constexpr float ALPHA_THRESHOLD = 0.01f; ///< Alpha threshold for particle visibility

@@ -226,8 +226,8 @@ namespace btk::ballistics
       float sinPitch = std::sin(best_pitch);
       float cosYaw = std::cos(best_yaw);
       float sinYaw = std::sin(best_yaw);
-      btk::math::Vector3D velocity_init(muzzle_velocity * cosPitch * sinYaw, // x (crossrange)
-                                        muzzle_velocity * sinPitch,           // y (vertical)
+      btk::math::Vector3D velocity_init(muzzle_velocity * cosPitch * sinYaw,   // x (crossrange)
+                                        muzzle_velocity * sinPitch,            // y (vertical)
                                         -muzzle_velocity * cosPitch * cosYaw); // z (-downrange)
 
       // Start at bore height (z=0)

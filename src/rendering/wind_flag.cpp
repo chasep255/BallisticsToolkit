@@ -5,60 +5,32 @@
 #include <cmath>
 
 #ifdef __EMSCRIPTEN__
-#include <emscripten/val.h>
 #include <emscripten/bind.h>
+#include <emscripten/val.h>
 #endif
 
 namespace btk::rendering
 {
 
-  WindFlag::WindFlag(float flag_base_width,
-                     float flag_tip_width,
-                     float flag_length,
-                     float flag_thickness,
-                     int flag_segments,
-                     float flag_min_angle,
-                     float flag_max_angle,
-                     float flag_angle_response_k,
-                     float flag_angle_interpolation_speed,
-                     float flag_direction_interpolation_speed,
-                     float flag_flap_frequency_base,
-                     float flag_flap_frequency_scale,
-                     float flag_flap_amplitude,
+  WindFlag::WindFlag(float flag_base_width, float flag_tip_width, float flag_length, float flag_thickness, int flag_segments, float flag_min_angle, float flag_max_angle, float flag_angle_response_k,
+                     float flag_angle_interpolation_speed, float flag_direction_interpolation_speed, float flag_flap_frequency_base, float flag_flap_frequency_scale, float flag_flap_amplitude,
                      float flag_wave_length)
-    : flag_base_width_(flag_base_width),
-      flag_tip_width_(flag_tip_width),
-      flag_length_(flag_length),
-      flag_thickness_(flag_thickness),
-      flag_segments_(flag_segments),
-      flag_min_angle_(flag_min_angle),
-      flag_max_angle_(flag_max_angle),
-      flag_angle_response_k_(flag_angle_response_k),
-      flag_angle_interpolation_speed_(flag_angle_interpolation_speed),
-      flag_direction_interpolation_speed_(flag_direction_interpolation_speed),
-      flag_flap_frequency_base_(flag_flap_frequency_base),
-      flag_flap_frequency_scale_(flag_flap_frequency_scale),
-      flag_flap_amplitude_(flag_flap_amplitude),
-      flag_wave_length_(flag_wave_length),
-      position_(0.0f, 0.0f, 0.0f),
-      current_angle_(flag_min_angle),
-      current_direction_(0.0f),
-      flap_phase_(0.0f)
+    : flag_base_width_(flag_base_width), flag_tip_width_(flag_tip_width), flag_length_(flag_length), flag_thickness_(flag_thickness), flag_segments_(flag_segments), flag_min_angle_(flag_min_angle),
+      flag_max_angle_(flag_max_angle), flag_angle_response_k_(flag_angle_response_k), flag_angle_interpolation_speed_(flag_angle_interpolation_speed),
+      flag_direction_interpolation_speed_(flag_direction_interpolation_speed), flag_flap_frequency_base_(flag_flap_frequency_base), flag_flap_frequency_scale_(flag_flap_frequency_scale),
+      flag_flap_amplitude_(flag_flap_amplitude), flag_wave_length_(flag_wave_length), position_(0.0f, 0.0f, 0.0f), current_angle_(flag_min_angle), current_direction_(0.0f), flap_phase_(0.0f)
   {
     updateDisplay();
   }
 
-  void WindFlag::setPosition(float x, float y, float z)
-  {
-    position_ = btk::math::Vector3D(x, y, z);
-  }
+  void WindFlag::setPosition(float x, float y, float z) { position_ = btk::math::Vector3D(x, y, z); }
 
   void WindFlag::update(float deltaTime, const btk::math::Vector3D& wind)
   {
     // Extract horizontal wind components (m/s)
     // BTK: X=crossrange (right), Y=up, Z=-downrange
-    float crossrange_mps = wind.x;     // +X = wind blowing to the right
-    float downrange_mps = -wind.z;     // Z=-downrange, so -wind.z = +downrange (tailwind toward targets)
+    float crossrange_mps = wind.x; // +X = wind blowing to the right
+    float downrange_mps = -wind.z; // Z=-downrange, so -wind.z = +downrange (tailwind toward targets)
     float windHoriz_mps = std::sqrt(crossrange_mps * crossrange_mps + downrange_mps * downrange_mps);
     float windHoriz_mph = btk::math::Conversions::mpsToMph(windHoriz_mps);
 
@@ -98,14 +70,7 @@ namespace btk::rendering
       flap_phase_ += 2.0f * M_PI;
   }
 
-  void WindFlag::calculateFlagSegmentPosition(int segmentIndex,
-                                               float angleDeg,
-                                               float direction,
-                                               float flapPhase,
-                                               float& outX,
-                                               float& outY,
-                                               float& outZ,
-                                               float& outHalfWidth)
+  void WindFlag::calculateFlagSegmentPosition(int segmentIndex, float angleDeg, float direction, float flapPhase, float& outX, float& outY, float& outZ, float& outHalfWidth)
   {
     const float t = static_cast<float>(segmentIndex) / static_cast<float>(flag_segments_ - 1);
     const float halfBase = flag_base_width_ / 2.0f;
@@ -123,9 +88,9 @@ namespace btk::rendering
     // direction is measured from +X toward +downrange, so the horizontal
     // wind direction vector is:
     //   h = (cosDir, 0, -sinDir)
-    const float segmentX = cosDir * sinPitch * flag_length_ * t;   // Horizontal extension in wind direction (X)
-    const float segmentY = -cosPitch * flag_length_ * t;           // Vertical droop (negative Y = down)
-    const float segmentZ = -sinDir * sinPitch * flag_length_ * t;  // Depth extension in wind direction (Z)
+    const float segmentX = cosDir * sinPitch * flag_length_ * t;  // Horizontal extension in wind direction (X)
+    const float segmentY = -cosPitch * flag_length_ * t;          // Vertical droop (negative Y = down)
+    const float segmentZ = -sinDir * sinPitch * flag_length_ * t; // Depth extension in wind direction (Z)
 
     // Flapping animation - flag waves in the wind
     const float wavePosition = t * flag_wave_length_;
@@ -135,8 +100,8 @@ namespace btk::rendering
     // Flapping perpendicular to wind direction (makes flag visible from all angles).
     // Perpendicular horizontal vector to h = (cosDir, 0, -sinDir) is:
     //   p = (sinDir, 0, cosDir)
-    const float flapX = sinDir * flapAmplitude;  // Horizontal flapping
-    const float flapZ = cosDir * flapAmplitude;  // Depth flapping
+    const float flapX = sinDir * flapAmplitude; // Horizontal flapping
+    const float flapZ = cosDir * flapAmplitude; // Depth flapping
 
     outX = segmentX + flapX;
     outY = segmentY;
@@ -273,4 +238,3 @@ namespace btk::rendering
 #endif
 
 } // namespace btk::rendering
-

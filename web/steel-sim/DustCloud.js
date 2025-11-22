@@ -97,7 +97,7 @@ export class DustCloud
     const baseG = baseColor.g / 255.0;
     const baseB = baseColor.b / 255.0;
 
-    for(let i = 0; i < numParticles; ++i)
+    for (let i = 0; i < numParticles; ++i)
     {
       // Add random color jitter (±20% variation)
       const jitterR = baseR + (Math.random() - 0.5) * baseR * 0.4;

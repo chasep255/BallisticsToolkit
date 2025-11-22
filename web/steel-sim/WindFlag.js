@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { Config } from './config.js';
+import
+{
+  Config
+}
+from './config.js';
 
 /**
  * Wrapper class for C++ WindFlag that manages Three.js rendering resources
@@ -231,7 +235,7 @@ export class WindFlag
     const posBtk = new btk.Vector3D(
       pos.x, // X = crossrange
       pos.y, // Y = up
-      pos.z  // Z = -downrange
+      pos.z // Z = -downrange
     );
 
     // Sample wind in BTK coordinates (m/s)
@@ -320,9 +324,9 @@ export class WindFlagFactory
     const
     {
       maxRange = Config.LANDSCAPE_CONFIG.groundLength,
-      interval = Config.WIND_FLAG_CONFIG.interval,
-      sideOffset = Config.LANDSCAPE_CONFIG.groundWidth / 2,
-      config = {}
+        interval = Config.WIND_FLAG_CONFIG.interval,
+        sideOffset = Config.LANDSCAPE_CONFIG.groundWidth / 2,
+        config = {}
     } = options;
 
     // Clear existing flags
@@ -339,7 +343,12 @@ export class WindFlagFactory
       const leftY = landscape.getHeightAt(leftX, z) || 0;
       const leftFlag = new WindFlag(
       {
-        position: { x: leftX, y: leftY, z },
+        position:
+        {
+          x: leftX,
+          y: leftY,
+          z
+        },
         scene,
         config
       });
@@ -350,7 +359,12 @@ export class WindFlagFactory
       const rightY = landscape.getHeightAt(rightX, z) || 0;
       const rightFlag = new WindFlag(
       {
-        position: { x: rightX, y: rightY, z },
+        position:
+        {
+          x: rightX,
+          y: rightY,
+          z
+        },
         scene,
         config
       });
@@ -392,4 +406,3 @@ export class WindFlagFactory
     return this.flags;
   }
 }
-

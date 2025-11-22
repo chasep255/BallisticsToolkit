@@ -11,10 +11,8 @@
 namespace btk::rendering
 {
 
-  DustCloud::DustCloud(int num_particles, const btk::math::Vector3D& position, float initial_radius,
-                       float growth_rate)
-    : center_position_(position), initial_radius_(initial_radius), growth_rate_(growth_rate), radius_(initial_radius),
-      alpha_(1.0f)
+  DustCloud::DustCloud(int num_particles, const btk::math::Vector3D& position, float initial_radius, float growth_rate)
+    : center_position_(position), initial_radius_(initial_radius), growth_rate_(growth_rate), radius_(initial_radius), alpha_(1.0f)
   {
     // Initialize particles with relative positions using Gaussian distribution (denser at center)
     // Scale relative positions by initial radius so they represent actual positions in meters
@@ -109,10 +107,7 @@ namespace btk::rendering
     return (alpha_ >= ALPHA_THRESHOLD) ? static_cast<int>(particles_.size()) : 0;
   }
 
-  btk::math::Vector3D DustCloud::getCenterPosition() const
-  {
-    return center_position_;
-  }
+  btk::math::Vector3D DustCloud::getCenterPosition() const { return center_position_; }
 
 #ifdef __EMSCRIPTEN__
   emscripten::val DustCloud::getPositions() const

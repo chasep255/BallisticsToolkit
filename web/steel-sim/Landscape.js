@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { Config } from './config.js';
+import
+{
+  Config
+}
+from './config.js';
 
 /**
  * Landscape class for managing ground planes and terrain
@@ -23,9 +27,9 @@ export class Landscape
     const
     {
       groundWidth = Config.LANDSCAPE_CONFIG.groundWidth,
-      groundLength = Config.LANDSCAPE_CONFIG.groundLength,
-      brownGroundWidth = Config.LANDSCAPE_CONFIG.brownGroundWidth,
-      brownGroundLength = Config.LANDSCAPE_CONFIG.brownGroundLength
+        groundLength = Config.LANDSCAPE_CONFIG.groundLength,
+        brownGroundWidth = Config.LANDSCAPE_CONFIG.brownGroundWidth,
+        brownGroundLength = Config.LANDSCAPE_CONFIG.brownGroundLength
     } = options;
 
     this.groundWidth = groundWidth;

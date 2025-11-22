@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { Config } from './config.js';
+import
+{
+  Config
+}
+from './config.js';
 
 /**
  * Wrapper class for C++ SteelTarget that manages Three.js rendering resources
@@ -66,7 +70,7 @@ export class SteelTarget
     else
     {
       // For rectangles, attach at top corners
-      attachmentX = width / 3;  // 1/3 width from center (left/right)
+      attachmentX = width / 3; // 1/3 width from center (left/right)
       attachmentY = height / 2; // Top of target
     }
 
@@ -217,7 +221,7 @@ export class SteelTarget
     targetMesh.userData.texture = texture; // Store texture reference
     // Vertices from C++ are already in world space, so leave mesh at origin
     this.scene.add(targetMesh);
-    
+
 
     return targetMesh;
   }
@@ -327,7 +331,7 @@ export class SteelTarget
 
     // Get actual anchor data from C++ physics engine (already updated by simulation)
     const anchors = this.steelTarget.getAnchors();
-    
+
     if (anchors.size() === 0)
     {
       anchors.delete();

@@ -106,8 +106,8 @@ namespace btk::match
     }
 
     // Get impact position and velocity
-    float impact_x = impact_point->getState().getPosition().x;        // X is crossrange
-    float impact_y = impact_point->getState().getPosition().y;        // Y is vertical
+    float impact_x = impact_point->getState().getPosition().x;         // X is crossrange
+    float impact_y = impact_point->getState().getPosition().y;         // Y is vertical
     float impact_velocity = -impact_point->getState().getVelocity().z; // Forward velocity at impact (magnitude of -Z)
 
     // Score the shot and add to match

@@ -14,7 +14,7 @@ namespace btk::physics
   {
     // Initialize sample corners to reasonable defaults
     // In new coordinate system: X=crossrange, Y=up, Z=-downrange
-    sample_corners_[0] = btk::math::Vector3D(-100.0f, 0.0f, 0.0f); // crossrange min, vertical min, downrange max (z=0 means -downrange=0)
+    sample_corners_[0] = btk::math::Vector3D(-100.0f, 0.0f, 0.0f);      // crossrange min, vertical min, downrange max (z=0 means -downrange=0)
     sample_corners_[1] = btk::math::Vector3D(100.0f, 100.0f, -1000.0f); // crossrange max, vertical max, downrange min (z=-1000 means -downrange=-1000, so downrange=1000)
   }
 
@@ -172,7 +172,7 @@ namespace btk::physics
     // Use global advection offset
     // In new coordinate system: position.x = crossrange, position.y = vertical, position.z = -downrange
     float downrange = -position.z - (-global_advection_offset_.z); // downrange is -Z
-    float crossrange = position.x - global_advection_offset_.x; // crossrange is X
+    float crossrange = position.x - global_advection_offset_.x;    // crossrange is X
 
     // Scale coordinates by spatial scales (larger scale => slower spatial variation)
     float scaled_x = downrange / component.downrange_scale;

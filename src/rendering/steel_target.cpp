@@ -23,8 +23,7 @@ namespace btk::rendering
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(0.0f, 0.0f, -1.0f),
       orientation_(btk::math::Quaternion()),                                                 // Identity orientation (no rotation)
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
-      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512),
-      texture_height_(512)
+      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
@@ -42,8 +41,7 @@ namespace btk::rendering
   SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal)
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(position), normal_(normal.normalized()), orientation_(btk::math::Quaternion()),
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
-      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512),
-      texture_height_(512)
+      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
@@ -154,7 +152,7 @@ namespace btk::rendering
 
     // Calculate mass from geometry
     float calculated_mass = area * thickness_ * STEEL_DENSITY;
-    
+
     // Apply minimum mass for stability
     mass_kg_ = std::max(calculated_mass, MIN_MASS);
 

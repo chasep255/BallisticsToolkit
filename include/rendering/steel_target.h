@@ -293,7 +293,7 @@ namespace btk::rendering
     static constexpr float MIN_MASS = 2.0f; // kg
 
     // Damping coefficients (fraction remaining after 1 second)
-    static constexpr float LINEAR_DAMPING = 0.5f; // 50% velocity remains after 1 second
+    static constexpr float LINEAR_DAMPING = 0.5f;  // 50% velocity remains after 1 second
     static constexpr float ANGULAR_DAMPING = 0.5f; // 50% angular velocity remains after 1 second
 
     // Velocity thresholds for "done moving" detection

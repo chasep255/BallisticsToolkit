@@ -6,7 +6,11 @@
  */
 
 import * as THREE from 'three';
-import { Config } from './config.js';
+import
+{
+  Config
+}
+from './config.js';
 
 // Reticle mapping constant.
 // In the original shader-based implementation, the relationship between

@@ -35,7 +35,12 @@ import
   WindFlagFactory
 }
 from './WindFlag.js';
-import { Config, initConfig } from './config.js';
+import
+{
+  Config,
+  initConfig
+}
+from './config.js';
 
 // ===== GLOBAL STATE =====
 let btk = null;
@@ -66,7 +71,7 @@ async function init()
   {
     btk = await BallisticsToolkit();
     window.btk = btk;
-    
+
     // Initialize config with SI unit values
     initConfig();
 
@@ -216,7 +221,7 @@ function setupScene()
     heightNormalized: scopeHeightNorm
   });
   camera = scope.getCamera(); // For raycasting
-  
+
   // Create target racks (independent of scope setup)
   createTargetRacks();
 
@@ -507,7 +512,7 @@ function fireFromScope()
         scopeCamera.position.y,
         scopeCamera.position.z
       );
-      
+
       const bullet = createBullet(impactPoint, shooterPos);
 
       hitTarget.hitBullet(bullet);
@@ -543,7 +548,7 @@ function createDustCloud(impactPoint)
     impactPoint.y,
     impactPoint.z
   );
-  
+
   DustCloudFactory.create(
   {
     position: impactPointThree, // Already in meters
@@ -565,7 +570,7 @@ function createMetallicDustCloud(impactPoint)
     impactPoint.y,
     impactPoint.z
   );
-  
+
   DustCloudFactory.create(
   {
     position: impactPointThree, // Already in meters

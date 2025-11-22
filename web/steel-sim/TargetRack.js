@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { Config } from './config.js';
+import
+{
+  Config
+}
+from './config.js';
 import
 {
   SteelTarget,

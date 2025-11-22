@@ -201,7 +201,7 @@ export class SmokeSimulation
       // Convert world wind vector into (downrange, crossrange) components in the simulation plane
       // Downrange component is along -Z (toward target), crossrange along +X (right)
       particle.velocity.x = -wind.z; // downrange velocity
-      particle.velocity.y = wind.x;  // crossrange velocity
+      particle.velocity.y = wind.x; // crossrange velocity
       particle.velocity.z = 0.0;
 
       // Clean up WASM object
