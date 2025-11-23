@@ -491,9 +491,11 @@ namespace btk::rendering
     btk::math::Vector3D local_pos_rotated = inv_orientation.rotate(local_pos);
     btk::math::Vector3D local_vel_rotated = inv_orientation.rotate(bullet.getVelocity());
 
-    // Determine which face was hit based on local Z coordinate
-    // In local frame: -Z is front face (facing downrange), +Z is back face
-    bool is_front_face = local_pos_rotated.z < 0.0f;
+    // Determine which face was hit based on bullet velocity vs surface normal.
+    // If the bullet velocity opposes the surface normal (dot < 0), it struck the front face.
+    // If it roughly aligns with the normal (dot > 0), it struck the back face.
+    btk::math::Vector3D vel_world = bullet.getVelocity();
+    bool is_front_face = vel_world.dot(normal_) < 0.0f;
 
     // Store impact in local coordinates
     impacts_.emplace_back(local_pos_rotated, local_vel_rotated, bullet.getDiameter(), 0.0f);
