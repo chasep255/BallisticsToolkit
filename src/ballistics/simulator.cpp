@@ -4,11 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdio>
 #include <tuple>
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-#endif
 
 namespace btk::ballistics
 {
@@ -251,7 +247,8 @@ namespace btk::ballistics
       }
 
       // Calculate error at target plane; ignore downrange (z) interpolation residue
-      btk::math::Vector3D error = point_at_target->getState().getPosition() - target_position;
+      btk::math::Vector3D actual_pos = point_at_target->getState().getPosition();
+      btk::math::Vector3D error = actual_pos - target_position;
       float lateral_error = error.x;  // crossrange
       float vertical_error = error.y; // vertical
       float xy_error_magnitude = std::sqrt(lateral_error * lateral_error + vertical_error * vertical_error);

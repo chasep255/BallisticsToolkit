@@ -147,14 +147,33 @@ export function initConfig()
       z: btk.Conversions.yardsToMeters(-100), // -100 yards (zero distance)
       useCustomY: true, // Use custom Y instead of ground height
       rackWidth: btk.Conversions.yardsToMeters(1.5), // 1.5 yards
-      rackHeight: Config.SHOOTER_HEIGHT * 2, // 1 yard
+      rackHeight: btk.Conversions.yardsToMeters(1), // 1 yard
       targets: [
-      {
-        width: btk.Conversions.inchesToMeters(10),
-        height: btk.Conversions.inchesToMeters(10),
-        thickness: btk.Conversions.inchesToMeters(0.5),
-        isOval: true
-      }]
+        {
+          width: btk.Conversions.inchesToMeters(5),
+          height: btk.Conversions.inchesToMeters(5),
+          thickness: btk.Conversions.inchesToMeters(0.5),
+          isOval: false
+        },
+        {
+          width: btk.Conversions.inchesToMeters(4),
+          height: btk.Conversions.inchesToMeters(4),
+          thickness: btk.Conversions.inchesToMeters(0.5),
+          isOval: false
+        },
+        {
+          width: btk.Conversions.inchesToMeters(3),
+          height: btk.Conversions.inchesToMeters(3),
+          thickness: btk.Conversions.inchesToMeters(0.5),
+          isOval: false
+        },
+        {
+          width: btk.Conversions.inchesToMeters(2),
+          height: btk.Conversions.inchesToMeters(2),
+          thickness: btk.Conversions.inchesToMeters(0.5),
+          isOval: false
+        }
+      ]
     },
 
     {

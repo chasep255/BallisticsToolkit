@@ -478,7 +478,6 @@ function onKeyDown(event)
  */
 function computeRifleZero()
 {
-
   // Create base bullet from config
   const baseBullet = new btk.Bullet(
     Config.BULLET_MASS,
@@ -504,18 +503,30 @@ function computeRifleZero()
   // Muzzle velocity from config
   const muzzleVel_mps = Config.BULLET_SPEED_MPS;
 
-  // TEST: Skip computeZero and just use a horizontal velocity
-  // This tests if the scope rotation is working correctly
-  const testVelocity = new btk.Vector3D(
-    0,              // x: no crossrange
-    0,              // y: perfectly horizontal
-    -muzzleVel_mps  // z: full velocity downrange
+  // Use BTK's computeZero to find the launch angle that makes the bullet
+  // pass 2" above the bore at 100 yards with NO wind.
+  const simulator = new btk.BallisticsSimulator();
+  simulator.setInitialBullet(baseBullet);
+  simulator.setAtmosphere(atmosphere);
+
+  // Zero with no wind
+  const zeroWind = new btk.Vector3D(0, 0, 0);
+  simulator.setWind(zeroWind);
+  zeroWind.delete();
+
+  const zeroedBullet = simulator.computeZero(
+    muzzleVel_mps,
+    targetPos,
+    0.001,  // dt (1ms)
+    20,     // max_iterations
+    0.001,  // tolerance (1mm)
+    0.0     // spin_rate
   );
 
-  // Store the test configuration
+  // Store the zeroed configuration
   rifleZero = {
     bullet: baseBullet,
-    zeroedVelocity: testVelocity,
+    zeroedVelocity: zeroedBullet.getVelocity(),
     atmosphere: atmosphere,
     scopeHeight_m: scopeHeight_m
   };
@@ -523,44 +534,9 @@ function computeRifleZero()
 
   // Cleanup
   targetPos.delete();
-  baseBullet.delete();
+  simulator.delete();
 }
 
-function createBullet(impactPoint, shooterPos)
-{
-  // All positions are btk.Vector3D (SI units)
-  const direction = new btk.Vector3D(
-    impactPoint.x - shooterPos.x,
-    impactPoint.y - shooterPos.y,
-    impactPoint.z - shooterPos.z
-  );
-  const directionNorm = direction.normalized();
-  // Velocity is already in m/s from Config, just scale direction vector
-  const bulletVel = new btk.Vector3D(
-    directionNorm.x * Config.BULLET_SPEED_MPS,
-    directionNorm.y * Config.BULLET_SPEED_MPS,
-    directionNorm.z * Config.BULLET_SPEED_MPS
-  );
-
-  const bulletPos = new btk.Vector3D(impactPoint.x, impactPoint.y, impactPoint.z);
-
-  const baseBullet = new btk.Bullet(
-    Config.BULLET_MASS,
-    Config.BULLET_DIAMETER,
-    Config.BULLET_LENGTH,
-    Config.BULLET_BC,
-    btk.DragFunction.G7
-  );
-
-  const bullet = new btk.Bullet(baseBullet, bulletPos, bulletVel, 0);
-
-  // Cleanup temporary objects (bullet owns bulletPos and bulletVel)
-  baseBullet.delete();
-  direction.delete();
-  directionNorm.delete();
-
-  return bullet;
-}
 
 function fireFromScope()
 {
@@ -589,21 +565,12 @@ function fireFromScope()
     borePosThree.z
   );
 
-  // Rotate the zeroed velocity by the scope's orientation
-  // The zeroed velocity is computed for shooting straight ahead (down -Z axis)
-  // We need to rotate it by the scope's current orientation quaternion
-  
+  // Rotate the zeroed velocity by the scope's orientation.
+  // Zeroed velocity is defined in local bore frame pointing "straight ahead" for the zero.
   const zeroVel = rifleZero.zeroedVelocity;
-  
-  // Create Three.js vector from zeroed velocity (BTK coords: x=cross, y=up, z=-down)
   const zeroVelThree = new THREE.Vector3(zeroVel.x, zeroVel.y, zeroVel.z);
-  
-  // Rotate by scope orientation
   zeroVelThree.applyQuaternion(scopeCamera.quaternion);
-  
-  // Convert back to BTK Vector3D
   const initialVelocity = new btk.Vector3D(zeroVelThree.x, zeroVelThree.y, zeroVelThree.z);
-
 
   // Create bullet params
   const bulletParams = {

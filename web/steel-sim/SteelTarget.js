@@ -604,16 +604,6 @@ export class SteelTargetFactory
   {
     for (const target of SteelTargetFactory.targets)
     {
-      if (!target)
-      {
-        console.error('[SteelTargetFactory] Null target in targets array!');
-        continue;
-      }
-      if (!target.steelTarget)
-      {
-        console.error('[SteelTargetFactory] Target has null steelTarget property!', target);
-        continue;
-      }
       target.steelTarget.updateDisplay();
       target.updateMesh();
       target.updateChainLines();
