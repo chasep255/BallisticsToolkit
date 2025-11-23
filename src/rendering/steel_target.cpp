@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 
 namespace btk::rendering
@@ -94,17 +95,6 @@ namespace btk::rendering
     return position_ + rotated;
   }
 
-  bool SteelTarget::hit(const btk::ballistics::Trajectory& trajectory)
-  {
-    auto intersection = checkTrajectoryIntersection(trajectory);
-    if(!intersection.has_value())
-    {
-      return false;
-    }
-    applyBulletImpact(intersection.value());
-    return true;
-  }
-
   void SteelTarget::hit(const btk::ballistics::Bullet& bullet)
   {
     btk::math::Vector3D impact_point = bullet.getPosition();
@@ -131,6 +121,146 @@ namespace btk::rendering
 
     // Record impact for visualization
     recordImpact(bullet);
+  }
+
+  std::optional<btk::ballistics::TrajectoryPoint> SteelTarget::intersectTrajectory(const btk::ballistics::Trajectory& trajectory) const
+  {
+    using btk::math::Vector3D;
+
+    if(trajectory.isEmpty())
+    {
+      return std::nullopt;
+    }
+
+    // Compute downrange distance (positive meters) of the target's plate corners
+    // using the same convention as TrajectoryPoint::getDistance() (distance = -Z).
+    float half_width = width_ * 0.5f;
+    float half_height = height_ * 0.5f;
+
+    Vector3D corners_local[4] = {
+      Vector3D(-half_width, -half_height, 0.0f),
+      Vector3D(half_width, -half_height, 0.0f),
+      Vector3D(half_width, half_height, 0.0f),
+      Vector3D(-half_width, half_height, 0.0f)
+    };
+
+    float min_dist = std::numeric_limits<float>::max();
+    float max_dist = std::numeric_limits<float>::lowest();
+
+    for(const auto& c_local : corners_local)
+    {
+      Vector3D c_world = position_ + orientation_.rotate(c_local);
+      float d = -c_world.z; // positive downrange distance
+      min_dist = std::min(min_dist, d);
+      max_dist = std::max(max_dist, d);
+    }
+
+    if(!(min_dist < max_dist))
+    {
+      return std::nullopt;
+    }
+
+    // Extract the trajectory segment that spans the target's downrange extent
+    auto pt_start_opt = trajectory.atDistance(min_dist);
+    auto pt_end_opt = trajectory.atDistance(max_dist);
+    if(!pt_start_opt.has_value() || !pt_end_opt.has_value())
+    {
+      return std::nullopt;
+    }
+
+    const Vector3D& p_start = pt_start_opt->getPosition();
+    const Vector3D& p_end = pt_end_opt->getPosition();
+
+    // Raycast this segment into the target
+    auto hit_opt = intersectSegment(p_start, p_end);
+    if(!hit_opt.has_value())
+    {
+      return std::nullopt;
+    }
+
+    const Vector3D& hit_point = hit_opt->point_world_;
+    float hit_dist = -hit_point.z;
+
+    // Query the trajectory state at the impact distance
+    auto pt_hit_opt = trajectory.atDistance(hit_dist);
+    if(!pt_hit_opt.has_value())
+    {
+      return std::nullopt;
+    }
+
+    // Return the trajectory point at the impact distance; caller can use its
+    // Bullet state or position as needed.
+    return pt_hit_opt;
+  }
+
+  std::optional<SteelTarget::RaycastHit> SteelTarget::intersectSegment(const btk::math::Vector3D& start, const btk::math::Vector3D& end) const
+  {
+    // Transform segment into target-local space where the plate lies in the XY
+    // plane with its mid-plane at Z = 0 and finite width_/height_ extents.
+    btk::math::Quaternion inv_orientation = orientation_.conjugate();
+
+    btk::math::Vector3D start_local = inv_orientation.rotate(start - position_);
+    btk::math::Vector3D end_local = inv_orientation.rotate(end - position_);
+    btk::math::Vector3D dir_local = end_local - start_local;
+
+    // If segment is nearly parallel to plate plane (local Z), treat as no hit
+    constexpr float EPS = 1e-6f;
+    if(std::fabs(dir_local.z) < EPS)
+    {
+      return std::nullopt;
+    }
+
+    // Intersect segment with plate mid-plane at z = 0
+    // start_local.z + t * dir_local.z = 0  =>  t = -start_local.z / dir_local.z
+    float t = -start_local.z / dir_local.z;
+    if(t < 0.0f || t > 1.0f)
+    {
+      // Intersection with plane lies outside the segment
+      return std::nullopt;
+    }
+
+    // Compute local-space intersection point
+    btk::math::Vector3D hit_local = start_local + dir_local * t;
+
+    // Check against finite plate extents in local XY
+    float half_width = width_ * 0.5f;
+    float half_height = height_ * 0.5f;
+
+    bool inside = false;
+    if(is_oval_)
+    {
+      // Elliptical plate: (x/a)^2 + (y/b)^2 <= 1
+      float nx = hit_local.x / half_width;
+      float ny = hit_local.y / half_height;
+      inside = (nx * nx + ny * ny) <= 1.0f;
+    }
+    else
+    {
+      // Rectangular plate: |x| <= half_width, |y| <= half_height
+      inside = (std::fabs(hit_local.x) <= half_width) && (std::fabs(hit_local.y) <= half_height);
+    }
+
+    if(!inside)
+    {
+      return std::nullopt;
+    }
+
+    // Convert intersection point and normal back to world space
+    btk::math::Vector3D hit_world = position_ + orientation_.rotate(hit_local);
+
+    // Use the current target normal for the surface normal in world space.
+    // This matches the plate's facing direction used elsewhere.
+    btk::math::Vector3D normal_world = normal_;
+
+    // Distance along the original world-space segment to the impact point
+    float segment_length = (end - start).magnitude();
+    float distance_m = segment_length * t;
+
+    RaycastHit result;
+    result.point_world_ = hit_world;
+    result.normal_world_ = normal_world;
+    result.distance_m_ = distance_m;
+    return result;
   }
 
   void SteelTarget::calculateMassAndInertia()
@@ -177,64 +307,6 @@ namespace btk::rendering
     }
   }
 
-  bool SteelTarget::isPointInTarget(const btk::math::Vector3D& point) const
-  {
-    // Shape is in XY plane, centered at position_
-    float dx = point.x - position_.x;
-    float dy = point.y - position_.y;
-
-    if(is_oval_)
-    {
-      // Oval (ellipse) test
-      float a = width_ / 2.0f;
-      float b = height_ / 2.0f;
-      return (dx * dx) / (a * a) + (dy * dy) / (b * b) <= 1.0f;
-    }
-    else
-    {
-      // Rectangle test
-      return std::abs(dx) <= width_ / 2.0f && std::abs(dy) <= height_ / 2.0f;
-    }
-  }
-
-  std::optional<SteelTarget::IntersectionResult> SteelTarget::checkTrajectoryIntersection(const btk::ballistics::Trajectory& trajectory) const
-  {
-    // Target's downrange distance (position.z in ballistics coordinate system, negative because downrange is -Z)
-    float target_distance_m = -position_.z;
-
-    // Get trajectory point at target distance
-    auto traj_point = trajectory.atDistance(target_distance_m);
-    if(!traj_point.has_value())
-    {
-      return std::nullopt;
-    }
-
-    // Get impact point
-    btk::math::Vector3D impact_point = traj_point->getPosition();
-
-    // Check if point is inside any component
-    if(!isPointInTarget(impact_point))
-    {
-      return std::nullopt;
-    }
-
-    // We have a hit! Build intersection result
-    const auto& bullet = traj_point->getState();
-
-    IntersectionResult result;
-    result.hit = true;
-    result.impact_point_ = impact_point;
-    result.impact_time_s_ = traj_point->getTime();
-    result.impact_velocity_ = bullet.getVelocity();
-    result.bullet_mass_kg_ = bullet.getWeight();
-    result.bullet_diameter_ = bullet.getDiameter();
-
-    // Surface normal
-    result.surface_normal_ = normal_;
-
-    return result;
-  }
-
   float SteelTarget::calculateMomentumTransferRatio(float angle_to_normal) const
   {
     // Simple model: perpendicular hits (0°) transfer maximum momentum
@@ -248,40 +320,6 @@ namespace btk::rendering
 
     // Clamp to reasonable range [0.1, 1.0] (even grazing hits transfer some momentum)
     return std::max(0.1f, transfer);
-  }
-
-  void SteelTarget::applyBulletImpact(const IntersectionResult& intersection)
-  {
-    if(!intersection.hit)
-    {
-      return;
-    }
-
-    // Calculate bullet momentum
-    btk::math::Vector3D bullet_momentum = intersection.impact_velocity_ * intersection.bullet_mass_kg_;
-
-    // Calculate impact angle
-    btk::math::Vector3D impact_direction = intersection.impact_velocity_;
-    impact_direction = impact_direction / impact_direction.magnitude();
-    float cos_angle = impact_direction.dot(intersection.surface_normal_);
-    float angle_to_normal = std::acos(std::fabs(cos_angle));
-
-    // Calculate momentum transfer ratio
-    float transfer_ratio = calculateMomentumTransferRatio(angle_to_normal);
-
-    // Apply impulse
-    btk::math::Vector3D impulse = bullet_momentum * transfer_ratio;
-    applyImpulse(impulse, intersection.impact_point_);
-
-    // Create bullet for impact recording
-    btk::ballistics::Bullet impact_bullet(intersection.bullet_mass_kg_, intersection.bullet_diameter_,
-                                          intersection.bullet_diameter_ * 3.0f, // Estimate length
-                                          0.3f,                                 // Estimate BC
-                                          btk::ballistics::DragFunction::G7);
-    btk::ballistics::Bullet flying_bullet(impact_bullet, intersection.impact_point_, intersection.impact_velocity_, 0.0f);
-
-    // Record impact for visualization
-    recordImpact(flying_bullet);
   }
 
   void SteelTarget::applyImpulse(const btk::math::Vector3D& impulse, const btk::math::Vector3D& world_position)

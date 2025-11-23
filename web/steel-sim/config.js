@@ -17,6 +17,12 @@ export function initConfig()
 {
   const btk = window.btk;
 
+  // ===== PHYSICS INTEGRATION CONSTANTS =====
+  Config.INTEGRATION_STEP_S = 0.005; // 5ms physics step
+  Config.BULLET_SUBSTEP_S = 0.001; // 1ms BTK integration
+  Config.TIME_MANAGER_MAX_DT_S = 0.05; // 50ms max frame time
+  Config.TIME_MANAGER_MIN_DT_S = 0; // No minimum (clamp to 0)
+
   // ===== CAMERA & SCENE CONSTANTS =====
   Config.SHOOTER_HEIGHT = btk.Conversions.yardsToMeters(5); // 5 yards
   Config.CAMERA_FOV = 35; // degrees (Three.js uses degrees)
@@ -36,7 +42,6 @@ export function initConfig()
     beamRadius: btk.Conversions.inchesToMeters(1.0), // 2" diameter beams
     postRadius: btk.Conversions.inchesToMeters(1.0) // 2" diameter posts
   };
-
   // ===== DUST CLOUD CONFIGURATIONS =====
   Config.GROUND_DUST_CONFIG = {
     numParticles: 1000,
@@ -135,6 +140,22 @@ export function initConfig()
   // ===== TARGET RACK CONFIGURATIONS =====
   // All positions in meters, all dimensions in meters
   Config.TARGET_RACKS_CONFIG = [
+
+    // Zero confirmation rack at 100 yards, at eye height
+    {
+      x: 0,
+      z: btk.Conversions.yardsToMeters(-100), // -100 yards (zero distance)
+      useCustomY: true, // Use custom Y instead of ground height
+      rackWidth: btk.Conversions.yardsToMeters(1.5), // 1.5 yards
+      rackHeight: Config.SHOOTER_HEIGHT * 2, // 1 yard
+      targets: [
+      {
+        width: btk.Conversions.inchesToMeters(10),
+        height: btk.Conversions.inchesToMeters(10),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      }]
+    },
 
     {
       x: 0,

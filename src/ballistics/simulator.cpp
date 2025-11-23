@@ -238,7 +238,8 @@ namespace btk::ballistics
       float sim_dist = -target_position.z * 1.1f;
       setInitialBullet(test_state);
       current_time_ = 0.0f; // Reset clock for each trial
-      Trajectory trajectory = simulate(sim_dist, dt, 5.0f);
+      simulate(sim_dist, dt, 5.0f);
+      Trajectory& trajectory = getTrajectory();
 
       // Get state at target distance using interpolation
       std::optional<TrajectoryPoint> point_at_target = trajectory.atDistance(-target_position.z);
@@ -288,7 +289,7 @@ namespace btk::ballistics
   }
 
   // Simulate trajectory using stored state
-  const Trajectory& Simulator::simulate(float max_distance, float dt, float max_time)
+  void Simulator::simulate(float max_distance, float dt, float max_time)
   {
     // Add initial point with current wind
     trajectory_.addPoint(current_time_, current_bullet_, wind_);
@@ -302,12 +303,10 @@ namespace btk::ballistics
       if(-current_bullet_.getPositionZ() > max_distance)
         break;
     }
-
-    return trajectory_;
   }
 
   // Simulate trajectory with wind generator sampling
-  const Trajectory& Simulator::simulate(float max_distance, float dt, float max_time, const btk::physics::WindGenerator& wind_gen)
+  void Simulator::simulate(float max_distance, float dt, float max_time, const btk::physics::WindGenerator& wind_gen)
   {
     // Sample wind at initial position (wind_gen expects: crossrange, vertical, -downrange)
     float x = current_bullet_.getPositionX();
@@ -335,12 +334,10 @@ namespace btk::ballistics
       if(-current_bullet_.getPositionZ() > max_distance)
         break;
     }
-
-    return trajectory_;
   }
 
   // Time step using stored state
-  const Bullet& Simulator::timeStep(float dt)
+  void Simulator::timeStep(float dt)
   {
     Bullet s0 = current_bullet_;
 
@@ -360,16 +357,11 @@ namespace btk::ballistics
 
     // Add point to trajectory with current wind
     trajectory_.addPoint(current_time_, current_bullet_, wind_);
-
-    // Return reference to the updated current bullet
-    return current_bullet_;
   }
 
   // State queries
   float Simulator::getCurrentDistance() const { return -current_bullet_.getPositionZ(); }
 
   float Simulator::getCurrentTime() const { return current_time_; }
-
-  const Trajectory& Simulator::getTrajectory() const { return trajectory_; }
 
 } // namespace btk::ballistics

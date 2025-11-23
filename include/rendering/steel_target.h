@@ -1,11 +1,11 @@
 #pragma once
 
-#include "ballistics/trajectory.h"
 #include "math/quaternion.h"
 #include "math/vector.h"
+#include "ballistics/bullet.h"
+#include "ballistics/trajectory.h"
 #include <cmath>
 #include <optional>
-#include <variant>
 #include <vector>
 
 // Forward declaration for WASM builds (for getVertices())
@@ -63,20 +63,17 @@ namespace btk::rendering
     };
 
     /**
-     * @brief Result of trajectory intersection check
+     * @brief Result of a simple ray-style intersection test against the target
      */
-    struct IntersectionResult
+    struct RaycastHit
     {
-      bool hit;                             ///< Whether trajectory intersects target
-      btk::math::Vector3D impact_point_;    ///< Impact point in world space
-      btk::math::Vector3D impact_velocity_; ///< Bullet velocity at impact
-      btk::math::Vector3D surface_normal_;  ///< Surface normal at impact point
-      float impact_time_s_;                 ///< Time of impact
-      float bullet_mass_kg_;                ///< Bullet mass for momentum transfer
-      float bullet_diameter_;               ///< Bullet diameter for impact recording
+      btk::math::Vector3D point_world_;  ///< Impact point in world coordinates
+      btk::math::Vector3D normal_world_; ///< Surface normal at impact point (world coordinates)
+      float distance_m_;                 ///< Distance from segment start to impact point in meters
 
-      IntersectionResult() : hit(false), impact_point_(0, 0, 0), impact_velocity_(0, 0, 0), surface_normal_(0, 0, 0), impact_time_s_(0.0f), bullet_mass_kg_(0.0f), bullet_diameter_(0.0f) {}
+      RaycastHit() : point_world_(0, 0, 0), normal_world_(0, 0, 0), distance_m_(0.0f) {}
     };
+
 
     /**
      * @brief Initialize steel target with single shape at origin
@@ -112,22 +109,37 @@ namespace btk::rendering
     void addChainAnchor(const btk::math::Vector3D& local_attachment, const btk::math::Vector3D& world_fixed);
 
     /**
-     * @brief Process bullet hit from trajectory
-     *
-     * Checks for intersection, applies physics, records impact.
-     * Does nothing if trajectory misses.
-     *
-     * @param trajectory Bullet trajectory to check
-     * @return True if hit, false if miss
-     */
-    bool hit(const btk::ballistics::Trajectory& trajectory);
-
-    /**
-     * @brief Process direct bullet hit (manual)
+     * @brief Process direct bullet hit
      *
      * @param bullet Bullet with position, velocity, mass, and diameter
      */
     void hit(const btk::ballistics::Bullet& bullet);
+
+    /**
+     * @brief Ray-style intersection test with the target using a line segment.
+     *
+     * The segment is defined in world coordinates by two endpoints. The method
+     * transforms the segment into the target's local space and tests against
+     * the finite plate (rectangle or oval) lying in the target's mid-plane.
+     *
+     * @param start World-space start point of the segment
+     * @param end World-space end point of the segment
+     * @return RaycastHit with world-space impact point/normal if hit, std::nullopt otherwise
+     */
+    std::optional<RaycastHit> intersectSegment(const btk::math::Vector3D& start, const btk::math::Vector3D& end) const;
+
+    /**
+     * @brief Intersect a full bullet trajectory with this target.
+     *
+     * Uses the target's current pose to compute its downrange extent, then
+     * extracts the corresponding segment from the trajectory and raycasts it
+     * against the plate. If an impact is found, returns the corresponding
+     * TrajectoryPoint (state along the trajectory) at the impact distance.
+     *
+     * @param trajectory Bullet trajectory in world coordinates
+     * @return TrajectoryPoint at impact if hit, std::nullopt if the trajectory misses
+     */
+    std::optional<btk::ballistics::TrajectoryPoint> intersectTrajectory(const btk::ballistics::Trajectory& trajectory) const;
 
     /**
      * @brief Advance physics simulation
@@ -349,16 +361,6 @@ namespace btk::rendering
     void applyChainForces(float dt);
 
     /**
-     * @brief Check if trajectory intersects target
-     */
-    std::optional<IntersectionResult> checkTrajectoryIntersection(const btk::ballistics::Trajectory& trajectory) const;
-
-    /**
-     * @brief Apply bullet impact physics
-     */
-    void applyBulletImpact(const IntersectionResult& intersection);
-
-    /**
      * @brief Apply instantaneous impulse at a world-space point
      */
     void applyImpulse(const btk::math::Vector3D& impulse, const btk::math::Vector3D& world_position);
@@ -386,11 +388,6 @@ namespace btk::rendering
      * @param is_front_face True to draw on front texture, false for back texture
      */
     void drawImpactOnTexture(const btk::math::Vector3D& local_position, float bullet_diameter, bool is_front_face);
-
-    /**
-     * @brief Test if point is inside any component (2D)
-     */
-    bool isPointInTarget(const btk::math::Vector3D& point) const;
 
     /**
      * @brief Calculate transfer ratio based on impact angle

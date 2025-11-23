@@ -127,9 +127,8 @@ namespace btk::ballistics
      * @param max_distance Maximum distance to simulate in m
      * @param dt Time step for simulation in s (default: 0.001f)
      * @param max_time Maximum simulation time in s (default: 60.0f)
-     * @return Const reference to trajectory object containing all simulation points
      */
-    const Trajectory& simulate(float max_distance, float dt = 0.001f, float max_time = 60.0f);
+    void simulate(float max_distance, float dt = 0.001f, float max_time = 60.0f);
 
     /**
      * @brief Simulate trajectory with wind generator sampling
@@ -138,17 +137,15 @@ namespace btk::ballistics
      * @param dt Time step for simulation in s
      * @param max_time Maximum simulation time in s
      * @param wind_gen Wind generator for position/time-dependent wind
-     * @return Const reference to trajectory object containing all simulation points
      */
-    const Trajectory& simulate(float max_distance, float dt, float max_time, const btk::physics::WindGenerator& wind_gen);
+    void simulate(float max_distance, float dt, float max_time, const btk::physics::WindGenerator& wind_gen);
 
     /**
      * @brief Advance simulation by one time step
      *
      * @param dt Time step in s
-     * @return Const reference to the updated current bullet state
      */
-    const Bullet& timeStep(float dt);
+    void timeStep(float dt);
 
     // State queries
     /**
@@ -170,7 +167,8 @@ namespace btk::ballistics
      *
      * @return Reference to the trajectory object
      */
-    const Trajectory& getTrajectory() const;
+    Trajectory& getTrajectory() {return trajectory_;};
+    const Trajectory& getTrajectory() const {return trajectory_;};
 
     // Aerodynamic parameter setters
     void setLiftSlopePerRad(float value) { lift_slope_per_rad_ = value; }

@@ -447,7 +447,7 @@ export class SteelTarget
   hitBullet(bullet)
   {
     if (!this.steelTarget) return;
-    this.steelTarget.hitBullet(bullet);
+    this.steelTarget.hit(bullet);
   }
 
   /**
@@ -586,6 +586,41 @@ export class SteelTargetFactory
   }
 
   /**
+   * Step physics for all targets
+   * @param {number} dt - Time step in seconds
+   */
+  static stepPhysics(dt)
+  {
+    for (const target of SteelTargetFactory.targets)
+    {
+      target.steelTarget.timeStep(dt);
+    }
+  }
+
+  /**
+   * Update display/rendering for all targets (no physics)
+   */
+  static updateDisplay()
+  {
+    for (const target of SteelTargetFactory.targets)
+    {
+      if (!target)
+      {
+        console.error('[SteelTargetFactory] Null target in targets array!');
+        continue;
+      }
+      if (!target.steelTarget)
+      {
+        console.error('[SteelTargetFactory] Target has null steelTarget property!', target);
+        continue;
+      }
+      target.steelTarget.updateDisplay();
+      target.updateMesh();
+      target.updateChainLines();
+    }
+  }
+
+  /**
    * Get all targets
    * @returns {SteelTarget[]} Array of all active targets
    */
@@ -615,41 +650,5 @@ export class SteelTargetFactory
       return null;
     }
     return SteelTargetFactory.targets[index];
-  }
-
-  /**
-   * Find targets that intersect with a ray
-   * @param {THREE.Raycaster} raycaster - Raycaster to use for intersection test
-   * @returns {Array<{target: SteelTarget, intersection: THREE.Intersection}>} Array of hits
-   */
-  static findHits(raycaster)
-  {
-    const hits = [];
-    for (const target of SteelTargetFactory.targets)
-    {
-      const intersection = target.isHit(raycaster);
-      if (intersection)
-      {
-        hits.push(
-        {
-          target,
-          intersection
-        });
-      }
-    }
-    // Sort by distance (closest first)
-    hits.sort((a, b) => a.intersection.distance - b.intersection.distance);
-    return hits;
-  }
-
-  /**
-   * Get the closest target hit by a ray
-   * @param {THREE.Raycaster} raycaster - Raycaster to use for intersection test
-   * @returns {{target: SteelTarget, intersection: THREE.Intersection}|null} Closest hit or null
-   */
-  static findClosestHit(raycaster)
-  {
-    const hits = SteelTargetFactory.findHits(raycaster);
-    return hits.length > 0 ? hits[0] : null;
   }
 }

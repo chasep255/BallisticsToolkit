@@ -280,21 +280,16 @@ export class BallisticsEngine
       // Dispose varied bullet immediately - simulator has copied the data
       variedBullet.delete();
 
-      // Dispose previous trajectory before creating new one
-      if (this.lastTrajectory)
-      {
-        this.lastTrajectory.delete();
-      }
-
       // Sample wind at shooter position for logging
       const wind = sampleWindAtThreeJsPosition(this.windGenerator, 0, 0, 0);
       const windSpeedMph = Math.sqrt(wind.x ** 2 + wind.y ** 2 + wind.z ** 2);
       const windDirDeg = Math.atan2(wind.x, -wind.z) * 180 / Math.PI; // Angle from downrange
       console.log(`${LOG_PREFIX_SHOT} Wind at shooter: ${windSpeedMph.toFixed(1)}mph @ ${windDirDeg.toFixed(0)}°`);
 
-      // Simulate with wind generator
+      // Simulate with wind generator (trajectory is owned by simulator, get reference to it)
       const range_m = btk.Conversions.yardsToMeters(range);
-      this.lastTrajectory = this.ballisticSimulator.simulateWithWind(range_m, dt, 5.0, this.windGenerator);
+      this.ballisticSimulator.simulateWithWind(range_m, dt, 5.0, this.windGenerator);
+      this.lastTrajectory = this.ballisticSimulator.getTrajectory();
       const pointAtTarget = this.lastTrajectory.atDistance(range_m); // distance in meters
 
       if (!pointAtTarget)
@@ -634,10 +629,7 @@ export class BallisticsEngine
     {
       this.ballisticSimulator.delete();
     }
-    if (this.lastTrajectory)
-    {
-      this.lastTrajectory.delete();
-    }
+    // Note: lastTrajectory is owned by ballisticSimulator, don't delete it
 
     // Clear references
     this.ballisticSimulator = null;

@@ -90,7 +90,8 @@ namespace btk::match
     // Set the modified bullet as initial and wind, then fire
     simulator_.setInitialBullet(modified_bullet);
     simulator_.setWind(varied_wind);
-    btk::ballistics::Trajectory trajectory = simulator_.simulate(target_range_, timestep_);
+    simulator_.simulate(target_range_, timestep_);
+    btk::ballistics::Trajectory& trajectory = simulator_.getTrajectory();
 
     // Get impact at target range
     std::optional<btk::ballistics::TrajectoryPoint> impact_point = trajectory.atDistance(target_range_);

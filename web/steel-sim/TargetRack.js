@@ -128,12 +128,12 @@ export class TargetRack
     const totalTargets = this.targets.length;
     if (totalTargets === 0) return;
 
-    // Delete all existing steel targets
+    // Delete all existing steel targets (use factory to properly remove from array)
     for (const targetConfig of this.targets)
     {
       if (targetConfig.steelTarget)
       {
-        targetConfig.steelTarget.dispose();
+        SteelTargetFactory.delete(targetConfig.steelTarget);
         targetConfig.steelTarget = null;
       }
     }

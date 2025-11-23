@@ -41,6 +41,16 @@ import
   initConfig
 }
 from './config.js';
+import
+{
+  TimeManager
+}
+from './Time.js';
+import
+{
+  ShotFactory
+}
+from './Shot.js';
 
 // ===== GLOBAL STATE =====
 let btk = null;
@@ -51,12 +61,12 @@ let scope = null;
 let backgroundCamera = null; // Fixed camera for background scene
 let raycaster;
 let animationId = null;
-let lastTime = performance.now();
+let timeManager = null;
 let landscape = null;
 let scopeMode = false; // Whether mouse is controlling the scope
 let scopeLayer = null; // Store scope layer for bounds checking
 let windGenerator = null; // BTK WindGenerator instance
-let windStartTime = null; // Track elapsed time for wind generator
+let rifleZero = null; // Zeroed bullet configuration
 
 // ===== COORDINATE SYSTEM =====
 // BTK and Three.js use the SAME coordinate system:
@@ -74,6 +84,13 @@ async function init()
 
     // Initialize config with SI unit values
     initConfig();
+
+    // Initialize time manager
+    timeManager = new TimeManager();
+    timeManager.start();
+
+    // Compute rifle zero
+    computeRifleZero();
 
     setupScene();
     setupUI();
@@ -167,7 +184,6 @@ function setupScene()
 
   const windPresetName = presetNames.includes(Config.WIND_CONFIG.defaultPreset) ? Config.WIND_CONFIG.defaultPreset : presetNames[0];
   windGenerator = btk.WindPresets.getPreset(windPresetName, minCorner, maxCorner);
-  windStartTime = performance.now() / 1000; // Track start time in seconds
 
   // Clean up temporary vectors
   minCorner.delete();
@@ -210,7 +226,7 @@ function setupScene()
     initialLookAt:
     {
       x: 0,
-      y: 0,
+      y: Config.SHOOTER_HEIGHT, // Look at horizon (same height as camera)
       z: -Config.LANDSCAPE_CONFIG.groundLength
     },
     centerNormalized:
@@ -245,6 +261,10 @@ function setupScene()
   window.addEventListener('keydown', onKeyDown);
   document.addEventListener('pointerlockchange', onPointerLockChange);
   window.addEventListener('resize', onWindowResize);
+
+  // Initialize time manager
+  timeManager = new TimeManager();
+  timeManager.start();
 
   // Ensure renderer uses the final CSS size on first layout
   onWindowResize();
@@ -450,6 +470,62 @@ function onKeyDown(event)
   }
 }
 
+// ===== RIFLE ZEROING =====
+
+/**
+ * Compute rifle zero at 100 yards with 2" scope height
+ * Stores a zeroed bullet configuration that can be rotated for shots
+ */
+function computeRifleZero()
+{
+
+  // Create base bullet from config
+  const baseBullet = new btk.Bullet(
+    Config.BULLET_MASS,
+    Config.BULLET_DIAMETER,
+    Config.BULLET_LENGTH,
+    Config.BULLET_BC,
+    btk.DragFunction.G7
+  );
+
+  // Create atmosphere (standard conditions)
+  const atmosphere = new btk.Atmosphere();
+
+  // Zero range: 100 yards downrange
+  const zeroRange_m = btk.Conversions.yardsToMeters(100);
+  
+  // Scope height: 2 inches above bore
+  const scopeHeight_m = btk.Conversions.inchesToMeters(2);
+
+  // Target position in LOCAL coordinates (origin at bore)
+  // Target is at scope height above bore, at zero range downrange
+  const targetPos = new btk.Vector3D(0, scopeHeight_m, -zeroRange_m);
+
+  // Muzzle velocity from config
+  const muzzleVel_mps = Config.BULLET_SPEED_MPS;
+
+  // TEST: Skip computeZero and just use a horizontal velocity
+  // This tests if the scope rotation is working correctly
+  const testVelocity = new btk.Vector3D(
+    0,              // x: no crossrange
+    0,              // y: perfectly horizontal
+    -muzzleVel_mps  // z: full velocity downrange
+  );
+
+  // Store the test configuration
+  rifleZero = {
+    bullet: baseBullet,
+    zeroedVelocity: testVelocity,
+    atmosphere: atmosphere,
+    scopeHeight_m: scopeHeight_m
+  };
+
+
+  // Cleanup
+  targetPos.delete();
+  baseBullet.delete();
+}
+
 function createBullet(impactPoint, shooterPos)
 {
   // All positions are btk.Vector3D (SI units)
@@ -488,54 +564,67 @@ function createBullet(impactPoint, shooterPos)
 
 function fireFromScope()
 {
-  // Cast ray from scope camera center (reticle crosshair)
+  if (!rifleZero)
+  {
+    console.warn('[fireFromScope] Rifle not zeroed yet');
+    return;
+  }
+
+  // Get scope camera
   const scopeCamera = scope.getCamera();
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), scopeCamera);
 
-  // Check for target hit
-  const allTargets = TargetRackFactory.getAllTargets();
-  const intersects = allTargets.length > 0 ? raycaster.intersectObjects(allTargets.map(t => t.mesh)) : [];
-  if (intersects.length > 0)
-  {
-    const hitTarget = allTargets.find(t => t.mesh === intersects[0].object);
-    if (hitTarget)
-    {
-      // Three.js scene is in meters (SI units) - no conversion needed
-      const impactPointThree = intersects[0].point;
-      const impactPoint = new btk.Vector3D(
-        impactPointThree.x,
-        impactPointThree.y,
-        impactPointThree.z
-      );
-      const shooterPos = new btk.Vector3D(
-        scopeCamera.position.x,
-        scopeCamera.position.y,
-        scopeCamera.position.z
-      );
+  // Scope position (eye level)
+  const scopePosThree = scopeCamera.position;
+  
+  // Bore position is 2" below scope (bullet launches from bore, not scope)
+  const boreOffset_m = -rifleZero.scopeHeight_m; // Negative Y because bore is below scope
+  const borePosThree = new THREE.Vector3(
+    scopePosThree.x,
+    scopePosThree.y + boreOffset_m,
+    scopePosThree.z
+  );
+  const borePos = new btk.Vector3D(
+    borePosThree.x,
+    borePosThree.y,
+    borePosThree.z
+  );
 
-      const bullet = createBullet(impactPoint, shooterPos);
+  // Rotate the zeroed velocity by the scope's orientation
+  // The zeroed velocity is computed for shooting straight ahead (down -Z axis)
+  // We need to rotate it by the scope's current orientation quaternion
+  
+  const zeroVel = rifleZero.zeroedVelocity;
+  
+  // Create Three.js vector from zeroed velocity (BTK coords: x=cross, y=up, z=-down)
+  const zeroVelThree = new THREE.Vector3(zeroVel.x, zeroVel.y, zeroVel.z);
+  
+  // Rotate by scope orientation
+  zeroVelThree.applyQuaternion(scopeCamera.quaternion);
+  
+  // Convert back to BTK Vector3D
+  const initialVelocity = new btk.Vector3D(zeroVelThree.x, zeroVelThree.y, zeroVelThree.z);
 
-      hitTarget.hitBullet(bullet);
-      hitTarget.updateTexture();
-      createMetallicDustCloud(impactPoint);
 
-      // Cleanup
-      bullet.delete();
-      impactPoint.delete();
-      shooterPos.delete();
-      return;
-    }
-  }
+  // Create bullet params
+  const bulletParams = {
+    mass: Config.BULLET_MASS,
+    diameter: Config.BULLET_DIAMETER,
+    length: Config.BULLET_LENGTH,
+    bc: Config.BULLET_BC,
+    dragFunction: 'G7'
+  };
 
-  // No target hit - check landscape
-  if (landscape)
-  {
-    const landscapeIntersect = landscape.intersectRaycaster(raycaster);
-    if (landscapeIntersect)
-    {
-      createDustCloud(landscapeIntersect.point);
-    }
-  }
+  // Create shot from bore position (2" below scope)
+  ShotFactory.create({
+    initialPosition: borePos,
+    initialVelocity: initialVelocity,
+    bulletParams: bulletParams,
+    atmosphere: rifleZero.atmosphere,
+    windGenerator: windGenerator,
+    scene: scene,
+    shadowsEnabled: true
+  });
+
 }
 
 // ===== DUST CLOUD EFFECTS =====
@@ -595,22 +684,173 @@ function resetTarget()
 
 // ===== ANIMATION LOOP =====
 
+// ===== COLLISION DETECTION =====
+
+/**
+ * Check for bullet-target collisions
+ */
+function checkBulletTargetCollisions()
+{
+  const shots = ShotFactory.getShots();
+  const targets = SteelTargetFactory.getAll();
+
+  for (const shot of shots)
+  {
+    const trajectory = shot.getTrajectory();
+    if (!trajectory) continue;
+
+    let earliestHit = null;
+    let earliestTarget = null;
+
+    // Check against all targets
+    for (const target of targets)
+    {
+      const hit = target.steelTarget.intersectTrajectory(trajectory);
+      if (hit !== undefined && hit !== null)
+      {
+        if (!earliestHit || hit.time_s_ < earliestHit.time_s_)
+        {
+          earliestHit = hit;
+          earliestTarget = target;
+        }
+      }
+    }
+
+    // Apply earliest hit
+    if (earliestHit && earliestTarget)
+    {
+      // Get the bullet state at impact from the TrajectoryPoint
+      const impactBullet = earliestHit.getState();
+      const impactPosition = impactBullet.getPosition();
+
+      // Debug: Print first point in trajectory
+      const trajectory = shot.getTrajectory();
+
+      // Apply impact to target
+      earliestTarget.steelTarget.hit(impactBullet);
+      earliestTarget.updateTexture();
+
+      // Create dust cloud at impact position
+      createMetallicDustCloud(impactPosition);
+
+      // Mark shot as dead
+      shot.markDead();
+
+      // Cleanup
+      impactPosition.delete();
+      earliestHit.delete();
+    }
+  }
+}
+
+/**
+ * Check for bullet-ground collisions
+ */
+function checkBulletGroundCollisions()
+{
+  const shots = ShotFactory.getShots();
+
+  for (const shot of shots)
+  {
+    const currentBullet = shot.getCurrentBullet();
+    if (!currentBullet) continue;
+
+    const pos = currentBullet.getPosition();
+    
+    // Check if bullet is below ground (y < 0)
+    if (pos.y < 0)
+    {
+      // Step back through trajectory to find where it crossed y=0
+      const trajectory = shot.getTrajectory();
+      if (trajectory)
+      {
+        
+        const currentTime = shot.currentTime;
+        const searchStep = 0.001; // 1ms steps backward
+        let impactPoint = null;
+
+        // Search backward from current time
+        for (let t = currentTime; t >= 0; t -= searchStep)
+        {
+          const optPoint = trajectory.atTime(t);
+          if (optPoint !== undefined && optPoint !== null)
+          {
+            const testPos = optPoint.getState().getPosition();
+            if (testPos.y >= 0)
+            {
+              // Found the crossing point - use this position
+              impactPoint = new btk.Vector3D(testPos.x, 0, testPos.z); // Clamp y to 0
+              testPos.delete();
+              optPoint.delete();
+              break;
+            }
+            testPos.delete();
+            optPoint.delete();
+          }
+        }
+
+        // Create dust cloud at impact point
+        if (impactPoint)
+        {
+          createDustCloud(impactPoint);
+          impactPoint.delete();
+        }
+        else
+        {
+          // Fallback: use current position clamped to ground
+          const fallbackPoint = new btk.Vector3D(pos.x, 0, pos.z);
+          createDustCloud(fallbackPoint);
+          fallbackPoint.delete();
+        }
+      }
+
+      // Mark shot as dead (will be disposed by ShotFactory.updateAll)
+      shot.markDead();
+    }
+
+    pos.delete();
+  }
+}
+
+// ===== MAIN ANIMATION LOOP =====
+
 function animate()
 {
   animationId = requestAnimationFrame(animate);
 
-  const currentTime = performance.now();
-  const dt = Math.min((currentTime - lastTime) / 1000, 1 / 30);
-  lastTime = currentTime;
+  // Update time manager
+  timeManager.update();
+  const dt = timeManager.getDeltaTime();
 
-  // Advance wind generator time
-  if (windGenerator && windStartTime !== null)
+  // Break dt into fixed-size substeps (max 5ms each)
+  const numSubsteps = Math.ceil(dt / Config.INTEGRATION_STEP_S);
+  const stepDt = dt / numSubsteps;
+
+  for (let i = 0; i < numSubsteps; i++)
   {
-    const elapsedTime = (currentTime / 1000) - windStartTime;
-    windGenerator.advanceTime(elapsedTime);
+    // Update wind generator time
+    if (windGenerator)
+    {
+      windGenerator.advanceTime(timeManager.getElapsedTime());
+    }
+
+    // Update active bullets (physics)
+    ShotFactory.updateAll(stepDt);
+
+    // Check collisions
+    checkBulletTargetCollisions();
+    checkBulletGroundCollisions();
+
+    // Clean up dead shots
+    ShotFactory.cleanupDeadShots();
+
+    // Step all steel target physics
+    SteelTargetFactory.stepPhysics(stepDt);
   }
 
-  SteelTargetFactory.updateAll(dt);
+  // Update visual animations
+  ShotFactory.updateAnimations();
+  SteelTargetFactory.updateDisplay();
   DustCloudFactory.updateAll(windGenerator, dt);
   WindFlagFactory.updateAll(windGenerator, dt);
 

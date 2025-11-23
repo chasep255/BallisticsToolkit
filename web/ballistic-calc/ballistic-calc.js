@@ -99,8 +99,9 @@ function calculateTrajectory()
   simulator.setWind(windVector);
   windVector.delete(); // Dispose Vector3D to prevent memory leak
 
-  // Simulate trajectory
-  const trajectoryObj = simulator.simulate(maxRange, 0.001, 60.0);
+  // Simulate trajectory (trajectory is owned by simulator, get reference to it)
+  simulator.simulate(maxRange, 0.001, 60.0);
+  const trajectoryObj = simulator.getTrajectory();
 
   // Extract trajectory points at specified intervals
   const trajectory = [];
@@ -143,7 +144,7 @@ function calculateTrajectory()
   displayResults(trajectory);
 
   // Dispose BTK objects to prevent memory leaks
-  trajectoryObj.delete();
+  // Note: trajectoryObj is owned by simulator, don't delete it
   simulator.delete();
   atmosphere.delete();
   bullet.delete();

@@ -179,7 +179,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getImpactAngle", &Trajectory::getImpactAngle)
     .function("clear", &Trajectory::clear);
 
-  // Register optional<TrajectoryPoint> binding
+  // Register optional bindings used by trajectories and intersection helpers
   register_optional<btk::ballistics::TrajectoryPoint>();
 
   // Ballistics Simulator class
@@ -194,8 +194,9 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getWind", &btk::ballistics::Simulator::getWind)
     .function("resetToInitial", &btk::ballistics::Simulator::resetToInitial)
     .function("computeZero", &btk::ballistics::Simulator::computeZero)
-    .function("simulate", select_overload<const Trajectory&(float, float, float)>(&btk::ballistics::Simulator::simulate))
-    .function("simulateWithWind", select_overload<const Trajectory&(float, float, float, const WindGenerator&)>(&btk::ballistics::Simulator::simulate))
+    .function("simulate", select_overload<void(float, float, float)>(&btk::ballistics::Simulator::simulate))
+    .function("simulateWithWind", select_overload<void(float, float, float, const WindGenerator&)>(&btk::ballistics::Simulator::simulate))
+    .function("getTrajectory", select_overload<Trajectory&()>(&btk::ballistics::Simulator::getTrajectory), return_value_policy::reference())
     .function("timeStep", &btk::ballistics::Simulator::timeStep);
 
   // Target class
@@ -315,20 +316,14 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .field("bulletDiameter", &btk::rendering::SteelTarget::Impact::bullet_diameter_)
     .field("timestamp", &btk::rendering::SteelTarget::Impact::timestamp_s_);
 
-  // Steel Target - Intersection Result
-  value_object<btk::rendering::SteelTarget::IntersectionResult>("IntersectionResult")
-    .field("hit", &btk::rendering::SteelTarget::IntersectionResult::hit)
-    .field("impactPoint", &btk::rendering::SteelTarget::IntersectionResult::impact_point_)
-    .field("impactVelocity", &btk::rendering::SteelTarget::IntersectionResult::impact_velocity_)
-    .field("surfaceNormal", &btk::rendering::SteelTarget::IntersectionResult::surface_normal_)
-    .field("impactTime", &btk::rendering::SteelTarget::IntersectionResult::impact_time_s_)
-    .field("bulletMass", &btk::rendering::SteelTarget::IntersectionResult::bullet_mass_kg_)
-    .field("bulletDiameter", &btk::rendering::SteelTarget::IntersectionResult::bullet_diameter_);
+  // Steel Target - Raycast hit
+  value_object<btk::rendering::SteelTarget::RaycastHit>("SteelTargetRaycastHit")
+    .field("pointWorld", &btk::rendering::SteelTarget::RaycastHit::point_world_)
+    .field("normalWorld", &btk::rendering::SteelTarget::RaycastHit::normal_world_)
+    .field("distanceM", &btk::rendering::SteelTarget::RaycastHit::distance_m_);
 
-  // Register optional<IntersectionResult>
-  register_optional<btk::rendering::SteelTarget::IntersectionResult>();
-
-  // Register vectors for SteelTarget
+  // Register optional<RaycastHit> and vectors for SteelTarget
+  register_optional<btk::rendering::SteelTarget::RaycastHit>();
   register_vector<btk::rendering::SteelTarget::ChainAnchor>("ChainAnchorVector");
   register_vector<btk::rendering::SteelTarget::Impact>("ImpactVector");
 
@@ -337,8 +332,9 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .constructor<float, float, float, bool>()
     .constructor<float, float, float, bool, const btk::math::Vector3D&, const btk::math::Vector3D&>()
     .function("addChainAnchor", &btk::rendering::SteelTarget::addChainAnchor)
-    .function("hit", select_overload<bool(const btk::ballistics::Trajectory&)>(&btk::rendering::SteelTarget::hit))
-    .function("hitBullet", select_overload<void(const btk::ballistics::Bullet&)>(&btk::rendering::SteelTarget::hit))
+    .function("hit", &btk::rendering::SteelTarget::hit)
+    .function("intersectSegment", &btk::rendering::SteelTarget::intersectSegment)
+    .function("intersectTrajectory", &btk::rendering::SteelTarget::intersectTrajectory)
     .function("timeStep", &btk::rendering::SteelTarget::timeStep)
     .function("getImpacts", &btk::rendering::SteelTarget::getImpacts)
     .function("getAnchors", &btk::rendering::SteelTarget::getAnchors)
