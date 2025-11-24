@@ -37,12 +37,12 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Immersive Environment** - Procedural terrain, dynamic audio, comprehensive HUD
 - **Debug Mode** - Add `?debug=1` to URL for rapid testing (1-min relays, 2 shots)
 
-### 🔩 Steel Target Simulator *(Under Construction)*
-- **Interactive Shooting Simulator** - Shoot at reactive steel targets with full ballistics simulation including trajectory calculation, wind effects, and spin dynamics
-- **Realistic Ballistics** - 4DOF trajectory simulation with G1/G7 drag models, atmospheric compensation, wind effects, spin drift, and crosswind jump. Muzzle velocity variation and rifle accuracy simulate real-world shot-to-shot variability
-- **Target Physics** - Realistic steel target dynamics with chain constraints, momentum transfer, and bullet impact visualization. Targets respond to center hits with linear motion and edge hits with rotation
-- **Range** - Multiple target racks from 100 to 2000 yards with various target sizes.
-- **Scope Interaction** - Mouse-based scope controls: click scope to enter, mouse move to pan, scroll wheel to zoom (4X to 40X), click to fire. FFP reticle scales with zoom maintaining MRAD subtensions
+### 🔩 Steel Target Simulator *(Under Construction – Early Preview)*
+- **Interactive Steel Range** - Early-preview shooting simulator with reactive steel targets and full ballistics. Multiple target racks from 100 to 1760 yards (1 mile) with plates from ~2″ chips to large 6‑ft gongs.
+- **Realistic Ballistics** - 4DOF trajectory simulation with G1/G7 drag models, wind presets, spin drift, and crosswind jump. Muzzle velocity variation (MV σ) and rifle accuracy (MOA) model real-world shot-to-shot spreads.
+- **Target Physics** - Steel targets hang from virtual chains with momentum transfer, damping, and rotation. Center hits drive linear swing; edge hits kick targets into rotation. Impacts leave visible mark splatter and spawn metal dust.
+- **Wind & Environment** - 3D landscape with wind flags along the range driven by the same curl‑noise wind field used for the ballistics engine. Brown ground dust when you miss; silver‑gray metallic dust when you hit steel.
+- **Scope & HUD Interaction** - Mouse-based FFP scope with pointer lock: click scope to enter, move mouse to pan, wheel or `+`/`-` to zoom (4×–40×), click to fire, `Esc` to exit. MRAD elevation/windage dials adjust point of impact with arrow keys (Shift for 1.0 mrad steps), with a HUD readout showing current dial settings.
 
 ## Quick Start
 

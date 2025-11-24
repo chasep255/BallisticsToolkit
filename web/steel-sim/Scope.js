@@ -80,6 +80,15 @@ export class Scope
     this.yaw = 0;
     this.pitch = 0;
 
+    // Scope dial adjustments (integer clicks to avoid floating-point errors)
+    this.elevationClicks = 0; // Positive = dial up (bullet impacts high)
+    this.windageClicks = 0;   // Positive = dial right (bullet impacts right)
+    
+    // Dial constants
+    this.CLICK_VALUE_MRAD = 0.1; // Each click is 0.1 MRAD
+    this.maxDialMRAD = config.maxDialMRAD || 30.0; // Maximum dial adjustment in MRAD (±30 MRAD default)
+    this.maxDialClicks = Math.floor(this.maxDialMRAD / this.CLICK_VALUE_MRAD);
+
     // Shooter position
     this.cameraPosition = config.cameraPosition ||
     {
@@ -434,8 +443,8 @@ export class Scope
   {
     const maxExtentMrad = 10.0; // how far ticks extend from center in mrad
 
-    const mainLineThicknessMrad = 0.1;
-    const minorLineThicknessMrad = 0.05;
+    const mainLineThicknessMrad = 0.06;
+    const minorLineThicknessMrad = 0.03;
 
     // Main crosshair lines (through center)
     this.addLineMrad(-maxExtentMrad, 0, maxExtentMrad, 0, mainLineThicknessMrad);
@@ -562,6 +571,81 @@ export class Scope
   getCamera()
   {
     return this.camera;
+  }
+
+  // ===== SCOPE DIAL METHODS =====
+
+  /**
+   * Dial scope up (increase elevation - bullet impacts higher)
+   * @param {number} clicks - Number of clicks to dial (default 1)
+   */
+  dialUp(clicks = 1)
+  {
+    const newClicks = this.elevationClicks + clicks;
+    if (Math.abs(newClicks) <= this.maxDialClicks)
+    {
+      this.elevationClicks = newClicks;
+    }
+  }
+
+  /**
+   * Dial scope down (decrease elevation - bullet impacts lower)
+   * @param {number} clicks - Number of clicks to dial (default 1)
+   */
+  dialDown(clicks = 1)
+  {
+    const newClicks = this.elevationClicks - clicks;
+    if (Math.abs(newClicks) <= this.maxDialClicks)
+    {
+      this.elevationClicks = newClicks;
+    }
+  }
+
+  /**
+   * Dial scope left (decrease windage - bullet impacts left)
+   * @param {number} clicks - Number of clicks to dial (default 1)
+   */
+  dialLeft(clicks = 1)
+  {
+    const newClicks = this.windageClicks - clicks;
+    if (Math.abs(newClicks) <= this.maxDialClicks)
+    {
+      this.windageClicks = newClicks;
+    }
+  }
+
+  /**
+   * Dial scope right (increase windage - bullet impacts right)
+   * @param {number} clicks - Number of clicks to dial (default 1)
+   */
+  dialRight(clicks = 1)
+  {
+    const newClicks = this.windageClicks + clicks;
+    if (Math.abs(newClicks) <= this.maxDialClicks)
+    {
+      this.windageClicks = newClicks;
+    }
+  }
+
+  /**
+   * Reset dial to zero
+   */
+  resetDial()
+  {
+    this.elevationClicks = 0;
+    this.windageClicks = 0;
+  }
+
+  /**
+   * Get current dial position in MRAD
+   * @returns {Object} {elevation: number, windage: number} in MRAD
+   */
+  getDialPositionMRAD()
+  {
+    return {
+      elevation: this.elevationClicks * this.CLICK_VALUE_MRAD,
+      windage: this.windageClicks * this.CLICK_VALUE_MRAD
+    };
   }
 
   render()

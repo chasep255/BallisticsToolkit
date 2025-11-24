@@ -42,6 +42,11 @@ import
 from './RangeSign.js';
 import
 {
+  HUD
+}
+from './HUD.js';
+import
+{
   Config,
   initConfig
 }
@@ -119,6 +124,9 @@ class SteelSimulator
     // Scope and shooting
     this.scopeMode = false;
     this.rifleZero = null;
+    
+    // HUD
+    this.hud = null;
 
     // Physics and effects
     this.windGenerator = null;
@@ -232,23 +240,29 @@ class SteelSimulator
       this.landscape.dispose();
       this.landscape = null;
     }
+    
+    // Dispose modules that own their own resources
+    if (this.hud)
+    {
+      this.hud.dispose();
+      this.hud = null;
+    }
     if (this.scope)
     {
-      // Scope cleanup if needed
+      this.scope.dispose();
       this.scope = null;
     }
+    
+    // Dispose CompositionRenderer (handles render targets, composition scene)
     if (this.compositionRenderer)
     {
-      // CompositionRenderer cleanup if needed
+      this.compositionRenderer.dispose();
       this.compositionRenderer = null;
     }
-    if (this.scene)
-    {
-      // Scene will be garbage collected
-      this.scene = null;
-    }
 
-    // Clear references (but keep btk - it's a global module)
+    // Clear remaining references
+    this.scene = null;
+    this.camera = null;
     this.timeManager = null;
   }
 
@@ -373,9 +387,18 @@ class SteelSimulator
     {
       canvas: this.canvas
     });
+    
+    // Get aspect for element positioning
+    const aspect = this.compositionRenderer.getAspect();
+    
+    // Create HUD overlay
+    this.hud = new HUD({
+      compositionScene: this.compositionRenderer.compositionScene,
+      compositionCamera: this.compositionRenderer.compositionCamera
+    });
+    this.hud.updatePositions();
 
     // Create background 3D scene layer (covers full screen)
-    const aspect = this.compositionRenderer.getAspect();
     this.backgroundElement = this.compositionRenderer.createElement(0, 0, 2 * aspect, 2,
     {
       renderOrder: 0
@@ -541,6 +564,12 @@ class SteelSimulator
     // Layer-specific resize callbacks (like Scope) are invoked by the
     // CompositionRenderer itself.
     this.compositionRenderer.handleResize(width, height);
+    
+    // Update HUD positions (reads from updated camera bounds)
+    if (this.hud)
+    {
+      this.hud.updatePositions();
+    }
   }
 
   // ===== TARGET RACK CREATION =====
@@ -736,6 +765,44 @@ class SteelSimulator
         this.scope.zoomOut();
         return;
       }
+      
+      // R key: Reset scope dial to zero
+      if (event.key === 'r' || event.key === 'R')
+      {
+        event.preventDefault();
+        this.scope.resetDial();
+        return;
+      }
+      
+      // Arrow keys: Dial adjustments
+      // Shift + Arrow: 1.0 MRAD (10 clicks)
+      // Arrow alone: 0.1 MRAD (1 click)
+      const clicks = event.shiftKey ? 10 : 1;
+      
+      if (event.key === 'ArrowUp')
+      {
+        event.preventDefault();
+        this.scope.dialUp(clicks);
+        return;
+      }
+      if (event.key === 'ArrowDown')
+      {
+        event.preventDefault();
+        this.scope.dialDown(clicks);
+        return;
+      }
+      if (event.key === 'ArrowLeft')
+      {
+        event.preventDefault();
+        this.scope.dialLeft(clicks);
+        return;
+      }
+      if (event.key === 'ArrowRight')
+      {
+        event.preventDefault();
+        this.scope.dialRight(clicks);
+        return;
+      }
     }
   }
 
@@ -774,6 +841,11 @@ class SteelSimulator
     const mvVariationMps = (Math.random() - 0.5) * 2.0 * this.mvSd_mps;
     const actualMVMps = this.mv_mps + mvVariationMps;
 
+    // Get scope dial position (in MRAD)
+    const dialPos = this.scope.getDialPositionMRAD();
+    const dialElevationRad = dialPos.elevation * 0.001; // MRAD to radians
+    const dialWindageRad = dialPos.windage * 0.001;     // MRAD to radians
+
     // Rifle accuracy as uniform distribution within a circle (diameter)
     // Generate random point within unit circle using rejection sampling
     let accuracyX, accuracyY;
@@ -799,12 +871,16 @@ class SteelSimulator
     const zeroVelMag = zeroVelThree.length();
     const unitDir = zeroVelThree.normalize();
 
-    // Apply accuracy errors as small angular adjustments
-    // Accuracy errors are applied as yaw (around Y axis) and pitch (around X axis)
-    const cosYaw = Math.cos(accuracyErrorH);
-    const sinYaw = Math.sin(accuracyErrorH);
-    const cosPitch = Math.cos(accuracyErrorV);
-    const sinPitch = Math.sin(accuracyErrorV);
+    // Apply dial and accuracy errors as small angular adjustments
+    // Combine dial adjustments with accuracy errors
+    // Note: Invert elevation sign - dialing up should raise impact point
+    const totalYawAdjustment = dialWindageRad + accuracyErrorH;
+    const totalPitchAdjustment = -dialElevationRad + accuracyErrorV;
+    
+    const cosYaw = Math.cos(totalYawAdjustment);
+    const sinYaw = Math.sin(totalYawAdjustment);
+    const cosPitch = Math.cos(totalPitchAdjustment);
+    const sinPitch = Math.sin(totalPitchAdjustment);
 
     // Rotate unit direction: yaw around Y, then pitch around X
     const rx = unitDir.x * cosYaw - unitDir.z * sinYaw;
@@ -1057,6 +1133,13 @@ class SteelSimulator
 
     // Composite everything to screen
     this.compositionRenderer.render();
+
+    // Update HUD with current scope dial position
+    if (this.hud && this.scope)
+    {
+      const dialPos = this.scope.getDialPositionMRAD();
+      this.hud.updateDial(dialPos.elevation, dialPos.windage);
+    }
 
     // Track FPS
     const frameEndTime = performance.now();

@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Steel Target Simulator - Physics Testing | Ballistics Toolkit</title>
-  <meta name="description" content="Interactive steel target physics simulator. Test realistic target physics with chain constraints, damping, and bullet impacts.">
-  <meta name="keywords" content="steel target, physics simulation, target dynamics, shooting simulator, ballistics">
+  <title>Steel Target Simulator - Early Preview Steel Range | Ballistics Toolkit</title>
+  <meta name="description" content="Early-preview interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile).">
+  <meta name="keywords" content="steel target, physics simulation, target dynamics, shooting simulator, ballistics, long range, 1 mile">
   <link rel="canonical" href="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
   
   <!-- Open Graph / Facebook -->
@@ -31,8 +31,8 @@
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Steel Target Simulator",
-    "description": "Interactive steel target physics simulator with realistic dynamics",
+    "name": "Steel Target Simulator (Early Preview)",
+    "description": "Interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile).",
     "url": "https://www.ballisticstoolkit.com/steel-sim/steel-sim.html",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Web Browser",
@@ -61,7 +61,7 @@
   <div class="app-container">
     <h1>🔩 Steel Target Simulator</h1>
     <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 12px; margin: 20px 0; color: #856404;">
-      <strong>⚠️ Under Construction:</strong> Interactive shooting simulator with realistic ballistics and steel target physics. Shoot at reactive targets from 100 to 2000 yards with full trajectory simulation, wind effects, and realistic target dynamics. Currently under development.
+      <strong>⚠️ Under Construction (Early Preview):</strong> Playable interactive steel range with full ballistics and steel target physics. Shoot from 100 to 1760 yards (1 mile) at reactive racks using a pointer-lock FFP scope, MRAD dials, wind presets, and realistic impact visuals. Expect UI and content to change as development continues.
     </div>
 
     <!-- Bullet Parameters -->
@@ -137,7 +137,10 @@
       <!-- Quick Key Guide -->
       <div class="quick-keys">
         <div class="quick-keys-section">
-          <strong>Scope:</strong> Click scope to enter • Mouse move to pan • <kbd>Wheel</kbd> or <kbd>+</kbd><kbd>-</kbd> Zoom • Click to fire • <kbd>Esc</kbd> to exit
+          <strong>Scope:</strong> Click scope to enter • Move mouse to pan • <kbd>Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> zoom (4×–40×) • Click to fire • <kbd>Esc</kbd> to exit scope mode
+        </div>
+        <div class="quick-keys-section">
+          <strong>Dials & View (in scope):</strong> <kbd>Arrow</kbd> keys adjust MRAD dial (0.1 mrad per press, hold <kbd>Shift</kbd> for 1.0 mrad) • <kbd>R</kbd> reset dial to zero • <kbd>S</kbd> toggle scope overlay
         </div>
       </div>
     </div>
@@ -153,7 +156,7 @@
       <div class="help-modal-body">
         <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
           <h3 style="margin-top: 0;">Overview</h3>
-          <p>Steel Target Simulator is an interactive shooting simulator with realistic ballistics and steel target physics. Shoot at reactive steel targets at distances from 100 to 2000 yards with full trajectory simulation including wind effects, spin dynamics, and realistic target responses to bullet impacts. Currently under development.</p>
+          <p>Steel Target Simulator is an early-preview interactive steel range with full ballistics and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and realistic target responses to bullet impacts. A pointer-lock FFP scope, MRAD dials, wind flags, dust/metal effects, and a simple HUD make it a playable prototype while UI and content are still evolving.</p>
         </div>
         
         <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
@@ -170,22 +173,30 @@
             <strong>Buttons:</strong><br>
             - <strong>Start:</strong> Initialize the simulator and begin shooting<br>
             - <strong>Restart:</strong> Restart the simulator with current parameters<br>
-            - <strong>Help:</strong> Show this help dialog<br><br>
+            - <strong>Help:</strong> Show this help dialog<br>
+            - Settings (bullet, rifle, wind, zero) are automatically saved and restored using cookies on reload<br><br>
             
             <strong>Rifle Scope:</strong><br>
             - Click inside the scope circle to enter scope mode (pointer lock activates)<br>
             - Move mouse to pan/aim the scope (reticle moves with cursor at 1:1 speed)<br>
             - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (4X to 40X magnification)<br>
             - Click to fire bullet from scope crosshair<br>
-            - <kbd>Esc</kbd> to exit scope mode<br>
-            - FFP reticle scales with zoom (maintains MRAD subtensions)
+            - <kbd>Esc</kbd> to exit scope mode (releases pointer lock)<br>
+            - <kbd>S</kbd> toggle scope overlay visibility on/off<br>
+            - FFP reticle scales with zoom (maintains MRAD subtensions)<br><br>
+
+            <strong>MRAD Dial Controls (only in scope mode):</strong><br>
+            - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation up/down (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad)<br>
+            - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage left/right (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad)<br>
+            - <kbd>R</kbd> reset both elevation and windage dials to zero<br>
+            - The HUD in the upper-right shows current elevation and windage dial values in mrad
           </div>
         </div>
         
         <div class="help-section">
           <h3>Targets & Physics</h3>
           <div class="param-help">
-            <strong>Target Racks:</strong> Multiple target racks positioned from 100 to 2000 yards with various target sizes and configurations. Targets include both rectangular and oval shapes with sizes ranging from 2" to 72" depending on distance and rack configuration.<br><br>
+            <strong>Target Racks:</strong> Multiple target racks positioned from 100 to 1760 yards (1 mile) with various target sizes and configurations. Targets include both rectangular and oval shapes with sizes ranging from ~2" chips up to large ~6‑ft gongs, roughly spanning 0.5–2+ MOA depending on distance and rack configuration.<br><br>
             <strong>Chain Mounting:</strong> Each target has two chains attached at the top, connecting to an overhead beam. Chains act as damped springs (10,000 N/m spring constant, 200 N·s/m damping) that dissipate energy to prevent bouncing.<br><br>
             <strong>Impact Physics:</strong> Bullet impacts transfer momentum to targets. Center hits cause mostly linear motion; edge hits create rotation. Smaller targets respond more dramatically than larger ones.<br><br>
             <strong>Damping:</strong> Linear damping (75% velocity per second) and angular damping (10% angular velocity per second) simulate air resistance and friction.
@@ -217,7 +228,7 @@
             <strong>Rifle Parameters:</strong><br>
             - <strong>MV σ:</strong> Muzzle velocity standard deviation in fps (lower = more consistent, typical values: 5-15 fps)<br>
             - <strong>Accuracy:</strong> Rifle+shooter precision in MOA (1 MOA ≈ 1" at 100 yards)<br>
-            - <strong>Zero Distance:</strong> Distance at which the rifle is zeroed in yards<br>
+            - <strong>Zero Distance:</strong> Distance at which the rifle is zeroed in yards (commonly 100 yards; a dedicated 100‑yard rack is included)<br>
             - <strong>Scope Height:</strong> Height of the scope above the bore in inches<br><br>
             
             <strong>Spin Effects:</strong> Spin drift and crosswind jump are modeled based on bullet spin rate calculated from barrel twist and muzzle velocity. Spin rate is recomputed for each shot based on actual muzzle velocity (accounting for MV variation).<br><br>
@@ -226,9 +237,9 @@
             
             <strong>Zeroing:</strong> Rifle is zeroed at the configured distance with scope height compensation. Zeroing calculates the initial launch angle needed to hit the target point-of-aim at zero distance. Zeroing is computed without spin effects for simplicity.<br><br>
             
-            <strong>Wind:</strong> Wind presets control atmospheric conditions affecting bullet trajectory throughout the flight path. Wind flags along the range show wind direction and intensity at multiple distances. Wind affects bullet trajectory, not just dust particles.<br><br>
+            <strong>Wind:</strong> Wind presets (selected in the UI) control atmospheric conditions affecting bullet trajectory throughout the full 3D flight path. Wind flags along the range show wind direction and intensity at multiple distances. Wind affects bullet trajectory, not just dust particles.<br><br>
             
-            <strong>Settings:</strong> All parameters are automatically saved and restored on page reload.
+            <strong>Settings & HUD:</strong> All parameters are automatically saved and restored on page reload. The HUD in the upper-right displays current elevation and windage dial settings in mrad so you can track holds and adjustments.
           </div>
         </div>
         

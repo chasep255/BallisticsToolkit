@@ -391,6 +391,7 @@ export class CompositionRenderer
    */
   dispose()
   {
+    // Dispose tracked elements (render targets, geometries, materials)
     for (const element of this.elements.values())
     {
       this.compositionScene.remove(element.mesh);
@@ -398,8 +399,21 @@ export class CompositionRenderer
       element.material.dispose();
       element.renderTarget.dispose();
     }
-
     this.elements.clear();
-    this.renderer.dispose();
+
+    // Note: compositionScene contents (HUD, Scope overlays) are disposed by their owners
+    // Dispose the scene itself (clears children and internal structures)
+    if (this.compositionScene)
+    {
+      this.compositionScene.clear();
+      this.compositionScene = null;
+    }
+
+    // Dispose renderer
+    if (this.renderer)
+    {
+      this.renderer.dispose();
+      this.renderer = null;
+    }
   }
 }
