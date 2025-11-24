@@ -118,6 +118,13 @@ class SteelSimulator
 
     // Event handler references for cleanup
     this.boundHandlers = {};
+
+    // FPS tracking
+    this.fpsFrameCount = 0;
+    this.fpsStartTime = null;
+    this.fpsLastLogTime = null;
+    this.fpsLogInterval = 10.0; // Log every 10 seconds
+    this.fpsTotalFrameTime = 0; // Sum of all frame times for theoretical FPS
   }
 
   // ===== LIFECYCLE METHODS =====
@@ -873,8 +880,8 @@ class SteelSimulator
       // Check against all targets
       for (const target of targets)
       {
-        const hit = target.steelTarget.intersectTrajectory(trajectory);
-        if (hit !== undefined && hit !== null)
+        const hit = target.intersectTrajectory(trajectory);
+        if (hit)
         {
           if (!earliestHit || hit.time_s_ < earliestHit.time_s_)
           {
@@ -892,8 +899,7 @@ class SteelSimulator
         const impactPosition = impactBullet.getPosition();
 
         // Apply impact to target
-        earliestTarget.steelTarget.hit(impactBullet);
-        earliestTarget.updateTexture();
+        earliestTarget.hit(impactBullet);
 
         // Create dust cloud at impact position
         this.createMetallicDustCloud(impactPosition);
@@ -986,6 +992,8 @@ class SteelSimulator
   {
     if (!this.isRunning) return;
 
+    const frameStartTime = performance.now();
+
     this.animationId = requestAnimationFrame(() => this.animate());
 
     // Update time manager
@@ -1018,7 +1026,7 @@ class SteelSimulator
       SteelTargetFactory.stepPhysics(stepDt);
     }
 
-    // Update visual animations
+    // // Update visual animations
     ShotFactory.updateAnimations();
     SteelTargetFactory.updateDisplay();
     DustCloudFactory.updateAll(this.windGenerator, dt);
@@ -1036,6 +1044,38 @@ class SteelSimulator
 
     // Composite everything to screen
     this.compositionRenderer.render();
+
+    // Track FPS
+    const frameEndTime = performance.now();
+    const frameTime = frameEndTime - frameStartTime;
+    this.fpsTotalFrameTime += frameTime;
+    this.fpsFrameCount++;
+
+    // Initialize timing on first frame
+    if (this.fpsStartTime === null)
+    {
+      this.fpsStartTime = frameStartTime;
+      this.fpsLastLogTime = frameStartTime;
+    }
+
+    // Log FPS every 10 seconds
+    const timeSinceLastLog = (frameEndTime - this.fpsLastLogTime) / 1000.0;
+    if (timeSinceLastLog >= this.fpsLogInterval)
+    {
+      // Calculate actual FPS (frames rendered over wall clock time)
+      const actualFps = this.fpsFrameCount / timeSinceLastLog;
+
+      // Calculate theoretical FPS (if we rendered as fast as possible)
+      const avgFrameTime = this.fpsTotalFrameTime / this.fpsFrameCount;
+      const theoreticalFps = 1000.0 / avgFrameTime;
+
+      console.log(`FPS: Actual=${actualFps.toFixed(1)} (limited by requestAnimationFrame), Theoretical=${theoreticalFps.toFixed(1)} (if unlimited)`);
+
+      // Reset counters
+      this.fpsFrameCount = 0;
+      this.fpsLastLogTime = frameEndTime;
+      this.fpsTotalFrameTime = 0;
+    }
   }
 }
 

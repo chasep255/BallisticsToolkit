@@ -55,8 +55,6 @@ export class SteelTarget
     this.scene = scene;
     this.outwardOffset = outwardOffset; // Store for use in addChainAnchor
 
-    this.lastUpdateTime = performance.now();
-
     // Calculate attachment points based on shape
     // In new coordinate system: X=crossrange (width), Y=up (height), Z=thickness (normal direction)
     let attachmentX, attachmentY;
@@ -115,23 +113,6 @@ export class SteelTarget
     leftWorldFixed.delete();
     rightWorldFixed.delete();
 
-    // // Initial settle step: run physics in 1-second increments until target settles
-    // // Check after each step if target has stopped moving, stop early if settled
-    // // Maximum 30 seconds total
-    // const MAX_SETTLE_TIME = 30.0; // seconds
-    // const SETTLE_STEP_SIZE = 1.0; // seconds per step
-
-    // for (let elapsed = 0; elapsed < MAX_SETTLE_TIME; elapsed += SETTLE_STEP_SIZE)
-    // {
-    //   this.steelTarget.timeStep(SETTLE_STEP_SIZE);
-
-    //   // Check if target has stopped moving (C++ now tracks this)
-    //   if (!this.isMoving())
-    //   {
-    //     break; // Target has settled, stop early
-    //   }
-    // }
-
     // Create Three.js mesh
     this.mesh = this.createMesh();
 
@@ -182,8 +163,6 @@ export class SteelTarget
     geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
     geometry.computeVertexNormals();
-    geometry.computeBoundingBox();
-    geometry.computeBoundingSphere();
 
     // Get texture from C++ (already initialized with paint color)
     const textureData = this.steelTarget.getTexture();
@@ -198,14 +177,13 @@ export class SteelTarget
     texture.magFilter = THREE.LinearFilter;
 
     // Create material with texture.
+    // Use Lambert material for better performance (simpler lighting than Standard)
     // Render both sides so the back of the plate is visible when it swings,
     // but apply a small polygon offset so the plate as a whole wins the depth
     // test against the background terrain (reduces flicker/see-through).
-    const material = new THREE.MeshStandardMaterial(
+    const material = new THREE.MeshLambertMaterial(
     {
       map: texture,
-      metalness: 0.3,
-      roughness: 0.7,
       side: THREE.DoubleSide,
       depthTest: true,
       depthWrite: true,
@@ -235,15 +213,27 @@ export class SteelTarget
     // Chain radius from config (already in meters)
     const chainRadius = Config.TARGET_CONFIG.chainRadius;
 
-    // Create cylinder geometry for chains (will be resized in updateChainLines)
+    // Store base length for scaling (unit length = 1.0 meter)
+    this.chainBaseLength = 1.0;
+
+    // Create unit-length cylinder geometry (height = 1.0)
     // Use many segments (128) for very smooth appearance on thin cylinders
     // More segments = smoother curves, especially important when viewed from distance
-    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, 1, 128);
+    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, this.chainBaseLength, 128);
     chainGeometry.computeVertexNormals();
 
     // Use MeshPhysicalMaterial for better edge rendering and anti-aliasing
     // Physical material has better handling of thin geometry edges
-    const material = new THREE.MeshPhysicalMaterial(
+    const materialLeft = new THREE.MeshPhysicalMaterial(
+    {
+      color: 0x666666,
+      metalness: 0.6,
+      roughness: 0.5,
+      clearcoat: 0.1, // Slight clearcoat for metallic look
+      clearcoatRoughness: 0.3
+    });
+
+    const materialRight = new THREE.MeshPhysicalMaterial(
     {
       color: 0x666666,
       metalness: 0.6,
@@ -253,40 +243,14 @@ export class SteelTarget
     });
 
     // Left chain cylinder
-    const leftCylinder = new THREE.Mesh(chainGeometry.clone(), material);
+    const leftCylinder = new THREE.Mesh(chainGeometry.clone(), materialLeft);
     this.scene.add(leftCylinder);
 
     // Right chain cylinder
-    const rightCylinder = new THREE.Mesh(chainGeometry.clone(), material);
+    const rightCylinder = new THREE.Mesh(chainGeometry.clone(), materialRight);
     this.scene.add(rightCylinder);
 
     return [leftCylinder, rightCylinder];
-  }
-
-  /**
-   * Update physics and rendering (only if target is moving)
-   * @param {number} dt - Time step in seconds
-   */
-  update(dt)
-  {
-    if (!this.steelTarget) return;
-
-    // Skip updates for stationary targets (C++ tracks isMoving)
-    if (!this.steelTarget.isMoving())
-    {
-      return;
-    }
-
-    // Update physics (C++ will update isMoving flag)
-    this.steelTarget.timeStep(dt);
-
-    // Update mesh vertices
-    this.updateMesh();
-
-    // Update chain lines
-    this.updateChainLines();
-
-    this.lastUpdateTime = performance.now();
   }
 
   /**
@@ -296,6 +260,16 @@ export class SteelTarget
   isMoving()
   {
     return this.steelTarget ? this.steelTarget.isMoving() : false;
+  }
+
+  /**
+   * Step physics simulation
+   * @param {number} dt - Time step in seconds
+   */
+  stepPhysics(dt)
+  {
+    if (!this.steelTarget) return;
+    this.steelTarget.timeStep(dt);
   }
 
   /**
@@ -317,9 +291,7 @@ export class SteelTarget
 
     // Mark buffer as needing update
     this.mesh.geometry.attributes.position.needsUpdate = true;
-    this.mesh.geometry.computeVertexNormals();
-    this.mesh.geometry.computeBoundingBox();
-    this.mesh.geometry.computeBoundingSphere();
+    
   }
 
   /**
@@ -337,9 +309,6 @@ export class SteelTarget
       anchors.delete();
       return;
     }
-
-    // Chain radius from config (already in meters)
-    const chainRadius = Config.TARGET_CONFIG.chainRadius;
 
     // Update each chain cylinder for each anchor
     const numAnchors = anchors.size();
@@ -369,18 +338,8 @@ export class SteelTarget
       chainDirection.subVectors(attach, fixed);
       const chainLength = chainDirection.length();
 
-      // Dispose old geometry if it exists
-      if (this.chainLines[i].geometry)
-      {
-        this.chainLines[i].geometry.dispose();
-      }
-
-      // Create new cylinder geometry with correct length
-      // Use many segments (128) for very smooth appearance, especially important for thin cylinders
-      // More segments = smoother curves and better anti-aliasing when viewed from distance
-      const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, chainLength, 128);
-      chainGeometry.computeVertexNormals();
-      this.chainLines[i].geometry = chainGeometry;
+      // Update scale to match new length (much faster than recreating geometry)
+      this.chainLines[i].scale.y = chainLength / this.chainBaseLength;
 
       // Position cylinder at midpoint
       const midpoint = new THREE.Vector3();
@@ -424,30 +383,26 @@ export class SteelTarget
   }
 
   /**
-   * Check if ray intersects with this target
-   * @param {THREE.Raycaster} raycaster - Raycaster to use for intersection test
-   * @returns {THREE.Intersection|null} Intersection result or null if no hit
+   * Check if trajectory intersects with this target
+   * @param {btk.Trajectory} trajectory - Trajectory to test for intersection
+   * @returns {btk.TrajectoryPoint|null} Hit point or null if no intersection
    */
-  isHit(raycaster)
+  intersectTrajectory(trajectory)
   {
-    if (!this.mesh) return null;
-
-    // Update bounding volumes for accurate intersection
-    this.mesh.geometry.computeBoundingBox();
-    this.mesh.geometry.computeBoundingSphere();
-
-    const intersects = raycaster.intersectObject(this.mesh);
-    return intersects.length > 0 ? intersects[0] : null;
+    if (!this.steelTarget) return null;
+    const hit = this.steelTarget.intersectTrajectory(trajectory);
+    return (hit !== undefined && hit !== null) ? hit : null;
   }
 
   /**
    * Apply a bullet hit to this target
    * @param {btk.Bullet} bullet - Bullet instance to apply hit with
    */
-  hitBullet(bullet)
+  hit(bullet)
   {
     if (!this.steelTarget) return;
     this.steelTarget.hit(bullet);
+    this.updateTexture();
   }
 
   /**
@@ -574,37 +529,30 @@ export class SteelTargetFactory
   }
 
   /**
-   * Update all targets (physics and rendering)
-   * @param {number} dt - Time step in seconds
-   */
-  static updateAll(dt)
-  {
-    for (const target of SteelTargetFactory.targets)
-    {
-      target.update(dt);
-    }
-  }
-
-  /**
-   * Step physics for all targets
+   * Step physics for all targets (only updates targets that are moving)
    * @param {number} dt - Time step in seconds
    */
   static stepPhysics(dt)
   {
     for (const target of SteelTargetFactory.targets)
     {
-      target.steelTarget.timeStep(dt);
+      // Skip physics for stationary targets
+      if (!target.isMoving()) continue;
+      
+      target.stepPhysics(dt);
     }
   }
 
   /**
-   * Update display/rendering for all targets (no physics)
+   * Update display/rendering for all targets (only updates targets that are moving)
    */
   static updateDisplay()
   {
     for (const target of SteelTargetFactory.targets)
     {
-      target.steelTarget.updateDisplay();
+      // Skip rendering updates for stationary targets
+      if (!target.isMoving()) continue;
+      
       target.updateMesh();
       target.updateChainLines();
     }

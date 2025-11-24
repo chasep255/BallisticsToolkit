@@ -179,6 +179,11 @@ namespace btk::rendering
     const btk::math::Vector3D& getAngularVelocity() const { return angular_velocity_; }
 
     /**
+     * @brief Get current orientation
+     */
+    const btk::math::Quaternion& getOrientation() const { return orientation_; }
+
+    /**
      * @brief Check if target is currently moving
      */
     bool isMoving() const { return is_moving_; }
