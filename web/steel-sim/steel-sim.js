@@ -398,13 +398,8 @@ class SteelSimulator
     // Initialize wind generator
     this.setupWindGenerator();
 
-    // Create wind flags along the range
-    WindFlagFactory.createFlags(this.scene, this.landscape,
-    {
-      maxRange: Config.LANDSCAPE_CONFIG.groundLength, // meters
-      interval: Config.WIND_FLAG_CONFIG.interval, // meters
-      sideOffset: Config.LANDSCAPE_CONFIG.groundWidth / 2 // meters
-    });
+    // Create wind flags at configured positions
+    this.createWindFlags();
 
     // Create scope layer (bottom-center, ~80% of screen height)
     const scopeHeightNorm = 1.6; // 80% of vertical span (2)
@@ -605,6 +600,27 @@ class SteelSimulator
         position: signPosition,
         text: `${distanceYards} YD`,
         scene: this.scene
+      });
+    }
+  }
+
+  createWindFlags()
+  {
+    if (!this.landscape) return;
+
+    // Create flags from configuration
+    for (const flagConfig of Config.WIND_FLAGS)
+    {
+      const groundHeight = this.landscape.getHeightAt(flagConfig.x, flagConfig.z) || 0;
+      
+      WindFlagFactory.create({
+        position: {
+          x: flagConfig.x,
+          y: groundHeight,
+          z: flagConfig.z
+        },
+        scene: this.scene,
+        config: flagConfig.config || {}
       });
     }
   }

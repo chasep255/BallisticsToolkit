@@ -81,14 +81,14 @@ export function initConfig()
 
   // ===== WIND FLAG CONFIGURATION =====
   Config.WIND_FLAG_CONFIG = {
-    interval: btk.Conversions.yardsToMeters(100), // 100 yards - spacing between flags
-    poleHeight: btk.Conversions.yardsToMeters(12.0), // 12 yards - pole height
-    poleThickness: btk.Conversions.yardsToMeters(0.1), // 0.1 yards - pole thickness
-    flagBaseWidth: btk.Conversions.yardsToMeters(60.0 / 36.0), // 60 inches = 1.67 yards
-    flagTipWidth: btk.Conversions.yardsToMeters(24.0 / 36.0), // 24 inches = 0.67 yards
-    flagLength: btk.Conversions.yardsToMeters(16.0 / 3.0), // 16 feet = 5.33 yards
-    flagThickness: btk.Conversions.yardsToMeters(0.05), // 0.05 yards
-    flagSegments: 10,
+    // Default flag dimensions (large flags)
+    poleHeight: btk.Conversions.yardsToMeters(3.0), // 3 yards - pole height
+    poleThickness: btk.Conversions.inchesToMeters(1.0), // 1 inch - pole thickness
+    flagBaseWidth: btk.Conversions.inchesToMeters(18), // 18 inches
+    flagTipWidth: btk.Conversions.inchesToMeters(6), // 6 inches
+    flagLength: btk.Conversions.yardsToMeters(2.0), // 2 yards
+    flagThickness: btk.Conversions.yardsToMeters(0.02), // 0.02 yards
+    flagSegments: 8,
     flagMinAngle: 1.0, // degrees
     flagMaxAngle: 90.0, // degrees
     flagAngleResponseK: 0.0205,
@@ -96,9 +96,59 @@ export function initConfig()
     flagDirectionInterpolationSpeed: 1.0, // rad/s
     flagFlapFrequencyBase: 0.5, // Hz
     flagFlapFrequencyScale: 0.25, // Hz/mph
-    flagFlapAmplitude: btk.Conversions.yardsToMeters(0.3), // 0.3 yards
+    flagFlapAmplitude: btk.Conversions.yardsToMeters(0.15), // 0.15 yards
     flagWaveLength: 1.5
   };
+
+  // ===== WIND FLAG PLACEMENTS =====
+  // Individual flags placed at specific positions (all in meters)
+  // Varied X positions like a real PRS range
+  Config.WIND_FLAGS = [
+    // 300 yards
+    {
+      x: btk.Conversions.yardsToMeters(-5),
+      z: btk.Conversions.yardsToMeters(-300),
+      config: {}
+    },
+    {
+      x: btk.Conversions.yardsToMeters(8),
+      z: btk.Conversions.yardsToMeters(-600),
+      config: {}
+    },
+    {
+      x: btk.Conversions.yardsToMeters(22),
+      z: btk.Conversions.yardsToMeters(-600),
+      config: {}
+    },
+    // 900 yards
+    {
+      x: btk.Conversions.yardsToMeters(-17),
+      z: btk.Conversions.yardsToMeters(-900),
+      config: {}
+    },
+    {
+      x: btk.Conversions.yardsToMeters(3),
+      z: btk.Conversions.yardsToMeters(-900),
+      config: {}
+    },
+    {
+      x: btk.Conversions.yardsToMeters(15),
+      z: btk.Conversions.yardsToMeters(-1200),
+      config: {}
+    },
+    // 1500 yards
+    {
+      x: btk.Conversions.yardsToMeters(-15),
+      z: btk.Conversions.yardsToMeters(-1500),
+      config: {}
+    },
+    // 1760 yards (1 mile)
+    {
+      x: btk.Conversions.yardsToMeters(-7),
+      z: btk.Conversions.yardsToMeters(-1760),
+      config: {}
+    }
+  ];
 
   // ===== ENVIRONMENT CONFIGURATIONS =====
   Config.MOUNTAIN_CONFIG = {

@@ -119,9 +119,9 @@ export class WindFlag
     const poleGeometry = new THREE.BoxGeometry(poleThickness, this.poleHeight, poleThickness);
     const poleMaterial = new THREE.MeshStandardMaterial(
     {
-      color: 0xc0c0c0,
-      metalness: 0.8,
-      roughness: 0.2
+      color: 0x2a2a2a, // Dark gray/black
+      metalness: 0.3,
+      roughness: 0.8
     });
 
     const pole = new THREE.Mesh(poleGeometry, poleMaterial);
@@ -309,7 +309,19 @@ export class WindFlagFactory
   static flags = [];
 
   /**
-   * Create all flags along the range
+   * Create a single wind flag
+   * @param {Object} options - Same as WindFlag constructor
+   * @returns {WindFlag}
+   */
+  static create(options)
+  {
+    const flag = new WindFlag(options);
+    this.flags.push(flag);
+    return flag;
+  }
+
+  /**
+   * Create all flags along the range (legacy method for fclass-sim compatibility)
    * @param {THREE.Scene} scene - Three.js scene
    * @param {Landscape} landscape - Landscape instance for height queries
    * @param {Object} options - Optional configuration (all in meters, SI units)
