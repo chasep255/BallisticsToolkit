@@ -219,7 +219,7 @@ export class SteelTarget
     // Create unit-length cylinder geometry (height = 1.0)
     // Use many segments (128) for very smooth appearance on thin cylinders
     // More segments = smoother curves, especially important when viewed from distance
-    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, this.chainBaseLength, 128);
+    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, this.chainBaseLength, 16);
     chainGeometry.computeVertexNormals();
 
     // Use MeshPhysicalMaterial for better edge rendering and anti-aliasing

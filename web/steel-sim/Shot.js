@@ -98,9 +98,8 @@ export class Shot
 
     // Simulate forward by dt with wind generator
     // Parameters: max_distance (m), timestep (s), max_time (s), wind_generator
-    const maxRange_m = 10000.0; // Large value so distance doesn't terminate early
     this.ballisticSimulator.simulateWithWind(
-      maxRange_m,
+      Config.LANDSCAPE_CONFIG.brownGroundLength,
       Config.BULLET_SUBSTEP_S,
       dt,
       this.windGenerator

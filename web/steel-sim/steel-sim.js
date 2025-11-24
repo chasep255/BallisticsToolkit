@@ -37,6 +37,11 @@ import
 from './WindFlag.js';
 import
 {
+  RangeSignFactory
+}
+from './RangeSign.js';
+import
+{
   Config,
   initConfig
 }
@@ -72,23 +77,26 @@ class SteelSimulator
     this.canvas = canvas;
     this.params = params;
 
-    // Require all params to be in SI units
-    if (params.mv_mps === undefined)
+    // Require all params to be in SI units (no defaults allowed)
+    if (params.mv_mps === undefined || params.diameter_m === undefined || params.weight_kg === undefined ||
+        params.length_m === undefined || params.twist_mPerTurn === undefined || params.mvSd_mps === undefined ||
+        params.rifleAccuracy_rad === undefined || params.bc === undefined || params.dragFunction === undefined ||
+        params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined)
     {
-      throw new Error('Constructor requires SI unit parameters (mv_mps, diameter_m, weight_kg, etc.). Use getGameParams() to convert from frontend inputs.');
+      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m). Use getGameParams() to convert from frontend inputs.');
     }
     
-    // Params must be in SI units
+    // Store all params (all must be in SI units, no defaults)
     this.mv_mps = params.mv_mps;
-    this.bc = params.bc || 0.311;
-    this.dragFunction = params.dragFunction || 'G7';
+    this.bc = params.bc;
+    this.dragFunction = params.dragFunction;
     this.diameter_m = params.diameter_m;
     this.weight_kg = params.weight_kg;
     this.length_m = params.length_m;
-    this.twist_mPerTurn = params.twist_mPerTurn || 0;
-    this.mvSd_mps = params.mvSd_mps || 0;
-    this.rifleAccuracy_rad = params.rifleAccuracy_rad || 0;
-    this.windPreset = params.windPreset || 'Moderate';
+    this.twist_mPerTurn = params.twist_mPerTurn;
+    this.mvSd_mps = params.mvSd_mps;
+    this.rifleAccuracy_rad = params.rifleAccuracy_rad;
+    this.windPreset = params.windPreset;
     this.zeroDistance_m = params.zeroDistance_m;
     this.scopeHeight_m = params.scopeHeight_m;
 
@@ -123,8 +131,7 @@ class SteelSimulator
     this.fpsFrameCount = 0;
     this.fpsStartTime = null;
     this.fpsLastLogTime = null;
-    this.fpsLogInterval = 10.0; // Log every 10 seconds
-    this.fpsTotalFrameTime = 0; // Sum of all frame times for theoretical FPS
+    this.fpsTotalFrameTime = 0;
   }
 
   // ===== LIFECYCLE METHODS =====
@@ -202,6 +209,7 @@ class SteelSimulator
     TargetRackFactory.deleteAll();
     DustCloudFactory.deleteAll();
     WindFlagFactory.deleteAll();
+    RangeSignFactory.deleteAll();
 
     // Clean up BTK objects
     if (this.rifleZero)
@@ -302,11 +310,7 @@ class SteelSimulator
     // Calculate spin rate from twist rate (already in SI units: m/turn)
     const spinRate = btk.Bullet.computeSpinRateFromTwist(muzzleVel_mps, this.twist_mPerTurn);
 
-    console.log(`[SteelSimulator] Zeroing: MV=${btk.Conversions.mpsToFps(this.mv_mps).toFixed(1)}fps, Zero=${btk.Conversions.metersToYards(this.zeroDistance_m).toFixed(0)}yd, Scope Height=${btk.Conversions.metersToInches(this.scopeHeight_m).toFixed(1)}in`);
-    console.log(`[SteelSimulator] Spin rate: ${spinRate.toFixed(1)} rad/s (twist: ${btk.Conversions.metersToInches(this.twist_mPerTurn).toFixed(1)} in/turn)`);
-
-    // Time the zeroing computation
-    const zeroStartTime = performance.now();
+    // Compute zero
     const zeroedBullet = simulator.computeZero(
       muzzleVel_mps,
       targetPos,
@@ -315,10 +319,6 @@ class SteelSimulator
       0.001,  // tolerance (1mm)
       spinRate // spin_rate
     );
-    const zeroEndTime = performance.now();
-    const zeroTimeMs = zeroEndTime - zeroStartTime;
-
-    console.log(`[SteelSimulator] Zero computation took ${zeroTimeMs.toFixed(1)}ms`);
 
     // Log the zeroed bullet velocity to show elevation and windage
     const zeroVelBtk = zeroedBullet.getVelocity();
@@ -330,12 +330,7 @@ class SteelSimulator
     const elevationMoa = btk.Conversions.radiansToMoa(elevationRad);
     const windageMoa = btk.Conversions.radiansToMoa(windageRad);
     
-    console.log(`[SteelSimulator] Zero complete:`);
-    console.log(`  Elevation: ${elevationMoa.toFixed(2)} MOA (${elevationRad.toFixed(6)} rad)`);
-    console.log(`  Windage: ${windageMoa.toFixed(2)} MOA (${windageRad.toFixed(6)} rad)`);
-    console.log(`  Velocity: (${zeroVelBtk.x.toFixed(2)}, ${zeroVelBtk.y.toFixed(2)}, ${zeroVelBtk.z.toFixed(2)}) m/s`);
-    console.log(`  Velocity magnitude: ${zeroVelMag.toFixed(2)} m/s (${btk.Conversions.mpsToFps(zeroVelMag).toFixed(1)} fps)`);
-    console.log(`  Spin rate: ${zeroedBullet.getSpinRate().toFixed(1)} rad/s`);
+    console.log(`[Zero] ${btk.Conversions.metersToYards(this.zeroDistance_m).toFixed(0)}yd @ ${btk.Conversions.mpsToFps(this.mv_mps).toFixed(0)}fps: ${elevationMoa.toFixed(2)} MOA elevation, ${windageMoa.toFixed(3)} MOA windage`);
 
     // Store the zeroed configuration
     this.rifleZero = {
@@ -399,11 +394,6 @@ class SteelSimulator
     // Create landscape (uses Config.LANDSCAPE_CONFIG defaults)
     this.landscape = new Landscape(this.scene);
 
-    // Log green ground plane position for debugging
-    const greenGroundMesh = this.landscape.getGreenGroundMesh();
-    console.log('[Ground Debug] Green ground plane position:', greenGroundMesh.position);
-    console.log('[Ground Debug] Green ground plane rotation:', greenGroundMesh.rotation);
-    console.log('[Ground Debug] Green ground plane bounds - width:', Config.LANDSCAPE_CONFIG.groundWidth, 'm, length:', Config.LANDSCAPE_CONFIG.groundLength, 'm');
 
     // Initialize wind generator
     this.setupWindGenerator();
@@ -592,10 +582,30 @@ class SteelSimulator
   {
     if (!this.landscape) return;
 
+    const btk = this.btk;
+
     // Create target racks from configuration
     for (const rackConfig of Config.TARGET_RACKS_CONFIG)
     {
       this.addTargetRack(rackConfig.x, rackConfig.z, rackConfig.rackWidth, rackConfig.rackHeight, rackConfig.targets);
+      
+      // Create range sign next to each rack
+      const distanceYards = Math.round(btk.Conversions.metersToYards(-rackConfig.z));
+      const groundHeight = this.landscape.getHeightAt(rackConfig.x, rackConfig.z) || 0;
+      
+      // Position sign to the right of the rack, slightly behind it
+      const signOffset = rackConfig.rackWidth / 2 + 0.5; // 0.5m to the right of rack edge
+      const signPosition = new THREE.Vector3(
+        rackConfig.x + signOffset,
+        groundHeight,
+        rackConfig.z + 0.3 // Slightly behind rack (towards shooter)
+      );
+      
+      RangeSignFactory.create({
+        position: signPosition,
+        text: `${distanceYards} YD`,
+        scene: this.scene
+      });
     }
   }
 
@@ -763,7 +773,6 @@ class SteelSimulator
     const accuracyErrorH = accuracyX * accuracyRadius; // radians (horizontal/yaw)
     const accuracyErrorV = accuracyY * accuracyRadius; // radians (vertical/pitch)
 
-    console.log(`[SteelSimulator] Firing shot: MV=${btk.Conversions.mpsToFps(actualMVMps).toFixed(1)}fps (${btk.Conversions.mpsToFps(mvVariationMps) >= 0 ? '+' : ''}${btk.Conversions.mpsToFps(mvVariationMps).toFixed(1)}fps), Accuracy errors: H=${btk.Conversions.radiansToMoa(accuracyErrorH).toFixed(2)} MOA, V=${btk.Conversions.radiansToMoa(accuracyErrorV).toFixed(2)} MOA`);
 
     // Get zeroed velocity and rotate by scope orientation
     const zeroVel = this.rifleZero.zeroedVelocity;
@@ -798,7 +807,6 @@ class SteelSimulator
 
     // Recompute spin rate based on actual MV (spin rate varies with MV, already in SI units)
     const spinRate = btk.Bullet.computeSpinRateFromTwist(actualMVMps, this.twist_mPerTurn);
-    console.log(`[SteelSimulator] Spin rate: ${spinRate.toFixed(1)} rad/s (based on actual MV: ${btk.Conversions.mpsToFps(actualMVMps).toFixed(1)} fps)`);
 
     // Create shot from bore position (2" below scope)
     ShotFactory.create({
@@ -951,17 +959,6 @@ class SteelSimulator
               // Found the crossing point - use this position
               impactPoint = new btk.Vector3D(testPos.x, 0, testPos.z); // Clamp y to 0
 
-              // Log ground impact position
-              console.log('[Ground Impact] Bullet hit ground at:', {
-                x_m: impactPoint.x.toFixed(3),
-                y_m: impactPoint.y.toFixed(3),
-                z_m: impactPoint.z.toFixed(3),
-                x_yd: btk.Conversions.metersToYards(impactPoint.x).toFixed(2),
-                y_yd: btk.Conversions.metersToYards(impactPoint.y).toFixed(2),
-                z_yd: btk.Conversions.metersToYards(impactPoint.z).toFixed(2),
-                time_s: t.toFixed(3)
-              });
-
               testPos.delete();
               optPoint.delete();
               break;
@@ -1058,9 +1055,9 @@ class SteelSimulator
       this.fpsLastLogTime = frameStartTime;
     }
 
-    // Log FPS every 10 seconds
+    // Log FPS at configured interval
     const timeSinceLastLog = (frameEndTime - this.fpsLastLogTime) / 1000.0;
-    if (timeSinceLastLog >= this.fpsLogInterval)
+    if (timeSinceLastLog >= Config.FPS_LOG_INTERVAL_S)
     {
       // Calculate actual FPS (frames rendered over wall clock time)
       const actualFps = this.fpsFrameCount / timeSinceLastLog;
@@ -1116,18 +1113,18 @@ function getGameParams()
   const zeroDistanceYards = parseFloat(document.getElementById('zeroDistance').value);
   const scopeHeightInches = parseFloat(document.getElementById('scopeHeight').value);
 
-  // Convert to SI units
+  // Convert to SI units (all parameters required, no defaults)
   return {
     mv_mps: btk.Conversions.fpsToMps(mvFps),
-    bc: bc, // dimensionless, no conversion
-    dragFunction: dragFunction, // string, no conversion
+    bc: bc,
+    dragFunction: dragFunction,
     diameter_m: btk.Conversions.inchesToMeters(diameterInches),
     weight_kg: btk.Conversions.grainsToKg(weightGrains),
     length_m: btk.Conversions.inchesToMeters(lengthInches),
     twist_mPerTurn: btk.Conversions.inchesToMeters(twistInchesPerTurn),
     mvSd_mps: btk.Conversions.fpsToMps(mvSdFps),
     rifleAccuracy_rad: btk.Conversions.moaToRadians(rifleAccuracyMoa),
-    windPreset: windPreset, // string, no conversion
+    windPreset: windPreset,
     zeroDistance_m: btk.Conversions.yardsToMeters(zeroDistanceYards),
     scopeHeight_m: btk.Conversions.inchesToMeters(scopeHeightInches)
   };

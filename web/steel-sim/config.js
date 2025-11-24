@@ -23,17 +23,13 @@ export function initConfig()
   Config.TIME_MANAGER_MAX_DT_S = 0.05; // 50ms max frame time
   Config.TIME_MANAGER_MIN_DT_S = 0; // No minimum (clamp to 0)
 
+  // ===== FPS TRACKING =====
+  Config.FPS_LOG_INTERVAL_S = 5.0; // Log FPS every 10 seconds
+
   // ===== CAMERA & SCENE CONSTANTS =====
   Config.SHOOTER_HEIGHT = btk.Conversions.yardsToMeters(5); // 5 yards
   Config.CAMERA_FOV = 35; // degrees (Three.js uses degrees)
   Config.CAMERA_FAR_PLANE = btk.Conversions.yardsToMeters(2500); // 2500 yards
-
-  // ===== BULLET CONSTANTS =====
-  Config.BULLET_MASS = 0.00907; // kg - 140 grains (already SI)
-  Config.BULLET_DIAMETER = 0.00762; // meters - .308 caliber (already SI)
-  Config.BULLET_LENGTH = 0.0305; // meters - ~30mm typical (already SI)
-  Config.BULLET_BC = 0.3; // Ballistic coefficient (dimensionless)
-  Config.BULLET_SPEED_MPS = 800; // m/s - Muzzle velocity (already SI)
 
   // ===== TARGET CONSTANTS =====
   Config.TARGET_CONFIG = {
@@ -71,8 +67,8 @@ export function initConfig()
 
   // ===== LANDSCAPE CONFIGURATION =====
   Config.LANDSCAPE_CONFIG = {
-    groundWidth: btk.Conversions.yardsToMeters(100), // 100 yards
-    groundLength: btk.Conversions.yardsToMeters(2000), // 2000 yards
+    groundWidth: btk.Conversions.yardsToMeters(70), // 70 yards
+    groundLength: btk.Conversions.yardsToMeters(1800), // 2000 yards
     brownGroundWidth: btk.Conversions.yardsToMeters(1000), // 1000 yards
     brownGroundLength: btk.Conversions.yardsToMeters(2500) // 2500 yards
   };
@@ -80,8 +76,7 @@ export function initConfig()
   // ===== WIND GENERATOR CONFIGURATION =====
   Config.WIND_CONFIG = {
     boxPadding: btk.Conversions.yardsToMeters(50), // 50 yards
-    boxHeight: btk.Conversions.yardsToMeters(100), // 100 yards
-    defaultPreset: 'Moderate'
+    boxHeight: btk.Conversions.yardsToMeters(100) // 100 yards
   };
 
   // ===== WIND FLAG CONFIGURATION =====
@@ -117,7 +112,7 @@ export function initConfig()
   Config.TREE_CONFIG = {
     sideMinDistance: btk.Conversions.yardsToMeters(60), // 60 yards
     sideMaxDistance: btk.Conversions.yardsToMeters(110), // 110 yards
-    behindTargetWidth: btk.Conversions.yardsToMeters(80), // 80 yards
+    behindTargetWidth: btk.Conversions.yardsToMeters(200), // 200 yards
     behindTargetMin: btk.Conversions.yardsToMeters(10), // 10 yards
     behindTargetMax: btk.Conversions.yardsToMeters(100), // 100 yards
     countSides: 160,
@@ -137,6 +132,19 @@ export function initConfig()
     postRadius: btk.Conversions.yardsToMeters(0.05) // 0.05 yards (~2 inches)
   };
 
+  // ===== RANGE SIGN CONFIGURATION =====
+  Config.RANGE_SIGN_CONFIG = {
+    postHeight: btk.Conversions.yardsToMeters(1.0), // 1 yard
+    postWidth: btk.Conversions.inchesToMeters(4), // 4 inches
+    signWidth: btk.Conversions.inchesToMeters(24), // 24 inches
+    signHeight: btk.Conversions.inchesToMeters(12), // 12 inches
+    signThickness: btk.Conversions.inchesToMeters(1), // 1 inch
+    textFontSize: 120, // pixels on canvas
+    textFont: 'bold 120px Arial',
+    canvasWidth: 512,
+    canvasHeight: 256
+  };
+
   // ===== TARGET RACK CONFIGURATIONS =====
   // All positions in meters, all dimensions in meters
   Config.TARGET_RACKS_CONFIG = [
@@ -149,6 +157,12 @@ export function initConfig()
       rackWidth: btk.Conversions.yardsToMeters(1.5), // 1.5 yards
       rackHeight: btk.Conversions.yardsToMeters(1), // 1 yard
       targets: [
+        {
+          width: btk.Conversions.inchesToMeters(6),
+          height: btk.Conversions.inchesToMeters(6),
+          thickness: btk.Conversions.inchesToMeters(0.5),
+          isOval: false
+        },
         {
           width: btk.Conversions.inchesToMeters(5),
           height: btk.Conversions.inchesToMeters(5),
@@ -177,11 +191,17 @@ export function initConfig()
     },
 
     {
-      x: 0,
+      x: -5,
       z: btk.Conversions.yardsToMeters(-200), // -200 yards
       rackWidth: btk.Conversions.yardsToMeters(1.5), // 1.5 yards
       rackHeight: btk.Conversions.yardsToMeters(1), // 1 yard
       targets: [
+      {
+        width: btk.Conversions.inchesToMeters(6),
+        height: btk.Conversions.inchesToMeters(6),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
       {
         width: btk.Conversions.inchesToMeters(5),
         height: btk.Conversions.inchesToMeters(5),
@@ -208,8 +228,8 @@ export function initConfig()
       }]
     },
     {
-      x: btk.Conversions.yardsToMeters(10), // 10 yards
-      z: btk.Conversions.yardsToMeters(-225), // -225 yards
+      x: btk.Conversions.yardsToMeters(7),
+      z: btk.Conversions.yardsToMeters(-250),
       rackWidth: btk.Conversions.yardsToMeters(1.5),
       rackHeight: btk.Conversions.yardsToMeters(1),
       targets: [
@@ -238,6 +258,68 @@ export function initConfig()
         isOval: true
       }]
     },
+    {
+      x: btk.Conversions.yardsToMeters(-10), 
+      z: btk.Conversions.yardsToMeters(-300),
+      rackWidth: btk.Conversions.yardsToMeters(1.5),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+      {
+        width: btk.Conversions.inchesToMeters(6),
+        height: btk.Conversions.inchesToMeters(6),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(4),
+        height: btk.Conversions.inchesToMeters(4),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(3),
+        height: btk.Conversions.inchesToMeters(3),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(2),
+        height: btk.Conversions.inchesToMeters(2),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      }]
+    },
+    {
+      x: btk.Conversions.yardsToMeters(15), 
+      z: btk.Conversions.yardsToMeters(-400),
+      rackWidth: btk.Conversions.yardsToMeters(2),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+      {
+        width: btk.Conversions.inchesToMeters(8),
+        height: btk.Conversions.inchesToMeters(8),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(6),
+        height: btk.Conversions.inchesToMeters(6),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(4),
+        height: btk.Conversions.inchesToMeters(4),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(3),
+        height: btk.Conversions.inchesToMeters(3),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      }
+    ]},
     {
       x: btk.Conversions.yardsToMeters(5), // 5 yards
       z: btk.Conversions.yardsToMeters(-500), // -500 yards
@@ -299,6 +381,198 @@ export function initConfig()
         height: btk.Conversions.inchesToMeters(12 * 6),
         thickness: btk.Conversions.inchesToMeters(0.5),
         isOval: false
+      }]
+    },
+    // 600 yards - 2 MOA (~12"), 1.5 MOA (~9"), 1 MOA (~6"), 0.5 MOA (~3")
+    {
+      x: btk.Conversions.yardsToMeters(-20),
+      z: btk.Conversions.yardsToMeters(-600),
+      rackWidth: btk.Conversions.yardsToMeters(2.5),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+      {
+        width: btk.Conversions.inchesToMeters(12),
+        height: btk.Conversions.inchesToMeters(12),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(9),
+        height: btk.Conversions.inchesToMeters(9),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(6),
+        height: btk.Conversions.inchesToMeters(6),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(3),
+        height: btk.Conversions.inchesToMeters(3),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      }]
+    },
+    // 700 yards - 2 MOA (~15"), 1.5 MOA (~11"), 1 MOA (~7"), 0.5 MOA (~4")
+    {
+      x: btk.Conversions.yardsToMeters(20),
+      z: btk.Conversions.yardsToMeters(-700),
+      rackWidth: btk.Conversions.yardsToMeters(2.5),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+      {
+        width: btk.Conversions.inchesToMeters(15),
+        height: btk.Conversions.inchesToMeters(15),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(11),
+        height: btk.Conversions.inchesToMeters(11),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(7),
+        height: btk.Conversions.inchesToMeters(7),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(4),
+        height: btk.Conversions.inchesToMeters(4),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      }]
+    },
+    // 750 yards - 2 MOA (~15"), 1.5 MOA (~12"), 1 MOA (~8"), 0.5 MOA (~4")
+    {
+      x: btk.Conversions.yardsToMeters(-17),
+      z: btk.Conversions.yardsToMeters(-750),
+      rackWidth: btk.Conversions.yardsToMeters(2.5),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+      {
+        width: btk.Conversions.inchesToMeters(15),
+        height: btk.Conversions.inchesToMeters(15),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(12),
+        height: btk.Conversions.inchesToMeters(12),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(8),
+        height: btk.Conversions.inchesToMeters(8),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(4),
+        height: btk.Conversions.inchesToMeters(4),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      }]
+    },
+    // 800 yards - 2 MOA (~17"), 1.5 MOA (~13"), 1 MOA (~8"), 0.5 MOA (~4")
+    {
+      x: btk.Conversions.yardsToMeters(20),
+      z: btk.Conversions.yardsToMeters(-800),
+      rackWidth: btk.Conversions.yardsToMeters(2.5),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+      {
+        width: btk.Conversions.inchesToMeters(17),
+        height: btk.Conversions.inchesToMeters(17),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(13),
+        height: btk.Conversions.inchesToMeters(13),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(8),
+        height: btk.Conversions.inchesToMeters(8),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(4),
+        height: btk.Conversions.inchesToMeters(4),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      }]
+    },
+    // 900 yards - 2 MOA (~19"), 1.5 MOA (~14"), 1 MOA (~9"), 0.5 MOA (~5")
+    {
+      x: btk.Conversions.yardsToMeters(-25),
+      z: btk.Conversions.yardsToMeters(-900),
+      rackWidth: btk.Conversions.yardsToMeters(3),
+      rackHeight: btk.Conversions.yardsToMeters(1),
+      targets: [
+      {
+        width: btk.Conversions.inchesToMeters(19),
+        height: btk.Conversions.inchesToMeters(19),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(14),
+        height: btk.Conversions.inchesToMeters(14),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(9),
+        height: btk.Conversions.inchesToMeters(9),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(5),
+        height: btk.Conversions.inchesToMeters(5),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      }]
+    },
+    // 1200 yards - 2 MOA (~25"), 1.5 MOA (~19"), 1 MOA (~12"), 0.5 MOA (~6")
+    {
+      x: btk.Conversions.yardsToMeters(0),
+      z: btk.Conversions.yardsToMeters(-1200),
+      rackWidth: btk.Conversions.yardsToMeters(3.5),
+      rackHeight: btk.Conversions.yardsToMeters(1.5),
+      targets: [
+      {
+        width: btk.Conversions.inchesToMeters(25),
+        height: btk.Conversions.inchesToMeters(25),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(19),
+        height: btk.Conversions.inchesToMeters(19),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(12),
+        height: btk.Conversions.inchesToMeters(12),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
+      },
+      {
+        width: btk.Conversions.inchesToMeters(6),
+        height: btk.Conversions.inchesToMeters(6),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: true
       }]
     },
     {
