@@ -105,8 +105,18 @@ export function initConfig()
   // Varied X positions like a real PRS range
   Config.WIND_FLAGS = [
     {
-      x: btk.Conversions.yardsToMeters(15),
+      x: btk.Conversions.yardsToMeters(10),
       z: btk.Conversions.yardsToMeters(-25),
+      config: {}
+    },
+    {
+      x: btk.Conversions.yardsToMeters(-15),
+      z: btk.Conversions.yardsToMeters(-50),
+      config: {}
+    },
+    {
+      x: btk.Conversions.yardsToMeters(-30),
+      z: btk.Conversions.yardsToMeters(-100),
       config: {}
     },
     {
