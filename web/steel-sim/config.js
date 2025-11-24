@@ -83,12 +83,12 @@ export function initConfig()
   Config.WIND_FLAG_CONFIG = {
     // Default flag dimensions (large flags)
     poleHeight: btk.Conversions.yardsToMeters(3.0), // 3 yards - pole height
-    poleThickness: btk.Conversions.inchesToMeters(1.0), // 1 inch - pole thickness
+    poleThickness: btk.Conversions.inchesToMeters(2.0), // 2 inch - pole thickness
     flagBaseWidth: btk.Conversions.inchesToMeters(18), // 18 inches
     flagTipWidth: btk.Conversions.inchesToMeters(6), // 6 inches
     flagLength: btk.Conversions.yardsToMeters(2.0), // 2 yards
     flagThickness: btk.Conversions.yardsToMeters(0.02), // 0.02 yards
-    flagSegments: 8,
+    flagSegments: 32,
     flagMinAngle: 1.0, // degrees
     flagMaxAngle: 90.0, // degrees
     flagAngleResponseK: 0.0205,
@@ -104,6 +104,21 @@ export function initConfig()
   // Individual flags placed at specific positions (all in meters)
   // Varied X positions like a real PRS range
   Config.WIND_FLAGS = [
+    {
+      x: btk.Conversions.yardsToMeters(15),
+      z: btk.Conversions.yardsToMeters(-25),
+      config: {}
+    },
+    {
+      x: btk.Conversions.yardsToMeters(0),
+      z: btk.Conversions.yardsToMeters(-150),
+      config: {}
+    },
+    {
+      x: btk.Conversions.yardsToMeters(10),
+      z: btk.Conversions.yardsToMeters(-200),
+      config: {}
+    },
     // 300 yards
     {
       x: btk.Conversions.yardsToMeters(-5),

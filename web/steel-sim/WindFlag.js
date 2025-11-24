@@ -119,9 +119,9 @@ export class WindFlag
     const poleGeometry = new THREE.BoxGeometry(poleThickness, this.poleHeight, poleThickness);
     const poleMaterial = new THREE.MeshStandardMaterial(
     {
-      color: 0x2a2a2a, // Dark gray/black
-      metalness: 0.3,
-      roughness: 0.8
+      color: 0x606060, // Darker metal gray
+      metalness: 0.4,
+      roughness: 0.6
     });
 
     const pole = new THREE.Mesh(poleGeometry, poleMaterial);
