@@ -115,22 +115,22 @@ export class SteelTarget
     leftWorldFixed.delete();
     rightWorldFixed.delete();
 
-    // Initial settle step: run physics in 1-second increments until target settles
-    // Check after each step if target has stopped moving, stop early if settled
-    // Maximum 30 seconds total
-    const MAX_SETTLE_TIME = 30.0; // seconds
-    const SETTLE_STEP_SIZE = 1.0; // seconds per step
+    // // Initial settle step: run physics in 1-second increments until target settles
+    // // Check after each step if target has stopped moving, stop early if settled
+    // // Maximum 30 seconds total
+    // const MAX_SETTLE_TIME = 30.0; // seconds
+    // const SETTLE_STEP_SIZE = 1.0; // seconds per step
 
-    for (let elapsed = 0; elapsed < MAX_SETTLE_TIME; elapsed += SETTLE_STEP_SIZE)
-    {
-      this.steelTarget.timeStep(SETTLE_STEP_SIZE);
+    // for (let elapsed = 0; elapsed < MAX_SETTLE_TIME; elapsed += SETTLE_STEP_SIZE)
+    // {
+    //   this.steelTarget.timeStep(SETTLE_STEP_SIZE);
 
-      // Check if target has stopped moving (C++ now tracks this)
-      if (!this.isMoving())
-      {
-        break; // Target has settled, stop early
-      }
-    }
+    //   // Check if target has stopped moving (C++ now tracks this)
+    //   if (!this.isMoving())
+    //   {
+    //     break; // Target has settled, stop early
+    //   }
+    // }
 
     // Create Three.js mesh
     this.mesh = this.createMesh();

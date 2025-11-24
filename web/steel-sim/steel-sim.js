@@ -144,6 +144,12 @@ function setupScene()
 
   // Create landscape (uses Config.LANDSCAPE_CONFIG defaults)
   landscape = new Landscape(scene);
+  
+  // Log green ground plane position for debugging
+  const greenGroundMesh = landscape.getGreenGroundMesh();
+  console.log('[Ground Debug] Green ground plane position:', greenGroundMesh.position);
+  console.log('[Ground Debug] Green ground plane rotation:', greenGroundMesh.rotation);
+  console.log('[Ground Debug] Green ground plane bounds - width:', Config.LANDSCAPE_CONFIG.groundWidth, 'm, length:', Config.LANDSCAPE_CONFIG.groundLength, 'm');
 
   // Initialize wind generator
   // All config values are in meters (SI units)
@@ -719,63 +725,85 @@ function checkBulletGroundCollisions()
 
   for (const shot of shots)
   {
-    const currentBullet = shot.getCurrentBullet();
-    if (!currentBullet) continue;
+    const trajectory = shot.getTrajectory();
+    if (!trajectory) continue;
 
-    const pos = currentBullet.getPosition();
+    const pointCount = trajectory.getPointCount();
+    if (pointCount === 0) continue;
+
+    // Get the last point from trajectory (has time and bullet state)
+    const lastPoint = trajectory.getPoint(pointCount - 1);
+    const lastPos = lastPoint.getState().getPosition();
     
     // Check if bullet is below ground (y < 0)
-    if (pos.y < 0)
+    if (lastPos.y < 0)
     {
-      // Step back through trajectory to find where it crossed y=0
-      const trajectory = shot.getTrajectory();
-      if (trajectory)
-      {
-        
-        const currentTime = shot.currentTime;
-        const searchStep = 0.001; // 1ms steps backward
-        let impactPoint = null;
+      // Get time from last point
+      const currentTime = lastPoint.getTime();
+      const searchStep = 0.001; // 1ms steps backward
+      let impactPoint = null;
 
-        // Search backward from current time
-        for (let t = currentTime; t >= 0; t -= searchStep)
+      // Search backward from current time
+      for (let t = currentTime; t >= 0; t -= searchStep)
+      {
+        const optPoint = trajectory.atTime(t);
+        if (optPoint !== undefined && optPoint !== null)
         {
-          const optPoint = trajectory.atTime(t);
-          if (optPoint !== undefined && optPoint !== null)
+          const testPos = optPoint.getState().getPosition();
+          if (testPos.y >= 0)
           {
-            const testPos = optPoint.getState().getPosition();
-            if (testPos.y >= 0)
-            {
-              // Found the crossing point - use this position
-              impactPoint = new btk.Vector3D(testPos.x, 0, testPos.z); // Clamp y to 0
-              testPos.delete();
-              optPoint.delete();
-              break;
-            }
+            // Found the crossing point - use this position
+            impactPoint = new btk.Vector3D(testPos.x, 0, testPos.z); // Clamp y to 0
+            
+            // Log ground impact position
+            console.log('[Ground Impact] Bullet hit ground at:', {
+              x_m: impactPoint.x.toFixed(3),
+              y_m: impactPoint.y.toFixed(3),
+              z_m: impactPoint.z.toFixed(3),
+              x_yd: btk.Conversions.metersToYards(impactPoint.x).toFixed(2),
+              y_yd: btk.Conversions.metersToYards(impactPoint.y).toFixed(2),
+              z_yd: btk.Conversions.metersToYards(impactPoint.z).toFixed(2),
+              time_s: t.toFixed(3)
+            });
+            
             testPos.delete();
             optPoint.delete();
+            break;
           }
+          testPos.delete();
+          optPoint.delete();
         }
+      }
 
-        // Create dust cloud at impact point
-        if (impactPoint)
-        {
-          createDustCloud(impactPoint);
-          impactPoint.delete();
-        }
-        else
-        {
-          // Fallback: use current position clamped to ground
-          const fallbackPoint = new btk.Vector3D(pos.x, 0, pos.z);
-          createDustCloud(fallbackPoint);
-          fallbackPoint.delete();
-        }
+      // Create dust cloud at impact point
+      if (impactPoint)
+      {
+        createDustCloud(impactPoint);
+        impactPoint.delete();
+      }
+      else
+      {
+        // Fallback: use last position clamped to ground
+        const fallbackPoint = new btk.Vector3D(lastPos.x, 0, lastPos.z);
+        
+        // Log fallback ground impact position
+        console.log('[Ground Impact] Bullet hit ground (fallback) at:', {
+          x_m: fallbackPoint.x.toFixed(3),
+          y_m: fallbackPoint.y.toFixed(3),
+          z_m: fallbackPoint.z.toFixed(3),
+          x_yd: btk.Conversions.metersToYards(fallbackPoint.x).toFixed(2),
+          y_yd: btk.Conversions.metersToYards(fallbackPoint.y).toFixed(2),
+          z_yd: btk.Conversions.metersToYards(fallbackPoint.z).toFixed(2),
+          note: 'Used fallback - trajectory search failed'
+        });
+        
+        createDustCloud(fallbackPoint);
+        fallbackPoint.delete();
       }
 
       // Mark shot as dead (will be disposed by ShotFactory.updateAll)
       shot.markDead();
     }
-
-    pos.delete();
   }
 }
 
