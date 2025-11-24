@@ -61,12 +61,70 @@
   <div class="app-container">
     <h1>🔩 Steel Target Simulator</h1>
     <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 12px; margin: 20px 0; color: #856404;">
-      <strong>⚠️ Under Construction:</strong> This is currently a physics animation demo showcasing steel target dynamics. Eventually this will be a full shooting range simulator with multiple reactive steel targets.
+      <strong>⚠️ Under Construction:</strong> Interactive shooting simulator with realistic ballistics and steel target physics. Shoot at reactive targets from 100 to 2000 yards with full trajectory simulation, wind effects, and realistic target dynamics. Currently under development.
+    </div>
+
+    <!-- Bullet Parameters -->
+    <div class="params-bar" style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px;">
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="mv" title="Muzzle velocity in feet per second">MV (fps)</label>
+        <input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second" style="width: 100px; padding: 5px;">
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
+        <input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics" style="width: 100px; padding: 5px;">
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">Drag</label>
+        <select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data" style="width: 100px; padding: 5px;">
+          <option value="G1">G1</option>
+          <option value="G7" selected>G7</option>
+        </select>
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="diameter" title="Bullet diameter in inches">Dia (in)</label>
+        <input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches" style="width: 100px; padding: 5px;">
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="weight" title="Bullet weight in grains">Wt (gr)</label>
+        <input type="number" id="weight" value="140" step="1" min="10" max="1000" title="Bullet weight in grains" style="width: 100px; padding: 5px;">
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="length" title="Bullet length in inches">Len (in)</label>
+        <input type="number" id="length" value="1.4" step="0.01" min="0.1" max="5.0" title="Bullet length in inches" style="width: 100px; padding: 5px;">
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="twist" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)">Twist (in/turn)</label>
+        <input type="number" id="twist" value="8.0" step="0.1" min="1" max="20" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)" style="width: 100px; padding: 5px;">
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label>
+        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps" style="width: 100px; padding: 5px;">
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label>
+        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)" style="width: 100px; padding: 5px;">
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="windPreset" title="Wind preset">Wind</label>
+        <select id="windPreset" title="Wind preset" style="width: 120px; padding: 5px;">
+          <option value="Moderate" selected>Moderate</option>
+        </select>
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="zeroDistance" title="Zero distance in yards">Zero (yd)</label>
+        <input type="number" id="zeroDistance" value="100" step="10" min="25" max="1000" title="Zero distance in yards" style="width: 100px; padding: 5px;">
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="scopeHeight" title="Scope height above bore in inches">Scope Ht (in)</label>
+        <input type="number" id="scopeHeight" value="2.0" step="0.1" min="0.5" max="10.0" title="Scope height above bore in inches" style="width: 100px; padding: 5px;">
+      </div>
     </div>
 
     <!-- Control Buttons -->
-    <div class="controls">
-      <button id="resetBtn" class="btn btn-primary">Reset All Targets</button>
+    <div class="controls" style="display: flex; align-items: center; gap: 10px; justify-content: center; margin: 15px 0;">
+      <button id="startBtn" class="btn btn-primary">Start</button>
+      <button id="restartBtn" class="btn btn-secondary" style="display: none;">Restart</button>
       <button id="helpBtn" class="btn btn-secondary">Help</button>
     </div>
 
@@ -94,6 +152,11 @@
       </div>
       <div class="help-modal-body">
         <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
+          <h3 style="margin-top: 0;">Overview</h3>
+          <p>Steel Target Simulator is an interactive shooting simulator with realistic ballistics and steel target physics. Shoot at reactive steel targets at distances from 100 to 2000 yards with full trajectory simulation including wind effects, spin dynamics, and realistic target responses to bullet impacts. Currently under development.</p>
+        </div>
+        
+        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
           <h3 style="margin-top: 0;">Need Help or Found an Issue?</h3>
           <div class="param-help">
             <strong>📧 Email:</strong> <a href="mailto:admin@ballisticstoolkit.com">admin@ballisticstoolkit.com</a><br>
@@ -104,22 +167,25 @@
         <div class="help-section">
           <h3>Controls</h3>
           <div class="param-help">
+            <strong>Buttons:</strong><br>
+            - <strong>Start:</strong> Initialize the simulator and begin shooting<br>
+            - <strong>Restart:</strong> Restart the simulator with current parameters<br>
+            - <strong>Help:</strong> Show this help dialog<br><br>
+            
             <strong>Rifle Scope:</strong><br>
             - Click inside the scope circle to enter scope mode (pointer lock activates)<br>
             - Move mouse to pan/aim the scope (reticle moves with cursor at 1:1 speed)<br>
-            - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (4.5X to 30X magnification)<br>
-            - Click to fire bullet from scope crosshair (800 m/s / 2625 fps)<br>
+            - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (4X to 40X magnification)<br>
+            - Click to fire bullet from scope crosshair<br>
             - <kbd>Esc</kbd> to exit scope mode<br>
-            - FFP reticle scales with zoom (maintains MRAD subtensions)<br><br>
-            
-            <strong>Reset All Targets:</strong> Returns all targets to their initial resting positions and clears all velocities and impact history.
+            - FFP reticle scales with zoom (maintains MRAD subtensions)
           </div>
         </div>
         
         <div class="help-section">
           <h3>Targets & Physics</h3>
           <div class="param-help">
-            <strong>Target Racks:</strong> 10 target racks positioned at 100, 200, 300, ..., 1000 yards (every 100 yards). Each rack contains 3 targets with sizes scaling from 6" to 36" based on distance. All targets are 0.25" thick steel with realistic mass calculations.<br><br>
+            <strong>Target Racks:</strong> Multiple target racks positioned from 100 to 2000 yards with various target sizes and configurations. Targets include both rectangular and oval shapes with sizes ranging from 2" to 72" depending on distance and rack configuration.<br><br>
             <strong>Chain Mounting:</strong> Each target has two chains attached at the top, connecting to an overhead beam. Chains act as damped springs (10,000 N/m spring constant, 200 N·s/m damping) that dissipate energy to prevent bouncing.<br><br>
             <strong>Impact Physics:</strong> Bullet impacts transfer momentum to targets. Center hits cause mostly linear motion; edge hits create rotation. Smaller targets respond more dramatically than larger ones.<br><br>
             <strong>Damping:</strong> Linear damping (75% velocity per second) and angular damping (10% angular velocity per second) simulate air resistance and friction.
@@ -135,11 +201,43 @@
         </div>
         
         <div class="help-section">
+          <h3>Ballistics</h3>
+          <div class="param-help">
+            <strong>Trajectory Simulation:</strong> Full 4DOF ballistics with G1/G7 drag models, atmospheric compensation, and wind effects. Bullet parameters determine trajectory and impact energy.<br><br>
+            
+            <strong>Bullet Parameters:</strong><br>
+            - <strong>MV:</strong> Muzzle velocity in fps (critical for trajectory and time-of-flight)<br>
+            - <strong>BC:</strong> Ballistic coefficient (aerodynamic efficiency, higher = less drift/drop)<br>
+            - <strong>Drag Function:</strong> G7 (modern boat-tail) or G1 (flat-base/older)<br>
+            - <strong>Diameter:</strong> Bullet diameter in inches (affects spin calculations)<br>
+            - <strong>Weight:</strong> Bullet weight in grains (for spin moment of inertia)<br>
+            - <strong>Length:</strong> Bullet length in inches (for spin calculations)<br>
+            - <strong>Twist:</strong> Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist, calculates spin rate)<br><br>
+            
+            <strong>Rifle Parameters:</strong><br>
+            - <strong>MV σ:</strong> Muzzle velocity standard deviation in fps (lower = more consistent, typical values: 5-15 fps)<br>
+            - <strong>Accuracy:</strong> Rifle+shooter precision in MOA (1 MOA ≈ 1" at 100 yards)<br>
+            - <strong>Zero Distance:</strong> Distance at which the rifle is zeroed in yards<br>
+            - <strong>Scope Height:</strong> Height of the scope above the bore in inches<br><br>
+            
+            <strong>Spin Effects:</strong> Spin drift and crosswind jump are modeled based on bullet spin rate calculated from barrel twist and muzzle velocity. Spin rate is recomputed for each shot based on actual muzzle velocity (accounting for MV variation).<br><br>
+            
+            <strong>Variability:</strong> Each shot has slightly different muzzle velocity (from MV σ) and accuracy errors (from rifle accuracy setting). These simulate real-world shot-to-shot variability.<br><br>
+            
+            <strong>Zeroing:</strong> Rifle is zeroed at the configured distance with scope height compensation. Zeroing calculates the initial launch angle needed to hit the target point-of-aim at zero distance. Zeroing is computed without spin effects for simplicity.<br><br>
+            
+            <strong>Wind:</strong> Wind presets control atmospheric conditions affecting bullet trajectory throughout the flight path. Wind flags along the range show wind direction and intensity at multiple distances. Wind affects bullet trajectory, not just dust particles.<br><br>
+            
+            <strong>Settings:</strong> All parameters are automatically saved and restored on page reload.
+          </div>
+        </div>
+        
+        <div class="help-section">
           <h3>Technical Details</h3>
           <div class="param-help">
             <strong>Physics Engine:</strong> Custom rigid body physics in C++ (WebAssembly) with quaternion-based orientation for stable rotations.<br><br>
             <strong>Rendering:</strong> 3-pass composition system: background scene renders to texture, scope renders independently with zoom, then composited with reticle overlay. Three.js WebGL with 4× MSAA anti-aliasing. Vertex positions computed in C++ and transferred via typed memory views.<br><br>
-            <strong>Scope Reticle:</strong> Geometry-based reticle using Three.js meshes.  FFP behavior scales with zoom, maintaining MRAD subtensions.<br><br>
+            <strong>Scope Reticle:</strong> Geometry-based reticle using Three.js meshes. FFP behavior scales with zoom, maintaining MRAD subtensions.<br><br>
             <strong>Impact Detection:</strong> Raycasting from scope camera center detects target intersections. Impact points converted to local target coordinates for physics and texture drawing.<br><br>
             <strong>Texture Generation:</strong> Targets use double-width texture buffer: front face UVs map to left half (0-0.5), back face to right half (0.5-1.0), allowing impacts to appear on the correct side.
           </div>
@@ -150,7 +248,7 @@
           <div class="param-help">
             <strong>Simplified Physics:</strong> No collision detection between targets. Targets do not interact with each other.<br><br>
             <strong>Chain Model:</strong> Chains modeled as damped springs without mass or realistic chain link physics. Cannot go slack or wrap around objects.<br><br>
-            <strong>Fixed Environment:</strong> Fixed overhead beam. Ground interactions limited to visual dust effects. Wind effects only for dust particles, not bullet trajectories.
+            <strong>Fixed Environment:</strong> Fixed overhead beam. Ground interactions limited to visual dust effects.
           </div>
         </div>
       </div>

@@ -64,11 +64,16 @@ export class Shot
     );
 
     // Create bullet with initial position and velocity
+    const spinRate = this.bulletParams.spinRate || 0.0;
+    if (spinRate > 0)
+    {
+      console.log(`[Shot] Creating bullet with spin rate: ${spinRate.toFixed(1)} rad/s`);
+    }
     const initialBullet = new btk.Bullet(
       this.bullet,
       this.initialPosition,
       this.initialVelocity,
-      0.0 // No spin for now
+      spinRate
     );
 
     // Create ballistic simulator

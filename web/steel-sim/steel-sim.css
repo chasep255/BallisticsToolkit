@@ -75,8 +75,8 @@
 }
 
 #steelCanvas {
-  border: 2px solid #333;
-  background: #1a1a1a;
+  border: 1px solid #ddd;
+  background: #f8f9fa;
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 9;

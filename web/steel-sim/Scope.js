@@ -324,7 +324,7 @@ export class Scope
   }
 
   /**
-   * Set zoom level in X (e.g. 4.5–30X) and update camera + reticle scaling.
+   * Set zoom level in X (e.g. 4–40X) and update camera + reticle scaling.
    */
   setZoomX(zoomX)
   {

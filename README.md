@@ -38,10 +38,11 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Debug Mode** - Add `?debug=1` to URL for rapid testing (1-min relays, 2 shots)
 
 ### 🔩 Steel Target Simulator *(Under Construction)*
-- **Physics Animation Demo** - Currently showcases realistic steel target dynamics with chain constraints, momentum transfer, and bullet impact visualization
-- **Current Demo** - Features 10 target racks at 100-1000 yards (every 100 yards), with 3 targets per rack. Target sizes scale from 6" to 36" based on distance. All targets are 0.25" thick steel with realistic mass calculations
-- **Scope Controls** - Mouse-based scope interaction: click scope to enter, mouse move to pan, scroll wheel to zoom (4.5X to 30X), click to fire. Scope starts at minimum zoom (4.5X)
-- **Future Plans** - Will expand to a full shooting range simulator with multiple reactive steel targets and realistic shooting scenarios
+- **Interactive Shooting Simulator** - Shoot at reactive steel targets with full ballistics simulation including trajectory calculation, wind effects, and spin dynamics
+- **Realistic Ballistics** - 4DOF trajectory simulation with G1/G7 drag models, atmospheric compensation, wind effects, spin drift, and crosswind jump. Muzzle velocity variation and rifle accuracy simulate real-world shot-to-shot variability
+- **Target Physics** - Realistic steel target dynamics with chain constraints, momentum transfer, and bullet impact visualization. Targets respond to center hits with linear motion and edge hits with rotation
+- **Range** - Multiple target racks from 100 to 2000 yards with various target sizes.
+- **Scope Interaction** - Mouse-based scope controls: click scope to enter, mouse move to pan, scroll wheel to zoom (4X to 40X), click to fire. FFP reticle scales with zoom maintaining MRAD subtensions
 
 ## Quick Start
 
