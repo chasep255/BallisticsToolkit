@@ -27,7 +27,7 @@ export function initConfig()
   Config.FPS_LOG_INTERVAL_S = 5.0; // Log FPS every 10 seconds
 
   // ===== CAMERA & SCENE CONSTANTS =====
-  Config.SHOOTER_HEIGHT = btk.Conversions.yardsToMeters(5); // 5 yards
+  Config.SHOOTER_HEIGHT = btk.Conversions.yardsToMeters(3);
   Config.CAMERA_FOV = 35; // degrees (Three.js uses degrees)
   Config.CAMERA_FAR_PLANE = btk.Conversions.yardsToMeters(2500); // 2500 yards
   Config.SCOPE_MAX_PAN_DEG = 10; // Limit scope movement to ±10°
@@ -121,7 +121,7 @@ export function initConfig()
       config: {}
     },
     {
-      x: btk.Conversions.yardsToMeters(0),
+      x: btk.Conversions.yardsToMeters(-12),
       z: btk.Conversions.yardsToMeters(-150),
       config: {}
     },
@@ -335,7 +335,7 @@ export function initConfig()
       }]
     },
     {
-      x: btk.Conversions.yardsToMeters(-10), 
+      x: btk.Conversions.yardsToMeters(-2), 
       z: btk.Conversions.yardsToMeters(-300),
       rackWidth: btk.Conversions.yardsToMeters(1.5),
       rackHeight: btk.Conversions.yardsToMeters(1),
@@ -575,7 +575,7 @@ export function initConfig()
     },
     // 800 yards - 2 MOA (~17"), 1.5 MOA (~13"), 1 MOA (~8"), 0.5 MOA (~4")
     {
-      x: btk.Conversions.yardsToMeters(20),
+      x: btk.Conversions.yardsToMeters(15),
       z: btk.Conversions.yardsToMeters(-800),
       rackWidth: btk.Conversions.yardsToMeters(2.5),
       rackHeight: btk.Conversions.yardsToMeters(1),
