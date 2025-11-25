@@ -69,7 +69,27 @@ const TEXTURE_MANIFEST = {
     wrapT: THREE.RepeatWrapping
   },
 
-  // Concrete textures
+  // Cloth textures (for wind flags)
+  cloth_color:
+  {
+    path: '../textures/cloth/Fabric030_1K-JPG_Color.jpg',
+    wrapS: THREE.RepeatWrapping,
+    wrapT: THREE.RepeatWrapping
+  },
+  cloth_normal:
+  {
+    path: '../textures/cloth/Fabric030_1K-JPG_NormalGL.jpg',
+    wrapS: THREE.RepeatWrapping,
+    wrapT: THREE.RepeatWrapping
+  },
+  cloth_roughness:
+  {
+    path: '../textures/cloth/Fabric030_1K-JPG_Roughness.jpg',
+    wrapS: THREE.RepeatWrapping,
+    wrapT: THREE.RepeatWrapping
+  },
+
+  // Concrete textures (for target pits)
   concrete_color:
   {
     path: '../textures/concrete/Concrete012_1K-JPG_Color.jpg',

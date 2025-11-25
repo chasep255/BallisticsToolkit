@@ -293,26 +293,30 @@ export class TargetRenderer
     // Create pits with concrete texture
     const pitsGeometry = new THREE.BoxGeometry(this.rangeWidth, this.pitsHeight, this.pitsDepth);
 
-    // Load concrete textures for pits
-    const concreteLoader = new THREE.TextureLoader();
-    const concreteColor = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_Color.jpg');
-    const concreteNormal = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_NormalGL.jpg');
-    const concreteRoughness = concreteLoader.load('textures/concrete/Concrete012_1K-JPG_Roughness.jpg');
+    // Get concrete textures from ResourceManager
+    const concreteColor = ResourceManager.textures.getTexture('concrete_color');
+    const concreteNormal = ResourceManager.textures.getTexture('concrete_normal');
+    const concreteRoughness = ResourceManager.textures.getTexture('concrete_roughness');
 
-    // Configure texture wrapping and repeat
-    [concreteColor, concreteNormal, concreteRoughness].forEach(texture =>
+    // Clone textures for independent repeat settings
+    const concreteColorClone = concreteColor.clone();
+    const concreteNormalClone = concreteNormal.clone();
+    const concreteRoughnessClone = concreteRoughness.clone();
+
+    // Configure texture repeat for pits
+    [concreteColorClone, concreteNormalClone, concreteRoughnessClone].forEach(texture =>
     {
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
       texture.repeat.set(this.rangeWidth / 5, this.pitsDepth / 5); // Repeat every 5 yards
-      texture.anisotropy = 16;
+      texture.needsUpdate = true;
     });
 
     const pitsMaterial = new THREE.MeshStandardMaterial(
     {
-      map: concreteColor,
-      normalMap: concreteNormal,
-      roughnessMap: concreteRoughness,
+      map: concreteColorClone,
+      normalMap: concreteNormalClone,
+      roughnessMap: concreteRoughnessClone,
       roughness: 0.9,
       metalness: 0.1
     });

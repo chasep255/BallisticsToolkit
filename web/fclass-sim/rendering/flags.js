@@ -108,18 +108,22 @@ export class FlagRenderer
     // Create flag texture
     const flagTexture = this.createFlagTexture();
 
-    // Load cloth textures once
-    const clothLoader = new THREE.TextureLoader();
-    const clothColor = clothLoader.load('textures/cloth/Fabric030_1K-JPG_Color.jpg');
-    const clothNormal = clothLoader.load('textures/cloth/Fabric030_1K-JPG_NormalGL.jpg');
-    const clothRoughness = clothLoader.load('textures/cloth/Fabric030_1K-JPG_Roughness.jpg');
+    // Get cloth textures from ResourceManager
+    const clothColor = ResourceManager.textures.getTexture('cloth_color');
+    const clothNormal = ResourceManager.textures.getTexture('cloth_normal');
+    const clothRoughness = ResourceManager.textures.getTexture('cloth_roughness');
 
-    [clothColor, clothNormal, clothRoughness].forEach(texture =>
+    // Clone textures for independent repeat settings
+    const clothColorClone = clothColor.clone();
+    const clothNormalClone = clothNormal.clone();
+    const clothRoughnessClone = clothRoughness.clone();
+
+    [clothColorClone, clothNormalClone, clothRoughnessClone].forEach(texture =>
     {
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
       texture.repeat.set(0.5, 0.5);
-      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+      texture.needsUpdate = true;
     });
 
     // Create shared materials
@@ -134,8 +138,8 @@ export class FlagRenderer
       flag: new THREE.MeshStandardMaterial(
       {
         map: flagTexture,
-        normalMap: clothNormal,
-        roughnessMap: clothRoughness,
+        normalMap: clothNormalClone,
+        roughnessMap: clothRoughnessClone,
         color: 0xffffff,
         roughness: 0.8,
         metalness: 0.0,
