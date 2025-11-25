@@ -1,5 +1,5 @@
 /**
- * TextureManager - Manages texture loading and caching
+ * TextureManager - Manages texture loading and caching for Steel Simulator
  * Handles Three.js texture loading with proper wrapping and anisotropy
  */
 
@@ -69,26 +69,6 @@ const TEXTURE_MANIFEST = {
     wrapT: THREE.RepeatWrapping
   },
 
-  // Concrete textures
-  concrete_color:
-  {
-    path: '../textures/concrete/Concrete012_1K-JPG_Color.jpg',
-    wrapS: THREE.RepeatWrapping,
-    wrapT: THREE.RepeatWrapping
-  },
-  concrete_normal:
-  {
-    path: '../textures/concrete/Concrete012_1K-JPG_NormalGL.jpg',
-    wrapS: THREE.RepeatWrapping,
-    wrapT: THREE.RepeatWrapping
-  },
-  concrete_roughness:
-  {
-    path: '../textures/concrete/Concrete012_1K-JPG_Roughness.jpg',
-    wrapS: THREE.RepeatWrapping,
-    wrapT: THREE.RepeatWrapping
-  },
-
   // Rock textures
   rock_color:
   {
@@ -123,6 +103,7 @@ export class TextureManager
 
   /**
    * Load all textures from manifest
+   * @param {THREE.WebGLRenderer} renderer - Renderer for texture anisotropy (optional)
    */
   async loadAll(renderer)
   {
@@ -174,6 +155,20 @@ export class TextureManager
   }
 
   /**
+   * Update texture anisotropy after renderer is available
+   * @param {THREE.WebGLRenderer} renderer - Renderer for texture anisotropy
+   */
+  updateAnisotropy(renderer)
+  {
+    const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+    for (const texture of this.textures.values())
+    {
+      texture.anisotropy = maxAnisotropy;
+    }
+    console.log(`${LOG_PREFIX} Updated anisotropy to ${maxAnisotropy} for all textures`);
+  }
+
+  /**
    * Get a texture by ID
    * @param {string} id - Texture ID from manifest
    * @returns {THREE.Texture|null}
@@ -202,3 +197,4 @@ export class TextureManager
     this.textures.clear();
   }
 }
+

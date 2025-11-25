@@ -122,11 +122,15 @@ namespace btk::rendering
      * transforms the segment into the target's local space and tests against
      * the finite plate (rectangle or oval) lying in the target's mid-plane.
      *
+     * Uses the "line break rule": if bullet_radius > 0, expands the target
+     * bounds by the bullet radius, so near-misses within the bullet radius count as hits.
+     *
      * @param start World-space start point of the segment
      * @param end World-space end point of the segment
+     * @param bullet_radius Bullet radius in meters (default 0, no expansion)
      * @return RaycastHit with world-space impact point/normal if hit, std::nullopt otherwise
      */
-    std::optional<RaycastHit> intersectSegment(const btk::math::Vector3D& start, const btk::math::Vector3D& end) const;
+    std::optional<RaycastHit> intersectSegment(const btk::math::Vector3D& start, const btk::math::Vector3D& end, float bullet_radius = 0.0f) const;
 
     /**
      * @brief Intersect a full bullet trajectory with this target.

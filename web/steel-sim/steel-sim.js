@@ -66,6 +66,16 @@ import
   SettingsCookies
 }
 from './SettingsCookies.js';
+import
+{
+  AudioManager
+}
+from './AudioManager.js';
+import
+{
+  TextureManager
+}
+from './TextureManager.js';
 
 // ===== COORDINATE SYSTEM =====
 // BTK and Three.js use the SAME coordinate system:
@@ -131,6 +141,12 @@ class SteelSimulator
     // Physics and effects
     this.windGenerator = null;
     this.timeManager = null;
+    
+    // Audio
+    this.audioManager = null;
+    
+    // Textures
+    this.textureManager = null;
 
     // Event handler references for cleanup
     this.boundHandlers = {};
@@ -162,11 +178,21 @@ class SteelSimulator
       this.timeManager = new TimeManager();
       this.timeManager.start();
 
+      // Initialize and load audio
+      this.audioManager = new AudioManager();
+      await this.audioManager.loadAll();
+
+      // Start background noise loop (this unlocks audio context for immediate playback)
+      await this.audioManager.startLoop('background_noise', 1.0);
+
+      // Initialize texture manager
+      this.textureManager = new TextureManager();
+
       // Setup ballistics (computes rifle zero)
       await this.setupBallistics();
 
-      // Setup scene
-      this.setupScene();
+      // Setup scene (will load textures after renderer is available)
+      await this.setupScene();
 
       // Start animation loop
       this.isRunning = true;
@@ -242,6 +268,16 @@ class SteelSimulator
     }
     
     // Dispose modules that own their own resources
+    if (this.textureManager)
+    {
+      this.textureManager.dispose();
+      this.textureManager = null;
+    }
+    if (this.audioManager)
+    {
+      this.audioManager.dispose();
+      this.audioManager = null;
+    }
     if (this.hud)
     {
       this.hud.dispose();
@@ -370,7 +406,7 @@ class SteelSimulator
 
   // ===== SCENE SETUP =====
 
-  setupScene()
+  async setupScene()
   {
     // Create scene
     this.scene = new THREE.Scene();
@@ -387,6 +423,9 @@ class SteelSimulator
     {
       canvas: this.canvas
     });
+    
+    // Load textures now that renderer is available
+    await this.textureManager.loadAll(this.compositionRenderer.renderer);
     
     // Get aspect for element positioning
     const aspect = this.compositionRenderer.getAspect();
@@ -415,7 +454,7 @@ class SteelSimulator
     this.backgroundCamera.lookAt(0, 0, -Config.CAMERA_FAR_PLANE);
 
     // Create landscape (uses Config.LANDSCAPE_CONFIG defaults)
-    this.landscape = new Landscape(this.scene);
+    this.landscape = new Landscape(this.scene, { textureManager: this.textureManager });
 
 
     // Initialize wind generator
@@ -439,6 +478,7 @@ class SteelSimulator
       scene: this.scene,
       renderTarget: this.scopeLayer.renderTarget,
       renderer: this.scopeLayer.getRenderer(), // Must use the renderer that created the render target
+      audioManager: this.audioManager, // Pass audio manager for scope click sounds
       // Scope optical spec (4–40x, 25 ft @ 100 yd at 4x)
       minZoomX: 4.0,
       maxZoomX: 40.0,
@@ -775,9 +815,9 @@ class SteelSimulator
       }
       
       // Arrow keys: Dial adjustments
-      // Shift + Arrow: 1.0 MRAD (10 clicks)
-      // Arrow alone: 0.1 MRAD (1 click)
-      const clicks = event.shiftKey ? 10 : 1;
+      // Arrow alone: 1.0 MRAD (10 clicks) - large adjustment
+      // Shift + Arrow: 0.1 MRAD (1 click) - small adjustment
+      const clicks = event.shiftKey ? 1 : 10;
       
       if (event.key === 'ArrowUp')
       {
@@ -814,6 +854,12 @@ class SteelSimulator
     {
       console.warn('[fireFromScope] Rifle not zeroed yet');
       return;
+    }
+
+    // Play shot sound immediately
+    if (this.audioManager)
+    {
+      this.audioManager.playSound('long_shot');
     }
 
     const btk = this.btk;
@@ -1000,6 +1046,52 @@ class SteelSimulator
 
         // Apply impact to target
         earliestTarget.hit(impactBullet);
+
+        // Play ping sound with distance-based delay and volume
+        if (this.audioManager)
+        {
+          // Shooter position (scope/camera position)
+          const shooterPos = new THREE.Vector3(0, Config.SHOOTER_HEIGHT, 0);
+          
+          // Impact position in Three.js coordinates
+          const impactPosThree = new THREE.Vector3(
+            impactPosition.x,
+            impactPosition.y,
+            impactPosition.z
+          );
+          
+          // Calculate distance from target to shooter
+          const distance_m = impactPosThree.distanceTo(shooterPos);
+          
+          // Speed of sound: ~343 m/s at sea level, 20°C
+          const SPEED_OF_SOUND_MPS = 343.0;
+          
+          // Calculate delay: time for sound to travel from target to shooter
+          const delaySeconds = distance_m / SPEED_OF_SOUND_MPS;
+          
+          // Volume attenuation: linear interpolation from 100% at 100 yards to 10% at max range distance
+          const minDistance_m = btk.Conversions.yardsToMeters(100.0); // Full volume at 100 yards
+          const maxDistance_m = Config.LANDSCAPE_CONFIG.groundLength; // Max range distance
+          
+          let volume;
+          if (distance_m <= minDistance_m)
+          {
+            volume = 1.0; // Full volume at or closer than 100 yards
+          }
+          else if (distance_m >= maxDistance_m)
+          {
+            volume = 0.1; // Minimum volume at or beyond max distance
+          }
+          else
+          {
+            // Linear interpolation between minDistance and maxDistance
+            const t = (distance_m - minDistance_m) / (maxDistance_m - minDistance_m);
+            volume = 1.0 - t * (1.0 - 0.1); // Interpolate from 1.0 to 0.1
+          }
+          
+          // Play ping sound with delay and volume
+          this.audioManager.playSoundDelayed('ping1', delaySeconds, { volume: volume });
+        }
 
         // Create dust cloud at impact position
         this.createMetallicDustCloud(impactPosition);

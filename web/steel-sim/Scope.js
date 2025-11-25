@@ -79,6 +79,8 @@ export class Scope
     // Camera aim (yaw/pitch in radians)
     this.yaw = 0;
     this.pitch = 0;
+    const maxPanDeg = (config.maxPanDeg !== undefined) ? config.maxPanDeg : (Config.SCOPE_MAX_PAN_DEG || 20);
+    this.maxPanAngleRad = THREE.MathUtils.degToRad(maxPanDeg); // Limit scope movement
 
     // Scope dial adjustments (integer clicks to avoid floating-point errors)
     this.elevationClicks = 0; // Positive = dial up (bullet impacts high)
@@ -88,6 +90,9 @@ export class Scope
     this.CLICK_VALUE_MRAD = 0.1; // Each click is 0.1 MRAD
     this.maxDialMRAD = config.maxDialMRAD || 30.0; // Maximum dial adjustment in MRAD (±30 MRAD default)
     this.maxDialClicks = Math.floor(this.maxDialMRAD / this.CLICK_VALUE_MRAD);
+    
+    // Audio manager for scope click sounds (optional)
+    this.audioManager = config.audioManager || null;
 
     // Shooter position
     this.cameraPosition = config.cameraPosition ||
@@ -542,8 +547,8 @@ export class Scope
    */
   panBy(deltaYawRad, deltaPitchRad)
   {
-    this.yaw += deltaYawRad;
-    this.pitch += deltaPitchRad;
+    this.yaw = THREE.MathUtils.clamp(this.yaw + deltaYawRad, -this.maxPanAngleRad, this.maxPanAngleRad);
+    this.pitch = THREE.MathUtils.clamp(this.pitch + deltaPitchRad, -this.maxPanAngleRad, this.maxPanAngleRad);
     this.updateCameraLookAt();
   }
 
@@ -581,10 +586,16 @@ export class Scope
    */
   dialUp(clicks = 1)
   {
-    const newClicks = this.elevationClicks + clicks;
+    const oldClicks = this.elevationClicks;
+    const newClicks = oldClicks + clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.elevationClicks = newClicks;
+      // Play click sound if dial actually changed
+      if (oldClicks !== newClicks && this.audioManager)
+      {
+        this.audioManager.playSound('scope_click');
+      }
     }
   }
 
@@ -594,10 +605,16 @@ export class Scope
    */
   dialDown(clicks = 1)
   {
-    const newClicks = this.elevationClicks - clicks;
+    const oldClicks = this.elevationClicks;
+    const newClicks = oldClicks - clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.elevationClicks = newClicks;
+      // Play click sound if dial actually changed
+      if (oldClicks !== newClicks && this.audioManager)
+      {
+        this.audioManager.playSound('scope_click');
+      }
     }
   }
 
@@ -607,10 +624,16 @@ export class Scope
    */
   dialLeft(clicks = 1)
   {
-    const newClicks = this.windageClicks - clicks;
+    const oldClicks = this.windageClicks;
+    const newClicks = oldClicks - clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.windageClicks = newClicks;
+      // Play click sound if dial actually changed
+      if (oldClicks !== newClicks && this.audioManager)
+      {
+        this.audioManager.playSound('scope_click');
+      }
     }
   }
 
@@ -620,10 +643,16 @@ export class Scope
    */
   dialRight(clicks = 1)
   {
-    const newClicks = this.windageClicks + clicks;
+    const oldClicks = this.windageClicks;
+    const newClicks = oldClicks + clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.windageClicks = newClicks;
+      // Play click sound if dial actually changed
+      if (oldClicks !== newClicks && this.audioManager)
+      {
+        this.audioManager.playSound('scope_click');
+      }
     }
   }
 
@@ -632,8 +661,15 @@ export class Scope
    */
   resetDial()
   {
+    const hadElevation = this.elevationClicks !== 0;
+    const hadWindage = this.windageClicks !== 0;
     this.elevationClicks = 0;
     this.windageClicks = 0;
+    // Play click sound if dial was actually reset (was non-zero)
+    if ((hadElevation || hadWindage) && this.audioManager)
+    {
+      this.audioManager.playSound('scope_click');
+    }
   }
 
   /**

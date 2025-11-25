@@ -29,13 +29,15 @@ export class Landscape
       groundWidth = Config.LANDSCAPE_CONFIG.groundWidth,
         groundLength = Config.LANDSCAPE_CONFIG.groundLength,
         brownGroundWidth = Config.LANDSCAPE_CONFIG.brownGroundWidth,
-        brownGroundLength = Config.LANDSCAPE_CONFIG.brownGroundLength
+        brownGroundLength = Config.LANDSCAPE_CONFIG.brownGroundLength,
+        textureManager = null
     } = options;
 
     this.groundWidth = groundWidth;
     this.groundLength = groundLength;
     this.brownGroundWidth = brownGroundWidth;
     this.brownGroundLength = brownGroundLength;
+    this.textureManager = textureManager;
 
     // Environment object arrays
     this.mountains = [];
@@ -46,12 +48,51 @@ export class Landscape
     // Create green ground plane (flat)
     // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
     const greenGroundGeometry = new THREE.PlaneGeometry(groundWidth, groundLength);
-    const greenGroundMaterial = new THREE.MeshStandardMaterial(
+    
+    // Get grass textures if available
+    let greenGroundMaterial;
+    if (this.textureManager)
     {
-      color: 0x4a7c59, // Green
-      roughness: 0.8,
-      metalness: 0.2
-    });
+      const grassColor = this.textureManager.getTexture('grass_color');
+      const grassNormal = this.textureManager.getTexture('grass_normal');
+      const grassRoughness = this.textureManager.getTexture('grass_roughness');
+      
+      // Configure texture repeat (repeat every 10 yards, matching F-Class)
+      // Convert meters to yards for repeat calculation
+      const btk = window.btk;
+      const groundWidth_yards = btk.Conversions.metersToYards(groundWidth);
+      const groundLength_yards = btk.Conversions.metersToYards(groundLength);
+      const repeatX = groundWidth_yards / 10;
+      const repeatY = groundLength_yards / 10;
+      [grassColor, grassNormal, grassRoughness].forEach(texture =>
+      {
+        if (texture)
+        {
+          texture.repeat.set(repeatX, repeatY);
+        }
+      });
+      
+      greenGroundMaterial = new THREE.MeshStandardMaterial(
+      {
+        map: grassColor,
+        normalMap: grassNormal,
+        roughnessMap: grassRoughness,
+        color: 0x8fb04a, // Lighter green tint (original was 0x6b8e23)
+        roughness: 1.0,
+        metalness: 0.0
+      });
+    }
+    else
+    {
+      // Fallback to plain color if textures not available
+      greenGroundMaterial = new THREE.MeshStandardMaterial(
+      {
+        color: 0x4a7c59, // Green
+        roughness: 0.8,
+        metalness: 0.2
+      });
+    }
+    
     this.greenGroundMesh = new THREE.Mesh(greenGroundGeometry, greenGroundMaterial);
     this.greenGroundMesh.rotation.x = -Math.PI / 2; // Rotate to horizontal (XZ plane)
     this.greenGroundMesh.position.set(0, 0, -groundLength / 2); // Center downrange
@@ -62,12 +103,51 @@ export class Landscape
 
     // Create brown ground plane (background, wider and longer)
     const brownGroundGeometry = new THREE.PlaneGeometry(brownGroundWidth, brownGroundLength);
-    const brownGroundMaterial = new THREE.MeshStandardMaterial(
+    
+    // Get dirt textures if available
+    let brownGroundMaterial;
+    if (this.textureManager)
     {
-      color: 0x8b6f47, // Brown
-      roughness: 0.8,
-      metalness: 0.2
-    });
+      const dirtColor = this.textureManager.getTexture('dirt_color');
+      const dirtNormal = this.textureManager.getTexture('dirt_normal');
+      const dirtRoughness = this.textureManager.getTexture('dirt_roughness');
+      
+      // Configure texture repeat (repeat every 10 yards, matching F-Class)
+      // Convert meters to yards for repeat calculation
+      const btk = window.btk;
+      const brownGroundWidth_yards = btk.Conversions.metersToYards(brownGroundWidth);
+      const brownGroundLength_yards = btk.Conversions.metersToYards(brownGroundLength);
+      const repeatX = brownGroundWidth_yards / 10;
+      const repeatY = brownGroundLength_yards / 10;
+      [dirtColor, dirtNormal, dirtRoughness].forEach(texture =>
+      {
+        if (texture)
+        {
+          texture.repeat.set(repeatX, repeatY);
+        }
+      });
+      
+      brownGroundMaterial = new THREE.MeshStandardMaterial(
+      {
+        map: dirtColor,
+        normalMap: dirtNormal,
+        roughnessMap: dirtRoughness,
+        color: 0xb89d6f, // Lighter brown tint (original was 0x8b6f47)
+        roughness: 1.0,
+        metalness: 0.0
+      });
+    }
+    else
+    {
+      // Fallback to plain color if textures not available
+      brownGroundMaterial = new THREE.MeshStandardMaterial(
+      {
+        color: 0x8b6f47, // Brown
+        roughness: 0.8,
+        metalness: 0.2
+      });
+    }
+    
     this.brownGroundMesh = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
     this.brownGroundMesh.rotation.x = -Math.PI / 2; // Rotate to horizontal (XZ plane)
     this.brownGroundMesh.position.set(0, -0.1, -brownGroundLength / 2); // Slightly below green ground
@@ -214,22 +294,85 @@ export class Landscape
   {
     const treeCount = Config.TREE_CONFIG.countSides + Config.TREE_CONFIG.countBehind;
 
-    // Trunk material - dark brown
-    const trunkMaterial = new THREE.MeshStandardMaterial(
+    // Trunk material - use bark textures if available
+    let trunkMaterial;
+    if (this.textureManager)
     {
-      color: 0x4a3728, // Dark brown
-      roughness: 1.0,
-      metalness: 0.0
-    });
+      const barkColor = this.textureManager.getTexture('bark_color');
+      const barkNormal = this.textureManager.getTexture('bark_normal');
+      const barkRoughness = this.textureManager.getTexture('bark_roughness');
+      
+      // Configure texture repeat for vertical bark pattern
+      [barkColor, barkNormal, barkRoughness].forEach(texture =>
+      {
+        if (texture)
+        {
+          texture.repeat.set(0.5, 2.0); // Vertical bark pattern
+        }
+      });
+      
+      trunkMaterial = new THREE.MeshStandardMaterial(
+      {
+        map: barkColor,
+        normalMap: barkNormal,
+        roughnessMap: barkRoughness,
+        color: 0x4a3728, // Darker brown tint
+        roughness: 1.0,
+        metalness: 0.0
+      });
+    }
+    else
+    {
+      // Fallback to plain color if textures not available
+      trunkMaterial = new THREE.MeshStandardMaterial(
+      {
+        color: 0x4a3728, // Dark brown
+        roughness: 1.0,
+        metalness: 0.0
+      });
+    }
 
-    // Foliage material - dark green
-    const foliageMaterial = new THREE.MeshStandardMaterial(
+    // Foliage material - use grass textures if available (leaves/foliage can use grass-like textures)
+    let foliageMaterial;
+    if (this.textureManager)
     {
-      color: 0x2d5016, // Dark green
-      roughness: 0.9,
-      metalness: 0.0,
-      side: THREE.DoubleSide
-    });
+      // Clone textures for foliage to avoid overwriting ground texture repeat
+      const grassColorGround = this.textureManager.getTexture('grass_color');
+      const grassNormalGround = this.textureManager.getTexture('grass_normal');
+      const grassRoughnessGround = this.textureManager.getTexture('grass_roughness');
+      
+      // Clone textures for foliage use (so we don't overwrite ground repeat)
+      const grassColor = grassColorGround.clone();
+      const grassNormal = grassNormalGround.clone();
+      const grassRoughness = grassRoughnessGround.clone();
+      
+      // Configure texture repeat for foliage (smaller repeat for detail)
+      grassColor.repeat.set(0.5, 0.5);
+      grassNormal.repeat.set(0.5, 0.5);
+      grassRoughness.repeat.set(0.5, 0.5);
+      
+      foliageMaterial = new THREE.MeshStandardMaterial(
+      {
+        map: grassColor,
+        normalMap: grassNormal,
+        roughnessMap: grassRoughness,
+        color: 0x2d5016, // Dark green tint
+        roughness: 0.9,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+      });
+    }
+    else
+    {
+      // Fallback to plain color if textures not available
+      foliageMaterial = new THREE.MeshStandardMaterial(
+      {
+        color: 0x2d5016, // Dark green
+        roughness: 0.9,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+      });
+    }
 
     // Cache tree geometries - multiple sizes
     const trunkGeometries = [];
@@ -302,13 +445,34 @@ export class Landscape
    */
   createRocks()
   {
-    // Rock material - gray/brown
-    const rockMaterial = new THREE.MeshStandardMaterial(
+    // Rock material - use rock textures if available
+    let rockMaterial;
+    if (this.textureManager)
     {
-      color: 0x6b5d4f, // Brown-gray
-      roughness: 0.9,
-      metalness: 0.1
-    });
+      const rockColor = this.textureManager.getTexture('rock_color');
+      const rockNormal = this.textureManager.getTexture('rock_normal');
+      const rockRoughness = this.textureManager.getTexture('rock_roughness');
+      
+      rockMaterial = new THREE.MeshStandardMaterial(
+      {
+        map: rockColor,
+        normalMap: rockNormal,
+        roughnessMap: rockRoughness,
+        color: 0xa89d8f, // Lighter brown-gray tint (original was 0x6b5d4f)
+        roughness: 0.9,
+        metalness: 0.1
+      });
+    }
+    else
+    {
+      // Fallback to plain color if textures not available
+      rockMaterial = new THREE.MeshStandardMaterial(
+      {
+        color: 0x6b5d4f, // Brown-gray
+        roughness: 0.9,
+        metalness: 0.1
+      });
+    }
 
     for (let i = 0; i < Config.ROCK_CONFIG.count; i++)
     {

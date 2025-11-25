@@ -171,8 +171,11 @@ namespace btk::rendering
     const Vector3D& p_start = pt_start_opt->getPosition();
     const Vector3D& p_end = pt_end_opt->getPosition();
 
-    // Raycast this segment into the target
-    auto hit_opt = intersectSegment(p_start, p_end);
+    // Get bullet radius for line break rule (bullet diameter doesn't change during flight)
+    float bullet_radius = pt_start_opt->getState().getDiameter() * 0.5f;
+
+    // Raycast this segment into the target (with line break rule)
+    auto hit_opt = intersectSegment(p_start, p_end, bullet_radius);
     if(!hit_opt.has_value())
     {
       return std::nullopt;
@@ -193,7 +196,7 @@ namespace btk::rendering
     return pt_hit_opt;
   }
 
-  std::optional<SteelTarget::RaycastHit> SteelTarget::intersectSegment(const btk::math::Vector3D& start, const btk::math::Vector3D& end) const
+  std::optional<SteelTarget::RaycastHit> SteelTarget::intersectSegment(const btk::math::Vector3D& start, const btk::math::Vector3D& end, float bullet_radius) const
   {
     // Transform segment into target-local space where the plate lies in the XY
     // plane with its mid-plane at Z = 0 and finite width_/height_ extents.
@@ -223,13 +226,15 @@ namespace btk::rendering
     btk::math::Vector3D hit_local = start_local + dir_local * t;
 
     // Check against finite plate extents in local XY
-    float half_width = width_ * 0.5f;
-    float half_height = height_ * 0.5f;
+    // Line break rule: expand bounds by bullet radius
+    float half_width = width_ * 0.5f + bullet_radius;
+    float half_height = height_ * 0.5f + bullet_radius;
 
     bool inside = false;
     if(is_oval_)
     {
       // Elliptical plate: (x/a)^2 + (y/b)^2 <= 1
+      // Expanded ellipse with bullet radius
       float nx = hit_local.x / half_width;
       float ny = hit_local.y / half_height;
       inside = (nx * nx + ny * ny) <= 1.0f;
@@ -237,6 +242,7 @@ namespace btk::rendering
     else
     {
       // Rectangular plate: |x| <= half_width, |y| <= half_height
+      // Expanded rectangle with bullet radius
       inside = (std::fabs(hit_local.x) <= half_width) && (std::fabs(hit_local.y) <= half_height);
     }
 
@@ -491,16 +497,45 @@ namespace btk::rendering
     btk::math::Vector3D local_pos_rotated = inv_orientation.rotate(local_pos);
     btk::math::Vector3D local_vel_rotated = inv_orientation.rotate(bullet.getVelocity());
 
+    // Clamp local position to actual target bounds (for line break rule hits)
+    // This ensures texture mapping works correctly even when hit point is outside bounds
+    float half_width = width_ * 0.5f;
+    float half_height = height_ * 0.5f;
+    btk::math::Vector3D local_pos_clamped = local_pos_rotated;
+
+    if(is_oval_)
+    {
+      // For oval targets, clamp to ellipse boundary
+      float nx = local_pos_rotated.x / half_width;
+      float ny = local_pos_rotated.y / half_height;
+      float dist_from_center = std::sqrt(nx * nx + ny * ny);
+      if(dist_from_center > 1.0f)
+      {
+        // Project point onto ellipse boundary by scaling normalized coordinates
+        float scale = 1.0f / dist_from_center;
+        local_pos_clamped.x = nx * scale * half_width;
+        local_pos_clamped.y = ny * scale * half_height;
+      }
+    }
+    else
+    {
+      // For rectangular targets, clamp to rectangle boundary
+      local_pos_clamped.x = std::max(-half_width, std::min(half_width, local_pos_rotated.x));
+      local_pos_clamped.y = std::max(-half_height, std::min(half_height, local_pos_rotated.y));
+    }
+    // Z component stays the same (should be near 0 anyway)
+
     // Determine which face was hit based on bullet velocity vs surface normal.
     // If the bullet velocity opposes the surface normal (dot < 0), it struck the front face.
     // If it roughly aligns with the normal (dot > 0), it struck the back face.
     btk::math::Vector3D vel_world = bullet.getVelocity();
     bool is_front_face = vel_world.dot(normal_) < 0.0f;
 
-    // Store impact in local coordinates
+    // Store impact in local coordinates (use original position for physics, clamped for display)
     impacts_.emplace_back(local_pos_rotated, local_vel_rotated, bullet.getDiameter(), 0.0f);
 
-    drawImpactOnTexture(local_pos_rotated, bullet.getDiameter(), is_front_face);
+    // Draw impact using clamped position to ensure it's within texture bounds
+    drawImpactOnTexture(local_pos_clamped, bullet.getDiameter(), is_front_face);
   }
 
   void SteelTarget::updateDisplay()
@@ -861,6 +896,11 @@ namespace btk::rendering
       return;
     }
 
+    // Calculate half-width to confine drawing to correct side
+    int half_texture_width = texture_width_ / 2;
+    int u_min = is_front_face ? 0 : half_texture_width;
+    int u_max = is_front_face ? half_texture_width : texture_width_;
+
     // Convert UV to pixel coordinates
     int center_x = static_cast<int>(u * texture_width_);
     int center_y = static_cast<int>(v * texture_height_);
@@ -882,8 +922,8 @@ namespace btk::rendering
         int px = center_x + dx;
         int py = center_y + dy;
 
-        // Check bounds
-        if(px < 0 || px >= texture_width_ || py < 0 || py >= texture_height_)
+        // Check bounds - confine to correct half of texture
+        if(px < u_min || px >= u_max || py < 0 || py >= texture_height_)
           continue;
 
         // Calculate distance from center
@@ -938,7 +978,8 @@ namespace btk::rendering
           int px = spike_x + static_cast<int>(spike_dir_y * w);
           int py = spike_y - static_cast<int>(spike_dir_x * w);
 
-          if(px >= 0 && px < texture_width_ && py >= 0 && py < texture_height_)
+          // Check bounds - confine to correct half of texture
+          if(px >= u_min && px < u_max && py >= 0 && py < texture_height_)
           {
             size_t pixel_idx = (py * texture_width_ + px) * 4;
 

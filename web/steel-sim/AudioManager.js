@@ -1,6 +1,7 @@
 /**
- * AudioManager - Manages audio loading, playback, and looping sounds
+ * AudioManager - Manages audio loading and playback for Steel Simulator
  * Handles Web Audio API context and buffer management
+ * Supports immediate and scheduled/delayed sound playback
  */
 
 const LOG_PREFIX = '[AudioManager]';
@@ -8,36 +9,9 @@ const LOG_PREFIX = '[AudioManager]';
 // Audio manifest - all audio files to load
 const AUDIO_MANIFEST = {
   // Shot sounds
-  shot1:
+  long_shot:
   {
-    path: '../audio/shot1.mp3',
-    type: 'oneshot'
-  },
-
-  // Background shot sounds (for other shooters)
-  bg_shot_1:
-  {
-    path: '../audio/bg_shot_1.mp3',
-    type: 'oneshot'
-  },
-  bg_shot_2:
-  {
-    path: '../audio/bg_shot_2.mp3',
-    type: 'oneshot'
-  },
-  bg_shot_3:
-  {
-    path: '../audio/bg_shot_3.mp3',
-    type: 'oneshot'
-  },
-  bg_shot_4:
-  {
-    path: '../audio/bg_shot_4.mp3',
-    type: 'oneshot'
-  },
-  bg_shot_5:
-  {
-    path: '../audio/bg_shot_5.mp3',
+    path: '../audio/long_shot.mp3',
     type: 'oneshot'
   },
 
@@ -48,32 +22,20 @@ const AUDIO_MANIFEST = {
     type: 'oneshot'
   },
 
+  // Target hit sounds
+  ping1:
+  {
+    path: '../audio/ping1.mp3',
+    type: 'oneshot'
+  },
+
   // Ambient sounds
   background_noise:
   {
     path: '../audio/background_noise.mp3',
     type: 'loop'
-  },
-  wind:
-  {
-    path: '../audio/wind.mp3',
-    type: 'loop'
   }
 };
-
-// Helper to get random background shot sound ID (avoiding repeats)
-let lastBgShotId = null;
-
-function getRandomBgShotId()
-{
-  let index;
-  do {
-    index = Math.floor(Math.random() * 5) + 1;
-  } while (`bg_shot_${index}` === lastBgShotId);
-
-  lastBgShotId = `bg_shot_${index}`;
-  return lastBgShotId;
-}
 
 export class AudioManager
 {
@@ -82,6 +44,7 @@ export class AudioManager
     this.audioContext = null;
     this.audioBuffers = new Map();
     this.activeSources = new Set();
+    this.scheduledSources = new Set(); // Track scheduled sources for cleanup
     this.loopingSources = new Map(); // Map<soundId, {source, gainNode}>
     this.loadingProgress = 0;
 
@@ -98,6 +61,19 @@ export class AudioManager
       this.audioContext = new(window.AudioContext || window.webkitAudioContext)();
       console.log(`${LOG_PREFIX} Audio context created (sample rate: ${this.audioContext.sampleRate}Hz)`);
     }
+    
+    // Resume context if suspended (browser autoplay policy)
+    if (this.audioContext.state === 'suspended')
+    {
+      this.audioContext.resume().then(() =>
+      {
+        console.log(`${LOG_PREFIX} Audio context resumed`);
+      }).catch((error) =>
+      {
+        console.warn(`${LOG_PREFIX} Failed to resume audio context:`, error);
+      });
+    }
+    
     return this.audioContext;
   }
 
@@ -147,19 +123,13 @@ export class AudioManager
   }
 
   /**
-   * Play a sound by ID
+   * Play a sound by ID (immediate playback)
    * @param {string} id - Sound ID from manifest
-   * @param {Object} options - Playback options {volume, loop}
+   * @param {Object} options - Playback options {volume}
    * @returns {AudioBufferSourceNode|null} The audio source node
    */
   playSound(id, options = {})
   {
-    // Handle special case: random background shot
-    if (id === 'bg_shot_random')
-    {
-      id = getRandomBgShotId();
-    }
-
     const buffer = this.audioBuffers.get(id);
     if (!buffer)
     {
@@ -194,6 +164,7 @@ export class AudioManager
       source.onended = () =>
       {
         this.activeSources.delete(source);
+        this.scheduledSources.delete(source);
         try
         {
           source.disconnect();
@@ -204,6 +175,14 @@ export class AudioManager
         }
       };
 
+      // Ensure context is running before playback (should be running after background loop starts)
+      // Resume synchronously if suspended - this should be rare after user interaction
+      if (context.state === 'suspended')
+      {
+        context.resume();
+      }
+      
+      // Start immediately - if context was suspended, resume() will queue the start
       source.start(0);
       return source;
     }
@@ -215,11 +194,78 @@ export class AudioManager
   }
 
   /**
+   * Play a sound with a delay (scheduled playback)
+   * @param {string} id - Sound ID from manifest
+   * @param {number} delaySeconds - Delay in seconds before playing
+   * @param {Object} options - Playback options {volume}
+   * @returns {AudioBufferSourceNode|null} The audio source node
+   */
+  playSoundDelayed(id, delaySeconds, options = {})
+  {
+    const buffer = this.audioBuffers.get(id);
+    if (!buffer)
+    {
+      console.warn(`${LOG_PREFIX} Audio buffer not found: ${id}`);
+      return null;
+    }
+
+    const context = this.initializeContext();
+
+    try
+    {
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+
+      // Apply volume if specified
+      if (options.volume !== undefined)
+      {
+        const gainNode = context.createGain();
+        gainNode.gain.value = options.volume;
+        source.connect(gainNode);
+        gainNode.connect(context.destination);
+      }
+      else
+      {
+        source.connect(context.destination);
+      }
+
+      // Track scheduled source
+      this.scheduledSources.add(source);
+      this.activeSources.add(source);
+
+      // Auto-cleanup when sound ends
+      source.onended = () =>
+      {
+        this.activeSources.delete(source);
+        this.scheduledSources.delete(source);
+        try
+        {
+          source.disconnect();
+        }
+        catch (e)
+        {
+          // Already disconnected
+        }
+      };
+
+      // Schedule playback at current time + delay
+      const startTime = context.currentTime + delaySeconds;
+      source.start(startTime);
+      return source;
+    }
+    catch (error)
+    {
+      console.error(`${LOG_PREFIX} Failed to schedule sound ${id}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Start a looping sound with volume control
    * @param {string} id - Sound ID from manifest
    * @param {number} initialVolume - Initial volume (0-1)
    */
-  startLoop(id, initialVolume = 1.0)
+  async startLoop(id, initialVolume = 1.0)
   {
     // Stop existing loop if playing
     this.stopLoop(id);
@@ -232,6 +278,12 @@ export class AudioManager
     }
 
     const context = this.initializeContext();
+    
+    // Ensure context is running (resume if suspended)
+    if (context.state === 'suspended')
+    {
+      await context.resume();
+    }
 
     try
     {
@@ -247,6 +299,12 @@ export class AudioManager
       source.connect(gainNode);
       gainNode.connect(context.destination);
 
+      // Start playback - context should be running after user interaction (Start button)
+      // Resume if suspended (shouldn't happen, but handle gracefully)
+      if (context.state === 'suspended')
+      {
+        context.resume();
+      }
       source.start(0);
 
       this.loopingSources.set(id,
@@ -302,50 +360,11 @@ export class AudioManager
   }
 
   /**
-   * Pause all audio (suspends audio context)
-   */
-  pause()
-  {
-    if (this.audioContext && this.audioContext.state === 'running')
-    {
-      this.audioContext.suspend();
-      console.log(`${LOG_PREFIX} Paused`);
-    }
-  }
-
-  /**
-   * Resume all audio (resumes audio context)
-   */
-  resume()
-  {
-    if (this.audioContext && this.audioContext.state === 'suspended')
-    {
-      this.audioContext.resume();
-      console.log(`${LOG_PREFIX} Resumed`);
-    }
-  }
-
-  /**
    * Dispose all audio resources
    */
   dispose()
   {
-    console.log(`${LOG_PREFIX} Disposing (${this.activeSources.size} active, ${this.loopingSources.size} looping)`);
-
-    // Stop all active sources
-    for (const source of this.activeSources)
-    {
-      try
-      {
-        source.stop();
-        source.disconnect();
-      }
-      catch (e)
-      {
-        // Already stopped
-      }
-    }
-    this.activeSources.clear();
+    console.log(`${LOG_PREFIX} Disposing (${this.activeSources.size} active, ${this.scheduledSources.size} scheduled, ${this.loopingSources.size} looping)`);
 
     // Stop all looping sources
     for (const [id, loopData] of this.loopingSources)
@@ -363,6 +382,22 @@ export class AudioManager
     }
     this.loopingSources.clear();
 
+    // Stop all active sources
+    for (const source of this.activeSources)
+    {
+      try
+      {
+        source.stop();
+        source.disconnect();
+      }
+      catch (e)
+      {
+        // Already stopped
+      }
+    }
+    this.activeSources.clear();
+    this.scheduledSources.clear();
+
     // Close audio context
     if (this.audioContext)
     {
@@ -374,3 +409,4 @@ export class AudioManager
     console.log(`${LOG_PREFIX} Disposed`);
   }
 }
+
