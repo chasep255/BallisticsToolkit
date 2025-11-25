@@ -49,9 +49,25 @@ export class HUD
     // Scope Dial - Windage
     this.windageCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
     this.windageMesh = this.createHudMesh(this.windageCanvas, displayWidth, displayHeight, margin, currentY);
+    currentY -= lineHeight;
+    
+    // Estimated Look Point - X coordinate
+    this.lookPointXCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.lookPointXMesh = this.createHudMesh(this.lookPointXCanvas, displayWidth, displayHeight, margin, currentY);
+    currentY -= lineHeight;
+    
+    // Estimated Look Point - Z coordinate
+    this.lookPointZCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.lookPointZMesh = this.createHudMesh(this.lookPointZCanvas, displayWidth, displayHeight, margin, currentY);
+    currentY -= lineHeight;
+    
+    // Estimated Look Point - Range
+    this.lookPointRangeCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.lookPointRangeMesh = this.createHudMesh(this.lookPointRangeCanvas, displayWidth, displayHeight, margin, currentY);
     
     // Initialize dial display
     this.updateDial(0, 0);
+    // Note: updateImpactPoint will be called on first frame
   }
   
   createHudCanvas(width, height)
@@ -145,6 +161,45 @@ export class HUD
       if (this.windageMesh && this.windageMesh.material.map)
       {
         this.windageMesh.material.map.needsUpdate = true;
+      }
+    }
+  }
+  
+  updateImpactPoint(impactPoint)
+  {
+    // Update X coordinate display
+    if (this.lookPointXCanvas)
+    {
+      const ctx = this.lookPointXCanvas.getContext('2d');
+      const xStr = impactPoint ? `${impactPoint.x.toFixed(1)}m` : 'N/A';
+      this.drawText(ctx, 'Look X:', xStr, this.lookPointXCanvas);
+      if (this.lookPointXMesh && this.lookPointXMesh.material.map)
+      {
+        this.lookPointXMesh.material.map.needsUpdate = true;
+      }
+    }
+    
+    // Update Z coordinate display
+    if (this.lookPointZCanvas)
+    {
+      const ctx = this.lookPointZCanvas.getContext('2d');
+      const zStr = impactPoint ? `${impactPoint.z.toFixed(1)}m` : 'N/A';
+      this.drawText(ctx, 'Look Z:', zStr, this.lookPointZCanvas);
+      if (this.lookPointZMesh && this.lookPointZMesh.material.map)
+      {
+        this.lookPointZMesh.material.map.needsUpdate = true;
+      }
+    }
+    
+    // Update range display
+    if (this.lookPointRangeCanvas)
+    {
+      const ctx = this.lookPointRangeCanvas.getContext('2d');
+      const rangeStr = impactPoint ? `${impactPoint.range.toFixed(1)}m` : 'N/A';
+      this.drawText(ctx, 'Look Range:', rangeStr, this.lookPointRangeCanvas);
+      if (this.lookPointRangeMesh && this.lookPointRangeMesh.material.map)
+      {
+        this.lookPointRangeMesh.material.map.needsUpdate = true;
       }
     }
   }

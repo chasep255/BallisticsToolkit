@@ -76,6 +76,11 @@ import
   TextureManager
 }
 from './TextureManager.js';
+import
+{
+  BallisticsTable
+}
+from './BallisticsTable.js';
 
 // ===== COORDINATE SYSTEM =====
 // BTK and Three.js use the SAME coordinate system:
@@ -402,6 +407,25 @@ class SteelSimulator
     // Cleanup
     targetPos.delete();
     simulator.delete();
+    
+    // Build ballistics table (drop table) for estimating impact points
+    this.ballisticsTable = new BallisticsTable();
+    this.ballisticsTable.build(this.rifleZero, {
+      maxRange_m: Config.LANDSCAPE_CONFIG.groundLength * 1.25,
+      rangeStep_m: btk.Conversions.yardsToMeters(25) // 25 yard steps
+    });
+  }
+  
+  /**
+   * Estimate where the bullet will impact based on current scope dial settings.
+   * @returns {Object} {x, y, z, range} in meters, or null if no valid estimate
+   */
+  estimateBulletImpactPoint()
+  {
+    if (!this.ballisticsTable || !this.scope) return null;
+    
+    const dialPos = this.scope.getDialPositionMRAD();
+    return this.ballisticsTable.estimateImpactPoint(dialPos.elevation);
   }
 
   // ===== SCENE SETUP =====
@@ -863,24 +887,10 @@ class SteelSimulator
     }
 
     const btk = this.btk;
-
-    // Get scope camera
-    const scopeCamera = this.scope.getCamera();
-
-    // Scope position (eye level)
-    const scopePosThree = scopeCamera.position;
-
-    // Bore position is 2" below scope (bullet launches from bore, not scope)
-    const boreOffset_m = -this.rifleZero.scopeHeight_m; // Negative Y because bore is below scope
-    const borePosThree = new THREE.Vector3(
-      scopePosThree.x,
-      scopePosThree.y + boreOffset_m,
-      scopePosThree.z
-    );
     const borePos = new btk.Vector3D(
-      borePosThree.x,
-      borePosThree.y,
-      borePosThree.z
+      0,
+      Config.SHOOTER_HEIGHT - this.rifleZero.scopeHeight_m,
+      0
     );
 
     // Apply MV variation (already in SI: m/s)
@@ -888,9 +898,11 @@ class SteelSimulator
     const actualMVMps = this.mv_mps + mvVariationMps;
 
     // Get scope dial position (in MRAD)
-    const dialPos = this.scope.getDialPositionMRAD();
-    const dialElevationRad = dialPos.elevation * 0.001; // MRAD to radians
-    const dialWindageRad = dialPos.windage * 0.001;     // MRAD to radians
+    const scopeAngle = this.scope.getTotalAngleMRAD();
+    const scopeElevationRad = scopeAngle.elevation * 0.001; // MRAD to radians
+    const scopeWindageRad = scopeAngle.windage * 0.001;     // MRAD to radians
+
+    console.log(`[fireFromScope] Scope angle: ${scopeElevationRad} rad elevation, ${scopeWindageRad} rad windage`);
 
     // Rifle accuracy as uniform distribution within a circle (diameter)
     // Generate random point within unit circle using rejection sampling
@@ -907,21 +919,8 @@ class SteelSimulator
     const accuracyErrorH = accuracyX * accuracyRadius; // radians (horizontal/yaw)
     const accuracyErrorV = accuracyY * accuracyRadius; // radians (vertical/pitch)
 
-
-    // Get zeroed velocity and rotate by scope orientation
-    const zeroVel = this.rifleZero.zeroedVelocity;
-    const zeroVelThree = new THREE.Vector3(zeroVel.x, zeroVel.y, zeroVel.z);
-    zeroVelThree.applyQuaternion(scopeCamera.quaternion);
-
-    // Normalize to get unit direction
-    const zeroVelMag = zeroVelThree.length();
-    const unitDir = zeroVelThree.normalize();
-
-    // Apply dial and accuracy errors as small angular adjustments
-    // Combine dial adjustments with accuracy errors
-    // Note: Invert elevation sign - dialing up should raise impact point
-    const totalYawAdjustment = dialWindageRad + accuracyErrorH;
-    const totalPitchAdjustment = -dialElevationRad + accuracyErrorV;
+    const totalYawAdjustment = -scopeWindageRad + accuracyErrorH;
+    const totalPitchAdjustment = -scopeElevationRad + accuracyErrorV;
     
     const cosYaw = Math.cos(totalYawAdjustment);
     const sinYaw = Math.sin(totalYawAdjustment);
@@ -929,12 +928,14 @@ class SteelSimulator
     const sinPitch = Math.sin(totalPitchAdjustment);
 
     // Rotate unit direction: yaw around Y, then pitch around X
+    const unitDir = this.rifleZero.zeroedVelocity.normalized();
     const rx = unitDir.x * cosYaw - unitDir.z * sinYaw;
     const rz = unitDir.x * sinYaw + unitDir.z * cosYaw;
     const ry = unitDir.y;
     const ux = rx;
     const uy = ry * cosPitch + rz * sinPitch;
     const uz = -ry * sinPitch + rz * cosPitch;
+    unitDir.delete();
 
     // Scale by actual MV (already in m/s) and create BTK velocity vector
     const initialVelocity = new btk.Vector3D(
@@ -1231,6 +1232,10 @@ class SteelSimulator
     {
       const dialPos = this.scope.getDialPositionMRAD();
       this.hud.updateDial(dialPos.elevation, dialPos.windage);
+      
+      // Update HUD with estimated bullet impact point
+      const impactPoint = this.estimateBulletImpactPoint();
+      this.hud.updateImpactPoint(impactPoint);
     }
 
     // Track FPS

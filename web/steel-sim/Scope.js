@@ -684,6 +684,31 @@ export class Scope
     };
   }
 
+  /**
+   * Get current hold position in MRAD
+   * @returns {Object} {elevation: number, windage: number} in MRAD
+   */
+  getHoldPositionMRAD()
+  {
+    return {
+      elevation: this.pitch * 1000,
+      windage: this.yaw * 1000
+    };
+  }
+
+  /**
+   * Get current total angle in MRAD
+   * @returns {Object} {elevation: number, windage: number} in MRAD
+   */
+  getTotalAngleMRAD()
+  {
+    return {
+      elevation: this.elevationClicks * this.CLICK_VALUE_MRAD + this.pitch * 1000,
+      windage: this.windageClicks * this.CLICK_VALUE_MRAD + this.yaw * 1000
+    };
+  }
+
+
   render()
   {
     // Step 1: Render 3D scene to internal render target
