@@ -775,7 +775,17 @@ class SteelSimulator
     window.addEventListener('resize', this.boundHandlers.onWindowResize);
     
     // Fullscreen change needs delayed resize to let layout update
-    this.boundHandlers.onFullscreenChange = () => {
+    this.boundHandlers.onFullscreenChange = async () => {
+      // Lock orientation when entering fullscreen
+      if (document.fullscreenElement)
+      {
+        await lockOrientationLandscape();
+      }
+      else
+      {
+        unlockOrientation();
+      }
+      
       // Wait for layout to update before resizing
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -1470,12 +1480,17 @@ class SteelSimulator
     }
     else if (touches.length === 1)
     {
-      // Single finger - pan only after tap duration threshold
+      // Single finger - pan if moved enough distance
       const touch = touches[0];
-      const elapsed = performance.now() - this.touchState.touchStartTime;
-      const TAP_DURATION_THRESHOLD = 150; // ms - panning starts after this
+      const DRAG_DISTANCE_THRESHOLD = 5; // pixels - start dragging if moved this far
       
-      if (elapsed > TAP_DURATION_THRESHOLD)
+      // Calculate distance moved from start position
+      const deltaXFromStart = touch.clientX - this.touchState.touchStartPos.x;
+      const deltaYFromStart = touch.clientY - this.touchState.touchStartPos.y;
+      const distanceFromStart = Math.sqrt(deltaXFromStart * deltaXFromStart + deltaYFromStart * deltaYFromStart);
+      
+      // Start panning if moved enough distance
+      if (distanceFromStart > DRAG_DISTANCE_THRESHOLD)
       {
         // It's a drag now - pan the view
         const deltaX = touch.clientX - this.touchState.lastTouchPos.x;
@@ -2222,6 +2237,71 @@ function setupUI()
 }
 
 /**
+ * Lock screen orientation to landscape
+ */
+async function lockOrientationLandscape()
+{
+  try
+  {
+    if (screen.orientation && screen.orientation.lock)
+    {
+      await screen.orientation.lock('landscape');
+    }
+    else if (screen.lockOrientation)
+    {
+      // Legacy API
+      screen.lockOrientation('landscape');
+    }
+    else if (screen.mozLockOrientation)
+    {
+      // Firefox legacy
+      screen.mozLockOrientation('landscape');
+    }
+    else if (screen.msLockOrientation)
+    {
+      // IE/Edge legacy
+      screen.msLockOrientation('landscape');
+    }
+  }
+  catch (err)
+  {
+    // Orientation lock may fail (e.g., user gesture required, not supported)
+    // This is expected on some browsers/devices
+    console.warn('Could not lock orientation to landscape:', err);
+  }
+}
+
+/**
+ * Unlock screen orientation
+ */
+function unlockOrientation()
+{
+  try
+  {
+    if (screen.orientation && screen.orientation.unlock)
+    {
+      screen.orientation.unlock();
+    }
+    else if (screen.unlockOrientation)
+    {
+      screen.unlockOrientation();
+    }
+    else if (screen.mozUnlockOrientation)
+    {
+      screen.mozUnlockOrientation();
+    }
+    else if (screen.msUnlockOrientation)
+    {
+      screen.msUnlockOrientation();
+    }
+  }
+  catch (err)
+  {
+    console.warn('Could not unlock orientation:', err);
+  }
+}
+
+/**
  * Toggle fullscreen mode for the canvas container
  * Also starts the game if it hasn't started yet
  */
@@ -2238,21 +2318,34 @@ async function toggleFullscreen()
     }
     
     // Enter fullscreen
-    if (canvasContainer.requestFullscreen)
+    try
     {
-      canvasContainer.requestFullscreen();
+      if (canvasContainer.requestFullscreen)
+      {
+        await canvasContainer.requestFullscreen();
+      }
+      else if (canvasContainer.webkitRequestFullscreen)
+      {
+        await canvasContainer.webkitRequestFullscreen(); // Safari
+      }
+      else if (canvasContainer.msRequestFullscreen)
+      {
+        await canvasContainer.msRequestFullscreen(); // IE/Edge
+      }
+      
+      // Lock orientation to landscape after entering fullscreen
+      await lockOrientationLandscape();
     }
-    else if (canvasContainer.webkitRequestFullscreen)
+    catch (err)
     {
-      canvasContainer.webkitRequestFullscreen(); // Safari
-    }
-    else if (canvasContainer.msRequestFullscreen)
-    {
-      canvasContainer.msRequestFullscreen(); // IE/Edge
+      console.error('Fullscreen error:', err);
     }
   }
   else
   {
+    // Unlock orientation before exiting fullscreen
+    unlockOrientation();
+    
     // Exit fullscreen
     if (document.exitFullscreen)
     {
@@ -2292,6 +2385,25 @@ document.addEventListener('DOMContentLoaded', async () =>
 
     // Attach auto-save listeners to all settings inputs
     SettingsCookies.attachAutoSave();
+
+    // Try to lock orientation to landscape (may require user gesture on some browsers)
+    // Also try on first user interaction since many browsers require a gesture
+    let orientationLockAttempted = false;
+    const tryLockOrientation = async () =>
+    {
+      if (!orientationLockAttempted)
+      {
+        orientationLockAttempted = true;
+        await lockOrientationLandscape();
+      }
+    };
+    
+    // Try immediately (may fail without user gesture)
+    await lockOrientationLandscape();
+    
+    // Also try on first click/touch (user gesture required on some browsers)
+    document.addEventListener('click', tryLockOrientation, { once: true });
+    document.addEventListener('touchstart', tryLockOrientation, { once: true });
 
     // Don't auto-start - wait for Start button
   }
