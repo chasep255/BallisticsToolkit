@@ -35,6 +35,7 @@ export class Shot
 
     // Shot state
     this.alive = true;
+    this.lastCheckedCollisionTime = 0.0; // Track last collision check time
 
     // Bullet animation state
     this.bulletMesh = null;
@@ -115,7 +116,6 @@ export class Shot
    */
   updateAnimation()
   {
-    if (!this.alive || !this.ballisticSimulator || !this.bulletMesh) return;
 
     const currentBullet = this.ballisticSimulator.getCurrentBullet();
     const posBtk = currentBullet.getPosition();
@@ -259,6 +259,26 @@ export class Shot
   {
     if (!this.ballisticSimulator) return null;
     return this.ballisticSimulator.getTrajectory();
+  }
+
+  /**
+   * Get and update the last checked collision time
+   * Returns the time range [lastChecked, currentTime] and updates lastChecked
+   */
+  getCollisionCheckTimeRange()
+  {
+    if (!this.ballisticSimulator) return null;
+    
+    const trajectory = this.ballisticSimulator.getTrajectory();
+    if (!trajectory) return null;
+    
+    const currentTime = trajectory.getTotalTime();
+    const lastChecked = this.lastCheckedCollisionTime;
+    
+    // Update for next check
+    this.lastCheckedCollisionTime = currentTime;
+    
+    return { t0: lastChecked, t1: currentTime };
   }
 
   /**

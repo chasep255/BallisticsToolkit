@@ -188,6 +188,22 @@ namespace btk::ballistics
      */
     bool isEmpty() const { return points_.empty(); }
 
+    /**
+     * @brief Find the index of the first point at or after the given time.
+     *
+     * @param time_s Time in seconds
+     * @return Index of first point >= time_s, or getPointCount() if none found
+     */
+    size_t findPointIndexAtTime(float time_s) const;
+
+    /**
+     * @brief Find the segment index that contains or starts at the given time.
+     *
+     * @param time_s Time in seconds
+     * @return Segment index (0-based), or -1 if no segment contains this time
+     */
+    int findSegmentIndexAtTime(float time_s) const;
+
     private:
     std::vector<TrajectoryPoint> points_;
 

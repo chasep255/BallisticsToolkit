@@ -50,15 +50,14 @@ export class ImpactDetector
       indices = geometry.index.array;
     }
 
-    // Convert to BTK coordinates (Three.js uses same coord system for steel-sim: X=right, Y=up, Z=toward camera)
-    // BTK: X=crossrange, Y=up, Z=-downrange
-    // So we need to negate Z values when passing to C++
+    // Vertices are already in BTK-compatible coordinates (geometry should be pre-transformed)
+    // BTK: X=crossrange, Y=up, Z=-downrange (same as Three.js world space for this sim)
     const verticesBTK = new Float32Array(vertices.length);
     for (let i = 0; i < vertices.length; i += 3)
     {
       verticesBTK[i] = vertices[i]; // X unchanged
       verticesBTK[i + 1] = vertices[i + 1]; // Y unchanged
-      verticesBTK[i + 2] = -vertices[i + 2]; // Z negated (Three.js +Z = toward camera, BTK -Z = downrange)
+      verticesBTK[i + 2] = vertices[i + 2]; // Z unchanged - geometry is already in world/BTK coords
     }
 
     // Allocate object ID and store user data
@@ -66,13 +65,10 @@ export class ImpactDetector
     this.userData.set(objectId, userData);
 
     // Register with C++ detector
-    const handle = this.detector.addMeshCollider(verticesBTK, indices || new Uint32Array(0), objectId);
-
-    if (handle >= 0)
-    {
-      console.log(`[ImpactDetector] Registered mesh collider: handle=${handle}, id=${objectId}, verts=${vertices.length / 3}`);
-    }
-    else
+    const indicesArray = indices || new Uint32Array(0);
+    const handle = this.detector.addMeshCollider(verticesBTK, indicesArray, objectId);
+    
+    if (handle < 0)
     {
       console.error(`[ImpactDetector] Failed to register mesh collider: id=${objectId}`);
       this.userData.delete(objectId); // Clean up on failure

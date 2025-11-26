@@ -178,6 +178,8 @@ namespace btk::rendering
     int binIndexX(float x_m) const;
     int binIndexZ(float z_m) const;
     int gridIndex(int bin_x, int bin_z) const;
+
+    std::optional<ImpactResult> checkSegmentCollisions(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, float t_start_s, float t_end_s, float bullet_radius) const;
   };
 
 } // namespace btk::rendering

@@ -239,6 +239,59 @@ namespace btk
 
     void Trajectory::clear() { points_.clear(); }
 
+    size_t Trajectory::findPointIndexAtTime(float time_s) const
+    {
+      if(points_.empty())
+      {
+        return 0;
+      }
+
+      // Binary search for first point at or after time_s
+      int left = 0;
+      int right = static_cast<int>(points_.size()) - 1;
+      int result = static_cast<int>(points_.size());
+
+      while(left <= right)
+      {
+        int mid = left + (right - left) / 2;
+        if(points_[mid].getTime() >= time_s)
+        {
+          result = mid;
+          right = mid - 1;
+        }
+        else
+        {
+          left = mid + 1;
+        }
+      }
+
+      return result;
+    }
+
+    int Trajectory::findSegmentIndexAtTime(float time_s) const
+    {
+      if(points_.size() < 2)
+      {
+        return -1;
+      }
+
+      size_t idx = findPointIndexAtTime(time_s);
+
+      // If we found a point exactly at time_s, it starts a segment
+      if(idx < points_.size() && points_[idx].getTime() == time_s)
+      {
+        return static_cast<int>(idx);
+      }
+
+      // Otherwise, back up one to get the segment containing time_s
+      if(idx > 0)
+      {
+        return static_cast<int>(idx - 1);
+      }
+
+      return -1;
+    }
+
     Bullet Trajectory::interpolate(const TrajectoryPoint& point1, const TrajectoryPoint& point2, float distance) const
     {
       float dist1 = point1.getDistance();

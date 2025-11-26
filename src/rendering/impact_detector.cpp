@@ -322,71 +322,106 @@ namespace btk::rendering
     return handle;
   }
 
-  std::optional<ImpactResult> ImpactDetector::findFirstImpact(const btk::ballistics::Trajectory& trajectory, float t0_s, float t1_s) const
+  std::optional<ImpactResult> ImpactDetector::checkSegmentCollisions(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, float t_start_s, float t_end_s,
+                                                                      float bullet_radius) const
   {
-    auto pos0_opt = trajectory.atTime(t0_s);
-    auto pos1_opt = trajectory.atTime(t1_s);
+    const float min_x = std::min(start_m.x, end_m.x);
+    const float max_x = std::max(start_m.x, end_m.x);
+    const float min_z = std::min(start_m.z, end_m.z);
+    const float max_z = std::max(start_m.z, end_m.z);
 
-    if(!pos0_opt.has_value() || !pos1_opt.has_value())
-    {
-      return std::nullopt;
-    }
+    const int min_bin_x = binIndexX(min_x);
+    const int max_bin_x = binIndexX(max_x);
+    const int min_bin_z = binIndexZ(min_z);
+    const int max_bin_z = binIndexZ(max_z);
 
-    const btk::math::Vector3D& start_m = pos0_opt->getState().getPosition();
-    const btk::math::Vector3D& end_m = pos1_opt->getState().getPosition();
-
-    // Compute segment AABB in XZ
-    float min_x = std::min(start_m.x, end_m.x);
-    float max_x = std::max(start_m.x, end_m.x);
-    float min_z = std::min(start_m.z, end_m.z);
-    float max_z = std::max(start_m.z, end_m.z);
-
-    int min_bin_x = binIndexX(min_x);
-    int max_bin_x = binIndexX(max_x);
-    int min_bin_z = binIndexZ(min_z);
-    int max_bin_z = binIndexZ(max_z);
-
-    // Gather candidates (deduplicate by handle)
-    std::vector<ObjectRecord> candidates;
-    std::vector<bool> seen(colliders_.size(), false);
+    std::optional<ImpactResult> earliest_hit;
+    float earliest_time = std::numeric_limits<float>::max();
 
     for(int bz = min_bin_z; bz <= max_bin_z; ++bz)
     {
       for(int bx = min_bin_x; bx <= max_bin_x; ++bx)
       {
-        int gidx = gridIndex(bx, bz);
+        const int gidx = gridIndex(bx, bz);
         if(gidx < 0)
           continue;
 
         for(const auto& rec : grid_[gidx])
         {
-          if(!seen[rec.collider_handle])
+          auto hit_opt = colliders_[rec.collider_handle]->intersectSegment(start_m, end_m, t_start_s, t_end_s, bullet_radius, rec.object_id);
+
+          if(hit_opt.has_value() && hit_opt->time_s < earliest_time)
           {
-            seen[rec.collider_handle] = true;
-            candidates.push_back(rec);
+            earliest_time = hit_opt->time_s;
+            earliest_hit = hit_opt;
           }
         }
       }
     }
 
-    // Test candidates
-    std::optional<ImpactResult> earliest_hit;
-    float earliest_time = std::numeric_limits<float>::max();
+    return earliest_hit;
+  }
 
-    float bullet_radius = pos0_opt->getState().getDiameter() * 0.5f;
-
-    for(const auto& rec : candidates)
+  std::optional<ImpactResult> ImpactDetector::findFirstImpact(const btk::ballistics::Trajectory& trajectory, float t0_s, float t1_s) const
+  {
+    const int point_count = static_cast<int>(trajectory.getPointCount());
+    if(point_count < 2)
     {
-      auto hit_opt = colliders_[rec.collider_handle]->intersectSegment(start_m, end_m, t0_s, t1_s, bullet_radius, rec.object_id);
+      return std::nullopt;
+    }
 
-      if(hit_opt.has_value() && hit_opt->time_s < earliest_time)
+    // Binary search for the last point at or before t0_s
+    // This ensures we catch segments that straddle t0_s
+    int left = 0;
+    int right = point_count - 1;
+    int start_idx = 0;
+
+    while(left <= right)
+    {
+      int mid = left + (right - left) / 2;
+      float t = trajectory.getPoint(mid).getTime();
+      if(t <= t0_s)
       {
-        earliest_time = hit_opt->time_s;
-        earliest_hit = hit_opt;
+        start_idx = mid;
+        left = mid + 1;
+      }
+      else
+      {
+        right = mid - 1;
       }
     }
 
-    return earliest_hit;
+    // start_idx is now the last point <= t0_s, which is the start of a segment that might overlap [t0_s, t1_s]
+
+    // Scan segments until we pass t1_s
+    for(int i = start_idx; i < point_count - 1; ++i)
+    {
+      const auto& p0 = trajectory.getPoint(i);
+      const auto& p1 = trajectory.getPoint(i + 1);
+
+      const float seg_t0 = p0.getTime();
+      const float seg_t1 = p1.getTime();
+
+      // Stop when segments are completely past t1_s
+      if(seg_t0 > t1_s)
+      {
+        break;
+      }
+
+      const auto& start_m = p0.getPosition();
+      const auto& end_m = p1.getPosition();
+      const float bullet_radius = p0.getState().getDiameter() * 0.5f;
+
+      auto hit_opt = checkSegmentCollisions(start_m, end_m, seg_t0, seg_t1, bullet_radius);
+
+      if(hit_opt.has_value())
+      {
+        // Since segments are time-sorted, first hit is earliest hit
+        return hit_opt;
+      }
+    }
+
+    return std::nullopt;
   }
 
 } // namespace btk::rendering

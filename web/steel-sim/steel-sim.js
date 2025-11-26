@@ -762,17 +762,39 @@ class SteelSimulator
 
     // Register all steel targets from factory
     const STEEL_RADIUS = 5.0; // 5m radius for binning (covers swing arc)
-
+    
     const targets = SteelTargetFactory.getAll();
     for (const target of targets)
     {
       this.impactDetector.addSteelTarget(
         target.steelTarget,
         STEEL_RADIUS,
-        target // Store the SteelTarget wrapper as userData
+        {
+          target: target,
+          soundName: 'ping1',
+          createDust: (impactPosition, scene, windGenerator) => {
+            const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+            DustCloudFactory.create({
+              position: pos,
+              scene: scene,
+              numParticles: Config.METAL_DUST_CONFIG.numParticles,
+              color: Config.METAL_DUST_CONFIG.color,
+              windGenerator: windGenerator,
+              initialRadius: Config.METAL_DUST_CONFIG.initialRadius,
+              growthRate: Config.METAL_DUST_CONFIG.growthRate,
+              particleDiameter: Config.METAL_DUST_CONFIG.particleDiameter
+            });
+          }
+        }
       );
     }
 
+    // Let landscape register its objects
+    if (this.landscape)
+    {
+      this.landscape.registerWithImpactDetector(this.impactDetector);
+    }
+    
     console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets`);
     console.log('[SteelSim] ImpactDetector stats:', this.impactDetector.getStats());
   }
@@ -1075,51 +1097,62 @@ class SteelSimulator
 
     for (const shot of shots)
     {
+      // Get the time range since last check
+      const timeRange = shot.getCollisionCheckTimeRange();
+      if (!timeRange) continue;
+
       const trajectory = shot.getTrajectory();
       if (!trajectory) continue;
 
-      // Use ImpactDetector to find first impact
-      const t0 = 0.0;
-      const t1 = trajectory.getTotalTime();
-      const impact = this.impactDetector.findFirstImpact(trajectory, t0, t1);
+      // Only check the new time range since last frame
+      const impact = this.impactDetector.findFirstImpact(trajectory, timeRange.t0 - 0.001, timeRange.t1 + 0.001);
 
       // If we hit something, handle it
       if (impact && impact.userData)
       {
-        const target = impact.userData;
+        const userData = impact.userData;
 
         // Get the bullet state at impact time
         const impactPoint = trajectory.atTime(impact.time);
         if (!impactPoint) continue;
-
+        
         const impactBullet = impactPoint.getState();
         const impactPosition = impactBullet.getPosition();
 
-        // Apply impact to target
-        target.hit(impactBullet);
+        // If userData has a target, apply impact
+        if (userData.target)
+        {
+          userData.target.hit(impactBullet);
+        }
 
-        // Play ping sound with distance-based delay and volume
-        if (this.audioManager)
+        // Create dust effect if generator provided
+        if (userData.createDust)
+        {
+          userData.createDust(impactPosition, this.scene, this.windGenerator);
+        }
+
+        // Play sound if sound name provided
+        if (userData.soundName && this.audioManager)
         {
           // Shooter position (scope/camera position)
           const shooterPos = new THREE.Vector3(0, Config.SHOOTER_HEIGHT, 0);
-
+          
           // Impact position in Three.js coordinates
           const impactPosThree = new THREE.Vector3(
             impactPosition.x,
             impactPosition.y,
             impactPosition.z
           );
-
+          
           // Calculate distance from target to shooter
           const distance_m = impactPosThree.distanceTo(shooterPos);
-
+          
           // Speed of sound: ~343 m/s at sea level, 20°C
           const SPEED_OF_SOUND_MPS = 343.0;
-
+          
           // Calculate delay: time for sound to travel from target to shooter
           const delaySeconds = distance_m / SPEED_OF_SOUND_MPS;
-
+          
           // Volume attenuation: linear interpolation from 100% at 100 yards to 10% at max range distance
           const minDistance_m = btk.Conversions.yardsToMeters(100.0); // Full volume at 100 yards
           const maxDistance_m = Config.LANDSCAPE_CONFIG.groundLength; // Max range distance
@@ -1140,15 +1173,9 @@ class SteelSimulator
             volume = 1.0 - t * (1.0 - 0.1); // Interpolate from 1.0 to 0.1
           }
 
-          // Play ping sound with delay and volume
-          this.audioManager.playSoundDelayed('ping1', delaySeconds,
-          {
-            volume: volume
-          });
+          // Play sound with delay and volume
+          this.audioManager.playSoundDelayed(userData.soundName, delaySeconds, { volume });
         }
-
-        // Create dust cloud at impact position
-        this.createMetallicDustCloud(impactPosition);
 
         // Mark shot as dead
         shot.markDead();

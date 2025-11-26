@@ -4,6 +4,11 @@ import
   Config
 }
 from './config.js';
+import
+{
+  DustCloudFactory
+}
+from './DustCloud.js';
 
 /**
  * Landscape class for managing ground planes and terrain
@@ -623,5 +628,55 @@ export class Landscape
         this.brownGroundMesh.material.dispose();
       }
     }
+  }
+
+  /**
+   * Register landscape objects with the ImpactDetector
+   * @param {ImpactDetector} impactDetector - The impact detector to register with
+   */
+  registerWithImpactDetector(impactDetector)
+  {
+    if (!impactDetector) return;
+
+    // Register rocks - need to apply world transform to geometry
+    let rockCount = 0;
+    for (const rock of this.rocks)
+    {
+      // Clone geometry and apply the rock's world transform
+      const transformedGeometry = rock.geometry.clone();
+      rock.updateMatrixWorld();
+      transformedGeometry.applyMatrix4(rock.matrixWorld);
+      
+      const rockIndex = rockCount;
+      const handle = impactDetector.addMeshFromGeometry(
+        transformedGeometry,
+        {
+          name: `Rock ${rockIndex}`,
+          soundName: null, // Rocks are silent
+          createDust: (impactPosition, scene, windGenerator) => {
+            const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+            
+            // Big chunky particles for rocks
+            DustCloudFactory.create({
+              position: pos,
+              scene: scene,
+              numParticles: 500, // Just a few big chunks
+              color: 0xC0C0C0, // Light grey rock dust
+              windGenerator: windGenerator,
+              initialRadius: 0.05, // Tighter initial spread
+              growthRate: 0.1, // Medium growth
+              particleDiameter: 1 
+            });
+          }
+        }
+      );
+      
+      if (handle >= 0)
+      {
+        rockCount++;
+      }
+    }
+
+    console.log(`[Landscape] Registered ${rockCount} rocks with ImpactDetector`);
   }
 }
