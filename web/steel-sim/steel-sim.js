@@ -32,6 +32,11 @@ import
 from './Scope.js';
 import
 {
+  SpottingScope
+}
+from './SpottingScope.js';
+import
+{
   WindFlagFactory
 }
 from './WindFlag.js';
@@ -140,15 +145,27 @@ class SteelSimulator
     this.camera = null;
     this.compositionRenderer = null;
     this.backgroundElement = null;
-    this.scope = null;
+    this.scope = null; // Rifle scope
+    this.spottingScope = null; // Spotting scope
     this.backgroundCamera = null;
     this.raycaster = null;
     this.scopeLayer = null;
+    this.spottingScopeLayer = null;
     this.landscape = null;
 
     // Scope and shooting
     this.scopeMode = false;
     this.rifleZero = null;
+
+    // Spotting scope key states
+    this.spottingScopeKeys = {
+      w: false,
+      a: false,
+      s: false,
+      d: false,
+      e: false,
+      q: false
+    };
 
     // HUD
     this.hud = null;
@@ -243,6 +260,10 @@ class SteelSimulator
     {
       window.removeEventListener('keydown', this.boundHandlers.onKeyDown);
     }
+    if (this.boundHandlers.onKeyUp)
+    {
+      window.removeEventListener('keyup', this.boundHandlers.onKeyUp);
+    }
     if (this.boundHandlers.onPointerLockChange)
     {
       document.removeEventListener('pointerlockchange', this.boundHandlers.onPointerLockChange);
@@ -308,6 +329,11 @@ class SteelSimulator
     {
       this.scope.dispose();
       this.scope = null;
+    }
+    if (this.spottingScope)
+    {
+      this.spottingScope.dispose();
+      this.spottingScope = null;
     }
 
     // Dispose CompositionRenderer (handles render targets, composition scene)
@@ -474,7 +500,7 @@ class SteelSimulator
     await this.textureManager.loadAll(this.compositionRenderer.renderer);
 
     // Get aspect for element positioning
-    const aspect = this.compositionRenderer.getAspect();
+    const compositionAspect = this.compositionRenderer.getAspect();
 
     // Create HUD overlay
     this.hud = new HUD(
@@ -485,7 +511,7 @@ class SteelSimulator
     this.hud.updatePositions();
 
     // Create background 3D scene layer (covers full screen)
-    this.backgroundElement = this.compositionRenderer.createElement(0, 0, 2 * aspect, 2,
+    this.backgroundElement = this.compositionRenderer.createElement(0, 0, 2 * compositionAspect, 2,
     {
       renderOrder: 0
     });
@@ -513,11 +539,57 @@ class SteelSimulator
     // Create wind flags at configured positions
     this.createWindFlags();
 
-    // Create scope layer (bottom-center, ~80% of screen height)
-    const scopeHeightNorm = 1.6; // 80% of vertical span (2)
-    const scopeWidthNorm = scopeHeightNorm; // square in virtual units
-    const scopeY = -1 + scopeHeightNorm / 2; // bottom + half height
-    this.scopeLayer = this.compositionRenderer.createElement(0, scopeY, scopeWidthNorm, scopeHeightNorm,
+    // Create scope layers (in corners)
+    // Get aspect ratio for X positioning (X spans [-aspect, +aspect])
+    const scopeAspect = this.compositionRenderer.getAspect();
+    
+    // Spotting scope in bottom-left corner (keep same size: 60% of screen height)
+    const spottingScopeHeightNorm = 1.2; // 60% of vertical span (2)
+    const spottingScopeWidthNorm = spottingScopeHeightNorm; // square in virtual units
+    const spottingScopeY = -1 + spottingScopeHeightNorm / 2; // bottom + half height
+    const spottingScopeX = -scopeAspect + spottingScopeWidthNorm / 2; // Left edge + half width
+    this.spottingScopeLayer = this.compositionRenderer.createElement(spottingScopeX, spottingScopeY, spottingScopeWidthNorm, spottingScopeHeightNorm,
+    {
+      renderOrder: 1,
+      transparent: true
+    });
+
+    this.spottingScope = new SpottingScope(
+    {
+      scene: this.scene,
+      renderTarget: this.spottingScopeLayer.renderTarget,
+      renderer: this.spottingScopeLayer.getRenderer(),
+      // Scope optical spec (4–40x, 25 ft @ 100 yd at 4x)
+      minZoomX: 4.0,
+      maxZoomX: 40.0,
+      lowFovFeet: 25,
+      cameraPosition:
+      {
+        x: 0,
+        y: Config.SHOOTER_HEIGHT,
+        z: 0
+      },
+      initialLookAt:
+      {
+        x: 0,
+        y: Config.SHOOTER_HEIGHT, // Look at horizon (same height as camera)
+        z: -Config.LANDSCAPE_CONFIG.groundLength
+      },
+      centerNormalized:
+      {
+        x: spottingScopeX,
+        y: spottingScopeY
+      },
+      heightNormalized: spottingScopeHeightNorm,
+      panSpeedBase: 0.1 // radians per second base speed
+    });
+
+    // Rifle scope in bottom-right corner (almost full screen height: 95%)
+    const rifleScopeHeightNorm = 1.9; // 95% of vertical span (2)
+    const rifleScopeWidthNorm = rifleScopeHeightNorm; // square in virtual units
+    const rifleScopeY = -1 + rifleScopeHeightNorm / 2; // bottom + half height
+    const rifleScopeX = scopeAspect - rifleScopeWidthNorm / 2; // Right edge - half width
+    this.scopeLayer = this.compositionRenderer.createElement(rifleScopeX, rifleScopeY, rifleScopeWidthNorm, rifleScopeHeightNorm,
     {
       renderOrder: 1,
       transparent: true
@@ -547,10 +619,10 @@ class SteelSimulator
       },
       centerNormalized:
       {
-        x: 0,
-        y: scopeY
+        x: rifleScopeX,
+        y: rifleScopeY
       },
-      heightNormalized: scopeHeightNorm
+      heightNormalized: rifleScopeHeightNorm
     });
     this.camera = this.scope.getCamera(); // For raycasting
 
@@ -560,11 +632,15 @@ class SteelSimulator
     // Create impact detector and register steel targets
     this.setupImpactDetector();
 
-    // When the scope layer's render target is resized by the composition
-    // renderer, update the scope's internal render targets and camera aspect.
+    // When the scope layers' render targets are resized by the composition
+    // renderer, update the scopes' internal render targets and camera aspects.
     this.scopeLayer.setResizeHandler((w, h) =>
     {
       this.scope.resizeRenderTargets(w, h);
+    });
+    this.spottingScopeLayer.setResizeHandler((w, h) =>
+    {
+      this.spottingScope.resizeRenderTargets(w, h);
     });
 
     // Setup raycaster for scope-based shooting
@@ -631,6 +707,7 @@ class SteelSimulator
     this.boundHandlers.onMouseMove = (e) => this.onMouseMove(e);
     this.boundHandlers.onMouseDown = (e) => this.onMouseDown(e);
     this.boundHandlers.onKeyDown = (e) => this.onKeyDown(e);
+    this.boundHandlers.onKeyUp = (e) => this.onKeyUp(e);
     this.boundHandlers.onPointerLockChange = () => this.onPointerLockChange();
     this.boundHandlers.onWindowResize = () => this.onWindowResize();
 
@@ -642,6 +719,7 @@ class SteelSimulator
     this.canvas.addEventListener('mousemove', this.boundHandlers.onMouseMove);
     this.canvas.addEventListener('mousedown', this.boundHandlers.onMouseDown);
     window.addEventListener('keydown', this.boundHandlers.onKeyDown);
+    window.addEventListener('keyup', this.boundHandlers.onKeyUp);
     document.addEventListener('pointerlockchange', this.boundHandlers.onPointerLockChange);
     window.addEventListener('resize', this.boundHandlers.onWindowResize);
   }
@@ -944,10 +1022,40 @@ class SteelSimulator
 
   onKeyDown(event)
   {
-    // Toggle scope display with S key
+    // Spotting scope controls (always active, no pointer lock needed)
+    const key = event.key.toLowerCase();
+    if (key === 'w' || key === 'a' || key === 's' || key === 'd' || key === 'e' || key === 'q')
+    {
+      // Don't prevent default if modifier keys are pressed (allow shortcuts)
+      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey)
+      {
+        return;
+      }
+      
+      this.spottingScopeKeys[key] = true;
+      
+      // Handle zoom keys immediately (E/Q)
+      if (key === 'e' && this.spottingScope)
+      {
+        event.preventDefault();
+        this.spottingScope.zoomIn();
+      }
+      else if (key === 'q' && this.spottingScope)
+      {
+        event.preventDefault();
+        this.spottingScope.zoomOut();
+      }
+      else
+      {
+        event.preventDefault(); // Prevent default for WASD
+      }
+      return;
+    }
+
+    // Toggle scope display with S key (only if not using spotting scope S key)
     if (event.key === 's' || event.key === 'S')
     {
-      if (this.scopeLayer && this.scopeLayer._mesh)
+      if (!this.scopeMode && this.scopeLayer && this.scopeLayer._mesh)
       {
         this.scopeLayer._mesh.visible = !this.scopeLayer._mesh.visible;
       }
@@ -964,9 +1072,10 @@ class SteelSimulator
       return;
     }
 
-    // Zoom controls: +/- or =/- keys (only when in scope mode)
+    // Rifle scope controls (only when in scope mode)
     if (this.scopeMode)
     {
+      // Zoom controls: +/- or =/- keys
       if (event.key === '=' || event.key === '+')
       {
         event.preventDefault();
@@ -1016,6 +1125,20 @@ class SteelSimulator
         event.preventDefault();
         this.scope.dialRight(clicks);
         return;
+      }
+    }
+  }
+
+  onKeyUp(event)
+  {
+    // Handle spotting scope key releases
+    const key = event.key.toLowerCase();
+    if (key === 'w' || key === 'a' || key === 's' || key === 'd' || key === 'e' || key === 'q')
+    {
+      if (!event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey)
+      {
+        this.spottingScopeKeys[key] = false;
+        event.preventDefault();
       }
     }
   }
@@ -1400,7 +1523,23 @@ class SteelSimulator
       clearColor: 0x87ceeb
     });
 
-    // Render scope (composites 3D scene + mirage + reticle into its render target)
+    // Update spotting scope camera from key states (only update WASD, not E/Q which are handled immediately)
+    if (this.spottingScope)
+    {
+      const panKeys = {
+        w: this.spottingScopeKeys.w,
+        a: this.spottingScopeKeys.a,
+        s: this.spottingScopeKeys.s,
+        d: this.spottingScopeKeys.d
+      };
+      this.spottingScope.updateFromKeys(panKeys, dt);
+    }
+
+    // Render scopes (composites 3D scene + reticle into their render targets)
+    if (this.spottingScope)
+    {
+      this.spottingScope.render(dt);
+    }
     this.scope.render(dt);
 
     // Composite everything to screen

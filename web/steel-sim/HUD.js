@@ -29,7 +29,7 @@ export class HUD
 
   createHudElements()
   {
-    // Position HUD in top-right corner
+    // Position HUD in top-left corner
     // Composition scene uses orthographic camera: X in [-aspect, aspect], Y in [-1, 1]
     // We don't know aspect here, but composition camera handles it automatically
     const margin = 0.06; // Margin from edge
@@ -43,7 +43,7 @@ export class HUD
     const displayWidth = 0.5;
     const displayHeight = 0.1;
 
-    // Start from top-right (actual X position will be set per-element based on aspect)
+    // Start from top-left (actual X position will be set per-element based on aspect)
     let currentY = 1.0 - margin - displayHeight / 2;
 
     // Scope Dial - Elevation
@@ -74,7 +74,7 @@ export class HUD
     return canvas;
   }
 
-  createHudMesh(canvas, displayWidth, displayHeight, marginFromRight, y)
+  createHudMesh(canvas, displayWidth, displayHeight, marginFromLeft, y)
   {
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
@@ -92,9 +92,9 @@ export class HUD
     const mesh = new THREE.Mesh(geometry, material);
 
     // Position in composition space
-    // X will be dynamically calculated by shader to be at right edge
+    // X will be dynamically calculated to be at left edge
     // Store margin and width for dynamic positioning
-    mesh.userData.marginFromRight = marginFromRight;
+    mesh.userData.marginFromLeft = marginFromLeft;
     mesh.userData.displayWidth = displayWidth;
     mesh.renderOrder = 1000; // Render on top
     mesh.frustumCulled = false; // Don't cull HUD elements
@@ -224,15 +224,15 @@ export class HUD
   updatePositions()
   {
     // Update X positions based on current camera bounds
-    // Composition camera is orthographic with dynamic right bound based on aspect
-    const rightEdge = this.compositionCamera.right;
+    // Composition camera is orthographic with dynamic left/right bounds based on aspect
+    const leftEdge = this.compositionCamera.left;
 
     for (const mesh of this.hudMeshes)
     {
-      const marginFromRight = mesh.userData.marginFromRight;
+      const marginFromLeft = mesh.userData.marginFromLeft;
       const displayWidth = mesh.userData.displayWidth;
-      // Right edge is at camera.right, subtract margin and half width
-      mesh.position.x = rightEdge - marginFromRight - displayWidth / 2;
+      // Left edge is at camera.left, add margin and half width
+      mesh.position.x = leftEdge + marginFromLeft + displayWidth / 2;
     }
   }
 
