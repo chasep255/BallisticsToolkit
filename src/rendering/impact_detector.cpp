@@ -322,8 +322,7 @@ namespace btk::rendering
     return handle;
   }
 
-  std::optional<ImpactResult> ImpactDetector::checkSegmentCollisions(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, float t_start_s, float t_end_s,
-                                                                      float bullet_radius) const
+  std::optional<ImpactResult> ImpactDetector::checkSegmentCollisions(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, float t_start_s, float t_end_s, float bullet_radius) const
   {
     const float min_x = std::min(start_m.x, end_m.x);
     const float max_x = std::max(start_m.x, end_m.x);

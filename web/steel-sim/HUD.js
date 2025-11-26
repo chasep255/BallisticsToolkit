@@ -171,7 +171,7 @@ export class HUD
     if (!this.impactCanvas) return;
 
     const ctx = this.impactCanvas.getContext('2d');
-    
+
     // Clear canvas
     ctx.clearRect(0, 0, this.impactCanvas.width, this.impactCanvas.height);
 

@@ -31,7 +31,7 @@ export class SpottingScope
     this.scene = config.scene;
     this.outputRenderTarget = config.renderTarget; // Render target from CompositionLayer
     this.renderer = config.renderer; // Must use the renderer that created the render target
-    
+
     // Scope specifications
     if (config.minZoomX === undefined) throw new Error('SpottingScope config requires minZoomX');
     if (config.maxZoomX === undefined) throw new Error('SpottingScope config requires maxZoomX');
@@ -375,4 +375,3 @@ export class SpottingScope
     });
   }
 }
-

@@ -29,6 +29,12 @@ const AUDIO_MANIFEST = {
     type: 'oneshot'
   },
 
+  ricochet:
+  {
+    path: '../audio/ricochet.mp3',
+    type: 'oneshot'
+  },
+
   // Ambient sounds
   background_noise:
   {

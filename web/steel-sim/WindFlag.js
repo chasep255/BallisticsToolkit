@@ -4,6 +4,16 @@ import
   Config
 }
 from './config.js';
+import
+{
+  DustCloudFactory
+}
+from './DustCloud.js';
+import
+{
+  ImpactMarkFactory
+}
+from './ImpactMark.js';
 
 /**
  * Wrapper class for C++ WindFlag that manages Three.js rendering resources
@@ -269,6 +279,71 @@ export class WindFlag
 
     // Recompute normals for lighting
     this.flagMesh.geometry.computeVertexNormals();
+  }
+
+  /**
+   * Get the pole mesh for collision detection
+   * @returns {THREE.Mesh}
+   */
+  getPoleMesh()
+  {
+    return this.pole;
+  }
+
+  /**
+   * Register pole with the impact detector
+   * @param {ImpactDetector} impactDetector - The impact detector to register with
+   */
+  registerWithImpactDetector(impactDetector)
+  {
+    if (!impactDetector || !this.pole) return;
+
+    // Clone geometry and apply world transform
+    const transformedGeometry = this.pole.geometry.clone();
+    this.pole.updateMatrixWorld();
+    transformedGeometry.applyMatrix4(this.pole.matrixWorld);
+
+    impactDetector.addMeshFromGeometry(
+      transformedGeometry,
+      {
+        name: 'FlagPole',
+        soundName: 'ricochet', // Metal ricochet sound
+        mesh: this.pole, // Store mesh reference for decal projection
+        onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+        {
+          const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+
+          // Small metal dust puff
+          DustCloudFactory.create(
+          {
+            position: pos,
+            scene: scene,
+            numParticles: 150,
+            color:
+            {
+              r: 160,
+              g: 160,
+              b: 160
+            }, // Light grey
+            windGenerator: windGenerator,
+            initialRadius: 0.02,
+            growthRate: 0.06,
+            particleDiameter: 0.3
+          });
+
+          // Small dark impact mark (1cm)
+          ImpactMarkFactory.create(
+          {
+            position: pos,
+            normal: normal,
+            velocity: velocity,
+            mesh: targetMesh,
+            color: 0x2a2a2a, // Dark grey
+            size: 0.2 // 1cm
+          });
+        }
+      }
+    );
   }
 
   /**

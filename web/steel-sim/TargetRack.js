@@ -282,16 +282,24 @@ export class TargetRack
         transformedGeometry,
         {
           name: 'RackFrame',
-          soundName: 'ping1', // Metal ping sound
-          onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
+          soundName: 'ricochet', // Metal ricochet sound
+          mesh: mesh, // Store mesh reference for decal projection
+          onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+          {
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
 
             // Small metal dust puff
-            DustCloudFactory.create({
+            DustCloudFactory.create(
+            {
               position: pos,
               scene: scene,
               numParticles: 200,
-              color: { r: 180, g: 180, b: 180 }, // Light grey
+              color:
+              {
+                r: 180,
+                g: 180,
+                b: 180
+              }, // Light grey
               windGenerator: windGenerator,
               initialRadius: 0.02,
               growthRate: 0.08,
@@ -299,10 +307,12 @@ export class TargetRack
             });
 
             // Small dark impact mark (1cm)
-            ImpactMarkFactory.create({
+            ImpactMarkFactory.create(
+            {
               position: pos,
               normal: normal,
               velocity: velocity,
+              mesh: targetMesh,
               color: 0x2a2a2a, // Dark grey
               size: 0.2 // 1cm (0.2 * 5cm base = 1cm)
             });

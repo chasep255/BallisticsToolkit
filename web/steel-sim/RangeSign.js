@@ -182,12 +182,25 @@ export class RangeSign
         {
           name: isPost ? 'SignPost' : 'SignBoard',
           soundName: null, // Signs are silent (wood/plastic)
-          onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
+          mesh: mesh, // Store mesh reference for decal projection
+          onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+          {
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
 
             // Wood splinter dust for post, white dust for sign board
-            const dustColor = isPost ? { r: 139, g: 90, b: 43 } : { r: 220, g: 220, b: 220 };
-            DustCloudFactory.create({
+            const dustColor = isPost ?
+            {
+              r: 139,
+              g: 90,
+              b: 43
+            } :
+            {
+              r: 220,
+              g: 220,
+              b: 220
+            };
+            DustCloudFactory.create(
+            {
               position: pos,
               scene: scene,
               numParticles: 150,
@@ -200,10 +213,12 @@ export class RangeSign
 
             // Small dark impact mark (1cm)
             const markColor = isPost ? 0x3d2510 : 0x404040; // Brown for wood, dark grey for sign
-            ImpactMarkFactory.create({
+            ImpactMarkFactory.create(
+            {
               position: pos,
               normal: normal,
               velocity: velocity,
+              mesh: targetMesh,
               color: markColor,
               size: 0.2 // 1cm
             });

@@ -87,26 +87,26 @@ export class Berm
     const vertices = geometry.attributes.position.array;
     const halfWidth = width;
     const halfDepth = depth / 2;
-    
+
     // Flat top region: same width as rack, 70% of depth
     const flatTopWidth = width;
     const flatTopDepth = depth * 0.7;
     const flatTopHalfWidth = flatTopWidth / 2;
     const flatTopHalfDepth = flatTopDepth / 2;
-    
+
     // Slope region: remaining width extends to sides, remaining depth extends back
     const slopeWidth = width; // Total width extends to 2x width (taper to sides)
     const slopeDepth = depth - flatTopDepth;
 
     for (let i = 0; i < vertices.length; i += 3)
     {
-      const x = vertices[i];     // X coordinate (crossrange) - stays X after rotation
+      const x = vertices[i]; // X coordinate (crossrange) - stays X after rotation
       const y = vertices[i + 1]; // Y coordinate (becomes -Z/downrange after rotation)
 
       // Check distance from center in each direction
       const absX = Math.abs(x);
       const absY = Math.abs(y);
-      
+
       let height;
       if (absX <= flatTopHalfWidth && absY <= flatTopHalfDepth)
       {
@@ -118,7 +118,7 @@ export class Berm
         // On slope - calculate distance from flat top edge
         const distX = Math.max(0, absX - flatTopHalfWidth);
         const distY = Math.max(0, absY - flatTopHalfDepth);
-        
+
         // Use Manhattan distance for more rectangular flat top with linear slopes
         const maxDist = Math.max(distX / (slopeWidth / 2), distY / (slopeDepth / 2));
         const slopeRatio = Math.min(maxDist, 1.0);
@@ -215,4 +215,3 @@ export class BermFactory
     return this.berms;
   }
 }
-

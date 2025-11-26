@@ -550,7 +550,7 @@ class SteelSimulator
     // Create scope layers (in corners)
     // Get aspect ratio for X positioning (X spans [-aspect, +aspect])
     const scopeAspect = this.compositionRenderer.getAspect();
-    
+
     // Spotting scope in bottom-left corner (keep same size: 60% of screen height)
     const spottingScopeHeightNorm = 1.2; // 60% of vertical span (2)
     const spottingScopeWidthNorm = spottingScopeHeightNorm; // square in virtual units
@@ -880,7 +880,7 @@ class SteelSimulator
 
     // Register all steel targets from factory
     const STEEL_RADIUS = 5.0; // 5m radius for binning (covers swing arc)
-    
+
     const targets = SteelTargetFactory.getAll();
     for (const target of targets)
     {
@@ -890,9 +890,11 @@ class SteelSimulator
         {
           target: target,
           soundName: 'ping1',
-          onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
+          onImpact: (impactPosition, normal, velocity, scene, windGenerator) =>
+          {
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
-            DustCloudFactory.create({
+            DustCloudFactory.create(
+            {
               position: pos,
               scene: scene,
               numParticles: Config.METAL_DUST_CONFIG.numParticles,
@@ -931,12 +933,19 @@ class SteelSimulator
           {
             name: 'Berm',
             soundName: null, // Berms are silent
-            onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
+            mesh: bermMesh, // Store mesh reference for decal projection
+            onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+            {
               const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
 
               // Sand dust for berm impacts
-              const dustColor = { r: 245, g: 220, b: 170 }; // Light sandy/yellow-tan
-              DustCloudFactory.create({
+              const dustColor = {
+                r: 245,
+                g: 220,
+                b: 170
+              }; // Light sandy/yellow-tan
+              DustCloudFactory.create(
+              {
                 position: pos,
                 scene: scene,
                 numParticles: 1000,
@@ -948,10 +957,12 @@ class SteelSimulator
               });
 
               // Impact mark - stretched based on impact angle
-              ImpactMarkFactory.create({
+              ImpactMarkFactory.create(
+              {
                 position: pos,
                 normal: normal,
                 velocity: velocity,
+                mesh: targetMesh,
                 color: 0x8b7a65, // Sandy tan
                 size: 1.0
               });
@@ -974,8 +985,15 @@ class SteelSimulator
     {
       sign.registerWithImpactDetector(this.impactDetector);
     }
-    
-    console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets, ${racks.length} racks, ${signs.length} signs`);
+
+    // Register wind flag poles
+    const flags = WindFlagFactory.getAll();
+    for (const flag of flags)
+    {
+      flag.registerWithImpactDetector(this.impactDetector);
+    }
+
+    console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets, ${racks.length} racks, ${signs.length} signs, ${flags.length} flags`);
     console.log('[SteelSim] ImpactDetector stats:', this.impactDetector.getStats());
   }
 
@@ -1064,9 +1082,9 @@ class SteelSimulator
       {
         return;
       }
-      
+
       this.spottingScopeKeys[key] = true;
-      
+
       // Handle zoom keys immediately (E/Q)
       if (key === 'e' && this.spottingScope)
       {
@@ -1340,7 +1358,7 @@ class SteelSimulator
         // Get the bullet state at impact time
         const impactPoint = trajectory.atTime(impact.time);
         if (!impactPoint) continue;
-        
+
         const impactBullet = impactPoint.getState();
         const impactPosition = impactBullet.getPosition();
 
@@ -1348,11 +1366,12 @@ class SteelSimulator
         if (userData.target)
         {
           userData.target.hit(impactBullet);
-          
+
           // Update HUD with hit status
           if (this.hud)
           {
-            this.hud.updateImpactStatus({
+            this.hud.updateImpactStatus(
+            {
               type: 'hit'
             });
           }
@@ -1362,7 +1381,8 @@ class SteelSimulator
           // Hit something that's not a target (berm, rock, ground) - count as miss
           if (this.hud)
           {
-            this.hud.updateImpactStatus({
+            this.hud.updateImpactStatus(
+            {
               type: 'miss'
             });
           }
@@ -1374,7 +1394,7 @@ class SteelSimulator
           const normalVec = new THREE.Vector3(impact.normal.x, impact.normal.y, impact.normal.z);
           const velocity = impactBullet.getVelocity();
           const velocityVec = new THREE.Vector3(velocity.x, velocity.y, velocity.z);
-          userData.onImpact(impactPosition, normalVec, velocityVec, this.scene, this.windGenerator);
+          userData.onImpact(impactPosition, normalVec, velocityVec, this.scene, this.windGenerator, userData.mesh);
           velocity.delete();
         }
 
@@ -1383,23 +1403,23 @@ class SteelSimulator
         {
           // Shooter position (scope/camera position)
           const shooterPos = new THREE.Vector3(0, Config.SHOOTER_HEIGHT, 0);
-          
+
           // Impact position in Three.js coordinates
           const impactPosThree = new THREE.Vector3(
             impactPosition.x,
             impactPosition.y,
             impactPosition.z
           );
-          
+
           // Calculate distance from target to shooter
           const distance_m = impactPosThree.distanceTo(shooterPos);
-          
+
           // Speed of sound: ~343 m/s at sea level, 20°C
           const SPEED_OF_SOUND_MPS = 343.0;
-          
+
           // Calculate delay: time for sound to travel from target to shooter
           const delaySeconds = distance_m / SPEED_OF_SOUND_MPS;
-          
+
           // Volume attenuation: linear interpolation from 100% at 100 yards to 10% at max range distance
           const minDistance_m = btk.Conversions.yardsToMeters(100.0); // Full volume at 100 yards
           const maxDistance_m = Config.LANDSCAPE_CONFIG.groundLength; // Max range distance
@@ -1421,7 +1441,10 @@ class SteelSimulator
           }
 
           // Play sound with delay and volume
-          this.audioManager.playSoundDelayed(userData.soundName, delaySeconds, { volume });
+          this.audioManager.playSoundDelayed(userData.soundName, delaySeconds,
+          {
+            volume
+          });
         }
 
         // Mark shot as dead
@@ -1498,7 +1521,8 @@ class SteelSimulator
         this.createDustCloud(impactPoint);
 
         // Create impact mark on ground - stretched based on impact angle
-        ImpactMarkFactory.create({
+        ImpactMarkFactory.create(
+        {
           position: new THREE.Vector3(impactPoint.x, impactPoint.y, impactPoint.z),
           normal: new THREE.Vector3(0, 1, 0),
           velocity: impactVelocity,
@@ -1511,7 +1535,8 @@ class SteelSimulator
         // Update HUD with miss status (ground hit = miss)
         if (this.hud && shot.alive)
         {
-          this.hud.updateImpactStatus({
+          this.hud.updateImpactStatus(
+          {
             type: 'miss'
           });
         }

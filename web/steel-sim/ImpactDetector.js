@@ -68,7 +68,7 @@ export class ImpactDetector
     // Register with C++ detector
     const indicesArray = indices || new Uint32Array(0);
     const handle = this.detector.addMeshCollider(verticesBTK, indicesArray, objectId);
-    
+
     if (handle < 0)
     {
       console.error(`[ImpactDetector] Failed to register mesh collider: id=${objectId}`);

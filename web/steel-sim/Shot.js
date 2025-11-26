@@ -268,17 +268,20 @@ export class Shot
   getCollisionCheckTimeRange()
   {
     if (!this.ballisticSimulator) return null;
-    
+
     const trajectory = this.ballisticSimulator.getTrajectory();
     if (!trajectory) return null;
-    
+
     const currentTime = trajectory.getTotalTime();
     const lastChecked = this.lastCheckedCollisionTime;
-    
+
     // Update for next check
     this.lastCheckedCollisionTime = currentTime;
-    
-    return { t0: lastChecked, t1: currentTime };
+
+    return {
+      t0: lastChecked,
+      t1: currentTime
+    };
   }
 
   /**

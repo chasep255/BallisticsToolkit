@@ -600,19 +600,26 @@ export class Landscape
       const transformedGeometry = rock.geometry.clone();
       rock.updateMatrixWorld();
       transformedGeometry.applyMatrix4(rock.matrixWorld);
-      
+
       const rockIndex = rockCount;
       const handle = impactDetector.addMeshFromGeometry(
         transformedGeometry,
         {
           name: `Rock ${rockIndex}`,
           soundName: null, // Rocks are silent
-          onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
+          mesh: rock, // Store mesh reference for decal projection
+          onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+          {
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
-            
+
             // Big chunky particles for rocks
-            const dustColor = { r: 192, g: 192, b: 192 }; // Light grey rock dust
-            DustCloudFactory.create({
+            const dustColor = {
+              r: 192,
+              g: 192,
+              b: 192
+            }; // Light grey rock dust
+            DustCloudFactory.create(
+            {
               position: pos,
               scene: scene,
               numParticles: 500,
@@ -620,21 +627,23 @@ export class Landscape
               windGenerator: windGenerator,
               initialRadius: 0.05,
               growthRate: 0.1,
-              particleDiameter: 1 
+              particleDiameter: 1
             });
 
             // Impact mark - stretched based on impact angle
-            ImpactMarkFactory.create({
+            ImpactMarkFactory.create(
+            {
               position: pos,
               normal: normal,
               velocity: velocity,
+              mesh: targetMesh,
               color: 0x4a4a4a, // Dark grey
               size: 0.8
             });
           }
         }
       );
-      
+
       if (handle >= 0)
       {
         rockCount++;
