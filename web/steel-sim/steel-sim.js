@@ -287,6 +287,10 @@ class SteelSimulator
     {
       window.removeEventListener('resize', this.boundHandlers.onWindowResize);
     }
+    if (this.boundHandlers.onFullscreenChange)
+    {
+      document.removeEventListener('fullscreenchange', this.boundHandlers.onFullscreenChange);
+    }
 
     // Remove touch event listeners
     if (this.boundHandlers.onTouchStart)
@@ -754,6 +758,17 @@ class SteelSimulator
     window.addEventListener('keyup', this.boundHandlers.onKeyUp);
     document.addEventListener('pointerlockchange', this.boundHandlers.onPointerLockChange);
     window.addEventListener('resize', this.boundHandlers.onWindowResize);
+    
+    // Fullscreen change needs delayed resize to let layout update
+    this.boundHandlers.onFullscreenChange = () => {
+      // Wait for layout to update before resizing
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.onWindowResize();
+        });
+      });
+    };
+    document.addEventListener('fullscreenchange', this.boundHandlers.onFullscreenChange);
 
     // Touch event listeners for mobile
     this.boundHandlers.onTouchStart = (e) => this.onTouchStart(e);
@@ -768,13 +783,67 @@ class SteelSimulator
   {
     if (!this.canvas || !this.compositionRenderer) return;
 
-    const width = this.canvas.clientWidth;
-    const height = this.canvas.clientHeight;
+    // In fullscreen, use viewport dimensions; otherwise use CSS-computed size
+    let width, height;
+    if (document.fullscreenElement)
+    {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      // Also update canvas CSS to match viewport exactly
+      this.canvas.style.width = width + 'px';
+      this.canvas.style.height = height + 'px';
+    }
+    else
+    {
+      // Reset to CSS-controlled sizing
+      this.canvas.style.width = '';
+      this.canvas.style.height = '';
+      width = this.canvas.clientWidth;
+      height = this.canvas.clientHeight;
+    }
 
     // Resize main renderer, composition camera, and all layer render targets.
     // Layer-specific resize callbacks (like Scope) are invoked by the
     // CompositionRenderer itself.
     this.compositionRenderer.handleResize(width, height);
+
+    // Reposition scopes to corners based on new aspect ratio
+    const newAspect = this.compositionRenderer.getAspect();
+    
+    if (this.spottingScopeLayer && this.spottingScope)
+    {
+      const spottingScopeHeightNorm = 1.2;
+      const spottingScopeWidthNorm = spottingScopeHeightNorm;
+      const spottingScopeY = -1 + spottingScopeHeightNorm / 2;
+      const spottingScopeX = -newAspect + spottingScopeWidthNorm / 2;
+      
+      this.compositionRenderer.setElementPosition(this.spottingScopeLayer, spottingScopeX, spottingScopeY);
+      this.spottingScope.centerNormalized.x = spottingScopeX;
+      this.spottingScope.centerNormalized.y = spottingScopeY;
+    }
+    
+    if (this.scopeLayer && this.scope)
+    {
+      const rifleScopeHeightNorm = 1.9;
+      const rifleScopeWidthNorm = rifleScopeHeightNorm;
+      const rifleScopeY = -1 + rifleScopeHeightNorm / 2;
+      const rifleScopeX = newAspect - rifleScopeWidthNorm / 2;
+      
+      this.compositionRenderer.setElementPosition(this.scopeLayer, rifleScopeX, rifleScopeY);
+      this.scope.centerNormalized.x = rifleScopeX;
+      this.scope.centerNormalized.y = rifleScopeY;
+    }
+
+    // Resize background to fill new aspect ratio
+    if (this.backgroundElement && this.backgroundCamera)
+    {
+      // Background covers full screen: width = 2 * aspect, height = 2
+      this.compositionRenderer.resizeElement(this.backgroundElement, 2 * newAspect, 2);
+      
+      // Update background camera aspect ratio
+      this.backgroundCamera.aspect = this.backgroundElement.pixelWidth / this.backgroundElement.pixelHeight;
+      this.backgroundCamera.updateProjectionMatrix();
+    }
 
     // Update HUD positions (reads from updated camera bounds)
     if (this.hud)
@@ -2031,6 +2100,74 @@ function setupUI()
     {
       if (e.target === helpModal) helpModal.style.display = 'none';
     });
+  }
+
+  // Fullscreen button
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  if (fullscreenBtn)
+  {
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+    
+    // Update button text when fullscreen changes
+    document.addEventListener('fullscreenchange', () =>
+    {
+      if (document.fullscreenElement)
+      {
+        fullscreenBtn.textContent = '⛶ Exit Fullscreen';
+      }
+      else
+      {
+        fullscreenBtn.textContent = '⛶ Fullscreen';
+      }
+    });
+  }
+}
+
+/**
+ * Toggle fullscreen mode for the canvas container
+ * Also starts the game if it hasn't started yet
+ */
+async function toggleFullscreen()
+{
+  const canvasContainer = document.querySelector('.canvas-container');
+  
+  if (!document.fullscreenElement)
+  {
+    // Start the game if it hasn't started yet
+    if (!steelSimulator)
+    {
+      await startGame();
+    }
+    
+    // Enter fullscreen
+    if (canvasContainer.requestFullscreen)
+    {
+      canvasContainer.requestFullscreen();
+    }
+    else if (canvasContainer.webkitRequestFullscreen)
+    {
+      canvasContainer.webkitRequestFullscreen(); // Safari
+    }
+    else if (canvasContainer.msRequestFullscreen)
+    {
+      canvasContainer.msRequestFullscreen(); // IE/Edge
+    }
+  }
+  else
+  {
+    // Exit fullscreen
+    if (document.exitFullscreen)
+    {
+      document.exitFullscreen();
+    }
+    else if (document.webkitExitFullscreen)
+    {
+      document.webkitExitFullscreen(); // Safari
+    }
+    else if (document.msExitFullscreen)
+    {
+      document.msExitFullscreen(); // IE/Edge
+    }
   }
 }
 

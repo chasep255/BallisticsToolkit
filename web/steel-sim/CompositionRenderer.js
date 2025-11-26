@@ -303,6 +303,60 @@ export class CompositionRenderer
   }
 
   /**
+   * Reposition an element in the composition
+   * @param {CompositionLayer|number} layerOrHandle - CompositionLayer instance or handle
+   * @param {number} x - New normalized X position
+   * @param {number} y - New normalized Y position
+   */
+  setElementPosition(layerOrHandle, x, y)
+  {
+    const handle = layerOrHandle instanceof CompositionLayer ? layerOrHandle.handle : layerOrHandle;
+    const element = this.elements.get(handle);
+    if (!element) return;
+
+    element.mesh.position.x = x;
+    element.mesh.position.y = y;
+  }
+
+  /**
+   * Resize an element's geometry and render target
+   * @param {CompositionLayer|number} layerOrHandle - CompositionLayer instance or handle
+   * @param {number} width - New normalized width
+   * @param {number} height - New normalized height
+   */
+  resizeElement(layerOrHandle, width, height)
+  {
+    const handle = layerOrHandle instanceof CompositionLayer ? layerOrHandle.handle : layerOrHandle;
+    const element = this.elements.get(handle);
+    if (!element) return;
+
+    // Update stored normalized dimensions
+    element.width = width;
+    element.height = height;
+
+    // Recreate geometry with new size
+    element.geometry.dispose();
+    element.geometry = new THREE.PlaneGeometry(width, height);
+    element.mesh.geometry = element.geometry;
+
+    // Resize render target
+    const pixelWidth = Math.floor((width / (2 * this.aspect)) * this.canvasWidth);
+    const pixelHeight = Math.floor((height / 2) * this.canvasHeight);
+    const ss = element.supersampleFactor ?? 2;
+    element.renderTarget.setSize(pixelWidth * ss, pixelHeight * ss);
+
+    // Update layer properties
+    if (element.layer)
+    {
+      element.layer.width = width;
+      element.layer.height = height;
+      element.layer.pixelWidth = pixelWidth;
+      element.layer.pixelHeight = pixelHeight;
+      element.layer._invokeResizeHandler(element.renderTarget.width, element.renderTarget.height);
+    }
+  }
+
+  /**
    * Remove a layer from the composition scene
    * @param {CompositionLayer|number} layerOrHandle - CompositionLayer instance or handle
    */
