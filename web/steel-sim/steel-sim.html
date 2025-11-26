@@ -152,35 +152,21 @@
       </div>
       <div class="help-modal-body">
         <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
-          <h3 style="margin-top: 0;">Quick Start</h3>
+          <h3 style="margin-top: 0;">Need Help or Found an Issue?</h3>
           <div class="param-help">
-            <strong>Getting Started:</strong><br>
-            1. Configure your bullet and rifle parameters in the settings bar<br>
-            2. Click <strong>Start</strong> to initialize the simulator<br>
-            3. Click inside the scope circle to enter scope mode<br>
-            4. Move mouse to pan, use <kbd>Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> to zoom (4×–40×)<br>
-            5. Adjust MRAD dials with <kbd>Arrow</kbd> keys (hold <kbd>Shift</kbd> for 1.0 mrad steps)<br>
-            6. Click to fire<br>
-            7. Press <kbd>Esc</kbd> to exit scope mode<br><br>
-            
-            <strong>Key Features:</strong><br>
-            - <strong>FFP Scope:</strong> First Focal Plane reticle scales with zoom, maintaining MRAD subtensions<br>
-            - <strong>MRAD Dials:</strong> Precise elevation and windage adjustments shown in HUD<br>
-            - <strong>Wind Flags:</strong> Reactive 3D flags show wind direction and intensity at multiple distances<br>
-            - <strong>Target Physics:</strong> Realistic chain-mounted targets with momentum transfer and rotation<br>
-            - <strong>Impact Detection:</strong> Accurate hit/miss detection with visual feedback
+            <strong>📧 Email:</strong> <a href="mailto:admin@ballisticstoolkit.com">admin@ballisticstoolkit.com</a><br>
+            <strong>💻 GitHub:</strong> <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener noreferrer">github.com/chasep255/BallisticsToolkit</a>
           </div>
         </div>
         
-        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
-          <h3 style="margin-top: 0;">Controls</h3>
+        <div class="help-section">
+          <h3>Overview</h3>
+          <p>Steel Target Simulator is an interactive steel range with full ballistics and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and realistic target responses to bullet impacts. A pointer-lock FFP scope, MRAD dials, wind flags, dust/metal effects, and a HUD make it a complete shooting experience.</p>
+        </div>
+        
+        <div class="help-section">
+          <h3>Controls</h3>
           <div class="param-help">
-            <strong>Buttons:</strong><br>
-            - <strong>Start:</strong> Initialize the simulator and begin shooting<br>
-            - <strong>Restart:</strong> Restart the simulator with current parameters<br>
-            - <strong>Help:</strong> Show this help dialog<br>
-            - Settings are automatically saved and restored using cookies on reload<br><br>
-            
             <strong>Rifle Scope:</strong><br>
             - Click inside the scope circle to enter scope mode (pointer lock activates)<br>
             - Move mouse to pan/aim the scope (reticle moves with cursor at 1:1 speed)<br>
@@ -194,12 +180,22 @@
             - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation up/down (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad)<br>
             - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage left/right (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad)<br>
             - <kbd>R</kbd> reset both elevation and windage dials to zero<br>
-            - The HUD in the upper-right shows current elevation and windage dial values in mrad
+            - Dial position shown in HUD (upper-right)
           </div>
         </div>
         
-        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
-          <h3 style="margin-top: 0;">Targets & Range</h3>
+        <div class="help-section">
+          <h3>Buttons</h3>
+          <div class="param-help">
+            - <strong>Start:</strong> Initialize the simulator and begin shooting<br>
+            - <strong>Restart:</strong> Restart the simulator with current parameters<br>
+            - <strong>Help:</strong> Show this help dialog<br>
+            - Settings are automatically saved and restored using cookies on reload
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Targets & Range</h3>
           <div class="param-help">
             <strong>Target Racks:</strong> Multiple target racks positioned from 100 to 1760 yards (1 mile) with various target sizes and configurations. Targets include both rectangular and oval shapes with sizes ranging from ~2" chips up to large ~6‑ft gongs, roughly spanning 0.5–2+ MOA depending on distance and rack configuration.<br><br>
             
@@ -209,12 +205,10 @@
           </div>
         </div>
         
-        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
-          <h3 style="margin-top: 0;">Ballistics & Settings</h3>
+        <div class="help-section">
+          <h3>Ballistic Parameters</h3>
           <div class="param-help">
-            <strong>Trajectory Simulation:</strong> Full 4DOF ballistics with G1/G7 drag models, atmospheric compensation, and wind effects. Bullet parameters determine trajectory and impact energy.<br><br>
-            
-            <strong>Bullet Parameters:</strong><br>
+            <strong>Bullet:</strong><br>
             - <strong>MV:</strong> Muzzle velocity in fps (critical for trajectory and time-of-flight)<br>
             - <strong>BC:</strong> Ballistic coefficient (aerodynamic efficiency, higher = less drift/drop)<br>
             - <strong>Drag Function:</strong> G7 (modern boat-tail) or G1 (flat-base/older)<br>
@@ -222,27 +216,34 @@
             - <strong>Weight:</strong> Bullet weight in grains (for spin moment of inertia)<br>
             - <strong>Length:</strong> Bullet length in inches (for spin calculations)<br>
             - <strong>Twist:</strong> Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist, calculates spin rate)<br><br>
-            
-            <strong>Rifle Parameters:</strong><br>
+
+            <strong>Rifle:</strong><br>
             - <strong>MV σ:</strong> Muzzle velocity standard deviation in fps (lower = more consistent, typical values: 5-15 fps)<br>
             - <strong>Accuracy:</strong> Rifle+shooter precision in MOA (1 MOA ≈ 1" at 100 yards)<br>
             - <strong>Zero Distance:</strong> Distance at which the rifle is zeroed in yards (commonly 100 yards; a dedicated 100‑yard rack is included)<br>
             - <strong>Scope Height:</strong> Height of the scope above the bore in inches<br><br>
-            
-            <strong>Spin Effects:</strong> Spin drift and crosswind jump are modeled based on bullet spin rate calculated from barrel twist and muzzle velocity. Spin rate is recomputed for each shot based on actual muzzle velocity (accounting for MV variation).<br><br>
-            
-            <strong>Variability:</strong> Each shot has slightly different muzzle velocity (from MV σ) and accuracy errors (from rifle accuracy setting). These simulate real-world shot-to-shot variability.<br><br>
-            
-            <strong>Zeroing:</strong> Rifle is zeroed at the configured distance with scope height compensation. Zeroing calculates the initial launch angle needed to hit the target point-of-aim at zero distance.<br><br>
-            
-            <strong>Wind:</strong> Wind presets (selected in the UI) control atmospheric conditions affecting bullet trajectory throughout the full 3D flight path. Wind flags along the range show wind direction and intensity at multiple distances. Wind affects bullet trajectory, not just dust particles.<br><br>
-            
-            <strong>Settings Persistence:</strong> All parameters are automatically saved and restored on page reload using cookies.
+
+            <strong>Spin Effects:</strong><br>
+            - Spin drift and crosswind jump are modeled based on bullet spin rate calculated from barrel twist and muzzle velocity<br>
+            - Spin rate is recomputed for each shot based on actual muzzle velocity (accounting for MV variation)<br><br>
+
+            <strong>Variability:</strong><br>
+            - Each shot has slightly different muzzle velocity (from MV σ) and accuracy errors (from rifle accuracy setting)<br>
+            - These simulate real-world shot-to-shot variability<br><br>
+
+            <strong>Zeroing:</strong><br>
+            - Rifle is zeroed at the configured distance with scope height compensation<br>
+            - Zeroing calculates the initial launch angle needed to hit the target point-of-aim at zero distance<br><br>
+
+            <strong>Wind:</strong><br>
+            - Wind presets (selected in the UI) control atmospheric conditions affecting bullet trajectory throughout the full 3D flight path<br>
+            - Wind flags along the range show wind direction and intensity at multiple distances<br>
+            - Wind affects bullet trajectory, not just dust particles
           </div>
         </div>
         
-        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
-          <h3 style="margin-top: 0;">Visual Effects</h3>
+        <div class="help-section">
+          <h3>Visual Effects</h3>
           <div class="param-help">
             <strong>Impact Marks:</strong> Bullet impacts appear as splatter marks on the target texture, with metal showing through the red paint on the side that was hit.<br><br>
             
@@ -253,19 +254,58 @@
         </div>
         
         <div class="help-section">
-          <h3 style="margin-top: 0;">Technical Details</h3>
+          <h3>HUD Display (Top-Right)</h3>
           <div class="param-help">
-            <strong>Physics Engine:</strong> Custom rigid body physics in C++ (WebAssembly) with quaternion-based orientation for stable rotations. Targets use momentum transfer with linear and angular damping.<br><br>
-            
-            <strong>Rendering:</strong> 3-pass composition system: background scene renders to texture, scope renders independently with zoom, then composited with reticle overlay. Three.js WebGL with 4× MSAA anti-aliasing. Vertex positions computed in C++ and transferred via typed memory views.<br><br>
-            
-            <strong>Scope Reticle:</strong> Geometry-based reticle using Three.js meshes. FFP behavior scales with zoom, maintaining MRAD subtensions.<br><br>
-            
-            <strong>Impact Detection:</strong> Spatial binning system (10m bins) for efficient collision detection. Raycasting from trajectory path detects target intersections. Impact points converted to local target coordinates for physics and texture drawing. No collision detection between targets (simplified physics).<br><br>
-            
-            <strong>Texture System:</strong> Targets use double-width texture buffer: front face UVs map to left half (0-0.5), back face to right half (0.5-1.0), allowing impacts to appear on the correct side.<br><br>
-            
-            <strong>Chain Model:</strong> Chains modeled as damped springs without mass or realistic chain link physics. Cannot go slack or wrap around objects.
+            - <strong>Elevation:</strong> Current elevation dial setting in mrad (U = up, D = down)<br>
+            - <strong>Windage:</strong> Current windage dial setting in mrad (R = right, L = left)<br>
+            - <strong>Impact Status:</strong> Shows "IMPACT" (green) when hitting targets, "MISS" (red) when missing
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Technical Details</h3>
+          <div class="param-help">
+            <strong>Physics Engine:</strong><br>
+            - Custom rigid body physics in C++ (WebAssembly) with quaternion-based orientation for stable rotations<br>
+            - Targets use momentum transfer with linear and angular damping<br><br>
+
+            <strong>Rendering:</strong><br>
+            - 3-pass composition system: background scene renders to texture, scope renders independently with zoom, then composited with reticle overlay<br>
+            - Three.js WebGL with 4× MSAA anti-aliasing<br>
+            - Vertex positions computed in C++ and transferred via typed memory views<br><br>
+
+            <strong>Scope Reticle:</strong><br>
+            - Geometry-based reticle using Three.js meshes<br>
+            - FFP behavior scales with zoom, maintaining MRAD subtensions<br><br>
+
+            <strong>Impact Detection:</strong><br>
+            - Spatial binning system (10m bins) for efficient collision detection<br>
+            - Raycasting from trajectory path detects target intersections<br>
+            - Impact points converted to local target coordinates for physics and texture drawing<br>
+            - No collision detection between targets (simplified physics)<br><br>
+
+            <strong>Texture System:</strong><br>
+            - Targets use double-width texture buffer: front face UVs map to left half (0-0.5), back face to right half (0.5-1.0)<br>
+            - Allows impacts to appear on the correct side<br><br>
+
+            <strong>Chain Model:</strong><br>
+            - Chains modeled as damped springs without mass or realistic chain link physics<br>
+            - Cannot go slack or wrap around objects
+          </div>
+        </div>
+        
+        <div class="help-section">
+          <h3>Tips for Success</h3>
+          <div class="param-help">
+            - Start with the 100-yard rack to confirm your zero<br>
+            - Use wind flags at multiple distances to read wind gradients<br>
+            - Watch target movement after impacts to understand hit location (center vs edge)<br>
+            - Make small MRAD adjustments (0.1 mrad increments) for precise corrections<br>
+            - Use <kbd>Shift</kbd>+<kbd>Arrow</kbd> keys for larger 1.0 mrad adjustments when needed<br>
+            - Higher BC bullets drift less in the wind<br>
+            - Lower MV σ = more consistent impacts<br>
+            - Practice at shorter distances before attempting 1760 yards (1 mile)<br>
+            - Use the HUD to track your dial settings and impact status
           </div>
         </div>
       </div>

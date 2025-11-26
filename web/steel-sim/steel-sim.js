@@ -1282,6 +1282,9 @@ class SteelSimulator
 
     for (const shot of shots)
     {
+      // Skip shots that already hit something (short-circuit ground check)
+      if (!shot.alive) continue;
+
       const trajectory = shot.getTrajectory();
       if (!trajectory) continue;
 
