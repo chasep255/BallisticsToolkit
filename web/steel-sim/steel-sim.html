@@ -135,13 +135,10 @@
       <!-- Quick Key Guide -->
       <div class="quick-keys">
         <div class="quick-keys-section">
-          <strong>Spotting Scope (Bottom-Left):</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Pan • <kbd>E</kbd><kbd>Q</kbd> Zoom
+          <strong>Desktop:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/<kbd>E</kbd><kbd>Q</kbd> Spotting scope • Click rifle scope to enter • <kbd>Arrows</kbd> dial • <kbd>Esc</kbd> exit
         </div>
         <div class="quick-keys-section">
-          <strong>Rifle Scope (Bottom-Right):</strong> Click scope to enter • Move mouse to pan • <kbd>Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> zoom (4×–40×) • Click to fire • <kbd>Esc</kbd> to exit scope mode
-        </div>
-        <div class="quick-keys-section">
-          <strong>Dials & View (in rifle scope):</strong> <kbd>Arrow</kbd> keys adjust MRAD dial (0.1 mrad per press, hold <kbd>Shift</kbd> for 1.0 mrad) • <kbd>R</kbd> reset dial to zero • <kbd>S</kbd> toggle scope overlay
+          <strong>Mobile:</strong> 1-finger drag to pan • Pinch to zoom • Tap rifle scope to fire
         </div>
       </div>
     </div>
@@ -191,7 +188,24 @@
             - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation up/down (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad)<br>
             - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage left/right (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad)<br>
             - <kbd>R</kbd> reset both elevation and windage dials to zero (only when in rifle scope mode)<br>
-            - Dial position shown in HUD (upper-right)
+            - Dial position shown in HUD (upper-left)
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Mobile/Touch Controls</h3>
+          <div class="param-help">
+            <strong>Both Scopes:</strong><br>
+            - <strong>Single-finger drag:</strong> Pan the scope view (natural scrolling direction)<br>
+            - <strong>Pinch:</strong> Zoom in/out (4× to 40× magnification)<br><br>
+
+            <strong>Rifle Scope:</strong><br>
+            - <strong>Tap:</strong> Fire a shot (quick tap without dragging)<br><br>
+
+            <strong>Fullscreen:</strong><br>
+            - Use the Fullscreen button for immersive mobile play<br>
+            - Canvas automatically adapts to your screen's aspect ratio<br>
+            - Works in both portrait and landscape orientations
           </div>
         </div>
         
@@ -201,6 +215,7 @@
             - <strong>Start:</strong> Initialize the simulator and begin shooting<br>
             - <strong>Restart:</strong> Restart the simulator with current parameters<br>
             - <strong>Help:</strong> Show this help dialog<br>
+            - <strong>Fullscreen:</strong> Enter fullscreen mode (also starts the game if not started). Canvas adapts to screen aspect ratio.<br>
             - Settings are automatically saved and restored using cookies on reload
           </div>
         </div>
@@ -265,7 +280,7 @@
         </div>
         
         <div class="help-section">
-          <h3>HUD Display (Top-Right)</h3>
+          <h3>HUD Display (Top-Left)</h3>
           <div class="param-help">
             - <strong>Elevation:</strong> Current elevation dial setting in mrad (U = up, D = down)<br>
             - <strong>Windage:</strong> Current windage dial setting in mrad (R = right, L = left)<br>

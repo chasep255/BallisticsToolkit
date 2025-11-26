@@ -177,6 +177,7 @@ class SteelSimulator
       active: false,
       lastPinchDistance: 0,
       lastTouchPos: { x: 0, y: 0 },
+      lastThreeFingerPos: { x: 0, y: 0 }, // For three-finger dial adjustment
       touchStartTime: 0,
       touchMoved: false,
       activeScope: null // 'rifle' | 'spotting' | null
@@ -1363,46 +1364,42 @@ class SteelSimulator
 
     if (touches.length >= 2)
     {
-      // Pinch zoom
+      // Pinch zoom - proportional to finger spread
       const newPinchDistance = this.getPinchDistance(touches[0], touches[1]);
-      const pinchDelta = newPinchDistance - this.touchState.lastPinchDistance;
-
-      // Threshold to trigger zoom (pixels)
-      const PINCH_THRESHOLD = 10;
-      if (Math.abs(pinchDelta) > PINCH_THRESHOLD)
+      
+      if (this.touchState.lastPinchDistance > 0)
       {
-        if (pinchDelta > 0)
-        {
-          scopeObj.zoomIn();
-        }
-        else
-        {
-          scopeObj.zoomOut();
-        }
-        this.touchState.lastPinchDistance = newPinchDistance;
-        this.touchState.touchMoved = true;
+        // Calculate zoom ratio from pinch ratio
+        const pinchRatio = newPinchDistance / this.touchState.lastPinchDistance;
+        const currentZoom = scopeObj.getZoomX();
+        const newZoom = currentZoom * pinchRatio;
+        scopeObj.setZoomX(newZoom); // setZoomX clamps to min/max
       }
+      
+      this.touchState.lastPinchDistance = newPinchDistance;
+      this.touchState.touchMoved = true;
     }
     else if (touches.length === 1)
     {
-      // Single finger pan
+      // Single finger - pan only after tap duration threshold
       const touch = touches[0];
-      const deltaX = touch.clientX - this.touchState.lastTouchPos.x;
-      const deltaY = touch.clientY - this.touchState.lastTouchPos.y;
-
-      // Only pan if there's significant movement
-      if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2)
+      const elapsed = performance.now() - this.touchState.touchStartTime;
+      const TAP_DURATION_THRESHOLD = 150; // ms - panning starts after this
+      
+      if (elapsed > TAP_DURATION_THRESHOLD)
       {
-        this.touchState.touchMoved = true;
+        // It's a drag now - pan the view
+        const deltaX = touch.clientX - this.touchState.lastTouchPos.x;
+        const deltaY = touch.clientY - this.touchState.lastTouchPos.y;
 
-        // Convert pixel delta to normalized delta and then to angles
-        // Negate deltas for natural touch scrolling (drag to move the view)
         const normDelta = this.compositionRenderer.movementToNormalized(-deltaX, -deltaY);
         const { deltaYaw, deltaPitch } = scopeObj.normalizedDeltaToAngles(normDelta.x, normDelta.y);
         scopeObj.panBy(deltaYaw, deltaPitch);
 
-        this.touchState.lastTouchPos = { x: touch.clientX, y: touch.clientY };
+        this.touchState.touchMoved = true;
       }
+      
+      this.touchState.lastTouchPos = { x: touch.clientX, y: touch.clientY };
     }
   }
 
