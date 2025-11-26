@@ -481,6 +481,7 @@ export function initConfig()
       z: btk.Conversions.yardsToMeters(-1000), // -1000 yards
       rackWidth: btk.Conversions.yardsToMeters(3),
       rackHeight: btk.Conversions.yardsToMeters(3),
+      hasBerm: false, // Large single square target - no berm
       targets: [
       {
         width: btk.Conversions.inchesToMeters(12 * 6),
@@ -705,6 +706,7 @@ export function initConfig()
       z: btk.Conversions.yardsToMeters(-1760), // -1760 yards
       rackWidth: btk.Conversions.yardsToMeters(3),
       rackHeight: btk.Conversions.yardsToMeters(3),
+      hasBerm: false, // Large single square target - no berm
       targets: [
       {
         width: btk.Conversions.inchesToMeters(12 * 6),

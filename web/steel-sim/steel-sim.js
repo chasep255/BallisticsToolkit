@@ -42,6 +42,11 @@ import
 from './RangeSign.js';
 import
 {
+  BermFactory
+}
+from './Berm.js';
+import
+{
   HUD
 }
 from './HUD.js';
@@ -254,6 +259,7 @@ class SteelSimulator
     DustCloudFactory.deleteAll();
     WindFlagFactory.deleteAll();
     RangeSignFactory.deleteAll();
+    BermFactory.deleteAll();
 
     // Clean up BTK objects
     if (this.rifleZero)
@@ -718,6 +724,32 @@ class SteelSimulator
         text: `${distanceYards} YD`,
         scene: this.scene
       });
+
+      // Create berm behind rack if enabled (default true)
+      const hasBerm = rackConfig.hasBerm !== false; // Default to true
+      if (hasBerm)
+      {
+        // Position berm 2 yards behind rack (towards shooter, positive Z)
+        const bermOffsetZ = btk.Conversions.yardsToMeters(2);
+        const bermPosition = new THREE.Vector3(
+          rackConfig.x,
+          groundHeight,
+          rackConfig.z - bermOffsetZ // Behind rack (towards shooter)
+        );
+
+        // Berm dimensions: flat top matches rack width, height matches rack height
+        const bermDepth = btk.Conversions.yardsToMeters(3); // 3 yards deep
+
+        BermFactory.create(
+        {
+          position: bermPosition,
+          width: rackConfig.rackWidth * 1.1, // Flat top width matches rack
+          height: rackConfig.rackHeight * 1.1, // Same height as rack
+          depth: bermDepth,
+          scene: this.scene,
+          textureManager: this.textureManager
+        });
+      }
     }
   }
 
@@ -772,7 +804,7 @@ class SteelSimulator
         {
           target: target,
           soundName: 'ping1',
-          createDust: (impactPosition, scene, windGenerator) => {
+          onImpact: (impactPosition, scene, windGenerator) => {
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
             DustCloudFactory.create({
               position: pos,
@@ -793,6 +825,43 @@ class SteelSimulator
     if (this.landscape)
     {
       this.landscape.registerWithImpactDetector(this.impactDetector);
+    }
+
+    // Register all berms with impact detector
+    const berms = BermFactory.getAll();
+    for (const berm of berms)
+    {
+      const bermMesh = berm.getMesh();
+      if (bermMesh)
+      {
+        // Clone geometry and apply the berm's world transform
+        const transformedGeometry = bermMesh.geometry.clone();
+        bermMesh.updateMatrixWorld();
+        transformedGeometry.applyMatrix4(bermMesh.matrixWorld);
+
+        this.impactDetector.addMeshFromGeometry(
+          transformedGeometry,
+          {
+            name: 'Berm',
+            soundName: null, // Berms are silent
+            onImpact: (impactPosition, scene, windGenerator) => {
+              const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+
+              // Sand dust for berm impacts
+              DustCloudFactory.create({
+                position: pos,
+                scene: scene,
+                numParticles: 1000, // Lots of sand particles
+                color: { r: 245, g: 220, b: 170 }, // Light sandy/yellow-tan color (distinct from brown dirt)
+                windGenerator: windGenerator,
+                initialRadius: 0.05, // Wider spread for sand
+                growthRate: 0.15, // Medium growth
+                particleDiameter: 0.5 // Small sand particles
+              });
+            }
+          }
+        );
+      }
     }
     
     console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets`);
@@ -1126,9 +1195,9 @@ class SteelSimulator
         }
 
         // Create dust effect if generator provided
-        if (userData.createDust)
+        if (userData.onImpact)
         {
-          userData.createDust(impactPosition, this.scene, this.windGenerator);
+          userData.onImpact(impactPosition, this.scene, this.windGenerator);
         }
 
         // Play sound if sound name provided

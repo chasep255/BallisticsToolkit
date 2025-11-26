@@ -48,7 +48,6 @@ export class Landscape
     this.mountains = [];
     this.trees = [];
     this.rocks = [];
-    this.markers = [];
 
     // Create green ground plane (flat)
     // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
@@ -229,14 +228,13 @@ export class Landscape
   }
 
   /**
-   * Create all environment features (mountains, trees, rocks, markers)
+   * Create all environment features (mountains, trees, rocks)
    */
   createEnvironment()
   {
     this.createMountains();
     this.createTrees();
     this.createRocks();
-    this.createMarkers();
   }
 
   /**
@@ -508,43 +506,6 @@ export class Landscape
     }
   }
 
-  /**
-   * Create range marker posts
-   */
-  createMarkers()
-  {
-    // Marker material - orange
-    const markerMaterial = new THREE.MeshStandardMaterial(
-    {
-      color: 0xffa500, // Orange
-      roughness: 0.7,
-      metalness: 0.1
-    });
-
-    const postRadius = Config.MARKER_CONFIG.postRadius; // meters from config
-
-    for (let i = 0; i < Config.MARKER_CONFIG.count; i++)
-    {
-      // Random position within range bounds
-      const x = (Math.random() - 0.5) * this.groundWidth * 0.8; // Stay within 80% of range width
-      const z = -Math.random() * this.groundLength * 0.95; // 0 to 95% downrange
-
-      // Get ground height at this position
-      const groundHeight = this.getHeightAt(x, z) || 0;
-
-      const postHeight = Config.MARKER_CONFIG.heightMin + Math.random() * (Config.MARKER_CONFIG.heightMax - Config.MARKER_CONFIG.heightMin);
-      const geometry = new THREE.CylinderGeometry(postRadius, postRadius, postHeight, 8);
-
-      const post = new THREE.Mesh(geometry, markerMaterial.clone());
-      post.position.set(x, groundHeight + postHeight / 2, z);
-      post.castShadow = true;
-      post.receiveShadow = true;
-
-      this.scene.add(post);
-      this.markers.push(post);
-    }
-  }
-
 
   /**
    * Clean up and dispose of all resources
@@ -587,22 +548,10 @@ export class Landscape
       }
     }
 
-    // Remove markers
-    for (const marker of this.markers)
-    {
-      this.scene.remove(marker);
-      marker.geometry.dispose();
-      if (marker.material)
-      {
-        marker.material.dispose();
-      }
-    }
-
     // Clear arrays
     this.mountains = [];
     this.trees = [];
     this.rocks = [];
-    this.markers = [];
 
     if (this.greenGroundMesh)
     {
@@ -653,7 +602,7 @@ export class Landscape
         {
           name: `Rock ${rockIndex}`,
           soundName: null, // Rocks are silent
-          createDust: (impactPosition, scene, windGenerator) => {
+          onImpact: (impactPosition, scene, windGenerator) => {
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
             
             // Big chunky particles for rocks
@@ -661,7 +610,7 @@ export class Landscape
               position: pos,
               scene: scene,
               numParticles: 500, // Just a few big chunks
-              color: 0xC0C0C0, // Light grey rock dust
+              color: { r: 192, g: 192, b: 192 }, // Light grey rock dust
               windGenerator: windGenerator,
               initialRadius: 0.05, // Tighter initial spread
               growthRate: 0.1, // Medium growth
