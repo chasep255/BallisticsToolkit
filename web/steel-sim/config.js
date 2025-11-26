@@ -154,6 +154,12 @@ export function initConfig()
       config:
       {}
     },
+    {
+      x: btk.Conversions.yardsToMeters(-10),
+      z: btk.Conversions.yardsToMeters(-750),
+      config:
+      {}
+    },
     // 900 yards
     {
       x: btk.Conversions.yardsToMeters(-17),

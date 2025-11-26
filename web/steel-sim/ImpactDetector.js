@@ -9,11 +9,12 @@ export class ImpactDetector
   {
     const btk = window.btk;
 
-    const binSize = config.binSize || 10.0; // Default 10 meters
-    const minX = config.minX || -100.0;
-    const maxX = config.maxX || 100.0;
-    const minZ = config.minZ || -2000.0;
-    const maxZ = config.maxZ || 100.0;
+    // All values must be provided - no defaults
+    const binSize = config.binSize;
+    const minX = config.minX;
+    const maxX = config.maxX;
+    const minZ = config.minZ;
+    const maxZ = config.maxZ;
 
     // Create C++ detector
     this.detector = new btk.ImpactDetector(binSize, minX, maxX, minZ, maxZ);

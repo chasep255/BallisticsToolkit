@@ -1192,6 +1192,24 @@ class SteelSimulator
         if (userData.target)
         {
           userData.target.hit(impactBullet);
+          
+          // Update HUD with hit status
+          if (this.hud)
+          {
+            this.hud.updateImpactStatus({
+              type: 'hit'
+            });
+          }
+        }
+        else
+        {
+          // Hit something that's not a target (berm, rock, ground) - count as miss
+          if (this.hud)
+          {
+            this.hud.updateImpactStatus({
+              type: 'miss'
+            });
+          }
         }
 
         // Create dust effect if generator provided
@@ -1311,6 +1329,14 @@ class SteelSimulator
 
         this.createDustCloud(impactPoint);
         impactPoint.delete();
+
+        // Update HUD with miss status (ground hit = miss)
+        if (this.hud && shot.alive)
+        {
+          this.hud.updateImpactStatus({
+            type: 'miss'
+          });
+        }
 
         // Mark shot as dead (will be disposed by ShotFactory.updateAll)
         shot.markDead();

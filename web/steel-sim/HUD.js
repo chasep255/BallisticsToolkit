@@ -54,9 +54,15 @@ export class HUD
     // Scope Dial - Windage
     this.windageCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
     this.windageMesh = this.createHudMesh(this.windageCanvas, displayWidth, displayHeight, margin, currentY);
+    currentY -= lineHeight;
+
+    // Impact/Miss Status
+    this.impactCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.impactMesh = this.createHudMesh(this.impactCanvas, displayWidth, displayHeight, margin, currentY);
 
     // Initialize dial display
     this.updateDial(0, 0);
+    this.updateImpactStatus(null); // No impact initially
   }
 
   createHudCanvas(width, height)
@@ -153,6 +159,56 @@ export class HUD
       {
         this.windageMesh.material.map.needsUpdate = true;
       }
+    }
+  }
+
+  /**
+   * Update impact/miss status display
+   * @param {Object|null} impactInfo - Impact information {type: 'hit'|'miss'} or null to clear
+   */
+  updateImpactStatus(impactInfo)
+  {
+    if (!this.impactCanvas) return;
+
+    const ctx = this.impactCanvas.getContext('2d');
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, this.impactCanvas.width, this.impactCanvas.height);
+
+    if (!impactInfo)
+    {
+      // No impact yet - show nothing or "Ready"
+      return;
+    }
+
+    // Semi-transparent background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(0, 0, this.impactCanvas.width, this.impactCanvas.height);
+
+    // Text styling
+    ctx.font = 'bold 15px monospace';
+    ctx.textBaseline = 'middle';
+
+    if (impactInfo.type === 'hit')
+    {
+      // Hit - green text, centered
+      ctx.font = 'bold 18px monospace';
+      ctx.fillStyle = '#00ff00'; // Green
+      ctx.textAlign = 'center';
+      ctx.fillText('IMPACT', this.impactCanvas.width / 2, this.impactCanvas.height / 2);
+    }
+    else if (impactInfo.type === 'miss')
+    {
+      // Miss - red text, centered
+      ctx.font = 'bold 18px monospace';
+      ctx.fillStyle = '#ff0000'; // Red
+      ctx.textAlign = 'center';
+      ctx.fillText('MISS', this.impactCanvas.width / 2, this.impactCanvas.height / 2);
+    }
+
+    if (this.impactMesh && this.impactMesh.material.map)
+    {
+      this.impactMesh.material.map.needsUpdate = true;
     }
   }
 
