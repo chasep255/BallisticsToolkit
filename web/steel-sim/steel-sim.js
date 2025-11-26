@@ -172,6 +172,16 @@ class SteelSimulator
       q: false
     };
 
+    // Touch state for mobile pinch zoom and pan
+    this.touchState = {
+      active: false,
+      lastPinchDistance: 0,
+      lastTouchPos: { x: 0, y: 0 },
+      touchStartTime: 0,
+      touchMoved: false,
+      activeScope: null // 'rifle' | 'spotting' | null
+    };
+
     // HUD
     this.hud = null;
 
@@ -276,6 +286,20 @@ class SteelSimulator
     if (this.boundHandlers.onWindowResize)
     {
       window.removeEventListener('resize', this.boundHandlers.onWindowResize);
+    }
+
+    // Remove touch event listeners
+    if (this.boundHandlers.onTouchStart)
+    {
+      this.canvas.removeEventListener('touchstart', this.boundHandlers.onTouchStart);
+    }
+    if (this.boundHandlers.onTouchMove)
+    {
+      this.canvas.removeEventListener('touchmove', this.boundHandlers.onTouchMove);
+    }
+    if (this.boundHandlers.onTouchEnd)
+    {
+      this.canvas.removeEventListener('touchend', this.boundHandlers.onTouchEnd);
     }
 
     // Clean up factories
@@ -730,6 +754,14 @@ class SteelSimulator
     window.addEventListener('keyup', this.boundHandlers.onKeyUp);
     document.addEventListener('pointerlockchange', this.boundHandlers.onPointerLockChange);
     window.addEventListener('resize', this.boundHandlers.onWindowResize);
+
+    // Touch event listeners for mobile
+    this.boundHandlers.onTouchStart = (e) => this.onTouchStart(e);
+    this.boundHandlers.onTouchMove = (e) => this.onTouchMove(e);
+    this.boundHandlers.onTouchEnd = (e) => this.onTouchEnd(e);
+    this.canvas.addEventListener('touchstart', this.boundHandlers.onTouchStart, { passive: false });
+    this.canvas.addEventListener('touchmove', this.boundHandlers.onTouchMove, { passive: false });
+    this.canvas.addEventListener('touchend', this.boundHandlers.onTouchEnd, { passive: false });
   }
 
   onWindowResize()
@@ -1192,6 +1224,141 @@ class SteelSimulator
         event.preventDefault();
       }
     }
+  }
+
+  // ===== TOUCH HANDLERS (Mobile) =====
+
+  /**
+   * Calculate distance between two touch points
+   */
+  getPinchDistance(touch1, touch2)
+  {
+    const dx = touch1.clientX - touch2.clientX;
+    const dy = touch1.clientY - touch2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  onTouchStart(event)
+  {
+    // Prevent default to stop page scrolling/zooming
+    event.preventDefault();
+
+    const touches = event.touches;
+    if (touches.length === 0) return;
+
+    // Get first touch position in normalized coordinates
+    const touch = touches[0];
+    const norm = this.compositionRenderer.screenToNormalized(touch.clientX, touch.clientY);
+
+    // Determine which scope is being touched
+    let activeScope = null;
+    
+    // Check spotting scope first (it's on the left)
+    if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
+    {
+      activeScope = 'spotting';
+    }
+    else if (this.scope && this.scope.isPointInside(norm.x, norm.y))
+    {
+      activeScope = 'rifle';
+    }
+
+    // If not touching a scope, ignore
+    if (!activeScope) return;
+
+    this.touchState.active = true;
+    this.touchState.activeScope = activeScope;
+    this.touchState.touchStartTime = performance.now();
+    this.touchState.touchMoved = false;
+    this.touchState.lastTouchPos = { x: touch.clientX, y: touch.clientY };
+
+    // Track pinch distance if two fingers
+    if (touches.length >= 2)
+    {
+      this.touchState.lastPinchDistance = this.getPinchDistance(touches[0], touches[1]);
+    }
+  }
+
+  onTouchMove(event)
+  {
+    if (!this.touchState.active) return;
+
+    event.preventDefault();
+
+    const touches = event.touches;
+    if (touches.length === 0) return;
+
+    // Get the active scope object
+    const scopeObj = this.touchState.activeScope === 'rifle' ? this.scope : this.spottingScope;
+    if (!scopeObj) return;
+
+    if (touches.length >= 2)
+    {
+      // Pinch zoom
+      const newPinchDistance = this.getPinchDistance(touches[0], touches[1]);
+      const pinchDelta = newPinchDistance - this.touchState.lastPinchDistance;
+
+      // Threshold to trigger zoom (pixels)
+      const PINCH_THRESHOLD = 10;
+      if (Math.abs(pinchDelta) > PINCH_THRESHOLD)
+      {
+        if (pinchDelta > 0)
+        {
+          scopeObj.zoomIn();
+        }
+        else
+        {
+          scopeObj.zoomOut();
+        }
+        this.touchState.lastPinchDistance = newPinchDistance;
+        this.touchState.touchMoved = true;
+      }
+    }
+    else if (touches.length === 1)
+    {
+      // Single finger pan
+      const touch = touches[0];
+      const deltaX = touch.clientX - this.touchState.lastTouchPos.x;
+      const deltaY = touch.clientY - this.touchState.lastTouchPos.y;
+
+      // Only pan if there's significant movement
+      if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2)
+      {
+        this.touchState.touchMoved = true;
+
+        // Convert pixel delta to normalized delta and then to angles
+        // Negate deltas for natural touch scrolling (drag to move the view)
+        const normDelta = this.compositionRenderer.movementToNormalized(-deltaX, -deltaY);
+        const { deltaYaw, deltaPitch } = scopeObj.normalizedDeltaToAngles(normDelta.x, normDelta.y);
+        scopeObj.panBy(deltaYaw, deltaPitch);
+
+        this.touchState.lastTouchPos = { x: touch.clientX, y: touch.clientY };
+      }
+    }
+  }
+
+  onTouchEnd(event)
+  {
+    if (!this.touchState.active) return;
+
+    event.preventDefault();
+
+    // Check for tap-to-fire on rifle scope
+    const elapsed = performance.now() - this.touchState.touchStartTime;
+    const TAP_MAX_DURATION = 300; // milliseconds
+
+    if (this.touchState.activeScope === 'rifle' &&
+        !this.touchState.touchMoved &&
+        elapsed < TAP_MAX_DURATION)
+    {
+      // Quick tap on rifle scope - fire!
+      this.fireFromScope();
+    }
+
+    // Reset touch state
+    this.touchState.active = false;
+    this.touchState.activeScope = null;
+    this.touchState.touchMoved = false;
   }
 
   // ===== SHOOTING =====

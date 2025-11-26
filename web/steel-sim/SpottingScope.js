@@ -270,6 +270,34 @@ export class SpottingScope
   }
 
   /**
+   * Convert normalized delta (composition coordinates) to yaw/pitch angles.
+   * Used for touch/mouse panning.
+   */
+  normalizedDeltaToAngles(deltaNormX, deltaNormY)
+  {
+    // Single sensitivity so horizontal and vertical feel identical.
+    const sensitivity = this.getFovRad() / 2;
+    const deltaYaw = -deltaNormX * sensitivity;
+    const deltaPitch = -deltaNormY * sensitivity;
+    return {
+      deltaYaw,
+      deltaPitch
+    };
+  }
+
+  /**
+   * Check if a normalized point is inside this scope's circular view
+   */
+  isPointInside(normX, normY)
+  {
+    if (!this.scopeRadiusNormalized) return false;
+
+    const dx = normX - this.centerNormalized.x;
+    const dy = normY - this.centerNormalized.y;
+    return dx * dx + dy * dy <= this.scopeRadiusNormalized * this.scopeRadiusNormalized;
+  }
+
+  /**
    * Pan scope by explicit yaw/pitch deltas (in radians).
    */
   panBy(deltaYawRad, deltaPitchRad)
