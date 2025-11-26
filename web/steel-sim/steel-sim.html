@@ -3,23 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Steel Target Simulator - Early Preview Steel Range | Ballistics Toolkit</title>
-  <meta name="description" content="Early-preview interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile).">
-  <meta name="keywords" content="steel target, physics simulation, target dynamics, shooting simulator, ballistics, long range, 1 mile">
+  <title>Steel Target Simulator - Interactive Steel Range | Ballistics Toolkit</title>
+  <meta name="description" content="Interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile).">
+  <meta name="keywords" content="steel target simulator, shooting simulator, long range shooting, 3D shooting game, ballistics simulation, steel target physics, FFP scope, MRAD dials, wind reading, spin drift, crosswind jump, impact detection">
   <link rel="canonical" href="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
-  <meta property="og:title" content="Steel Target Simulator - Physics Testing">
-  <meta property="og:description" content="Interactive steel target physics simulator with realistic chain dynamics and bullet impacts.">
+  <meta property="og:title" content="Steel Target Simulator - Interactive Steel Range">
+  <meta property="og:description" content="Interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile). Shoot with a pointer-lock FFP scope, MRAD dials, and realistic steel target physics with impact marks and dust effects.">
   <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
-  <meta property="twitter:title" content="Steel Target Simulator - Physics Testing">
-  <meta property="twitter:description" content="Interactive steel target physics simulator with realistic chain dynamics and bullet impacts.">
+  <meta property="twitter:title" content="Steel Target Simulator - Interactive Steel Range">
+  <meta property="twitter:description" content="Interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile). Shoot with a pointer-lock FFP scope, MRAD dials, and realistic steel target physics with impact marks and dust effects.">
   <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
@@ -31,7 +31,7 @@
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Steel Target Simulator (Early Preview)",
+    "name": "Steel Target Simulator",
     "description": "Interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile).",
     "url": "https://www.ballisticstoolkit.com/steel-sim/steel-sim.html",
     "applicationCategory": "UtilitiesApplication",
@@ -60,9 +60,6 @@
 
   <div class="app-container">
     <h1>🔩 Steel Target Simulator</h1>
-    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 12px; margin: 20px 0; color: #856404;">
-      <strong>⚠️ Under Construction (Early Preview):</strong> Playable interactive steel range with full ballistics and steel target physics. Shoot from 100 to 1760 yards (1 mile) at reactive racks using a pointer-lock FFP scope, MRAD dials, wind presets, and realistic impact visuals. Expect UI and content to change as development continues.
-    </div>
 
     <!-- Bullet Parameters -->
     <div class="params-bar" style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px;">
@@ -155,31 +152,39 @@
       </div>
       <div class="help-modal-body">
         <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
-          <h3 style="margin-top: 0;">Overview</h3>
-          <p>Steel Target Simulator is an early-preview interactive steel range with full ballistics and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and realistic target responses to bullet impacts. A pointer-lock FFP scope, MRAD dials, wind flags, dust/metal effects, and a simple HUD make it a playable prototype while UI and content are still evolving.</p>
-        </div>
-        
-        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
-          <h3 style="margin-top: 0;">Need Help or Found an Issue?</h3>
+          <h3 style="margin-top: 0;">Quick Start</h3>
           <div class="param-help">
-            <strong>📧 Email:</strong> <a href="mailto:admin@ballisticstoolkit.com">admin@ballisticstoolkit.com</a><br>
-            <strong>💻 GitHub:</strong> <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener noreferrer">github.com/chasep255/BallisticsToolkit</a>
+            <strong>Getting Started:</strong><br>
+            1. Configure your bullet and rifle parameters in the settings bar<br>
+            2. Click <strong>Start</strong> to initialize the simulator<br>
+            3. Click inside the scope circle to enter scope mode<br>
+            4. Move mouse to pan, use <kbd>Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> to zoom (4×–40×)<br>
+            5. Adjust MRAD dials with <kbd>Arrow</kbd> keys (hold <kbd>Shift</kbd> for 1.0 mrad steps)<br>
+            6. Click to fire<br>
+            7. Press <kbd>Esc</kbd> to exit scope mode<br><br>
+            
+            <strong>Key Features:</strong><br>
+            - <strong>FFP Scope:</strong> First Focal Plane reticle scales with zoom, maintaining MRAD subtensions<br>
+            - <strong>MRAD Dials:</strong> Precise elevation and windage adjustments shown in HUD<br>
+            - <strong>Wind Flags:</strong> Reactive 3D flags show wind direction and intensity at multiple distances<br>
+            - <strong>Target Physics:</strong> Realistic chain-mounted targets with momentum transfer and rotation<br>
+            - <strong>Impact Detection:</strong> Accurate hit/miss detection with visual feedback
           </div>
         </div>
         
-        <div class="help-section">
-          <h3>Controls</h3>
+        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
+          <h3 style="margin-top: 0;">Controls</h3>
           <div class="param-help">
             <strong>Buttons:</strong><br>
             - <strong>Start:</strong> Initialize the simulator and begin shooting<br>
             - <strong>Restart:</strong> Restart the simulator with current parameters<br>
             - <strong>Help:</strong> Show this help dialog<br>
-            - Settings (bullet, rifle, wind, zero) are automatically saved and restored using cookies on reload<br><br>
+            - Settings are automatically saved and restored using cookies on reload<br><br>
             
             <strong>Rifle Scope:</strong><br>
             - Click inside the scope circle to enter scope mode (pointer lock activates)<br>
             - Move mouse to pan/aim the scope (reticle moves with cursor at 1:1 speed)<br>
-            - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (4X to 40X magnification)<br>
+            - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (4× to 40× magnification)<br>
             - Click to fire bullet from scope crosshair<br>
             - <kbd>Esc</kbd> to exit scope mode (releases pointer lock)<br>
             - <kbd>S</kbd> toggle scope overlay visibility on/off<br>
@@ -193,26 +198,19 @@
           </div>
         </div>
         
-        <div class="help-section">
-          <h3>Targets & Physics</h3>
+        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
+          <h3 style="margin-top: 0;">Targets & Range</h3>
           <div class="param-help">
             <strong>Target Racks:</strong> Multiple target racks positioned from 100 to 1760 yards (1 mile) with various target sizes and configurations. Targets include both rectangular and oval shapes with sizes ranging from ~2" chips up to large ~6‑ft gongs, roughly spanning 0.5–2+ MOA depending on distance and rack configuration.<br><br>
+            
             <strong>Chain Mounting:</strong> Each target has two chains attached at the top, connecting to an overhead beam. Chains act as damped springs (10,000 N/m spring constant, 200 N·s/m damping) that dissipate energy to prevent bouncing.<br><br>
-            <strong>Impact Physics:</strong> Bullet impacts transfer momentum to targets. Center hits cause mostly linear motion; edge hits create rotation. Smaller targets respond more dramatically than larger ones.<br><br>
-            <strong>Damping:</strong> Linear damping (75% velocity per second) and angular damping (10% angular velocity per second) simulate air resistance and friction.
+            
+            <strong>Impact Physics:</strong> Bullet impacts transfer momentum to targets. Center hits cause mostly linear motion; edge hits create rotation. Smaller targets respond more dramatically than larger ones. Linear damping (75% velocity per second) and angular damping (10% angular velocity per second) simulate air resistance and friction.
           </div>
         </div>
         
-        <div class="help-section">
-          <h3>Visual Effects</h3>
-          <div class="param-help">
-            <strong>Impact Marks:</strong> Bullet impacts appear as splatter marks on the target texture, with metal showing through the red paint on the side that was hit.<br><br>
-            <strong>Dust Effects:</strong> Metallic dust particles (silver-gray) fly back when hitting targets. Brown dust clouds appear when missing and hitting the ground. Particles fade out over time.
-          </div>
-        </div>
-        
-        <div class="help-section">
-          <h3>Ballistics</h3>
+        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
+          <h3 style="margin-top: 0;">Ballistics & Settings</h3>
           <div class="param-help">
             <strong>Trajectory Simulation:</strong> Full 4DOF ballistics with G1/G7 drag models, atmospheric compensation, and wind effects. Bullet parameters determine trajectory and impact energy.<br><br>
             
@@ -235,31 +233,39 @@
             
             <strong>Variability:</strong> Each shot has slightly different muzzle velocity (from MV σ) and accuracy errors (from rifle accuracy setting). These simulate real-world shot-to-shot variability.<br><br>
             
-            <strong>Zeroing:</strong> Rifle is zeroed at the configured distance with scope height compensation. Zeroing calculates the initial launch angle needed to hit the target point-of-aim at zero distance. Zeroing is computed without spin effects for simplicity.<br><br>
+            <strong>Zeroing:</strong> Rifle is zeroed at the configured distance with scope height compensation. Zeroing calculates the initial launch angle needed to hit the target point-of-aim at zero distance.<br><br>
             
             <strong>Wind:</strong> Wind presets (selected in the UI) control atmospheric conditions affecting bullet trajectory throughout the full 3D flight path. Wind flags along the range show wind direction and intensity at multiple distances. Wind affects bullet trajectory, not just dust particles.<br><br>
             
-            <strong>Settings & HUD:</strong> All parameters are automatically saved and restored on page reload. The HUD in the upper-right displays current elevation and windage dial settings in mrad so you can track holds and adjustments.
+            <strong>Settings Persistence:</strong> All parameters are automatically saved and restored on page reload using cookies.
+          </div>
+        </div>
+        
+        <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
+          <h3 style="margin-top: 0;">Visual Effects</h3>
+          <div class="param-help">
+            <strong>Impact Marks:</strong> Bullet impacts appear as splatter marks on the target texture, with metal showing through the red paint on the side that was hit.<br><br>
+            
+            <strong>Dust Effects:</strong> Metallic dust particles (silver-gray) fly back when hitting targets. Brown dust clouds appear when missing and hitting the ground. Particles fade out over time.<br><br>
+            
+            <strong>Audio:</strong> Shot sounds play immediately on fire. Impact sounds (ping) play with distance-based delay and volume attenuation (full volume at 100 yards, fading to 10% at max range).
           </div>
         </div>
         
         <div class="help-section">
-          <h3>Technical Details</h3>
+          <h3 style="margin-top: 0;">Technical Details</h3>
           <div class="param-help">
-            <strong>Physics Engine:</strong> Custom rigid body physics in C++ (WebAssembly) with quaternion-based orientation for stable rotations.<br><br>
+            <strong>Physics Engine:</strong> Custom rigid body physics in C++ (WebAssembly) with quaternion-based orientation for stable rotations. Targets use momentum transfer with linear and angular damping.<br><br>
+            
             <strong>Rendering:</strong> 3-pass composition system: background scene renders to texture, scope renders independently with zoom, then composited with reticle overlay. Three.js WebGL with 4× MSAA anti-aliasing. Vertex positions computed in C++ and transferred via typed memory views.<br><br>
+            
             <strong>Scope Reticle:</strong> Geometry-based reticle using Three.js meshes. FFP behavior scales with zoom, maintaining MRAD subtensions.<br><br>
-            <strong>Impact Detection:</strong> Raycasting from scope camera center detects target intersections. Impact points converted to local target coordinates for physics and texture drawing.<br><br>
-            <strong>Texture Generation:</strong> Targets use double-width texture buffer: front face UVs map to left half (0-0.5), back face to right half (0.5-1.0), allowing impacts to appear on the correct side.
-          </div>
-        </div>
-        
-        <div class="help-section">
-          <h3>Limitations</h3>
-          <div class="param-help">
-            <strong>Simplified Physics:</strong> No collision detection between targets. Targets do not interact with each other.<br><br>
-            <strong>Chain Model:</strong> Chains modeled as damped springs without mass or realistic chain link physics. Cannot go slack or wrap around objects.<br><br>
-            <strong>Fixed Environment:</strong> Fixed overhead beam. Ground interactions limited to visual dust effects.
+            
+            <strong>Impact Detection:</strong> Spatial binning system (10m bins) for efficient collision detection. Raycasting from trajectory path detects target intersections. Impact points converted to local target coordinates for physics and texture drawing. No collision detection between targets (simplified physics).<br><br>
+            
+            <strong>Texture System:</strong> Targets use double-width texture buffer: front face UVs map to left half (0-0.5), back face to right half (0.5-1.0), allowing impacts to appear on the correct side.<br><br>
+            
+            <strong>Chain Model:</strong> Chains modeled as damped springs without mass or realistic chain link physics. Cannot go slack or wrap around objects.
           </div>
         </div>
       </div>
