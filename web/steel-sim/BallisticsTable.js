@@ -20,6 +20,8 @@ export class BallisticsTable
    * Uses a single trajectory simulation to create a drop table.
    * @param {Object} rifleZero - Zero configuration from steel-sim
    * @param {Object} config - Table generation config
+   *   - maxRange_m: maximum range to simulate (meters)
+   *   - rangeStep_m: step size for the table (meters)
    */
   build(rifleZero, config)
   {
@@ -27,12 +29,15 @@ export class BallisticsTable
     const startTime = performance.now();
     
     // Extract config
+    if (config.maxRange_m === undefined) throw new Error('BallisticsTable.build requires maxRange_m');
+    if (config.rangeStep_m === undefined) throw new Error('BallisticsTable.build requires rangeStep_m');
+    
     const maxRange_m = config.maxRange_m;
     const rangeStep_m = config.rangeStep_m;
     
     this.maxRange_m = maxRange_m;
     this.rangeStep_m = rangeStep_m;
-    this.dropTable = []; // Array of {range_m, drop_mrad} where drop_mrad is drop angle in milliradians
+    this.dropTable = []; // Array of {range_m, drop_mrad, spinDrift_mrad} where both angles are in milliradians
     
     // Create simulator for table generation
     const simulator = new window.btk.BallisticsSimulator();
@@ -69,20 +74,23 @@ export class BallisticsTable
     {
       const point = trajectoryObj.atDistance(range);
       if (!point) continue;
-      
+
       const state = point.getState();
       const position = state.getPosition();
-      
+
       const drop_m = position.y;
+      const spinDrift_m = position.x; // Lateral displacement due to spin drift
       const drop_mrad = range > 0 ? (drop_m / range) * 1000.0 : 0.0;
-      
+      const spinDrift_mrad = range > 0 ? (spinDrift_m / range) * 1000.0 : 0.0;
+
       this.dropTable.push({
         range_m: range,
-        drop_mrad: drop_mrad
+        drop_mrad: drop_mrad,
+        spinDrift_mrad: spinDrift_mrad
       });
 
-      console.log(`[BallisticsTable] Range: ${range}m, Drop: ${drop_mrad.toFixed(2)}mrad`);
-      
+      console.log(`[BallisticsTable] Range: ${range}m, Drop: ${drop_mrad.toFixed(2)}mrad, Spin Drift: ${spinDrift_mrad.toFixed(2)}mrad`);
+
       point.delete();
     }
     
@@ -93,72 +101,74 @@ export class BallisticsTable
   }
   
   /**
-   * Estimate where the bullet will impact based on scope dial elevation.
-   * Searches drop table for matching angle and interpolates range.
-   * @param {number} elevation_mrad - Current scope dial elevation in mrad
+   * Estimate where the bullet path intersects the scope line of sight, based
+   * on the current scope angles and the precomputed drop table.
+   * 
+   * Conceptually: at this elevation angle, how far does the dope table say the
+   * bullet will fly before it falls to ground level? We linearly scan the
+   * table and return the last distance where the bullet is still above ground.
+   * @param {number} elevation_mrad - Current total elevation angle in mrad (dial + holdover)
+   * @param {number} windage_mrad - Current total windage angle in mrad (dial + hold)
+   * @param {number} launch_height - Scope/eye height above ground in meters
    * @returns {Object} {x, y, z, range} in meters, or null if no valid estimate
    */
-  estimateImpactPoint(elevation_mrad)
+  estimateImpactPoint(elevation_mrad, windage_mrad, launch_height)
   {
     if (this.dropTable.length === 0) return null;
     
-    // Binary search for range where drop_mrad matches elevation_mrad
-    let left = 0;
-    let right = this.dropTable.length - 1;
-    let bestIdx = 0;
+    let lastEntry = null;
     
-    while (left <= right)
+    // Linear scan over the table: for each range, combine the scope elevation
+    // with the bullet drop angle to get the bullet's effective angle above
+    // horizontal, then see if that ray from launch_height is still above y=0.
+    for (let i = 0; i < this.dropTable.length; ++i)
     {
-      const mid = Math.floor((left + right) / 2);
-      const entry = this.dropTable[mid];
+      const entry = this.dropTable[i];
+      const range_m = entry.range_m;
       
-      if (Math.abs(entry.drop_mrad - elevation_mrad) < 0.01)
+      // Combined vertical angle in milliradians: scope angle + drop (negative)
+      const totalElev_mrad = elevation_mrad + entry.drop_mrad;
+      const totalElev_rad = totalElev_mrad / 1000.0;
+      
+      // Height of bullet above ground at this range
+      const height_m = launch_height + Math.tan(totalElev_rad) * range_m;
+      
+      if (height_m <= 0)
       {
-        bestIdx = mid;
+        // Bullet has gone below ground at this range; stop and use lastEntry
         break;
       }
-      else if (entry.drop_mrad < elevation_mrad)
-      {
-        // Need more drop (more range)
-        bestIdx = mid;
-        left = mid + 1;
-      }
-      else
-      {
-        // Too much drop (less range)
-        right = mid - 1;
-      }
+      
+      lastEntry = entry;
     }
     
-    // Interpolate between entries
-    if (bestIdx < this.dropTable.length - 1)
+    if (!lastEntry)
     {
-      const curr = this.dropTable[bestIdx];
-      const next = this.dropTable[bestIdx + 1];
-      
-      const currDiff = curr.drop_mrad - elevation_mrad;
-      const nextDiff = next.drop_mrad - elevation_mrad;
-      
-      if (Math.abs(nextDiff - currDiff) > 0.001)
-      {
-        const alpha = -currDiff / (nextDiff - currDiff);
-        const interpRange = curr.range_m + alpha * (next.range_m - curr.range_m);
-        
-        return {
-          x: 0,
-          y: 0,
-          z: -interpRange,
-          range: interpRange
-        };
-      }
+      // Bullet is immediately below ground (e.g., pointing into the dirt)
+      return {
+        x: 0,
+        y: 0,
+        z: 0,
+        range: 0
+      };
     }
     
-    const entry = this.dropTable[bestIdx];
+    const range_m = lastEntry.range_m;
+    
+    // Combine spin drift and dialed/held windage into a single yaw angle.
+    const totalYaw_rad = (windage_mrad + lastEntry.spinDrift_mrad) / 1000.0;
+    
+    // Interpret range as distance along a horizontal line of sight:
+    // - Z is downrange (negative)
+    // - X is crossrange (positive = right)
+    const x = range_m * Math.sin(totalYaw_rad);
+    const z = -range_m * Math.cos(totalYaw_rad);
+    
     return {
-      x: 0,
+      x,
       y: 0,
-      z: -entry.range_m,
-      range: entry.range_m
+      z,
+      range: range_m
     };
   }
   
@@ -172,17 +182,20 @@ export class BallisticsTable
       return {
         numEntries: 0,
         rangeRange: [0, 0],
-        dropRange_mrad: [0, 0]
+        dropRange_mrad: [0, 0],
+        spinDriftRange_mrad: [0, 0]
       };
     }
-    
+
     const ranges = this.dropTable.map(e => e.range_m);
     const drops = this.dropTable.map(e => e.drop_mrad);
-    
+    const spinDrifts = this.dropTable.map(e => e.spinDrift_mrad);
+
     return {
       numEntries: this.dropTable.length,
       rangeRange: [Math.min(...ranges), Math.max(...ranges)],
-      dropRange_mrad: [Math.min(...drops), Math.max(...drops)]
+      dropRange_mrad: [Math.min(...drops), Math.max(...drops)],
+      spinDriftRange_mrad: [Math.min(...spinDrifts), Math.max(...spinDrifts)]
     };
   }
 }

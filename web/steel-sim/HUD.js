@@ -4,6 +4,7 @@
  */
 
 import * as THREE from 'three';
+import { Config } from './config.js';
 
 export class HUD
 {
@@ -27,16 +28,16 @@ export class HUD
     // Position HUD in top-right corner
     // Composition scene uses orthographic camera: X in [-aspect, aspect], Y in [-1, 1]
     // We don't know aspect here, but composition camera handles it automatically
-    const margin = 0.1; // Virtual units from edge
-    const lineHeight = 0.15; // Virtual units between lines
+    const margin = 0.06; // Margin from edge
+    const lineHeight = 0.1; // Spacing between lines
     
     // Canvas texture dimensions (pixels - internal resolution)
     const textureCanvasWidth = 200;
     const textureCanvasHeight = 32;
     
     // Display dimensions (virtual units - how big they appear on screen)
-    const displayWidth = 0.6;
-    const displayHeight = 0.12;
+    const displayWidth = 0.5;
+    const displayHeight = 0.1;
     
     // Start from top-right (actual X position will be set per-element based on aspect)
     let currentY = 1.0 - margin - displayHeight / 2;
@@ -49,25 +50,9 @@ export class HUD
     // Scope Dial - Windage
     this.windageCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
     this.windageMesh = this.createHudMesh(this.windageCanvas, displayWidth, displayHeight, margin, currentY);
-    currentY -= lineHeight;
-    
-    // Estimated Look Point - X coordinate
-    this.lookPointXCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
-    this.lookPointXMesh = this.createHudMesh(this.lookPointXCanvas, displayWidth, displayHeight, margin, currentY);
-    currentY -= lineHeight;
-    
-    // Estimated Look Point - Z coordinate
-    this.lookPointZCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
-    this.lookPointZMesh = this.createHudMesh(this.lookPointZCanvas, displayWidth, displayHeight, margin, currentY);
-    currentY -= lineHeight;
-    
-    // Estimated Look Point - Range
-    this.lookPointRangeCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
-    this.lookPointRangeMesh = this.createHudMesh(this.lookPointRangeCanvas, displayWidth, displayHeight, margin, currentY);
     
     // Initialize dial display
     this.updateDial(0, 0);
-    // Note: updateImpactPoint will be called on first frame
   }
   
   createHudCanvas(width, height)
@@ -122,7 +107,7 @@ export class HUD
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // Text styling
-    ctx.font = 'bold 18px monospace';
+    ctx.font = 'bold 15px monospace';
     ctx.textBaseline = 'middle';
     
     // Label (left-aligned)
@@ -130,7 +115,8 @@ export class HUD
     ctx.textAlign = 'left';
     ctx.fillText(label, 8, canvas.height / 2);
     
-    // Value (right-aligned)
+    // Value (right-aligned) - slightly larger font for value
+    ctx.font = 'bold 16px monospace';
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'right';
     ctx.fillText(value, canvas.width - 8, canvas.height / 2);
@@ -161,45 +147,6 @@ export class HUD
       if (this.windageMesh && this.windageMesh.material.map)
       {
         this.windageMesh.material.map.needsUpdate = true;
-      }
-    }
-  }
-  
-  updateImpactPoint(impactPoint)
-  {
-    // Update X coordinate display
-    if (this.lookPointXCanvas)
-    {
-      const ctx = this.lookPointXCanvas.getContext('2d');
-      const xStr = impactPoint ? `${impactPoint.x.toFixed(1)}m` : 'N/A';
-      this.drawText(ctx, 'Look X:', xStr, this.lookPointXCanvas);
-      if (this.lookPointXMesh && this.lookPointXMesh.material.map)
-      {
-        this.lookPointXMesh.material.map.needsUpdate = true;
-      }
-    }
-    
-    // Update Z coordinate display
-    if (this.lookPointZCanvas)
-    {
-      const ctx = this.lookPointZCanvas.getContext('2d');
-      const zStr = impactPoint ? `${impactPoint.z.toFixed(1)}m` : 'N/A';
-      this.drawText(ctx, 'Look Z:', zStr, this.lookPointZCanvas);
-      if (this.lookPointZMesh && this.lookPointZMesh.material.map)
-      {
-        this.lookPointZMesh.material.map.needsUpdate = true;
-      }
-    }
-    
-    // Update range display
-    if (this.lookPointRangeCanvas)
-    {
-      const ctx = this.lookPointRangeCanvas.getContext('2d');
-      const rangeStr = impactPoint ? `${impactPoint.range.toFixed(1)}m` : 'N/A';
-      this.drawText(ctx, 'Look Range:', rangeStr, this.lookPointRangeCanvas);
-      if (this.lookPointRangeMesh && this.lookPointRangeMesh.material.map)
-      {
-        this.lookPointRangeMesh.material.map.needsUpdate = true;
       }
     }
   }

@@ -417,15 +417,19 @@ class SteelSimulator
   }
   
   /**
-   * Estimate where the bullet will impact based on current scope dial settings.
+   * Estimate where the shooter is looking based on total scope angle (dial + holdover).
    * @returns {Object} {x, y, z, range} in meters, or null if no valid estimate
    */
   estimateBulletImpactPoint()
   {
     if (!this.ballisticsTable || !this.scope) return null;
     
-    const dialPos = this.scope.getDialPositionMRAD();
-    return this.ballisticsTable.estimateImpactPoint(dialPos.elevation);
+    const totalAngle = this.scope.getTotalAngleMRAD();
+    return this.ballisticsTable.estimateImpactPoint(
+      totalAngle.elevation,
+      totalAngle.windage,
+      Config.SHOOTER_HEIGHT
+    );
   }
 
   // ===== SCENE SETUP =====
@@ -902,8 +906,6 @@ class SteelSimulator
     const scopeElevationRad = scopeAngle.elevation * 0.001; // MRAD to radians
     const scopeWindageRad = scopeAngle.windage * 0.001;     // MRAD to radians
 
-    console.log(`[fireFromScope] Scope angle: ${scopeElevationRad} rad elevation, ${scopeWindageRad} rad windage`);
-
     // Rifle accuracy as uniform distribution within a circle (diameter)
     // Generate random point within unit circle using rejection sampling
     let accuracyX, accuracyY;
@@ -1221,8 +1223,8 @@ class SteelSimulator
       clearColor: 0x87ceeb
     });
 
-    // Render scope (composites 3D scene + reticle into its render target)
-    this.scope.render();
+    // Render scope (composites 3D scene + mirage + reticle into its render target)
+    this.scope.render(dt);
 
     // Composite everything to screen
     this.compositionRenderer.render();
@@ -1232,10 +1234,6 @@ class SteelSimulator
     {
       const dialPos = this.scope.getDialPositionMRAD();
       this.hud.updateDial(dialPos.elevation, dialPos.windage);
-      
-      // Update HUD with estimated bullet impact point
-      const impactPoint = this.estimateBulletImpactPoint();
-      this.hud.updateImpactPoint(impactPoint);
     }
 
     // Track FPS
@@ -1376,7 +1374,7 @@ async function startGame()
 {
   try
   {
-    // Load BTK if not already loaded (required for getGameParams)
+    // BTK should already be loaded from DOMContentLoaded, but check just in case
     if (!window.btk)
     {
       window.btk = await BallisticsToolkit();
@@ -1400,10 +1398,8 @@ async function startGame()
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('restartBtn').style.display = 'inline-block';
 
-    // Populate wind preset dropdown now that BTK is loaded
-    populateWindPresetDropdown();
-    
-    // Reload cookies after dropdown is populated to restore saved wind preset
+    // Wind presets already populated during initialization
+    // Just reload cookies to restore saved wind preset
     SettingsCookies.loadAll();
   }
   catch (error)
@@ -1431,10 +1427,8 @@ async function restartGame()
     steelSimulator = new SteelSimulator(canvas, params);
     await steelSimulator.start();
 
-    // Populate wind preset dropdown now that BTK is loaded
-    populateWindPresetDropdown();
-    
-    // Reload cookies after dropdown is populated to restore saved wind preset
+    // Wind presets already populated during initialization
+    // Just reload cookies to restore saved wind preset
     SettingsCookies.loadAll();
   }
   catch (error)
@@ -1482,15 +1476,33 @@ function setupUI()
 
 // ===== START =====
 
-document.addEventListener('DOMContentLoaded', () =>
+document.addEventListener('DOMContentLoaded', async () =>
 {
-  setupUI();
-  
-  // Load saved settings from cookies (after wind presets are populated)
-  SettingsCookies.loadAll();
-  
-  // Attach auto-save listeners to all settings inputs
-  SettingsCookies.attachAutoSave();
-  
-  // Don't auto-start - wait for Start button
+  try
+  {
+    // Load BTK module first
+    if (!window.btk)
+    {
+      window.btk = await BallisticsToolkit();
+    }
+
+    // Setup UI
+    setupUI();
+
+    // Populate wind preset dropdown now that BTK is loaded
+    populateWindPresetDropdown();
+
+    // Load saved settings from cookies (after wind presets are populated)
+    SettingsCookies.loadAll();
+
+    // Attach auto-save listeners to all settings inputs
+    SettingsCookies.attachAutoSave();
+
+    // Don't auto-start - wait for Start button
+  }
+  catch (error)
+  {
+    console.error('Failed to initialize:', error);
+    showError('Failed to initialize. Please check the console for details.');
+  }
 });

@@ -120,6 +120,7 @@ export class Scope
     // Create resources
     this.createInternalRenderTarget(renderWidth, renderHeight);
     this.createCamera();
+
     this.createInternalComposition(renderWidth, renderHeight);
 
     // Derive normalized scope radius (matches scopeRadius in HUD)
@@ -221,9 +222,10 @@ export class Scope
     // Main scope view: circle mapped with lit 3D scene texture
     const scopeRadius = 0.98;
     const scopeGeom = new THREE.CircleGeometry(scopeRadius, 128);
+    const scopeTexture = this.sceneRenderTarget.texture;
     const scopeMat = new THREE.MeshBasicMaterial(
     {
-      map: this.sceneRenderTarget.texture,
+      map: scopeTexture,
       transparent: false,
       depthTest: false,
       depthWrite: false,
@@ -709,15 +711,12 @@ export class Scope
   }
 
 
-  render()
+  render(dt = 0)
   {
     // Step 1: Render 3D scene to internal render target
     this.renderer.setRenderTarget(this.sceneRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
-
-    // Mark texture as updated
-    this.sceneRenderTarget.texture.needsUpdate = true;
 
     // Step 2: Composite scene + reticle to output render target
     // Clear with transparent color to preserve alpha channel
