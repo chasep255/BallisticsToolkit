@@ -130,7 +130,7 @@ export class CompositionRenderer
     // continue to control the displayed size (width: 100%, aspect-ratio).
     this.renderer.setSize(this.canvasWidth, this.canvasHeight, false);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(0x87ceeb, 1.0); // Sky blue background
+    this.renderer.setClearColor(0x3a3d41, 1.0); // Lighter grey background
 
     // Create composition scene (2D orthographic, aspect-aware)
     this.compositionScene = new THREE.Scene();
@@ -380,6 +380,8 @@ export class CompositionRenderer
   render()
   {
     this.renderer.setRenderTarget(null);
+    // Ensure clear color is set before clearing
+    this.renderer.setClearColor(0x3a3d41, 1.0);
     this.renderer.clear();
     this.renderer.render(this.compositionScene, this.compositionCamera);
   }

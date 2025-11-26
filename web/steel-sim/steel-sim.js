@@ -149,10 +149,8 @@ class SteelSimulator
     this.scene = null;
     this.camera = null;
     this.compositionRenderer = null;
-    this.backgroundElement = null;
     this.scope = null; // Rifle scope
     this.spottingScope = null; // Spotting scope
-    this.backgroundCamera = null;
     this.raycaster = null;
     this.scopeLayer = null;
     this.spottingScopeLayer = null;
@@ -557,22 +555,6 @@ class SteelSimulator
     });
     this.hud.updatePositions();
 
-    // Create background 3D scene layer (covers full screen)
-    this.backgroundElement = this.compositionRenderer.createElement(0, 0, 2 * compositionAspect, 2,
-    {
-      renderOrder: 0
-    });
-
-    // Create fixed background camera (aspect ratio matches render target)
-    this.backgroundCamera = new THREE.PerspectiveCamera(
-      Config.CAMERA_FOV,
-      this.backgroundElement.pixelWidth / this.backgroundElement.pixelHeight,
-      0.1,
-      Config.CAMERA_FAR_PLANE
-    );
-    this.backgroundCamera.position.set(0, Config.SHOOTER_HEIGHT, 0);
-    this.backgroundCamera.lookAt(0, 0, -Config.CAMERA_FAR_PLANE);
-
     // Create landscape (uses Config.LANDSCAPE_CONFIG defaults)
     this.landscape = new Landscape(this.scene,
     {
@@ -588,16 +570,14 @@ class SteelSimulator
     // Create wind flags at configured positions
     this.createWindFlags();
 
-    // Create scope layers (in corners)
-    // Get aspect ratio for X positioning (X spans [-aspect, +aspect])
-    const scopeAspect = this.compositionRenderer.getAspect();
-
-    // Spotting scope in bottom-left corner (keep same size: 60% of screen height)
-    const spottingScopeHeightNorm = 1.2; // 60% of vertical span (2)
-    const spottingScopeWidthNorm = spottingScopeHeightNorm; // square in virtual units
-    const spottingScopeY = -1 + spottingScopeHeightNorm / 2; // bottom + half height
-    const spottingScopeX = -scopeAspect + spottingScopeWidthNorm / 2; // Left edge + half width
-    this.spottingScopeLayer = this.compositionRenderer.createElement(spottingScopeX, spottingScopeY, spottingScopeWidthNorm, spottingScopeHeightNorm,
+    // Create scope layers using unified positioning logic
+    const scopePositions = this.calculateScopePositions();
+    
+    this.spottingScopeLayer = this.compositionRenderer.createElement(
+      scopePositions.spotting.x, 
+      scopePositions.spotting.y, 
+      scopePositions.spotting.width, 
+      scopePositions.spotting.height,
     {
       renderOrder: 1,
       transparent: true
@@ -626,19 +606,19 @@ class SteelSimulator
       },
       centerNormalized:
       {
-        x: spottingScopeX,
-        y: spottingScopeY
+        x: scopePositions.spotting.x,
+        y: scopePositions.spotting.y
       },
-      heightNormalized: spottingScopeHeightNorm,
+      heightNormalized: scopePositions.spotting.height,
       panSpeedBase: 0.1 // radians per second base speed
     });
 
-    // Rifle scope in bottom-right corner (almost full screen height: 95%)
-    const rifleScopeHeightNorm = 1.9; // 95% of vertical span (2)
-    const rifleScopeWidthNorm = rifleScopeHeightNorm; // square in virtual units
-    const rifleScopeY = -1 + rifleScopeHeightNorm / 2; // bottom + half height
-    const rifleScopeX = scopeAspect - rifleScopeWidthNorm / 2; // Right edge - half width
-    this.scopeLayer = this.compositionRenderer.createElement(rifleScopeX, rifleScopeY, rifleScopeWidthNorm, rifleScopeHeightNorm,
+    // Rifle scope: centered vertically, max height, padding on left
+    this.scopeLayer = this.compositionRenderer.createElement(
+      scopePositions.rifle.x, 
+      scopePositions.rifle.y, 
+      scopePositions.rifle.width, 
+      scopePositions.rifle.height,
     {
       renderOrder: 1,
       transparent: true
@@ -668,10 +648,10 @@ class SteelSimulator
       },
       centerNormalized:
       {
-        x: rifleScopeX,
-        y: rifleScopeY
+        x: scopePositions.rifle.x,
+        y: scopePositions.rifle.y
       },
-      heightNormalized: rifleScopeHeightNorm
+      heightNormalized: scopePositions.rifle.height
     });
     this.camera = this.scope.getCamera(); // For raycasting
 
@@ -700,6 +680,34 @@ class SteelSimulator
 
     // Ensure renderer uses the final CSS size on first layout
     this.onWindowResize();
+  }
+
+  /**
+   * Calculate scope positions and sizes using unified logic.
+   * Returns positions in normalized coordinates (-1 to 1 for Y, -aspect to +aspect for X).
+   * @returns {Object} Object with 'spotting' and 'rifle' properties, each containing {x, y, width, height}
+   */
+  calculateScopePositions()
+  {
+    const aspect = this.compositionRenderer.getAspect();
+    const padding = 0.05; // Padding for scopes
+
+    // Spotting scope: bottom-left corner, 60% of screen height
+    const spottingHeight = 1.3;
+    const spottingWidth = spottingHeight; // square
+    const spottingY = -1 + spottingHeight / 2 + padding; // bottom + half height
+    const spottingX = -aspect + padding + spottingWidth / 2; // Left edge + padding + half width
+
+    // Rifle scope: centered vertically, max height, padding on left
+    const rifleHeight = 2.0 - padding * 2; // Full height (100% of vertical span)
+    const rifleWidth = rifleHeight; // square (circle)
+    const rifleY = 0; // Centered vertically
+    const rifleX = aspect - padding - rifleWidth / 2; // Right edge - padding - half width
+
+    return {
+      spotting: { x: spottingX, y: spottingY, width: spottingWidth, height: spottingHeight },
+      rifle: { x: rifleX, y: rifleY, width: rifleWidth, height: rifleHeight }
+    };
   }
 
   setupWindGenerator()
@@ -832,42 +840,41 @@ class SteelSimulator
     // CompositionRenderer itself.
     this.compositionRenderer.handleResize(width, height);
 
-    // Reposition scopes to corners based on new aspect ratio
-    const newAspect = this.compositionRenderer.getAspect();
+    // Reposition scopes using unified positioning logic
+    const scopePositions = this.calculateScopePositions();
     
     if (this.spottingScopeLayer && this.spottingScope)
     {
-      const spottingScopeHeightNorm = 1.2;
-      const spottingScopeWidthNorm = spottingScopeHeightNorm;
-      const spottingScopeY = -1 + spottingScopeHeightNorm / 2;
-      const spottingScopeX = -newAspect + spottingScopeWidthNorm / 2;
-      
-      this.compositionRenderer.setElementPosition(this.spottingScopeLayer, spottingScopeX, spottingScopeY);
-      this.spottingScope.centerNormalized.x = spottingScopeX;
-      this.spottingScope.centerNormalized.y = spottingScopeY;
+      this.compositionRenderer.setElementPosition(
+        this.spottingScopeLayer, 
+        scopePositions.spotting.x, 
+        scopePositions.spotting.y
+      );
+      this.compositionRenderer.resizeElement(
+        this.spottingScopeLayer,
+        scopePositions.spotting.width,
+        scopePositions.spotting.height
+      );
+      this.spottingScope.centerNormalized.x = scopePositions.spotting.x;
+      this.spottingScope.centerNormalized.y = scopePositions.spotting.y;
+      this.spottingScope.heightNormalized = scopePositions.spotting.height;
     }
     
     if (this.scopeLayer && this.scope)
     {
-      const rifleScopeHeightNorm = 1.9;
-      const rifleScopeWidthNorm = rifleScopeHeightNorm;
-      const rifleScopeY = -1 + rifleScopeHeightNorm / 2;
-      const rifleScopeX = newAspect - rifleScopeWidthNorm / 2;
-      
-      this.compositionRenderer.setElementPosition(this.scopeLayer, rifleScopeX, rifleScopeY);
-      this.scope.centerNormalized.x = rifleScopeX;
-      this.scope.centerNormalized.y = rifleScopeY;
-    }
-
-    // Resize background to fill new aspect ratio
-    if (this.backgroundElement && this.backgroundCamera)
-    {
-      // Background covers full screen: width = 2 * aspect, height = 2
-      this.compositionRenderer.resizeElement(this.backgroundElement, 2 * newAspect, 2);
-      
-      // Update background camera aspect ratio
-      this.backgroundCamera.aspect = this.backgroundElement.pixelWidth / this.backgroundElement.pixelHeight;
-      this.backgroundCamera.updateProjectionMatrix();
+      this.compositionRenderer.setElementPosition(
+        this.scopeLayer, 
+        scopePositions.rifle.x, 
+        scopePositions.rifle.y
+      );
+      this.compositionRenderer.resizeElement(
+        this.scopeLayer,
+        scopePositions.rifle.width,
+        scopePositions.rifle.height
+      );
+      this.scope.centerNormalized.x = scopePositions.rifle.x;
+      this.scope.centerNormalized.y = scopePositions.rifle.y;
+      this.scope.heightNormalized = scopePositions.rifle.height;
     }
 
     // Update HUD positions (reads from updated camera bounds)
@@ -1940,13 +1947,6 @@ class SteelSimulator
     SteelTargetFactory.updateDisplay();
     DustCloudFactory.updateAll(this.windGenerator, dt);
     WindFlagFactory.updateAll(this.windGenerator, dt);
-
-    // Render background scene into element's render target
-    this.backgroundElement.render(this.scene, this.backgroundCamera,
-    {
-      clear: true,
-      clearColor: 0x87ceeb
-    });
 
     // Update spotting scope camera from key states (only update WASD, not E/Q which are handled immediately)
     if (this.spottingScope)
