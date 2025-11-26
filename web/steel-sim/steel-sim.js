@@ -843,9 +843,9 @@ class SteelSimulator
       }
       
       // Arrow keys: Dial adjustments
-      // Arrow alone: 1.0 MRAD (10 clicks) - large adjustment
-      // Shift + Arrow: 0.1 MRAD (1 click) - small adjustment
-      const clicks = event.shiftKey ? 1 : 10;
+      // Arrow alone: 0.1 MRAD (1 click) - small adjustment
+      // Shift + Arrow: 1.0 MRAD (10 clicks) - large adjustment
+      const clicks = event.shiftKey ? 10 : 1;
       
       if (event.key === 'ArrowUp')
       {
