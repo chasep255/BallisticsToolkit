@@ -291,7 +291,7 @@ export class SteelTarget
 
     // Mark buffer as needing update
     this.mesh.geometry.attributes.position.needsUpdate = true;
-    
+
   }
 
   /**
@@ -538,7 +538,7 @@ export class SteelTargetFactory
     {
       // Skip physics for stationary targets
       if (!target.isMoving()) continue;
-      
+
       target.stepPhysics(dt);
     }
   }
@@ -552,7 +552,7 @@ export class SteelTargetFactory
     {
       // Skip rendering updates for stationary targets
       if (!target.isMoving()) continue;
-      
+
       target.updateMesh();
       target.updateChainLines();
     }

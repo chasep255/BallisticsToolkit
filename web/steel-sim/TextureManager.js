@@ -197,4 +197,3 @@ export class TextureManager
     this.textures.clear();
   }
 }
-

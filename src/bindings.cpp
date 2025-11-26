@@ -15,6 +15,7 @@
 #include "physics/atmosphere.h"
 #include "physics/wind_generator.h"
 #include "rendering/dust_cloud.h"
+#include "rendering/impact_detector.h"
 #include "rendering/steel_target.h"
 #include "rendering/wind_flag.h"
 
@@ -377,4 +378,19 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getVertices", &btk::rendering::WindFlag::getVertices)
     .function("getUVs", &btk::rendering::WindFlag::getUVs)
     .function("getIndices", &btk::rendering::WindFlag::getIndices);
+
+  // Impact detection
+  value_object<btk::rendering::ImpactResult>("ImpactResult")
+    .field("position", &btk::rendering::ImpactResult::position_m)
+    .field("normal", &btk::rendering::ImpactResult::normal)
+    .field("time", &btk::rendering::ImpactResult::time_s)
+    .field("objectId", &btk::rendering::ImpactResult::object_id);
+
+  register_optional<btk::rendering::ImpactResult>();
+
+  class_<btk::rendering::ImpactDetector>("ImpactDetector")
+    .constructor<float, float, float, float, float>()
+    .function("addMeshCollider", &btk::rendering::ImpactDetector::addMeshCollider)
+    .function("addSteelCollider", &btk::rendering::ImpactDetector::addSteelCollider, allow_raw_pointer<arg<0>>())
+    .function("findFirstImpact", &btk::rendering::ImpactDetector::findFirstImpact);
 }

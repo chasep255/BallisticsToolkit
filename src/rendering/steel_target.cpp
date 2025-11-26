@@ -137,12 +137,8 @@ namespace btk::rendering
     float half_width = width_ * 0.5f;
     float half_height = height_ * 0.5f;
 
-    Vector3D corners_local[4] = {
-      Vector3D(-half_width, -half_height, 0.0f),
-      Vector3D(half_width, -half_height, 0.0f),
-      Vector3D(half_width, half_height, 0.0f),
-      Vector3D(-half_width, half_height, 0.0f)
-    };
+    Vector3D corners_local[4] = {Vector3D(-half_width, -half_height, 0.0f), Vector3D(half_width, -half_height, 0.0f), Vector3D(half_width, half_height, 0.0f),
+                                 Vector3D(-half_width, half_height, 0.0f)};
 
     float min_dist = std::numeric_limits<float>::max();
     float max_dist = std::numeric_limits<float>::lowest();

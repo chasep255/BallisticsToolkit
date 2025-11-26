@@ -4,7 +4,11 @@
  */
 
 import * as THREE from 'three';
-import { Config } from './config.js';
+import
+{
+  Config
+}
+from './config.js';
 
 const LOG_PREFIX = '[TimeManager]';
 
@@ -161,4 +165,3 @@ export class TimeManager
     console.log(`${LOG_PREFIX} Disposed`);
   }
 }
-

@@ -48,7 +48,7 @@ export class Landscape
     // Create green ground plane (flat)
     // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
     const greenGroundGeometry = new THREE.PlaneGeometry(groundWidth, groundLength);
-    
+
     // Get grass textures if available
     let greenGroundMaterial;
     if (this.textureManager)
@@ -56,7 +56,7 @@ export class Landscape
       const grassColor = this.textureManager.getTexture('grass_color');
       const grassNormal = this.textureManager.getTexture('grass_normal');
       const grassRoughness = this.textureManager.getTexture('grass_roughness');
-      
+
       // Configure texture repeat (repeat every 10 yards, matching F-Class)
       // Convert meters to yards for repeat calculation
       const btk = window.btk;
@@ -71,7 +71,7 @@ export class Landscape
           texture.repeat.set(repeatX, repeatY);
         }
       });
-      
+
       greenGroundMaterial = new THREE.MeshStandardMaterial(
       {
         map: grassColor,
@@ -92,7 +92,7 @@ export class Landscape
         metalness: 0.2
       });
     }
-    
+
     this.greenGroundMesh = new THREE.Mesh(greenGroundGeometry, greenGroundMaterial);
     this.greenGroundMesh.rotation.x = -Math.PI / 2; // Rotate to horizontal (XZ plane)
     this.greenGroundMesh.position.set(0, 0, -groundLength / 2); // Center downrange
@@ -103,7 +103,7 @@ export class Landscape
 
     // Create brown ground plane (background, wider and longer)
     const brownGroundGeometry = new THREE.PlaneGeometry(brownGroundWidth, brownGroundLength);
-    
+
     // Get dirt textures if available
     let brownGroundMaterial;
     if (this.textureManager)
@@ -111,7 +111,7 @@ export class Landscape
       const dirtColor = this.textureManager.getTexture('dirt_color');
       const dirtNormal = this.textureManager.getTexture('dirt_normal');
       const dirtRoughness = this.textureManager.getTexture('dirt_roughness');
-      
+
       // Configure texture repeat (repeat every 10 yards, matching F-Class)
       // Convert meters to yards for repeat calculation
       const btk = window.btk;
@@ -126,7 +126,7 @@ export class Landscape
           texture.repeat.set(repeatX, repeatY);
         }
       });
-      
+
       brownGroundMaterial = new THREE.MeshStandardMaterial(
       {
         map: dirtColor,
@@ -147,7 +147,7 @@ export class Landscape
         metalness: 0.2
       });
     }
-    
+
     this.brownGroundMesh = new THREE.Mesh(brownGroundGeometry, brownGroundMaterial);
     this.brownGroundMesh.rotation.x = -Math.PI / 2; // Rotate to horizontal (XZ plane)
     this.brownGroundMesh.position.set(0, -0.1, -brownGroundLength / 2); // Slightly below green ground
@@ -301,7 +301,7 @@ export class Landscape
       const barkColor = this.textureManager.getTexture('bark_color');
       const barkNormal = this.textureManager.getTexture('bark_normal');
       const barkRoughness = this.textureManager.getTexture('bark_roughness');
-      
+
       // Configure texture repeat for vertical bark pattern
       [barkColor, barkNormal, barkRoughness].forEach(texture =>
       {
@@ -310,7 +310,7 @@ export class Landscape
           texture.repeat.set(0.5, 2.0); // Vertical bark pattern
         }
       });
-      
+
       trunkMaterial = new THREE.MeshStandardMaterial(
       {
         map: barkColor,
@@ -340,17 +340,17 @@ export class Landscape
       const grassColorGround = this.textureManager.getTexture('grass_color');
       const grassNormalGround = this.textureManager.getTexture('grass_normal');
       const grassRoughnessGround = this.textureManager.getTexture('grass_roughness');
-      
+
       // Clone textures for foliage use (so we don't overwrite ground repeat)
       const grassColor = grassColorGround.clone();
       const grassNormal = grassNormalGround.clone();
       const grassRoughness = grassRoughnessGround.clone();
-      
+
       // Configure texture repeat for foliage (smaller repeat for detail)
       grassColor.repeat.set(0.5, 0.5);
       grassNormal.repeat.set(0.5, 0.5);
       grassRoughness.repeat.set(0.5, 0.5);
-      
+
       foliageMaterial = new THREE.MeshStandardMaterial(
       {
         map: grassColor,
@@ -452,7 +452,7 @@ export class Landscape
       const rockColor = this.textureManager.getTexture('rock_color');
       const rockNormal = this.textureManager.getTexture('rock_normal');
       const rockRoughness = this.textureManager.getTexture('rock_roughness');
-      
+
       rockMaterial = new THREE.MeshStandardMaterial(
       {
         map: rockColor,

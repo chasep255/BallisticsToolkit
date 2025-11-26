@@ -167,8 +167,8 @@ namespace btk::ballistics
      *
      * @return Reference to the trajectory object
      */
-    Trajectory& getTrajectory() {return trajectory_;};
-    const Trajectory& getTrajectory() const {return trajectory_;};
+    Trajectory& getTrajectory() { return trajectory_; };
+    const Trajectory& getTrajectory() const { return trajectory_; };
 
     // Aerodynamic parameter setters
     void setLiftSlopePerRad(float value) { lift_slope_per_rad_ = value; }

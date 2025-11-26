@@ -1,9 +1,9 @@
 #pragma once
 
-#include "math/quaternion.h"
-#include "math/vector.h"
 #include "ballistics/bullet.h"
 #include "ballistics/trajectory.h"
+#include "math/quaternion.h"
+#include "math/vector.h"
 #include <cmath>
 #include <optional>
 #include <vector>
@@ -73,7 +73,6 @@ namespace btk::rendering
 
       RaycastHit() : point_world_(0, 0, 0), normal_world_(0, 0, 0), distance_m_(0.0f) {}
     };
-
 
     /**
      * @brief Initialize steel target with single shape at origin

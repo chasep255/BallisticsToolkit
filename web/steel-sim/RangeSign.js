@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { Config } from './config.js';
+import
+{
+  Config
+}
+from './config.js';
 
 /**
  * RangeSign - A sign that displays the distance to a target rack in yards
@@ -17,17 +21,24 @@ export class RangeSign
    */
   constructor(options)
   {
-    const { position, text, scene, config = {} } = options;
-    
+    const
+    {
+      position,
+      text,
+      scene,
+      config = {}
+    } = options;
+
     this.scene = scene;
     this.text = text;
     this.group = new THREE.Group();
-    
+
     // Get dimensions from config (allow overrides)
     const postHeight = config.postHeight || Config.RANGE_SIGN_CONFIG.postHeight;
     const postWidth = config.postWidth || Config.RANGE_SIGN_CONFIG.postWidth;
     const postGeometry = new THREE.BoxGeometry(postWidth, postHeight, postWidth);
-    const postMaterial = new THREE.MeshStandardMaterial({
+    const postMaterial = new THREE.MeshStandardMaterial(
+    {
       color: 0x8b4513, // Brown wood color
       roughness: 0.9,
       metalness: 0.0
@@ -37,13 +48,14 @@ export class RangeSign
     post.castShadow = true;
     post.receiveShadow = true;
     this.group.add(post);
-    
+
     // Create sign board (white background)
     const signWidth = config.signWidth || Config.RANGE_SIGN_CONFIG.signWidth;
     const signHeight = config.signHeight || Config.RANGE_SIGN_CONFIG.signHeight;
     const signThickness = config.signThickness || Config.RANGE_SIGN_CONFIG.signThickness;
     const signGeometry = new THREE.BoxGeometry(signWidth, signHeight, signThickness);
-    const signMaterial = new THREE.MeshStandardMaterial({
+    const signMaterial = new THREE.MeshStandardMaterial(
+    {
       color: 0xffffff, // White
       roughness: 0.5,
       metalness: 0.1
@@ -55,13 +67,14 @@ export class RangeSign
     signBoard.castShadow = true;
     signBoard.receiveShadow = true;
     this.group.add(signBoard);
-    
+
     // Create text canvas texture
     this.createTextTexture(text);
-    
+
     // Create text plane on sign (facing forward in local space)
     const textGeometry = new THREE.PlaneGeometry(signWidth * 0.9, signHeight * 0.9);
-    const textMaterial = new THREE.MeshBasicMaterial({
+    const textMaterial = new THREE.MeshBasicMaterial(
+    {
       map: this.textTexture,
       transparent: true,
       depthTest: true,
@@ -72,19 +85,19 @@ export class RangeSign
     textPlane.position.x = 0;
     textPlane.position.z = signThickness / 2 + 0.002; // In front of sign board
     this.group.add(textPlane);
-    
+
     // Position the post behind the sign (in local space, before rotation)
     post.position.z = -postWidth / 2 - signThickness / 2;
-    
+
     // Position and orient the entire group
     this.group.position.copy(position);
     // Don't rotate - signs face in positive Z direction by default, which is towards the shooter
     // (negative Z is downrange, positive Z is back towards shooter)
-    
+
     // Add to scene
     scene.add(this.group);
   }
-  
+
   /**
    * Create a canvas texture with the text
    * @param {string} text - Text to display
@@ -95,23 +108,23 @@ export class RangeSign
     canvas.width = Config.RANGE_SIGN_CONFIG.canvasWidth;
     canvas.height = Config.RANGE_SIGN_CONFIG.canvasHeight;
     const ctx = canvas.getContext('2d');
-    
+
     // Clear background (transparent)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     // Draw text
     ctx.fillStyle = '#000000'; // Black text
     ctx.font = Config.RANGE_SIGN_CONFIG.textFont;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    
+
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    
+
     // Create texture
     this.textTexture = new THREE.CanvasTexture(canvas);
     this.textTexture.needsUpdate = true;
   }
-  
+
   /**
    * Dispose of the sign and clean up resources
    */
@@ -121,9 +134,10 @@ export class RangeSign
     {
       this.textTexture.dispose();
     }
-    
+
     // Remove from scene and dispose geometry/materials
-    this.group.traverse((object) => {
+    this.group.traverse((object) =>
+    {
       if (object.geometry) object.geometry.dispose();
       if (object.material)
       {
@@ -137,7 +151,7 @@ export class RangeSign
         }
       }
     });
-    
+
     this.scene.remove(this.group);
   }
 }
@@ -148,7 +162,7 @@ export class RangeSign
 export class RangeSignFactory
 {
   static signs = [];
-  
+
   /**
    * Create a range sign
    * @param {Object} options - Same as RangeSign constructor
@@ -160,7 +174,7 @@ export class RangeSignFactory
     this.signs.push(sign);
     return sign;
   }
-  
+
   /**
    * Delete all range signs
    */
@@ -172,7 +186,7 @@ export class RangeSignFactory
     }
     this.signs = [];
   }
-  
+
   /**
    * Get all range signs
    * @returns {RangeSign[]}
@@ -182,4 +196,3 @@ export class RangeSignFactory
     return this.signs;
   }
 }
-

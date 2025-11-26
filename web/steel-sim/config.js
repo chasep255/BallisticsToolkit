@@ -108,71 +108,84 @@ export function initConfig()
     {
       x: btk.Conversions.yardsToMeters(10),
       z: btk.Conversions.yardsToMeters(-25),
-      config: {}
+      config:
+      {}
     },
     {
       x: btk.Conversions.yardsToMeters(-15),
       z: btk.Conversions.yardsToMeters(-50),
-      config: {}
+      config:
+      {}
     },
     {
       x: btk.Conversions.yardsToMeters(-30),
       z: btk.Conversions.yardsToMeters(-100),
-      config: {}
+      config:
+      {}
     },
     {
       x: btk.Conversions.yardsToMeters(-12),
       z: btk.Conversions.yardsToMeters(-150),
-      config: {}
+      config:
+      {}
     },
     {
       x: btk.Conversions.yardsToMeters(10),
       z: btk.Conversions.yardsToMeters(-200),
-      config: {}
+      config:
+      {}
     },
     // 300 yards
     {
       x: btk.Conversions.yardsToMeters(-5),
       z: btk.Conversions.yardsToMeters(-300),
-      config: {}
+      config:
+      {}
     },
     {
       x: btk.Conversions.yardsToMeters(8),
       z: btk.Conversions.yardsToMeters(-600),
-      config: {}
+      config:
+      {}
     },
     {
       x: btk.Conversions.yardsToMeters(22),
       z: btk.Conversions.yardsToMeters(-600),
-      config: {}
+      config:
+      {}
     },
     // 900 yards
     {
       x: btk.Conversions.yardsToMeters(-17),
       z: btk.Conversions.yardsToMeters(-900),
-      config: {}
+      config:
+      {}
     },
     {
       x: btk.Conversions.yardsToMeters(3),
       z: btk.Conversions.yardsToMeters(-900),
-      config: {}
+      config:
+      {}
     },
     {
       x: btk.Conversions.yardsToMeters(15),
       z: btk.Conversions.yardsToMeters(-1200),
-      config: {}
+      config:
+      {}
     },
     // 1500 yards
     {
       x: btk.Conversions.yardsToMeters(-15),
       z: btk.Conversions.yardsToMeters(-1500),
-      config: {}
+      config:
+      {}
     },
     // 1760 yards (1 mile)
     {
       x: btk.Conversions.yardsToMeters(-7),
       z: btk.Conversions.yardsToMeters(-1760),
-      config: {}
+      config:
+      {}
     }
   ];
 
@@ -233,37 +246,36 @@ export function initConfig()
       rackWidth: btk.Conversions.yardsToMeters(1.5), // 1.5 yards
       rackHeight: btk.Conversions.yardsToMeters(1), // 1 yard
       targets: [
-        {
-          width: btk.Conversions.inchesToMeters(6),
-          height: btk.Conversions.inchesToMeters(6),
-          thickness: btk.Conversions.inchesToMeters(0.5),
-          isOval: false
-        },
-        {
-          width: btk.Conversions.inchesToMeters(5),
-          height: btk.Conversions.inchesToMeters(5),
-          thickness: btk.Conversions.inchesToMeters(0.5),
-          isOval: false
-        },
-        {
-          width: btk.Conversions.inchesToMeters(4),
-          height: btk.Conversions.inchesToMeters(4),
-          thickness: btk.Conversions.inchesToMeters(0.5),
-          isOval: false
-        },
-        {
-          width: btk.Conversions.inchesToMeters(3),
-          height: btk.Conversions.inchesToMeters(3),
-          thickness: btk.Conversions.inchesToMeters(0.5),
-          isOval: false
-        },
-        {
-          width: btk.Conversions.inchesToMeters(2),
-          height: btk.Conversions.inchesToMeters(2),
-          thickness: btk.Conversions.inchesToMeters(0.5),
-          isOval: false
-        }
-      ]
+      {
+        width: btk.Conversions.inchesToMeters(6),
+        height: btk.Conversions.inchesToMeters(6),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(5),
+        height: btk.Conversions.inchesToMeters(5),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(4),
+        height: btk.Conversions.inchesToMeters(4),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(3),
+        height: btk.Conversions.inchesToMeters(3),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      },
+      {
+        width: btk.Conversions.inchesToMeters(2),
+        height: btk.Conversions.inchesToMeters(2),
+        thickness: btk.Conversions.inchesToMeters(0.5),
+        isOval: false
+      }]
     },
 
     {
@@ -335,7 +347,7 @@ export function initConfig()
       }]
     },
     {
-      x: btk.Conversions.yardsToMeters(-2), 
+      x: btk.Conversions.yardsToMeters(-2),
       z: btk.Conversions.yardsToMeters(-300),
       rackWidth: btk.Conversions.yardsToMeters(1.5),
       rackHeight: btk.Conversions.yardsToMeters(1),
@@ -366,7 +378,7 @@ export function initConfig()
       }]
     },
     {
-      x: btk.Conversions.yardsToMeters(15), 
+      x: btk.Conversions.yardsToMeters(15),
       z: btk.Conversions.yardsToMeters(-400),
       rackWidth: btk.Conversions.yardsToMeters(2),
       rackHeight: btk.Conversions.yardsToMeters(1),
@@ -394,8 +406,8 @@ export function initConfig()
         height: btk.Conversions.inchesToMeters(3),
         thickness: btk.Conversions.inchesToMeters(0.5),
         isOval: true
-      }
-    ]},
+      }]
+    },
     {
       x: btk.Conversions.yardsToMeters(5), // 5 yards
       z: btk.Conversions.yardsToMeters(-500), // -500 yards

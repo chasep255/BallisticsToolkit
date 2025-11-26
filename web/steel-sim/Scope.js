@@ -84,13 +84,13 @@ export class Scope
 
     // Scope dial adjustments (integer clicks to avoid floating-point errors)
     this.elevationClicks = 0; // Positive = dial up (bullet impacts high)
-    this.windageClicks = 0;   // Positive = dial right (bullet impacts right)
-    
+    this.windageClicks = 0; // Positive = dial right (bullet impacts right)
+
     // Dial constants
     this.CLICK_VALUE_MRAD = 0.1; // Each click is 0.1 MRAD
     this.maxDialMRAD = config.maxDialMRAD || 30.0; // Maximum dial adjustment in MRAD (±30 MRAD default)
     this.maxDialClicks = Math.floor(this.maxDialMRAD / this.CLICK_VALUE_MRAD);
-    
+
     // Audio manager for scope click sounds (optional)
     this.audioManager = config.audioManager || null;
 

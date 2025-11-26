@@ -61,7 +61,7 @@ export class AudioManager
       this.audioContext = new(window.AudioContext || window.webkitAudioContext)();
       console.log(`${LOG_PREFIX} Audio context created (sample rate: ${this.audioContext.sampleRate}Hz)`);
     }
-    
+
     // Resume context if suspended (browser autoplay policy)
     if (this.audioContext.state === 'suspended')
     {
@@ -73,7 +73,7 @@ export class AudioManager
         console.warn(`${LOG_PREFIX} Failed to resume audio context:`, error);
       });
     }
-    
+
     return this.audioContext;
   }
 
@@ -181,7 +181,7 @@ export class AudioManager
       {
         context.resume();
       }
-      
+
       // Start immediately - if context was suspended, resume() will queue the start
       source.start(0);
       return source;
@@ -278,7 +278,7 @@ export class AudioManager
     }
 
     const context = this.initializeContext();
-    
+
     // Ensure context is running (resume if suspended)
     if (context.state === 'suspended')
     {
@@ -409,4 +409,3 @@ export class AudioManager
     console.log(`${LOG_PREFIX} Disposed`);
   }
 }
-

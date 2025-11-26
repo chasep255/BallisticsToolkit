@@ -4,7 +4,11 @@
  */
 
 import * as THREE from 'three';
-import { Config } from './config.js';
+import
+{
+  Config
+}
+from './config.js';
 
 const LOG_PREFIX = '[Shot]';
 
@@ -116,13 +120,13 @@ export class Shot
     const currentBullet = this.ballisticSimulator.getCurrentBullet();
     const posBtk = currentBullet.getPosition();
     const pos = this.btkToThreeJsPosition(posBtk);
-    
+
     this.bulletMesh.position.set(pos.x, pos.y, pos.z);
     if (this.bulletGlowSprite)
     {
       this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
     }
-    
+
     posBtk.delete();
   }
 
@@ -174,12 +178,12 @@ export class Shot
     this.bulletMesh = new THREE.Mesh(this.bulletGeometry, this.bulletMaterial);
     this.bulletMesh.castShadow = this.shadowsEnabled;
     this.bulletMesh.receiveShadow = false;
-    
+
     // Set initial position
     const posBtk = this.initialPosition;
     const pos = this.btkToThreeJsPosition(posBtk);
     this.bulletMesh.position.set(pos.x, pos.y, pos.z);
-    
+
     this.scene.add(this.bulletMesh);
 
     // Create pressure wave glow sprite

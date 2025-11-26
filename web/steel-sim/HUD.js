@@ -4,7 +4,11 @@
  */
 
 import * as THREE from 'three';
-import { Config } from './config.js';
+import
+{
+  Config
+}
+from './config.js';
 
 export class HUD
 {
@@ -12,17 +16,17 @@ export class HUD
   {
     this.compositionScene = config.compositionScene;
     this.compositionCamera = config.compositionCamera;
-    
+
     // HUD state
     this.visible = true;
     this.hudMeshes = [];
     this.hudTextures = [];
     this.hudCanvases = [];
-    
+
     // Create HUD elements
     this.createHudElements();
   }
-  
+
   createHudElements()
   {
     // Position HUD in top-right corner
@@ -30,31 +34,31 @@ export class HUD
     // We don't know aspect here, but composition camera handles it automatically
     const margin = 0.06; // Margin from edge
     const lineHeight = 0.1; // Spacing between lines
-    
+
     // Canvas texture dimensions (pixels - internal resolution)
     const textureCanvasWidth = 200;
     const textureCanvasHeight = 32;
-    
+
     // Display dimensions (virtual units - how big they appear on screen)
     const displayWidth = 0.5;
     const displayHeight = 0.1;
-    
+
     // Start from top-right (actual X position will be set per-element based on aspect)
     let currentY = 1.0 - margin - displayHeight / 2;
-    
+
     // Scope Dial - Elevation
     this.elevationCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
     this.elevationMesh = this.createHudMesh(this.elevationCanvas, displayWidth, displayHeight, margin, currentY);
     currentY -= lineHeight;
-    
+
     // Scope Dial - Windage
     this.windageCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
     this.windageMesh = this.createHudMesh(this.windageCanvas, displayWidth, displayHeight, margin, currentY);
-    
+
     // Initialize dial display
     this.updateDial(0, 0);
   }
-  
+
   createHudCanvas(width, height)
   {
     const canvas = document.createElement('canvas');
@@ -63,23 +67,24 @@ export class HUD
     this.hudCanvases.push(canvas);
     return canvas;
   }
-  
+
   createHudMesh(canvas, displayWidth, displayHeight, marginFromRight, y)
   {
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     this.hudTextures.push(texture);
-    
-    const material = new THREE.MeshBasicMaterial({
+
+    const material = new THREE.MeshBasicMaterial(
+    {
       map: texture,
       transparent: true,
       depthTest: false,
       depthWrite: false
     });
-    
+
     const geometry = new THREE.PlaneGeometry(displayWidth, displayHeight);
     const mesh = new THREE.Mesh(geometry, material);
-    
+
     // Position in composition space
     // X will be dynamically calculated by shader to be at right edge
     // Store margin and width for dynamic positioning
@@ -87,41 +92,41 @@ export class HUD
     mesh.userData.displayWidth = displayWidth;
     mesh.renderOrder = 1000; // Render on top
     mesh.frustumCulled = false; // Don't cull HUD elements
-    
+
     // Y position is fixed, X will be set by updatePositions
     mesh.position.set(0, y, 5); // Z=5 to render on top
-    
+
     this.compositionScene.add(mesh);
     this.hudMeshes.push(mesh);
-    
+
     return mesh;
   }
-  
+
   drawText(ctx, label, value, canvas)
   {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     // Semi-transparent background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     // Text styling
     ctx.font = 'bold 15px monospace';
     ctx.textBaseline = 'middle';
-    
+
     // Label (left-aligned)
     ctx.fillStyle = '#aaaaaa';
     ctx.textAlign = 'left';
     ctx.fillText(label, 8, canvas.height / 2);
-    
+
     // Value (right-aligned) - slightly larger font for value
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'right';
     ctx.fillText(value, canvas.width - 8, canvas.height / 2);
   }
-  
+
   updateDial(elevationMRAD, windageMRAD)
   {
     // Update elevation display
@@ -136,7 +141,7 @@ export class HUD
         this.elevationMesh.material.map.needsUpdate = true;
       }
     }
-    
+
     // Update windage display
     if (this.windageCanvas)
     {
@@ -150,7 +155,7 @@ export class HUD
       }
     }
   }
-  
+
   setVisible(visible)
   {
     this.visible = visible;
@@ -159,13 +164,13 @@ export class HUD
       mesh.visible = visible;
     }
   }
-  
+
   updatePositions()
   {
     // Update X positions based on current camera bounds
     // Composition camera is orthographic with dynamic right bound based on aspect
     const rightEdge = this.compositionCamera.right;
-    
+
     for (const mesh of this.hudMeshes)
     {
       const marginFromRight = mesh.userData.marginFromRight;
@@ -174,7 +179,7 @@ export class HUD
       mesh.position.x = rightEdge - marginFromRight - displayWidth / 2;
     }
   }
-  
+
   dispose()
   {
     // Remove meshes from scene
@@ -188,10 +193,9 @@ export class HUD
         mesh.material.dispose();
       }
     }
-    
+
     this.hudMeshes = [];
     this.hudTextures = [];
     this.hudCanvases = [];
   }
 }
-

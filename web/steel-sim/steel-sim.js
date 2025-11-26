@@ -47,6 +47,11 @@ import
 from './HUD.js';
 import
 {
+  ImpactDetector
+}
+from './ImpactDetector.js';
+import
+{
   Config,
   initConfig
 }
@@ -99,13 +104,13 @@ class SteelSimulator
 
     // Require all params to be in SI units (no defaults allowed)
     if (params.mv_mps === undefined || params.diameter_m === undefined || params.weight_kg === undefined ||
-        params.length_m === undefined || params.twist_mPerTurn === undefined || params.mvSd_mps === undefined ||
-        params.rifleAccuracy_rad === undefined || params.bc === undefined || params.dragFunction === undefined ||
-        params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined)
+      params.length_m === undefined || params.twist_mPerTurn === undefined || params.mvSd_mps === undefined ||
+      params.rifleAccuracy_rad === undefined || params.bc === undefined || params.dragFunction === undefined ||
+      params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined)
     {
       throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m). Use getGameParams() to convert from frontend inputs.');
     }
-    
+
     // Store all params (all must be in SI units, no defaults)
     this.mv_mps = params.mv_mps;
     this.bc = params.bc;
@@ -139,17 +144,17 @@ class SteelSimulator
     // Scope and shooting
     this.scopeMode = false;
     this.rifleZero = null;
-    
+
     // HUD
     this.hud = null;
 
     // Physics and effects
     this.windGenerator = null;
     this.timeManager = null;
-    
+
     // Audio
     this.audioManager = null;
-    
+
     // Textures
     this.textureManager = null;
 
@@ -264,6 +269,11 @@ class SteelSimulator
       this.windGenerator.delete();
       this.windGenerator = null;
     }
+    if (this.impactDetector)
+    {
+      this.impactDetector.dispose();
+      this.impactDetector = null;
+    }
 
     // Clean up Three.js objects
     if (this.landscape)
@@ -271,7 +281,7 @@ class SteelSimulator
       this.landscape.dispose();
       this.landscape = null;
     }
-    
+
     // Dispose modules that own their own resources
     if (this.textureManager)
     {
@@ -293,7 +303,7 @@ class SteelSimulator
       this.scope.dispose();
       this.scope = null;
     }
-    
+
     // Dispose CompositionRenderer (handles render targets, composition scene)
     if (this.compositionRenderer)
     {
@@ -369,22 +379,22 @@ class SteelSimulator
     const zeroedBullet = simulator.computeZero(
       muzzleVel_mps,
       targetPos,
-      0.001,  // dt (1ms)
-      1000,    // max_iterations (increased for spin effects)
-      0.001,  // tolerance (1mm)
+      0.001, // dt (1ms)
+      1000, // max_iterations (increased for spin effects)
+      0.001, // tolerance (1mm)
       spinRate // spin_rate
     );
 
     // Log the zeroed bullet velocity to show elevation and windage
     const zeroVelBtk = zeroedBullet.getVelocity();
     const zeroVelMag = Math.sqrt(zeroVelBtk.x * zeroVelBtk.x + zeroVelBtk.y * zeroVelBtk.y + zeroVelBtk.z * zeroVelBtk.z);
-    
+
     // Calculate angles from velocity components (X=right, Y=up, Z=towards-camera where negative Z=downrange)
     const elevationRad = Math.asin(zeroVelBtk.y / zeroVelMag);
     const windageRad = Math.atan2(zeroVelBtk.x, -zeroVelBtk.z);
     const elevationMoa = btk.Conversions.radiansToMoa(elevationRad);
     const windageMoa = btk.Conversions.radiansToMoa(windageRad);
-    
+
     console.log(`[Zero] ${btk.Conversions.metersToYards(this.zeroDistance_m).toFixed(0)}yd @ ${btk.Conversions.mpsToFps(this.mv_mps).toFixed(0)}fps: ${elevationMoa.toFixed(2)} MOA elevation, ${windageMoa.toFixed(3)} MOA windage`);
 
     // Store the zeroed configuration
@@ -395,7 +405,8 @@ class SteelSimulator
       atmosphere: atmosphere,
       scopeHeight_m: scopeHeight_m,
       spinRate: spinRate,
-      bulletParams: {
+      bulletParams:
+      {
         mass: bulletMass_kg,
         diameter: bulletDiameter_m,
         length: bulletLength_m,
@@ -407,15 +418,16 @@ class SteelSimulator
     // Cleanup
     targetPos.delete();
     simulator.delete();
-    
+
     // Build ballistics table (drop table) for estimating impact points
     this.ballisticsTable = new BallisticsTable();
-    this.ballisticsTable.build(this.rifleZero, {
+    this.ballisticsTable.build(this.rifleZero,
+    {
       maxRange_m: Config.LANDSCAPE_CONFIG.groundLength * 1.25,
       rangeStep_m: btk.Conversions.yardsToMeters(25) // 25 yard steps
     });
   }
-  
+
   /**
    * Estimate where the shooter is looking based on total scope angle (dial + holdover).
    * @returns {Object} {x, y, z, range} in meters, or null if no valid estimate
@@ -423,7 +435,7 @@ class SteelSimulator
   estimateBulletImpactPoint()
   {
     if (!this.ballisticsTable || !this.scope) return null;
-    
+
     const totalAngle = this.scope.getTotalAngleMRAD();
     return this.ballisticsTable.estimateImpactPoint(
       totalAngle.elevation,
@@ -451,15 +463,16 @@ class SteelSimulator
     {
       canvas: this.canvas
     });
-    
+
     // Load textures now that renderer is available
     await this.textureManager.loadAll(this.compositionRenderer.renderer);
-    
+
     // Get aspect for element positioning
     const aspect = this.compositionRenderer.getAspect();
-    
+
     // Create HUD overlay
-    this.hud = new HUD({
+    this.hud = new HUD(
+    {
       compositionScene: this.compositionRenderer.compositionScene,
       compositionCamera: this.compositionRenderer.compositionCamera
     });
@@ -482,7 +495,10 @@ class SteelSimulator
     this.backgroundCamera.lookAt(0, 0, -Config.CAMERA_FAR_PLANE);
 
     // Create landscape (uses Config.LANDSCAPE_CONFIG defaults)
-    this.landscape = new Landscape(this.scene, { textureManager: this.textureManager });
+    this.landscape = new Landscape(this.scene,
+    {
+      textureManager: this.textureManager
+    });
 
 
     // Initialize wind generator
@@ -534,6 +550,9 @@ class SteelSimulator
 
     // Create target racks (independent of scope setup)
     this.createTargetRacks();
+
+    // Create impact detector and register steel targets
+    this.setupImpactDetector();
 
     // When the scope layer's render target is resized by the composition
     // renderer, update the scope's internal render targets and camera aspect.
@@ -632,7 +651,7 @@ class SteelSimulator
     // Layer-specific resize callbacks (like Scope) are invoked by the
     // CompositionRenderer itself.
     this.compositionRenderer.handleResize(width, height);
-    
+
     // Update HUD positions (reads from updated camera bounds)
     if (this.hud)
     {
@@ -680,11 +699,11 @@ class SteelSimulator
     for (const rackConfig of Config.TARGET_RACKS_CONFIG)
     {
       this.addTargetRack(rackConfig.x, rackConfig.z, rackConfig.rackWidth, rackConfig.rackHeight, rackConfig.targets);
-      
+
       // Create range sign next to each rack
       const distanceYards = Math.round(btk.Conversions.metersToYards(-rackConfig.z));
       const groundHeight = this.landscape.getHeightAt(rackConfig.x, rackConfig.z) || 0;
-      
+
       // Position sign to the right of the rack, slightly behind it
       const signOffset = rackConfig.rackWidth / 2 + 0.5; // 0.5m to the right of rack edge
       const signPosition = new THREE.Vector3(
@@ -692,8 +711,9 @@ class SteelSimulator
         groundHeight,
         rackConfig.z + 0.3 // Slightly behind rack (towards shooter)
       );
-      
-      RangeSignFactory.create({
+
+      RangeSignFactory.create(
+      {
         position: signPosition,
         text: `${distanceYards} YD`,
         scene: this.scene
@@ -709,17 +729,52 @@ class SteelSimulator
     for (const flagConfig of Config.WIND_FLAGS)
     {
       const groundHeight = this.landscape.getHeightAt(flagConfig.x, flagConfig.z) || 0;
-      
-      WindFlagFactory.create({
-        position: {
+
+      WindFlagFactory.create(
+      {
+        position:
+        {
           x: flagConfig.x,
           y: groundHeight,
           z: flagConfig.z
         },
         scene: this.scene,
-        config: flagConfig.config || {}
+        config: flagConfig.config ||
+        {}
       });
     }
+  }
+
+  setupImpactDetector()
+  {
+    // Create impact detector with world bounds
+    const halfWidth = Config.LANDSCAPE_CONFIG.groundWidth / 2;
+    const groundLength = Config.LANDSCAPE_CONFIG.groundLength;
+
+    this.impactDetector = new ImpactDetector(
+    {
+      binSize: 10.0, // 10 meter bins
+      minX: -halfWidth,
+      maxX: halfWidth,
+      minZ: -groundLength,
+      maxZ: 50.0 // A bit in front of shooter
+    });
+
+    // Register all steel targets from factory
+    const STEEL_RADIUS = 5.0; // 5m radius for binning (covers swing arc)
+
+    const targets = SteelTargetFactory.getAll();
+    for (const target of targets)
+    {
+      this.impactDetector.addSteelTarget(
+        target.steelTarget,
+        STEEL_RADIUS,
+        target // Store the SteelTarget wrapper as userData
+      );
+    }
+
+    console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets`);
+    console.log('[SteelSim] ImpactDetector stats:', this.impactDetector.getStats());
   }
 
   // ===== EVENT HANDLERS =====
@@ -833,7 +888,7 @@ class SteelSimulator
         this.scope.zoomOut();
         return;
       }
-      
+
       // R key: Reset scope dial to zero
       if (event.key === 'r' || event.key === 'R')
       {
@@ -841,12 +896,12 @@ class SteelSimulator
         this.scope.resetDial();
         return;
       }
-      
+
       // Arrow keys: Dial adjustments
       // Arrow alone: 0.1 MRAD (1 click) - small adjustment
       // Shift + Arrow: 1.0 MRAD (10 clicks) - large adjustment
       const clicks = event.shiftKey ? 10 : 1;
-      
+
       if (event.key === 'ArrowUp')
       {
         event.preventDefault();
@@ -904,13 +959,12 @@ class SteelSimulator
     // Get scope dial position (in MRAD)
     const scopeAngle = this.scope.getTotalAngleMRAD();
     const scopeElevationRad = scopeAngle.elevation * 0.001; // MRAD to radians
-    const scopeWindageRad = scopeAngle.windage * 0.001;     // MRAD to radians
+    const scopeWindageRad = scopeAngle.windage * 0.001; // MRAD to radians
 
     // Rifle accuracy as uniform distribution within a circle (diameter)
     // Generate random point within unit circle using rejection sampling
     let accuracyX, accuracyY;
-    do
-    {
+    do {
       accuracyX = (Math.random() - 0.5) * 2.0; // -1 to 1
       accuracyY = (Math.random() - 0.5) * 2.0; // -1 to 1
     }
@@ -923,7 +977,7 @@ class SteelSimulator
 
     const totalYawAdjustment = -scopeWindageRad + accuracyErrorH;
     const totalPitchAdjustment = -scopeElevationRad + accuracyErrorV;
-    
+
     const cosYaw = Math.cos(totalYawAdjustment);
     const sinYaw = Math.sin(totalYawAdjustment);
     const cosPitch = Math.cos(totalPitchAdjustment);
@@ -950,10 +1004,12 @@ class SteelSimulator
     const spinRate = btk.Bullet.computeSpinRateFromTwist(actualMVMps, this.twist_mPerTurn);
 
     // Create shot from bore position (2" below scope)
-    ShotFactory.create({
+    ShotFactory.create(
+    {
       initialPosition: borePos,
       initialVelocity: initialVelocity,
-      bulletParams: {
+      bulletParams:
+      {
         ...this.rifleZero.bulletParams,
         spinRate: spinRate
       },
@@ -1016,66 +1072,58 @@ class SteelSimulator
   checkBulletTargetCollisions()
   {
     const shots = ShotFactory.getShots();
-    const targets = SteelTargetFactory.getAll();
 
     for (const shot of shots)
     {
       const trajectory = shot.getTrajectory();
       if (!trajectory) continue;
 
-      let earliestHit = null;
-      let earliestTarget = null;
+      // Use ImpactDetector to find first impact
+      const t0 = 0.0;
+      const t1 = trajectory.getTotalTime();
+      const impact = this.impactDetector.findFirstImpact(trajectory, t0, t1);
 
-      // Check against all targets
-      for (const target of targets)
+      // If we hit something, handle it
+      if (impact && impact.userData)
       {
-        const hit = target.intersectTrajectory(trajectory);
-        if (hit)
-        {
-          if (!earliestHit || hit.time_s_ < earliestHit.time_s_)
-          {
-            earliestHit = hit;
-            earliestTarget = target;
-          }
-        }
-      }
+        const target = impact.userData;
 
-      // Apply earliest hit
-      if (earliestHit && earliestTarget)
-      {
-        // Get the bullet state at impact from the TrajectoryPoint
-        const impactBullet = earliestHit.getState();
+        // Get the bullet state at impact time
+        const impactPoint = trajectory.atTime(impact.time);
+        if (!impactPoint) continue;
+
+        const impactBullet = impactPoint.getState();
         const impactPosition = impactBullet.getPosition();
 
         // Apply impact to target
-        earliestTarget.hit(impactBullet);
+        target.hit(impactBullet);
 
         // Play ping sound with distance-based delay and volume
         if (this.audioManager)
         {
           // Shooter position (scope/camera position)
           const shooterPos = new THREE.Vector3(0, Config.SHOOTER_HEIGHT, 0);
-          
+
           // Impact position in Three.js coordinates
           const impactPosThree = new THREE.Vector3(
             impactPosition.x,
             impactPosition.y,
             impactPosition.z
           );
-          
+
           // Calculate distance from target to shooter
           const distance_m = impactPosThree.distanceTo(shooterPos);
-          
+
           // Speed of sound: ~343 m/s at sea level, 20°C
           const SPEED_OF_SOUND_MPS = 343.0;
-          
+
           // Calculate delay: time for sound to travel from target to shooter
           const delaySeconds = distance_m / SPEED_OF_SOUND_MPS;
-          
+
           // Volume attenuation: linear interpolation from 100% at 100 yards to 10% at max range distance
           const minDistance_m = btk.Conversions.yardsToMeters(100.0); // Full volume at 100 yards
           const maxDistance_m = Config.LANDSCAPE_CONFIG.groundLength; // Max range distance
-          
+
           let volume;
           if (distance_m <= minDistance_m)
           {
@@ -1091,9 +1139,12 @@ class SteelSimulator
             const t = (distance_m - minDistance_m) / (maxDistance_m - minDistance_m);
             volume = 1.0 - t * (1.0 - 0.1); // Interpolate from 1.0 to 0.1
           }
-          
+
           // Play ping sound with delay and volume
-          this.audioManager.playSoundDelayed('ping1', delaySeconds, { volume: volume });
+          this.audioManager.playSoundDelayed('ping1', delaySeconds,
+          {
+            volume: volume
+          });
         }
 
         // Create dust cloud at impact position
@@ -1104,7 +1155,8 @@ class SteelSimulator
 
         // Cleanup
         impactPosition.delete();
-        earliestHit.delete();
+        impactBullet.delete();
+        impactPoint.delete();
       }
     }
   }
@@ -1292,7 +1344,7 @@ function getGameParams()
   {
     throw new Error('BTK module must be loaded before calling getGameParams()');
   }
-  
+
   // Parse raw values from frontend
   const mvFps = parseFloat(document.getElementById('mv').value);
   const bc = parseFloat(document.getElementById('bc').value);
