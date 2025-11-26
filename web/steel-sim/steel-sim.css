@@ -121,6 +121,101 @@
   display: block;
 }
 
+/* Mobile Dial Controls - positioned below HUD area */
+.dial-controls {
+  position: absolute;
+  top: 110px; /* Below the HUD elements */
+  left: 10px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 6px 10px;
+  border-radius: 8px;
+  z-index: 100;
+}
+
+.dial-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.dial-label {
+  color: #aaa;
+  font-size: 10px;
+  font-weight: bold;
+  margin-right: 2px;
+}
+
+.dial-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation; /* Prevent double-tap zoom */
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.dial-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.dial-btn:active {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.dial-reset {
+  font-size: 18px;
+  margin-left: 2px;
+}
+
+/* Responsive dial controls */
+@media (max-width: 600px) {
+  .dial-controls {
+    top: 80px;
+    padding: 4px 6px;
+    gap: 4px;
+  }
+  .dial-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  .dial-label {
+    display: none; /* Hide labels on small screens */
+  }
+  .dial-reset {
+    font-size: 14px;
+  }
+}
+
+/* Fullscreen adjustments */
+.canvas-container:fullscreen .dial-controls {
+  top: 120px;
+}
+
+@media (max-height: 500px) {
+  /* Landscape mobile - move to right side */
+  .dial-controls {
+    top: 10px;
+    left: auto;
+    right: 10px;
+    flex-direction: column;
+  }
+  .dial-group {
+    flex-direction: row;
+  }
+}
+
 /* Quick key guide (displayed below canvas) */
 .quick-keys {
   display: flex;

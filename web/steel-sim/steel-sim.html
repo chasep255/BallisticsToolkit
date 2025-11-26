@@ -138,7 +138,7 @@
           <strong>Desktop:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/<kbd>E</kbd><kbd>Q</kbd> Spotting scope • Click rifle scope to enter • <kbd>Arrows</kbd> dial • <kbd>Esc</kbd> exit
         </div>
         <div class="quick-keys-section">
-          <strong>Mobile:</strong> 1-finger drag to pan • Pinch to zoom • Tap rifle scope to fire
+          <strong>Mobile:</strong> Drag to pan • Pinch to zoom • Tap to fire • Dial buttons next to HUD (hold to fast-dial)
         </div>
       </div>
     </div>
@@ -184,10 +184,11 @@
             - <kbd>S</kbd> toggle scope overlay visibility on/off<br>
             - FFP reticle scales with zoom (maintains MRAD subtensions)<br><br>
 
-            <strong>MRAD Dial Controls (only in rifle scope mode):</strong><br>
-            - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation up/down (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad)<br>
-            - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage left/right (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad)<br>
-            - <kbd>R</kbd> reset both elevation and windage dials to zero (only when in rifle scope mode)<br>
+            <strong>MRAD Dial Controls:</strong><br>
+            - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation up/down (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad) - requires scope mode<br>
+            - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage left/right (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad) - requires scope mode<br>
+            - <kbd>R</kbd> reset both dials to zero (only when in rifle scope mode)<br>
+            - On-screen dial buttons (▲▼◀▶⟲) next to HUD - click or hold to fast-dial, works anytime<br>
             - Dial position shown in HUD (upper-left)
           </div>
         </div>
@@ -196,11 +197,16 @@
           <h3>Mobile/Touch Controls</h3>
           <div class="param-help">
             <strong>Both Scopes:</strong><br>
-            - <strong>Single-finger drag:</strong> Pan the scope view (natural scrolling direction)<br>
+            - <strong>Single-finger drag:</strong> Pan the scope view (hold ~150ms then drag)<br>
             - <strong>Pinch:</strong> Zoom in/out (4× to 40× magnification)<br><br>
 
             <strong>Rifle Scope:</strong><br>
-            - <strong>Tap:</strong> Fire a shot (quick tap without dragging)<br><br>
+            - <strong>Tap:</strong> Fire a shot (quick tap < 150ms)<br><br>
+
+            <strong>Dial Buttons (on-screen, next to HUD):</strong><br>
+            - <strong>▲/▼:</strong> Adjust elevation up/down (0.1 mrad per tap, hold to fast-dial)<br>
+            - <strong>◀/▶:</strong> Adjust windage left/right (0.1 mrad per tap, hold to fast-dial)<br>
+            - <strong>⟲:</strong> Reset both dials to zero<br><br>
 
             <strong>Fullscreen:</strong><br>
             - Use the Fullscreen button for immersive mobile play<br>
@@ -280,11 +286,16 @@
         </div>
         
         <div class="help-section">
-          <h3>HUD Display (Top-Left)</h3>
+          <h3>HUD & Dial Buttons (Top-Left)</h3>
           <div class="param-help">
+            <strong>HUD Text:</strong><br>
             - <strong>Elevation:</strong> Current elevation dial setting in mrad (U = up, D = down)<br>
             - <strong>Windage:</strong> Current windage dial setting in mrad (R = right, L = left)<br>
-            - <strong>Impact Status:</strong> Shows "IMPACT" (green) when hitting targets, "MISS" (red) when missing
+            - <strong>Impact Status:</strong> Shows "IMPACT" (green) when hitting targets, "MISS" (red) when missing<br><br>
+            
+            <strong>Dial Buttons (next to HUD):</strong><br>
+            - ▲/▼ elevation, ◀/▶ windage, ⟲ reset<br>
+            - Tap for single adjustment (0.1 mrad), hold for fast-dial
           </div>
         </div>
 

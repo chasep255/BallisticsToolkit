@@ -180,8 +180,13 @@ class SteelSimulator
       lastThreeFingerPos: { x: 0, y: 0 }, // For three-finger dial adjustment
       touchStartTime: 0,
       touchMoved: false,
-      activeScope: null // 'rifle' | 'spotting' | null
+      activeScope: null, // 'rifle' | 'spotting' | null
+      activeDialAction: null // For dial button hold-to-repeat
     };
+
+    // Dial repeat state
+    this.dialRepeatTimeout = null;
+    this.dialRepeatInterval = null;
 
     // HUD
     this.hud = null;
@@ -259,6 +264,9 @@ class SteelSimulator
     // Stop animation
     this.stop();
 
+    // Stop any active dial repeat
+    this.stopDialRepeat();
+
     // Remove event listeners
     if (this.boundHandlers.onMouseWheel)
     {
@@ -271,6 +279,10 @@ class SteelSimulator
     if (this.boundHandlers.onMouseDown)
     {
       this.canvas.removeEventListener('mousedown', this.boundHandlers.onMouseDown);
+    }
+    if (this.boundHandlers.onMouseUp)
+    {
+      window.removeEventListener('mouseup', this.boundHandlers.onMouseUp);
     }
     if (this.boundHandlers.onKeyDown)
     {
@@ -743,6 +755,7 @@ class SteelSimulator
     this.boundHandlers.onMouseWheel = (e) => this.onMouseWheel(e);
     this.boundHandlers.onMouseMove = (e) => this.onMouseMove(e);
     this.boundHandlers.onMouseDown = (e) => this.onMouseDown(e);
+    this.boundHandlers.onMouseUp = (e) => this.onMouseUp(e);
     this.boundHandlers.onKeyDown = (e) => this.onKeyDown(e);
     this.boundHandlers.onKeyUp = (e) => this.onKeyUp(e);
     this.boundHandlers.onPointerLockChange = () => this.onPointerLockChange();
@@ -755,6 +768,7 @@ class SteelSimulator
     });
     this.canvas.addEventListener('mousemove', this.boundHandlers.onMouseMove);
     this.canvas.addEventListener('mousedown', this.boundHandlers.onMouseDown);
+    window.addEventListener('mouseup', this.boundHandlers.onMouseUp);
     window.addEventListener('keydown', this.boundHandlers.onKeyDown);
     window.addEventListener('keyup', this.boundHandlers.onKeyUp);
     document.addEventListener('pointerlockchange', this.boundHandlers.onPointerLockChange);
@@ -1152,6 +1166,15 @@ class SteelSimulator
 
     if (event.button === 0) // Left click
     {
+      // Check if clicking a dial button first
+      const dialAction = this.hud.getDialButtonHit(norm.x, norm.y);
+      if (dialAction)
+      {
+        this.handleDialAction(dialAction);
+        this.startDialRepeat(dialAction);
+        return;
+      }
+
       if (locked)
       {
         // Fire when clicking in scope mode
@@ -1164,6 +1187,62 @@ class SteelSimulator
         this.canvas.requestPointerLock();
       }
     }
+  }
+
+  handleDialAction(action)
+  {
+    if (!this.scope) return;
+    switch (action)
+    {
+      case 'dialUp':
+        this.scope.dialUp(1);
+        break;
+      case 'dialDown':
+        this.scope.dialDown(1);
+        break;
+      case 'dialLeft':
+        this.scope.dialLeft(1);
+        break;
+      case 'dialRight':
+        this.scope.dialRight(1);
+        break;
+      case 'dialReset':
+        this.scope.resetDial();
+        break;
+    }
+  }
+
+  startDialRepeat(action)
+  {
+    // Don't repeat the reset action
+    if (action === 'dialReset') return;
+    
+    // Initial delay before repeat starts (250ms), then repeat every 55ms
+    this.dialRepeatTimeout = setTimeout(() => {
+      this.dialRepeatInterval = setInterval(() => {
+        this.handleDialAction(action);
+      }, 55);
+    }, 250);
+  }
+
+  stopDialRepeat()
+  {
+    if (this.dialRepeatTimeout)
+    {
+      clearTimeout(this.dialRepeatTimeout);
+      this.dialRepeatTimeout = null;
+    }
+    if (this.dialRepeatInterval)
+    {
+      clearInterval(this.dialRepeatInterval);
+      this.dialRepeatInterval = null;
+    }
+  }
+
+  onMouseUp(event)
+  {
+    // Stop dial repeat on any mouse up
+    this.stopDialRepeat();
   }
 
   onPointerLockChange()
@@ -1320,6 +1399,16 @@ class SteelSimulator
     const touch = touches[0];
     const norm = this.compositionRenderer.screenToNormalized(touch.clientX, touch.clientY);
 
+    // Check if touching a dial button first
+    const dialAction = this.hud.getDialButtonHit(norm.x, norm.y);
+    if (dialAction)
+    {
+      this.handleDialAction(dialAction);
+      this.startDialRepeat(dialAction);
+      this.touchState.activeDialAction = dialAction;
+      return;
+    }
+
     // Determine which scope is being touched
     let activeScope = null;
     
@@ -1333,13 +1422,13 @@ class SteelSimulator
       activeScope = 'rifle';
     }
 
-    // If not touching a scope, ignore
-    if (!activeScope) return;
-
+    // Store start position and time for all touches (for dial buttons too)
     this.touchState.active = true;
-    this.touchState.activeScope = activeScope;
+    this.touchState.activeScope = activeScope; // may be null if outside scopes
+    this.touchState.activeDialAction = null;
     this.touchState.touchStartTime = performance.now();
     this.touchState.touchMoved = false;
+    this.touchState.touchStartPos = { x: touch.clientX, y: touch.clientY };
     this.touchState.lastTouchPos = { x: touch.clientX, y: touch.clientY };
 
     // Track pinch distance if two fingers
@@ -1405,20 +1494,31 @@ class SteelSimulator
 
   onTouchEnd(event)
   {
-    if (!this.touchState.active) return;
-
     event.preventDefault();
 
-    // Check for tap-to-fire on rifle scope
+    // Always stop dial repeat on touch end
+    this.stopDialRepeat();
+
+    // If dial button was being held, we're done
+    if (this.touchState.activeDialAction)
+    {
+      this.touchState.activeDialAction = null;
+      return;
+    }
+
+    if (!this.touchState.active) return;
+
+    // Check for tap on scope to fire
     const elapsed = performance.now() - this.touchState.touchStartTime;
     const TAP_MAX_DURATION = 300; // milliseconds
 
-    if (this.touchState.activeScope === 'rifle' &&
-        !this.touchState.touchMoved &&
-        elapsed < TAP_MAX_DURATION)
+    if (!this.touchState.touchMoved && elapsed < TAP_MAX_DURATION)
     {
-      // Quick tap on rifle scope - fire!
-      this.fireFromScope();
+      if (this.touchState.activeScope === 'rifle')
+      {
+        // Quick tap on rifle scope - fire!
+        this.fireFromScope();
+      }
     }
 
     // Reset touch state
@@ -2118,6 +2218,7 @@ function setupUI()
       }
     });
   }
+
 }
 
 /**

@@ -627,7 +627,7 @@ export class Scope
   dialLeft(clicks = 1)
   {
     const oldClicks = this.windageClicks;
-    const newClicks = oldClicks - clicks;
+    const newClicks = oldClicks + clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.windageClicks = newClicks;
@@ -646,7 +646,7 @@ export class Scope
   dialRight(clicks = 1)
   {
     const oldClicks = this.windageClicks;
-    const newClicks = oldClicks + clicks;
+    const newClicks = oldClicks - clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.windageClicks = newClicks;
