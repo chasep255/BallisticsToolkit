@@ -9,6 +9,11 @@ import
   DustCloudFactory
 }
 from './DustCloud.js';
+import
+{
+  ImpactMarkFactory
+}
+from './ImpactMark.js';
 
 /**
  * Landscape class for managing ground planes and terrain
@@ -602,19 +607,29 @@ export class Landscape
         {
           name: `Rock ${rockIndex}`,
           soundName: null, // Rocks are silent
-          onImpact: (impactPosition, scene, windGenerator) => {
+          onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
             
             // Big chunky particles for rocks
+            const dustColor = { r: 192, g: 192, b: 192 }; // Light grey rock dust
             DustCloudFactory.create({
               position: pos,
               scene: scene,
-              numParticles: 500, // Just a few big chunks
-              color: { r: 192, g: 192, b: 192 }, // Light grey rock dust
+              numParticles: 500,
+              color: dustColor,
               windGenerator: windGenerator,
-              initialRadius: 0.05, // Tighter initial spread
-              growthRate: 0.1, // Medium growth
+              initialRadius: 0.05,
+              growthRate: 0.1,
               particleDiameter: 1 
+            });
+
+            // Impact mark - stretched based on impact angle
+            ImpactMarkFactory.create({
+              position: pos,
+              normal: normal,
+              velocity: velocity,
+              color: 0x4a4a4a, // Dark grey
+              size: 0.8
             });
           }
         }

@@ -96,6 +96,11 @@ import
   BallisticsTable
 }
 from './BallisticsTable.js';
+import
+{
+  ImpactMarkFactory
+}
+from './ImpactMark.js';
 
 // ===== COORDINATE SYSTEM =====
 // BTK and Three.js use the SAME coordinate system:
@@ -281,6 +286,7 @@ class SteelSimulator
     WindFlagFactory.deleteAll();
     RangeSignFactory.deleteAll();
     BermFactory.deleteAll();
+    ImpactMarkFactory.dispose();
 
     // Clean up BTK objects
     if (this.rifleZero)
@@ -532,6 +538,8 @@ class SteelSimulator
       textureManager: this.textureManager
     });
 
+    // Initialize impact mark factory for bullet holes
+    ImpactMarkFactory.init(this.scene);
 
     // Initialize wind generator
     this.setupWindGenerator();
@@ -882,7 +890,7 @@ class SteelSimulator
         {
           target: target,
           soundName: 'ping1',
-          onImpact: (impactPosition, scene, windGenerator) => {
+          onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
             DustCloudFactory.create({
               position: pos,
@@ -894,6 +902,7 @@ class SteelSimulator
               growthRate: Config.METAL_DUST_CONFIG.growthRate,
               particleDiameter: Config.METAL_DUST_CONFIG.particleDiameter
             });
+            // No impact mark on steel targets
           }
         }
       );
@@ -922,27 +931,51 @@ class SteelSimulator
           {
             name: 'Berm',
             soundName: null, // Berms are silent
-            onImpact: (impactPosition, scene, windGenerator) => {
+            onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
               const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
 
               // Sand dust for berm impacts
+              const dustColor = { r: 245, g: 220, b: 170 }; // Light sandy/yellow-tan
               DustCloudFactory.create({
                 position: pos,
                 scene: scene,
-                numParticles: 1000, // Lots of sand particles
-                color: { r: 245, g: 220, b: 170 }, // Light sandy/yellow-tan color (distinct from brown dirt)
+                numParticles: 1000,
+                color: dustColor,
                 windGenerator: windGenerator,
-                initialRadius: 0.05, // Wider spread for sand
-                growthRate: 0.15, // Medium growth
-                particleDiameter: 0.5 // Small sand particles
+                initialRadius: 0.05,
+                growthRate: 0.15,
+                particleDiameter: 0.5
+              });
+
+              // Impact mark - stretched based on impact angle
+              ImpactMarkFactory.create({
+                position: pos,
+                normal: normal,
+                velocity: velocity,
+                color: 0x8b7a65, // Sandy tan
+                size: 1.0
               });
             }
           }
         );
       }
     }
+
+    // Register target rack frames (beam and posts)
+    const racks = TargetRackFactory.getAll();
+    for (const rack of racks)
+    {
+      rack.registerWithImpactDetector(this.impactDetector);
+    }
+
+    // Register range signs (post and sign board)
+    const signs = RangeSignFactory.getAll();
+    for (const sign of signs)
+    {
+      sign.registerWithImpactDetector(this.impactDetector);
+    }
     
-    console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets`);
+    console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets, ${racks.length} racks, ${signs.length} signs`);
     console.log('[SteelSim] ImpactDetector stats:', this.impactDetector.getStats());
   }
 
@@ -1335,10 +1368,14 @@ class SteelSimulator
           }
         }
 
-        // Create dust effect if generator provided
+        // Create dust effect and impact mark via callback
         if (userData.onImpact)
         {
-          userData.onImpact(impactPosition, this.scene, this.windGenerator);
+          const normalVec = new THREE.Vector3(impact.normal.x, impact.normal.y, impact.normal.z);
+          const velocity = impactBullet.getVelocity();
+          const velocityVec = new THREE.Vector3(velocity.x, velocity.y, velocity.z);
+          userData.onImpact(impactPosition, normalVec, velocityVec, this.scene, this.windGenerator);
+          velocity.delete();
         }
 
         // Play sound if sound name provided
@@ -1425,6 +1462,7 @@ class SteelSimulator
         const currentTime = lastPoint.getTime();
         const searchStep = 0.001; // 1ms steps backward
         let impactPoint = null;
+        let impactVelocity = null;
 
         // Search backward from current time
         for (let t = currentTime; t >= 0; t -= searchStep)
@@ -1432,11 +1470,15 @@ class SteelSimulator
           const optPoint = trajectory.atTime(t);
           if (optPoint !== undefined && optPoint !== null)
           {
-            const testPos = optPoint.getState().getPosition();
+            const bulletState = optPoint.getState();
+            const testPos = bulletState.getPosition();
             if (testPos.y >= 0)
             {
-              // Found the crossing point - use this position
+              // Found the crossing point - use this position and velocity
               impactPoint = new btk.Vector3D(testPos.x, 0, testPos.z); // Clamp y to 0
+              const vel = bulletState.getVelocity();
+              impactVelocity = new THREE.Vector3(vel.x, vel.y, vel.z);
+              vel.delete();
 
               testPos.delete();
               optPoint.delete();
@@ -1454,6 +1496,16 @@ class SteelSimulator
         }
 
         this.createDustCloud(impactPoint);
+
+        // Create impact mark on ground - stretched based on impact angle
+        ImpactMarkFactory.create({
+          position: new THREE.Vector3(impactPoint.x, impactPoint.y, impactPoint.z),
+          normal: new THREE.Vector3(0, 1, 0),
+          velocity: impactVelocity,
+          color: 0x4d4837, // Dark brown
+          size: 1.5 // Ground marks are bigger
+        });
+
         impactPoint.delete();
 
         // Update HUD with miss status (ground hit = miss)

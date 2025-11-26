@@ -10,6 +10,16 @@ import
   SteelTargetFactory
 }
 from './SteelTarget.js';
+import
+{
+  DustCloudFactory
+}
+from './DustCloud.js';
+import
+{
+  ImpactMarkFactory
+}
+from './ImpactMark.js';
 
 /**
  * Wrapper class for managing a rack of steel targets with beam and support posts
@@ -237,6 +247,69 @@ export class TargetRack
     this.rightPostMesh.castShadow = true;
     this.rightPostMesh.receiveShadow = true;
     this.scene.add(this.rightPostMesh);
+  }
+
+  /**
+   * Get the frame meshes (beam and posts) for collision detection
+   * @returns {THREE.Mesh[]} Array of frame meshes
+   */
+  getFrameMeshes()
+  {
+    const meshes = [];
+    if (this.beamMesh) meshes.push(this.beamMesh);
+    if (this.leftPostMesh) meshes.push(this.leftPostMesh);
+    if (this.rightPostMesh) meshes.push(this.rightPostMesh);
+    return meshes;
+  }
+
+  /**
+   * Register frame meshes with the impact detector
+   * @param {ImpactDetector} impactDetector - The impact detector to register with
+   */
+  registerWithImpactDetector(impactDetector)
+  {
+    if (!impactDetector) return;
+
+    const frameMeshes = this.getFrameMeshes();
+    for (const mesh of frameMeshes)
+    {
+      // Clone geometry and apply world transform
+      const transformedGeometry = mesh.geometry.clone();
+      mesh.updateMatrixWorld();
+      transformedGeometry.applyMatrix4(mesh.matrixWorld);
+
+      impactDetector.addMeshFromGeometry(
+        transformedGeometry,
+        {
+          name: 'RackFrame',
+          soundName: 'ping1', // Metal ping sound
+          onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
+            const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+
+            // Small metal dust puff
+            DustCloudFactory.create({
+              position: pos,
+              scene: scene,
+              numParticles: 200,
+              color: { r: 180, g: 180, b: 180 }, // Light grey
+              windGenerator: windGenerator,
+              initialRadius: 0.02,
+              growthRate: 0.08,
+              particleDiameter: 0.3
+            });
+
+            // Small dark impact mark (1cm)
+            ImpactMarkFactory.create({
+              position: pos,
+              normal: normal,
+              velocity: velocity,
+              color: 0x2a2a2a, // Dark grey
+              size: 0.2 // 1cm (0.2 * 5cm base = 1cm)
+            });
+          }
+        }
+      );
+    }
   }
 
   /**

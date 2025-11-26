@@ -4,6 +4,16 @@ import
   Config
 }
 from './config.js';
+import
+{
+  DustCloudFactory
+}
+from './DustCloud.js';
+import
+{
+  ImpactMarkFactory
+}
+from './ImpactMark.js';
 
 /**
  * RangeSign - A sign that displays the distance to a target rack in yards
@@ -43,11 +53,11 @@ export class RangeSign
       roughness: 0.9,
       metalness: 0.0
     });
-    const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.y = postHeight / 2;
-    post.castShadow = true;
-    post.receiveShadow = true;
-    this.group.add(post);
+    this.postMesh = new THREE.Mesh(postGeometry, postMaterial);
+    this.postMesh.position.y = postHeight / 2;
+    this.postMesh.castShadow = true;
+    this.postMesh.receiveShadow = true;
+    this.group.add(this.postMesh);
 
     // Create sign board (white background)
     const signWidth = config.signWidth || Config.RANGE_SIGN_CONFIG.signWidth;
@@ -60,13 +70,13 @@ export class RangeSign
       roughness: 0.5,
       metalness: 0.1
     });
-    const signBoard = new THREE.Mesh(signGeometry, signMaterial);
-    signBoard.position.y = postHeight - signHeight / 2 - 0.05; // Near top of post
-    signBoard.position.x = 0;
-    signBoard.position.z = 0;
-    signBoard.castShadow = true;
-    signBoard.receiveShadow = true;
-    this.group.add(signBoard);
+    this.signBoardMesh = new THREE.Mesh(signGeometry, signMaterial);
+    this.signBoardMesh.position.y = postHeight - signHeight / 2 - 0.05; // Near top of post
+    this.signBoardMesh.position.x = 0;
+    this.signBoardMesh.position.z = 0;
+    this.signBoardMesh.castShadow = true;
+    this.signBoardMesh.receiveShadow = true;
+    this.group.add(this.signBoardMesh);
 
     // Create text canvas texture
     this.createTextTexture(text);
@@ -81,13 +91,13 @@ export class RangeSign
       depthWrite: false
     });
     const textPlane = new THREE.Mesh(textGeometry, textMaterial);
-    textPlane.position.y = signBoard.position.y;
+    textPlane.position.y = this.signBoardMesh.position.y;
     textPlane.position.x = 0;
     textPlane.position.z = signThickness / 2 + 0.002; // In front of sign board
     this.group.add(textPlane);
 
     // Position the post behind the sign (in local space, before rotation)
-    post.position.z = -postWidth / 2 - signThickness / 2;
+    this.postMesh.position.z = -postWidth / 2 - signThickness / 2;
 
     // Position and orient the entire group
     this.group.position.copy(position);
@@ -123,6 +133,84 @@ export class RangeSign
     // Create texture
     this.textTexture = new THREE.CanvasTexture(canvas);
     this.textTexture.needsUpdate = true;
+  }
+
+  /**
+   * Get the meshes (post and sign board) for collision detection
+   * @returns {THREE.Mesh[]} Array of meshes
+   */
+  getMeshes()
+  {
+    const meshes = [];
+    if (this.postMesh) meshes.push(this.postMesh);
+    if (this.signBoardMesh) meshes.push(this.signBoardMesh);
+    return meshes;
+  }
+
+  /**
+   * Get the group containing all meshes (for world transform)
+   * @returns {THREE.Group}
+   */
+  getGroup()
+  {
+    return this.group;
+  }
+
+  /**
+   * Register meshes with the impact detector
+   * @param {ImpactDetector} impactDetector - The impact detector to register with
+   */
+  registerWithImpactDetector(impactDetector)
+  {
+    if (!impactDetector) return;
+
+    const meshes = this.getMeshes();
+    this.group.updateMatrixWorld();
+
+    for (const mesh of meshes)
+    {
+      // Clone geometry and apply world transform
+      const transformedGeometry = mesh.geometry.clone();
+      mesh.updateMatrixWorld();
+      transformedGeometry.applyMatrix4(mesh.matrixWorld);
+
+      // Determine if this is the wood post or sign board
+      const isPost = mesh === this.postMesh;
+
+      impactDetector.addMeshFromGeometry(
+        transformedGeometry,
+        {
+          name: isPost ? 'SignPost' : 'SignBoard',
+          soundName: null, // Signs are silent (wood/plastic)
+          onImpact: (impactPosition, normal, velocity, scene, windGenerator) => {
+            const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+
+            // Wood splinter dust for post, white dust for sign board
+            const dustColor = isPost ? { r: 139, g: 90, b: 43 } : { r: 220, g: 220, b: 220 };
+            DustCloudFactory.create({
+              position: pos,
+              scene: scene,
+              numParticles: 150,
+              color: dustColor,
+              windGenerator: windGenerator,
+              initialRadius: 0.02,
+              growthRate: 0.06,
+              particleDiameter: 0.4
+            });
+
+            // Small dark impact mark (1cm)
+            const markColor = isPost ? 0x3d2510 : 0x404040; // Brown for wood, dark grey for sign
+            ImpactMarkFactory.create({
+              position: pos,
+              normal: normal,
+              velocity: velocity,
+              color: markColor,
+              size: 0.2 // 1cm
+            });
+          }
+        }
+      );
+    }
   }
 
   /**
