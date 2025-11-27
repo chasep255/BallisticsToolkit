@@ -121,7 +121,9 @@ export class CompositionRenderer
     // Match internal render size to current CSS size, but let CSS
     // continue to control the displayed size (width: 100%, aspect-ratio).
     this.renderer.setSize(this.canvasWidth, this.canvasHeight, false);
-    this.renderer.setPixelRatio(1);
+    // Use device pixel ratio for crisp rendering on high-DPI displays
+    // On standard displays this is 1, on Retina/high-DPI Android it's typically 2-3
+    this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(0x3a3d41, 1.0); // Lighter grey background
 
     // Create composition scene (2D orthographic, aspect-aware)
