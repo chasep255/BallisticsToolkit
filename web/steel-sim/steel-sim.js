@@ -1388,14 +1388,14 @@ class SteelSimulator
     // Determine which scope is being touched
     let activeScope = null;
     
-    // Check spotting scope first (it's on the left)
-    if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
-    {
-      activeScope = 'spotting';
-    }
-    else if (this.scope && this.scope.isPointInside(norm.x, norm.y))
+    // Check rifle scope first (it has priority if there's overlap)
+    if (this.scope && this.scope.isPointInside(norm.x, norm.y))
     {
       activeScope = 'rifle';
+    }
+    else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
+    {
+      activeScope = 'spotting';
     }
 
     // Store start position and time for all touches (for dial buttons too)
@@ -2247,8 +2247,7 @@ async function lockOrientationLandscape()
   catch (err)
   {
     // Orientation lock may fail (e.g., user gesture required, not supported)
-    // This is expected on some browsers/devices
-    console.warn('Could not lock orientation to landscape:', err);
+    // This is expected on some browsers/devices - silently ignore
   }
 }
 

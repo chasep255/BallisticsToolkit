@@ -94,11 +94,7 @@ export class ImpactDetector
 
     const handle = this.detector.addSteelCollider(steelTarget, radius, objectId);
 
-    if (handle >= 0)
-    {
-      console.log(`[ImpactDetector] Registered steel collider: handle=${handle}, id=${objectId}, radius=${radius.toFixed(2)}m`);
-    }
-    else
+    if (handle < 0)
     {
       console.error(`[ImpactDetector] Failed to register steel collider: id=${objectId}`);
       this.userData.delete(objectId); // Clean up on failure

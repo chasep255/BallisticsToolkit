@@ -60,8 +60,8 @@ export class TimeManager
     // Subtract total paused time from elapsed time to get actual game time
     this.lastElapsedTime = this.clock.getElapsedTime() - this.totalPausedTime;
 
-    // Log if delta time is unusual (potential performance issue)
-    if (rawDelta > 0.1)
+    // Log if delta time is unusually large (potential performance issue, not just tab switching)
+    if (rawDelta > 1.0)
     {
       console.warn(`${LOG_PREFIX} Large delta time: ${(rawDelta * 1000).toFixed(1)}ms (clamped to ${(this.lastDeltaTime * 1000).toFixed(1)}ms)`);
     }
