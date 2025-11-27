@@ -562,8 +562,138 @@ namespace btk::rendering
   void SteelTarget::updateDisplay()
   {
     vertices_buffer_.clear();
-    uvs_buffer_.clear();
     normals_buffer_.clear();
+    
+    // Generate UVs once if not already computed (they're static based on geometry)
+    if(uvs_buffer_.empty())
+    {
+      float halfThickness = thickness_ / 2.0f;
+      
+      if(is_oval_)
+      {
+        float rx = width_ / 2.0f;
+        float ry = height_ / 2.0f;
+        
+        for(int i = 0; i < segments_per_circle_; ++i)
+        {
+          float angle1 = (2.0f * M_PI_F * i) / segments_per_circle_;
+          float angle2 = (2.0f * M_PI_F * (i + 1)) / segments_per_circle_;
+          
+          float cos1 = std::cos(angle1), sin1 = std::sin(angle1);
+          float cos2 = std::cos(angle2), sin2 = std::sin(angle2);
+          
+          btk::math::Vector3D centerFront_local(0.0f, 0.0f, -halfThickness);
+          btk::math::Vector3D v1Front_local(rx * cos1, ry * sin1, -halfThickness);
+          btk::math::Vector3D v2Front_local(rx * cos2, ry * sin2, -halfThickness);
+          btk::math::Vector3D centerBack_local(0.0f, 0.0f, halfThickness);
+          btk::math::Vector3D v1Back_local(rx * cos1, ry * sin1, halfThickness);
+          btk::math::Vector3D v2Back_local(rx * cos2, ry * sin2, halfThickness);
+          
+          auto pushUVFront = [&](const btk::math::Vector3D& local)
+          {
+            float u = 0.5f + local.x / width_;
+            float v = 0.5f + local.y / height_;
+            u = u * 0.5f;
+            uvs_buffer_.push_back(u);
+            uvs_buffer_.push_back(v);
+          };
+          
+          auto pushUVBack = [&](const btk::math::Vector3D& local)
+          {
+            float u = 0.5f + local.x / width_;
+            float v = 0.5f + local.y / height_;
+            u = u * 0.5f + 0.5f;
+            uvs_buffer_.push_back(u);
+            uvs_buffer_.push_back(v);
+          };
+          
+          auto pushBlankUV = [&]()
+          {
+            uvs_buffer_.push_back(-1.0f);
+            uvs_buffer_.push_back(-1.0f);
+          };
+          
+          // Front face (3 vertices)
+          pushUVFront(centerFront_local);
+          pushUVFront(v1Front_local);
+          pushUVFront(v2Front_local);
+          
+          // Back face (3 vertices)
+          pushUVBack(centerBack_local);
+          pushUVBack(v2Back_local);
+          pushUVBack(v1Back_local);
+          
+          // Edge face (6 vertices)
+          pushBlankUV();
+          pushBlankUV();
+          pushBlankUV();
+          pushBlankUV();
+          pushBlankUV();
+          pushBlankUV();
+        }
+      }
+      else
+      {
+        float hw = width_ / 2.0f;
+        float hh = height_ / 2.0f;
+        
+        btk::math::Vector3D v0_local(-hw, -hh, -halfThickness);
+        btk::math::Vector3D v1_local(+hw, -hh, -halfThickness);
+        btk::math::Vector3D v2_local(+hw, +hh, -halfThickness);
+        btk::math::Vector3D v3_local(-hw, +hh, -halfThickness);
+        btk::math::Vector3D v4_local(-hw, -hh, +halfThickness);
+        btk::math::Vector3D v5_local(+hw, -hh, +halfThickness);
+        btk::math::Vector3D v6_local(+hw, +hh, +halfThickness);
+        btk::math::Vector3D v7_local(-hw, +hh, +halfThickness);
+        
+        auto pushUVFront = [&](const btk::math::Vector3D& local)
+        {
+          float u = 0.5f + local.x / width_;
+          float v = 0.5f + local.y / height_;
+          u = u * 0.5f;
+          uvs_buffer_.push_back(u);
+          uvs_buffer_.push_back(v);
+        };
+        
+        auto pushUVBack = [&](const btk::math::Vector3D& local)
+        {
+          float u = 0.5f + local.x / width_;
+          float v = 0.5f + local.y / height_;
+          u = u * 0.5f + 0.5f;
+          uvs_buffer_.push_back(u);
+          uvs_buffer_.push_back(v);
+        };
+        
+        auto pushBlankUV = [&]()
+        {
+          uvs_buffer_.push_back(-1.0f);
+          uvs_buffer_.push_back(-1.0f);
+        };
+        
+        // Front face (6 vertices)
+        pushUVFront(v0_local);
+        pushUVFront(v1_local);
+        pushUVFront(v2_local);
+        pushUVFront(v0_local);
+        pushUVFront(v2_local);
+        pushUVFront(v3_local);
+        
+        // Back face (6 vertices)
+        pushUVBack(v4_local);
+        pushUVBack(v6_local);
+        pushUVBack(v5_local);
+        pushUVBack(v4_local);
+        pushUVBack(v7_local);
+        pushUVBack(v6_local);
+        
+        // Edge faces (24 vertices = 4 edges * 6 vertices each)
+        for(int i = 0; i < 24; ++i)
+        {
+          pushBlankUV();
+        }
+      }
+    }
+    
     float halfThickness = thickness_ / 2.0f;
 
     // Use full orientation quaternion to rotate from local (-Z-normal) frame to world
@@ -612,63 +742,24 @@ namespace btk::rendering
           vertices_buffer_.push_back(v.z);
         };
 
-        // Helper lambda to push UV coordinates for FRONT face (left half of texture)
-        auto pushUVFront = [&](const btk::math::Vector3D& local)
-        {
-          float u = 0.5f + local.x / width_;  // X maps to U [0, 1]
-          float v = 0.5f + local.y / height_; // Y maps to V [0, 1]
-          u = u * 0.5f;                       // Scale to left half [0, 0.5]
-          uvs_buffer_.push_back(u);
-          uvs_buffer_.push_back(v);
-        };
-
-        // Helper lambda to push UV coordinates for BACK face (right half of texture)
-        auto pushUVBack = [&](const btk::math::Vector3D& local)
-        {
-          float u = 0.5f + local.x / width_;  // X maps to U [0, 1]
-          float v = 0.5f + local.y / height_; // Y maps to V [0, 1]
-          u = u * 0.5f + 0.5f;                // Scale to right half [0.5, 1.0]
-          uvs_buffer_.push_back(u);
-          uvs_buffer_.push_back(v);
-        };
-
-        // Helper lambda to push blank UVs (for edges - no texture)
-        auto pushBlankUV = [&]()
-        {
-          uvs_buffer_.push_back(-1.0f); // Outside texture range
-          uvs_buffer_.push_back(-1.0f);
-        };
-
         // Front face - maps to left half of texture
         pushVertex(centerFront);
-        pushUVFront(centerFront_local);
         pushVertex(v1Front);
-        pushUVFront(v1Front_local);
         pushVertex(v2Front);
-        pushUVFront(v2Front_local);
 
         // Back face - maps to right half of texture
         pushVertex(centerBack);
-        pushUVBack(centerBack_local);
         pushVertex(v2Back);
-        pushUVBack(v2Back_local);
         pushVertex(v1Back);
-        pushUVBack(v1Back_local);
 
         // Edge face (quad connecting front and back) - 2 triangles - no texture
         pushVertex(v1Front);
-        pushBlankUV();
         pushVertex(v1Back);
-        pushBlankUV();
         pushVertex(v2Front);
-        pushBlankUV();
 
         pushVertex(v2Front);
-        pushBlankUV();
         pushVertex(v1Back);
-        pushBlankUV();
         pushVertex(v2Back);
-        pushBlankUV();
       }
     }
     else
@@ -711,116 +802,51 @@ namespace btk::rendering
         vertices_buffer_.push_back(v.z);
       };
 
-      // Helper lambda to push UV coordinates for FRONT face (left half of texture)
-      auto pushUVFront = [&](const btk::math::Vector3D& local)
-      {
-        float u = 0.5f + local.x / width_;  // X maps to U [0, 1]
-        float v = 0.5f + local.y / height_; // Y maps to V [0, 1]
-        u = u * 0.5f;                       // Scale to left half [0, 0.5]
-        uvs_buffer_.push_back(u);
-        uvs_buffer_.push_back(v);
-      };
-
-      // Helper lambda to push UV coordinates for BACK face (right half of texture)
-      auto pushUVBack = [&](const btk::math::Vector3D& local)
-      {
-        float u = 0.5f + local.x / width_;  // X maps to U [0, 1]
-        float v = 0.5f + local.y / height_; // Y maps to V [0, 1]
-        u = u * 0.5f + 0.5f;                // Scale to right half [0.5, 1.0]
-        uvs_buffer_.push_back(u);
-        uvs_buffer_.push_back(v);
-      };
-
-      // Helper lambda to push blank UVs (for edges - no texture)
-      auto pushBlankUV = [&]()
-      {
-        uvs_buffer_.push_back(-1.0f); // Outside texture range
-        uvs_buffer_.push_back(-1.0f);
-      };
-
       // Front face (Z = -halfThickness) - maps to left half of texture
-      // Use v0–v3 (local Z = -halfThickness)
       pushVertex(v0);
-      pushUVFront(v0_local);
       pushVertex(v1);
-      pushUVFront(v1_local);
       pushVertex(v2);
-      pushUVFront(v2_local);
       pushVertex(v0);
-      pushUVFront(v0_local);
       pushVertex(v2);
-      pushUVFront(v2_local);
       pushVertex(v3);
-      pushUVFront(v3_local);
 
       // Back face (Z = +halfThickness) - maps to right half of texture
-      // Use v4–v7 (local Z = +halfThickness)
       pushVertex(v4);
-      pushUVBack(v4_local);
       pushVertex(v6);
-      pushUVBack(v6_local);
       pushVertex(v5);
-      pushUVBack(v5_local);
       pushVertex(v4);
-      pushUVBack(v4_local);
       pushVertex(v7);
-      pushUVBack(v7_local);
       pushVertex(v6);
-      pushUVBack(v6_local);
 
       // Edge faces (4 sides) - no texture
       // Bottom edge
       pushVertex(v0);
-      pushBlankUV();
       pushVertex(v1);
-      pushBlankUV();
       pushVertex(v5);
-      pushBlankUV();
       pushVertex(v0);
-      pushBlankUV();
       pushVertex(v5);
-      pushBlankUV();
       pushVertex(v4);
-      pushBlankUV();
       // Top edge
       pushVertex(v2);
-      pushBlankUV();
       pushVertex(v6);
-      pushBlankUV();
       pushVertex(v3);
-      pushBlankUV();
       pushVertex(v3);
-      pushBlankUV();
       pushVertex(v6);
-      pushBlankUV();
       pushVertex(v7);
-      pushBlankUV();
       // Left edge
       pushVertex(v0);
-      pushBlankUV();
       pushVertex(v4);
-      pushBlankUV();
       pushVertex(v7);
-      pushBlankUV();
       pushVertex(v0);
-      pushBlankUV();
       pushVertex(v7);
-      pushBlankUV();
       pushVertex(v3);
-      pushBlankUV();
       // Right edge
       pushVertex(v1);
-      pushBlankUV();
       pushVertex(v5);
-      pushBlankUV();
       pushVertex(v6);
-      pushBlankUV();
       pushVertex(v1);
-      pushBlankUV();
       pushVertex(v6);
-      pushBlankUV();
       pushVertex(v2);
-      pushBlankUV();
     }
 
     // Compute vertex normals

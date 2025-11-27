@@ -525,7 +525,7 @@ class SteelSimulator
     this.scene.background = new THREE.Color(0x87ceeb);
 
     // Setup lighting first
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
     const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
     directionalLight.position.set(1000, 1000, 1000);
     this.scene.add(directionalLight);
@@ -912,7 +912,7 @@ class SteelSimulator
       RangeSignFactory.create(
       {
         position: signPosition,
-        text: `${distanceYards} YD`,
+        text: `${distanceYards}`,
         scene: this.scene
       });
 

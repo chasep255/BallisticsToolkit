@@ -29,9 +29,11 @@ export function initConfig()
   // ===== CAMERA & SCENE CONSTANTS =====
   Config.SHOOTER_HEIGHT = btk.Conversions.yardsToMeters(3);
   Config.CAMERA_FOV = 35; // degrees (Three.js uses degrees)
-  Config.CAMERA_NEAR_PLANE = btk.Conversions.yardsToMeters(2); // 2 yards near plane
+  Config.CAMERA_NEAR_PLANE = btk.Conversions.yardsToMeters(30); // 2 yards near plane
   Config.CAMERA_FAR_PLANE = btk.Conversions.yardsToMeters(2500); // 2500 yards
-  Config.SCOPE_MAX_PAN_DEG = 10; // Limit scope movement to ±10°
+  Config.SCOPE_MAX_PAN_DEG = 10; // Limit scope horizontal movement to ±10°
+  Config.SCOPE_MAX_PITCH_UP_DEG = 10; // Maximum look up angle (degrees)
+  Config.SCOPE_MAX_PITCH_DOWN_DEG = 3; // Maximum look down angle (degrees)
 
   // ===== TARGET CONSTANTS =====
   Config.TARGET_CONFIG = {
@@ -106,19 +108,7 @@ export function initConfig()
   // Individual flags placed at specific positions (all in meters)
   Config.WIND_FLAGS = [
     {
-      x: btk.Conversions.yardsToMeters(-3),
-      z: btk.Conversions.yardsToMeters(-25),
-      config:
-      {}
-    },
-    {
-      x: btk.Conversions.yardsToMeters(-30),
-      z: btk.Conversions.yardsToMeters(-100),
-      config:
-      {}
-    },
-    {
-      x: btk.Conversions.yardsToMeters(-12),
+      x: btk.Conversions.yardsToMeters(-7),
       z: btk.Conversions.yardsToMeters(-150),
       config:
       {}
@@ -214,9 +204,8 @@ export function initConfig()
     postWidth: btk.Conversions.inchesToMeters(4), // 4 inches
     signWidth: btk.Conversions.inchesToMeters(24), // 24 inches
     signHeight: btk.Conversions.inchesToMeters(12), // 12 inches
-    signThickness: btk.Conversions.inchesToMeters(1), // 1 inch
-    textFontSize: 120, // pixels on canvas
-    textFont: 'bold 120px Arial',
+    signThickness: btk.Conversions.inchesToMeters(2), // 1 inch
+    textFont: 'bold 180px Arial',
     canvasWidth: 512,
     canvasHeight: 256
   };

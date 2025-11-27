@@ -345,45 +345,33 @@ export class Landscape
 
     // Foliage material - use grass textures if available (leaves/foliage can use grass-like textures)
     let foliageMaterial;
-    if (this.textureManager)
+
+    // Clone textures for foliage to avoid overwriting ground texture repeat
+    const grassColorGround = this.textureManager.getTexture('grass_color');
+    const grassNormalGround = this.textureManager.getTexture('grass_normal');
+    const grassRoughnessGround = this.textureManager.getTexture('grass_roughness');
+
+    // Clone textures for foliage use (so we don't overwrite ground repeat)
+    const grassColor = grassColorGround.clone();
+    const grassNormal = grassNormalGround.clone();
+    const grassRoughness = grassRoughnessGround.clone();
+
+    // Configure texture repeat for foliage (smaller repeat for detail)
+    grassColor.repeat.set(0.5, 0.5);
+    grassNormal.repeat.set(0.5, 0.5);
+    grassRoughness.repeat.set(0.5, 0.5);
+
+    foliageMaterial = new THREE.MeshStandardMaterial(
     {
-      // Clone textures for foliage to avoid overwriting ground texture repeat
-      const grassColorGround = this.textureManager.getTexture('grass_color');
-      const grassNormalGround = this.textureManager.getTexture('grass_normal');
-      const grassRoughnessGround = this.textureManager.getTexture('grass_roughness');
-
-      // Clone textures for foliage use (so we don't overwrite ground repeat)
-      const grassColor = grassColorGround.clone();
-      const grassNormal = grassNormalGround.clone();
-      const grassRoughness = grassRoughnessGround.clone();
-
-      // Configure texture repeat for foliage (smaller repeat for detail)
-      grassColor.repeat.set(0.5, 0.5);
-      grassNormal.repeat.set(0.5, 0.5);
-      grassRoughness.repeat.set(0.5, 0.5);
-
-      foliageMaterial = new THREE.MeshStandardMaterial(
-      {
-        map: grassColor,
-        normalMap: grassNormal,
-        roughnessMap: grassRoughness,
-        color: 0x2d5016, // Dark green tint
-        roughness: 0.9,
-        metalness: 0.0,
-        side: THREE.DoubleSide
-      });
-    }
-    else
-    {
-      // Fallback to plain color if textures not available
-      foliageMaterial = new THREE.MeshStandardMaterial(
-      {
-        color: 0x2d5016, // Dark green
-        roughness: 0.9,
-        metalness: 0.0,
-        side: THREE.DoubleSide
-      });
-    }
+      map: grassColor,
+      normalMap: grassNormal,
+      roughnessMap: grassRoughness,
+      color: 0x2d5016, // Dark green tint
+      roughness: 1.0,
+      metalness: 0.0,
+      side: THREE.DoubleSide
+    });
+   
 
     // Cache tree geometries - multiple sizes
     const trunkGeometries = [];

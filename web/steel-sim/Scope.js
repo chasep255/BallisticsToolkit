@@ -85,7 +85,13 @@ export class Scope
     this.yaw = 0;
     this.pitch = 0;
     const maxPanDeg = (config.maxPanDeg !== undefined) ? config.maxPanDeg : (Config.SCOPE_MAX_PAN_DEG || 20);
-    this.maxPanAngleRad = THREE.MathUtils.degToRad(maxPanDeg); // Limit scope movement
+    this.maxPanAngleRad = THREE.MathUtils.degToRad(maxPanDeg); // Limit scope horizontal movement
+    
+    // Separate limits for pitch up and down
+    const maxPitchUpDeg = (config.maxPitchUpDeg !== undefined) ? config.maxPitchUpDeg : (Config.SCOPE_MAX_PITCH_UP_DEG || 10);
+    const maxPitchDownDeg = (config.maxPitchDownDeg !== undefined) ? config.maxPitchDownDeg : (Config.SCOPE_MAX_PITCH_DOWN_DEG || 10);
+    this.maxPitchUpRad = THREE.MathUtils.degToRad(maxPitchUpDeg);
+    this.maxPitchDownRad = THREE.MathUtils.degToRad(maxPitchDownDeg);
 
     // Feature flags
     this.hasReticle = config.hasReticle !== undefined ? config.hasReticle : true;
@@ -558,7 +564,7 @@ export class Scope
   panBy(deltaYawRad, deltaPitchRad)
   {
     this.yaw = THREE.MathUtils.clamp(this.yaw + deltaYawRad, -this.maxPanAngleRad, this.maxPanAngleRad);
-    this.pitch = THREE.MathUtils.clamp(this.pitch + deltaPitchRad, -this.maxPanAngleRad, this.maxPanAngleRad);
+    this.pitch = THREE.MathUtils.clamp(this.pitch + deltaPitchRad, -this.maxPitchDownRad, this.maxPitchUpRad);
     this.updateCameraLookAt();
   }
 
