@@ -913,7 +913,8 @@ class SteelSimulator
       {
         position: signPosition,
         text: `${distanceYards}`,
-        scene: this.scene
+        scene: this.scene,
+        textureManager: this.textureManager
       });
 
       // Create berm behind rack if enabled (default true)

@@ -36,6 +36,7 @@ export class RangeSign
       position,
       text,
       scene,
+      textureManager = null,
       config = {}
     } = options;
 
@@ -47,12 +48,44 @@ export class RangeSign
     const postHeight = config.postHeight || Config.RANGE_SIGN_CONFIG.postHeight;
     const postWidth = config.postWidth || Config.RANGE_SIGN_CONFIG.postWidth;
     const postGeometry = new THREE.BoxGeometry(postWidth, postHeight, postWidth);
-    const postMaterial = new THREE.MeshStandardMaterial(
+    
+    // Use bark textures if available, otherwise fallback to plain color
+    let postMaterial;
+    if (textureManager)
     {
-      color: 0x8b4513, // Brown wood color
-      roughness: 0.9,
-      metalness: 0.0
-    });
+      const barkColor = textureManager.getTexture('bark_color');
+      const barkNormal = textureManager.getTexture('bark_normal');
+      const barkRoughness = textureManager.getTexture('bark_roughness');
+
+      // Configure texture repeat for vertical bark pattern
+      [barkColor, barkNormal, barkRoughness].forEach(texture =>
+      {
+        if (texture)
+        {
+          texture.repeat.set(0.5, 2.0); // Vertical bark pattern
+        }
+      });
+
+      postMaterial = new THREE.MeshStandardMaterial(
+      {
+        map: barkColor,
+        normalMap: barkNormal,
+        roughnessMap: barkRoughness,
+        color: 0x8b4513, // Brown wood color tint
+        roughness: 1.0,
+        metalness: 0.0
+      });
+    }
+    else
+    {
+      // Fallback to plain color if textures not available
+      postMaterial = new THREE.MeshStandardMaterial(
+      {
+        color: 0x8b4513, // Brown wood color
+        roughness: 0.9,
+        metalness: 0.0
+      });
+    }
     this.postMesh = new THREE.Mesh(postGeometry, postMaterial);
     this.postMesh.position.y = postHeight / 2;
     this.postMesh.castShadow = true;
@@ -211,17 +244,32 @@ export class RangeSign
               particleDiameter: 0.4
             });
 
-            // Small dark impact mark (1cm)
-            const markColor = isPost ? 0x3d2510 : 0x404040; // Brown for wood, dark grey for sign
-            ImpactMarkFactory.create(
+            if (isPost)
             {
-              position: pos,
-              normal: normal,
-              velocity: velocity,
-              mesh: targetMesh,
-              color: markColor,
-              size: 0.2 // 1cm
-            });
+              // Light tan patch for wood post
+              ImpactMarkFactory.create(
+              {
+                position: pos,
+                normal: normal,
+                velocity: velocity,
+                mesh: targetMesh,
+                color: 0xd4c4a8, // Light tan
+                size: 0.2 // 2.5cm patch
+              });
+            }
+            else
+            {
+              // Small dark impact mark for sign board
+              ImpactMarkFactory.create(
+              {
+                position: pos,
+                normal: normal,
+                velocity: velocity,
+                mesh: targetMesh,
+                color: 0x404040, // Dark grey for sign
+                size: 0.2 // 1cm
+              });
+            }
           }
         }
       );
