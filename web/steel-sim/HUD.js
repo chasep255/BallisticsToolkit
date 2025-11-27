@@ -264,21 +264,21 @@ export class HUD
     const centerY = 0.65; // Lower - away from top edge
 
     // Cross pattern:
-    //     ▲
-    //   ◀ ⟲ ▶
-    //     ▼
+    //     U
+    //   L ⟲ R
+    //     D
     
     // offsetX is relative to dialButtonBaseX, Y is absolute
     // Up (top center)
-    this.dialButtons.push(this.createDialButton('▲', buttonSize, 0, centerY + step, 'dialUp'));
+    this.dialButtons.push(this.createDialButton('U', buttonSize, 0, centerY + step, 'dialUp'));
     // Left
-    this.dialButtons.push(this.createDialButton('◀', buttonSize, -step, centerY, 'dialLeft'));
+    this.dialButtons.push(this.createDialButton('L', buttonSize, -step, centerY, 'dialLeft'));
     // Center (reset)
     this.dialButtons.push(this.createDialButton('⟲', buttonSize, 0, centerY, 'dialReset'));
     // Right
-    this.dialButtons.push(this.createDialButton('▶', buttonSize, step, centerY, 'dialRight'));
+    this.dialButtons.push(this.createDialButton('R', buttonSize, step, centerY, 'dialRight'));
     // Down (bottom center)
-    this.dialButtons.push(this.createDialButton('▼', buttonSize, 0, centerY - step, 'dialDown'));
+    this.dialButtons.push(this.createDialButton('D', buttonSize, 0, centerY - step, 'dialDown'));
   }
 
   createDialButton(label, size, offsetX, y, action)
