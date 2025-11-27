@@ -1,8 +1,11 @@
 /**
- * Scope - FFP (First Focal Plane) scope with geometry-based reticle
+ * Scope - FFP (First Focal Plane) scope with optional geometry-based reticle
  * 
- * Renders the 3D scene through a scope view with mrad reticle that scales with zoom.
- * Positioned at bottom-center of composition for future turret overlays on top.
+ * Renders the 3D scene through a scope view. Can optionally include:
+ * - MRAD reticle that scales with zoom (FFP)
+ * - Dial adjustments for elevation/windage
+ * 
+ * Used for both rifle scope (with reticle/dials) and spotting scope (without).
  */
 
 import * as THREE from 'three';
@@ -83,7 +86,12 @@ export class Scope
     const maxPanDeg = (config.maxPanDeg !== undefined) ? config.maxPanDeg : (Config.SCOPE_MAX_PAN_DEG || 20);
     this.maxPanAngleRad = THREE.MathUtils.degToRad(maxPanDeg); // Limit scope movement
 
+    // Feature flags
+    this.hasReticle = config.hasReticle !== undefined ? config.hasReticle : true;
+    this.hasDials = config.hasDials !== undefined ? config.hasDials : true;
+
     // Scope dial adjustments (integer clicks to avoid floating-point errors)
+    // Only used if hasDials is true
     this.elevationClicks = 0; // Positive = dial up (bullet impacts high)
     this.windageClicks = 0; // Positive = dial right (bullet impacts right)
 
@@ -94,6 +102,9 @@ export class Scope
 
     // Audio manager for scope click sounds (optional)
     this.audioManager = config.audioManager || null;
+
+    // Pan speed for keyboard control (used by spotting scope)
+    this.panSpeedBase = config.panSpeedBase || 0.1; // radians per second base speed
 
     // Shooter position
     this.cameraPosition = config.cameraPosition ||
@@ -210,21 +221,24 @@ export class Scope
     scopeMesh.position.set(0, 0, 0.01);
     this.internalScene.add(scopeMesh);
 
-    // Stencil mask: defines circular aperture for reticle elements
-    const maskGeom = new THREE.CircleGeometry(scopeRadius, 64);
-    const maskMat = new THREE.MeshBasicMaterial(
+    // Stencil mask: defines circular aperture for reticle elements (only if reticle enabled)
+    if (this.hasReticle)
     {
-      colorWrite: false,
-      depthWrite: false,
-      depthTest: false,
-      stencilWrite: true,
-      stencilRef: 1,
-      stencilFunc: THREE.AlwaysStencilFunc,
-      stencilZPass: THREE.ReplaceStencilOp
-    });
-    const maskMesh = new THREE.Mesh(maskGeom, maskMat);
-    maskMesh.position.set(0, 0, 0.015);
-    this.internalScene.add(maskMesh);
+      const maskGeom = new THREE.CircleGeometry(scopeRadius, 64);
+      const maskMat = new THREE.MeshBasicMaterial(
+      {
+        colorWrite: false,
+        depthWrite: false,
+        depthTest: false,
+        stencilWrite: true,
+        stencilRef: 1,
+        stencilFunc: THREE.AlwaysStencilFunc,
+        stencilZPass: THREE.ReplaceStencilOp
+      });
+      const maskMesh = new THREE.Mesh(maskGeom, maskMat);
+      maskMesh.position.set(0, 0, 0.015);
+      this.internalScene.add(maskMesh);
+    }
 
     // Thin black housing ring around the glass (simple geometry)
     const housingOuterRadius = 1.0; // controls thickness
@@ -242,32 +256,40 @@ export class Scope
     housingMesh.position.set(0, 0, 0.02);
     this.internalScene.add(housingMesh);
 
-    // Reticle group built in MRAD space, then mapped into HUD units
-    this.reticleGroup = new THREE.Group();
-    this.reticleGroup.position.set(0, 0, 0.02);
-    this.internalScene.add(this.reticleGroup);
-
-    // Shared metallic material for reticle elements
-    const reticleMaterial = new THREE.MeshStandardMaterial(
+    // Reticle group built in MRAD space, then mapped into HUD units (only if reticle enabled)
+    if (this.hasReticle)
     {
-      color: 0x050505, // very dark, reads as black but allows specular
-      metalness: 0.9,
-      roughness: 0.25,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false,
-      stencilWrite: true,
-      stencilRef: 1,
-      stencilFunc: THREE.EqualStencilFunc,
-      stencilZPass: THREE.KeepStencilOp
-    });
-    this.reticleMaterial = reticleMaterial;
+      this.reticleGroup = new THREE.Group();
+      this.reticleGroup.position.set(0, 0, 0.02);
+      this.internalScene.add(this.reticleGroup);
 
-    // Build reticle using MRAD-space helpers
-    this.buildReticle();
+      // Shared metallic material for reticle elements
+      const reticleMaterial = new THREE.MeshStandardMaterial(
+      {
+        color: 0x050505, // very dark, reads as black but allows specular
+        metalness: 0.9,
+        roughness: 0.25,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+        stencilWrite: true,
+        stencilRef: 1,
+        stencilFunc: THREE.EqualStencilFunc,
+        stencilZPass: THREE.KeepStencilOp
+      });
+      this.reticleMaterial = reticleMaterial;
 
-    // Apply initial FFP scaling (and map from [-0.5,0.5] reticle space to [-1,1] HUD space)
-    this.updateReticleScale();
+      // Build reticle using MRAD-space helpers
+      this.buildReticle();
+
+      // Apply initial FFP scaling (and map from [-0.5,0.5] reticle space to [-1,1] HUD space)
+      this.updateReticleScale();
+    }
+    else
+    {
+      this.reticleGroup = null;
+      this.reticleMaterial = null;
+    }
 
     // Local lighting for metallic look on housing + reticle
     const ambient = new THREE.AmbientLight(0xffffff, 0.15);
@@ -325,7 +347,10 @@ export class Scope
 
     this.camera.fov = this.currentFOV;
     this.camera.updateProjectionMatrix();
-    this.updateReticleScale();
+    if (this.hasReticle)
+    {
+      this.updateReticleScale();
+    }
   }
 
   getZoomX()
@@ -361,6 +386,8 @@ export class Scope
    */
   addLineMrad(x1Mrad, y1Mrad, x2Mrad, y2Mrad, thicknessMrad)
   {
+    if (!this.hasReticle || !this.reticleGroup || !this.reticleMaterial) return;
+
     const x1 = this.mradToReticleUnitsAtFov(x1Mrad, this.initialFOV);
     const y1 = this.mradToReticleUnitsAtFov(y1Mrad, this.initialFOV);
     const x2 = this.mradToReticleUnitsAtFov(x2Mrad, this.initialFOV);
@@ -387,6 +414,8 @@ export class Scope
    */
   addRingMrad(centerXMrad, centerYMrad, radiusMrad, thicknessMrad, segments = 96)
   {
+    if (!this.hasReticle || !this.reticleGroup || !this.reticleMaterial) return;
+
     const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
     const thicknessUnits = this.mradToReticleUnitsAtFov(thicknessMrad, this.initialFOV);
     const innerRadius = Math.max(radiusUnits - thicknessUnits * 0.5, 0.0);
@@ -407,6 +436,8 @@ export class Scope
    */
   addDotMrad(centerXMrad, centerYMrad, radiusMrad, segments = 48)
   {
+    if (!this.hasReticle || !this.reticleGroup || !this.reticleMaterial) return;
+
     const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
     const geom = new THREE.CircleGeometry(radiusUnits, segments);
     const mesh = new THREE.Mesh(geom, this.reticleMaterial);
@@ -508,16 +539,16 @@ export class Scope
     this.reticleGroup.scale.set(s, s, 1);
   }
 
-  zoomIn()
+  zoomIn(factor = 1.1)
   {
-    const zoomFactor = 1.1; // 10% increase in magnification per step
-    this.setZoomX(this.currentZoomX * zoomFactor);
+    // Default 1.1 for rifle scope, can be overridden for continuous zoom (spotting scope)
+    this.setZoomX(this.currentZoomX * factor);
   }
 
-  zoomOut()
+  zoomOut(factor = 1.1)
   {
-    const zoomFactor = 1.1;
-    this.setZoomX(this.currentZoomX / zoomFactor);
+    // Default 1.1 for rifle scope, can be overridden for continuous zoom (spotting scope)
+    this.setZoomX(this.currentZoomX / factor);
   }
 
   /**
@@ -530,25 +561,42 @@ export class Scope
     this.updateCameraLookAt();
   }
 
-  // Optional keyboard helpers: small fixed steps
-  panLeft(stepRad = 0.001)
+  // Keyboard control helpers (used by spotting scope)
+  up(deltaRad)
   {
-    this.panBy(stepRad, 0);
+    this.panBy(0, deltaRad);
   }
 
-  panRight(stepRad = 0.001)
+  down(deltaRad)
   {
-    this.panBy(-stepRad, 0);
+    this.panBy(0, -deltaRad);
   }
 
-  panUp(stepRad = 0.001)
+  left(deltaRad)
   {
-    this.panBy(0, stepRad);
+    this.panBy(deltaRad, 0);
   }
 
-  panDown(stepRad = 0.001)
+  right(deltaRad)
   {
-    this.panBy(0, -stepRad);
+    this.panBy(-deltaRad, 0);
+  }
+
+  /**
+   * Update camera based on key states (called from animation loop)
+   * Pan speed scales with FOV (slower when zoomed in)
+   */
+  updateFromKeys(keyStates, dt)
+  {
+    const currentFOV = this.getFovDeg();
+    const maxFOV = this.getFovForZoomX(this.minZoomX);
+    const fovScale = currentFOV / maxFOV; // 1.0 at max zoom out, < 1.0 when zoomed in
+    const panSpeed = this.panSpeedBase * fovScale * dt; // Scale with FOV and delta time
+
+    if (keyStates.w) this.up(panSpeed);
+    if (keyStates.s) this.down(panSpeed);
+    if (keyStates.a) this.left(panSpeed);
+    if (keyStates.d) this.right(panSpeed);
   }
 
   getCamera()
@@ -564,6 +612,7 @@ export class Scope
    */
   dialUp(clicks = 1)
   {
+    if (!this.hasDials) return;
     const oldClicks = this.elevationClicks;
     const newClicks = oldClicks + clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
@@ -583,6 +632,7 @@ export class Scope
    */
   dialDown(clicks = 1)
   {
+    if (!this.hasDials) return;
     const oldClicks = this.elevationClicks;
     const newClicks = oldClicks - clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
@@ -602,6 +652,7 @@ export class Scope
    */
   dialLeft(clicks = 1)
   {
+    if (!this.hasDials) return;
     const oldClicks = this.windageClicks;
     const newClicks = oldClicks + clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
@@ -621,6 +672,7 @@ export class Scope
    */
   dialRight(clicks = 1)
   {
+    if (!this.hasDials) return;
     const oldClicks = this.windageClicks;
     const newClicks = oldClicks - clicks;
     if (Math.abs(newClicks) <= this.maxDialClicks)
@@ -639,6 +691,7 @@ export class Scope
    */
   resetDial()
   {
+    if (!this.hasDials) return;
     const hadElevation = this.elevationClicks !== 0;
     const hadWindage = this.windageClicks !== 0;
     this.elevationClicks = 0;
@@ -656,6 +709,7 @@ export class Scope
    */
   getDialPositionMRAD()
   {
+    if (!this.hasDials) return { elevation: 0, windage: 0 };
     return {
       elevation: this.elevationClicks * this.CLICK_VALUE_MRAD,
       windage: this.windageClicks * this.CLICK_VALUE_MRAD
@@ -680,9 +734,11 @@ export class Scope
    */
   getTotalAngleMRAD()
   {
+    const dialElevation = this.hasDials ? this.elevationClicks * this.CLICK_VALUE_MRAD : 0;
+    const dialWindage = this.hasDials ? this.windageClicks * this.CLICK_VALUE_MRAD : 0;
     return {
-      elevation: this.elevationClicks * this.CLICK_VALUE_MRAD + this.pitch * 1000,
-      windage: this.windageClicks * this.CLICK_VALUE_MRAD + this.yaw * 1000
+      elevation: dialElevation + this.pitch * 1000,
+      windage: dialWindage + this.yaw * 1000
     };
   }
 

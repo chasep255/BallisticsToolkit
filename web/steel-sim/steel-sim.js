@@ -32,11 +32,6 @@ import
 from './Scope.js';
 import
 {
-  SpottingScope
-}
-from './SpottingScope.js';
-import
-{
   WindFlagFactory
 }
 from './WindFlag.js';
@@ -583,7 +578,7 @@ class SteelSimulator
       transparent: true
     });
 
-    this.spottingScope = new SpottingScope(
+    this.spottingScope = new Scope(
     {
       scene: this.scene,
       renderTarget: this.spottingScopeLayer.renderTarget,
@@ -592,6 +587,8 @@ class SteelSimulator
       minZoomX: 4.0,
       maxZoomX: 40.0,
       lowFovFeet: 25,
+      hasReticle: false, // Spotting scope has no reticle
+      hasDials: false, // Spotting scope has no dials
       cameraPosition:
       {
         x: 0,
@@ -604,7 +601,7 @@ class SteelSimulator
         y: Config.SHOOTER_HEIGHT, // Look at horizon (same height as camera)
         z: -Config.LANDSCAPE_CONFIG.groundLength
       },
-      panSpeedBase: 0.1 // radians per second base speed
+      panSpeedBase: 0.1 // radians per second base speed for keyboard control
     });
 
     // Rifle scope: centered vertically, max height, padding on left
