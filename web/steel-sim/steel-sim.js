@@ -1282,22 +1282,7 @@ class SteelSimulator
       }
 
       this.spottingScopeKeys[key] = true;
-
-      // Handle zoom keys immediately (E/Q)
-      if (key === 'e' && this.spottingScope)
-      {
-        event.preventDefault();
-        this.spottingScope.zoomIn();
-      }
-      else if (key === 'q' && this.spottingScope)
-      {
-        event.preventDefault();
-        this.spottingScope.zoomOut();
-      }
-      else
-      {
-        event.preventDefault(); // Prevent default for WASD
-      }
+      event.preventDefault(); // Prevent default for all spotting scope keys
       return;
     }
 
@@ -1464,9 +1449,20 @@ class SteelSimulator
     const touches = event.touches;
     if (touches.length === 0) return;
 
-    // Get the active scope object
-    const scopeObj = this.touchState.activeScope === 'rifle' ? this.scope : this.spottingScope;
-    if (!scopeObj) return;
+    // Get the active scope object (chosen by first touch in onTouchStart)
+    let scopeObj;
+    if (this.touchState.activeScope === 'rifle')
+    {
+      scopeObj = this.scope;
+    }
+    else if (this.touchState.activeScope === 'spotting')
+    {
+      scopeObj = this.spottingScope;
+    }
+    else
+    {
+      return; // No scope was chosen at touch start, ignore gesture
+    }
 
     if (touches.length >= 2)
     {
@@ -1948,7 +1944,7 @@ class SteelSimulator
     DustCloudFactory.updateAll(this.windGenerator, dt);
     WindFlagFactory.updateAll(this.windGenerator, dt);
 
-    // Update spotting scope camera from key states (only update WASD, not E/Q which are handled immediately)
+    // Update spotting scope camera from key states (WASD for panning, E/Q for zoom)
     if (this.spottingScope)
     {
       const panKeys = {
@@ -1958,6 +1954,17 @@ class SteelSimulator
         d: this.spottingScopeKeys.d
       };
       this.spottingScope.updateFromKeys(panKeys, dt);
+
+      // Handle continuous zoom (E/Q) - exponential scaling for smooth zoom
+      const zoomFactor = Math.pow(1.1, dt * 10);
+      if (this.spottingScopeKeys.e)
+      {
+        this.spottingScope.zoomIn(zoomFactor);
+      }
+      if (this.spottingScopeKeys.q)
+      {
+        this.spottingScope.zoomOut(zoomFactor);
+      }
     }
 
     // Render scopes (composites 3D scene + reticle into their render targets)

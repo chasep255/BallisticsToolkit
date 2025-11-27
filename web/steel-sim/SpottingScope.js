@@ -339,16 +339,14 @@ export class SpottingScope
     this.panBy(-deltaRad, 0);
   }
 
-  zoomIn()
+  zoomIn(factor = 1.05)
   {
-    const zoomFactor = 1.05; // 5% increase per step (like fclass sim)
-    this.setZoomX(this.currentZoomX * zoomFactor);
+    this.setZoomX(this.currentZoomX * factor);
   }
 
-  zoomOut()
+  zoomOut(factor = 1.05)
   {
-    const zoomFactor = 1.05;
-    this.setZoomX(this.currentZoomX / zoomFactor);
+    this.setZoomX(this.currentZoomX / factor);
   }
 
   getCamera()
