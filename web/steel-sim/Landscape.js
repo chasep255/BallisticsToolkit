@@ -264,9 +264,14 @@ export class Landscape
     const mountainTexture = new THREE.CanvasTexture(canvas);
 
     // Create mountains
+    // Spread mountains across the full brown ground width, ensuring coverage at edges
+    const mountainSpread = this.brownGroundWidth * 0.9; // Use 90% of brown ground width for spread
     for (let i = 0; i < Config.MOUNTAIN_CONFIG.count; i++)
     {
-      const x = (Math.random() - 0.5) * 3000;
+      // Distribute evenly across width with some randomness, ensuring coverage at edges
+      const normalizedPos = Config.MOUNTAIN_CONFIG.count > 1 ? i / (Config.MOUNTAIN_CONFIG.count - 1) : 0.5; // 0 to 1, or 0.5 if only one mountain
+      const baseX = (normalizedPos - 0.5) * mountainSpread;
+      const x = baseX + (Math.random() - 0.5) * (mountainSpread / Math.max(Config.MOUNTAIN_CONFIG.count, 1)); // Add small random offset
       const height = Config.MOUNTAIN_CONFIG.heightMin + Math.random() * (Config.MOUNTAIN_CONFIG.heightMax - Config.MOUNTAIN_CONFIG.heightMin);
       const z = -(Config.MOUNTAIN_CONFIG.distanceMin + Math.random() * (Config.MOUNTAIN_CONFIG.distanceMax - Config.MOUNTAIN_CONFIG.distanceMin));
       const radius = height * 1.8; // Radius proportional to height

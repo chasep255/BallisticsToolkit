@@ -126,7 +126,8 @@ export class WindFlag
     const poleThickness = Config.WIND_FLAG_CONFIG.poleThickness;
     const baseY = this.windFlag.getPosition().y - this.poleHeight + this.flagBaseWidth / 2;
 
-    const poleGeometry = new THREE.BoxGeometry(poleThickness, this.poleHeight, poleThickness);
+    const poleRadius = poleThickness / 2;
+    const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, this.poleHeight, 16);
     const poleMaterial = new THREE.MeshStandardMaterial(
     {
       color: 0x606060, // Darker metal gray (original)
@@ -276,9 +277,6 @@ export class WindFlag
       uvs.set(uvView);
       this.flagMesh.geometry.attributes.uv.needsUpdate = true;
     }
-
-    // Recompute normals for lighting
-    this.flagMesh.geometry.computeVertexNormals();
   }
 
   /**

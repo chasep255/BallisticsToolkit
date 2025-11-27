@@ -655,6 +655,35 @@ class SteelSimulator
 
     // Ensure renderer uses the final CSS size on first layout
     this.onWindowResize();
+
+    const vertexCount = this.countSceneVertices(this.scene);
+    console.log(`[Debug] Total scene vertices: ${vertexCount.toLocaleString()}`);
+  }
+
+  /**
+   * Count total vertices in a Three.js scene by traversing all meshes
+   * @param {THREE.Scene} scene - The scene to count vertices in
+   * @returns {number} Total vertex count
+   */
+  countSceneVertices(scene)
+  {
+    let totalVertices = 0;
+    
+    scene.traverse((object) =>
+    {
+      if (object.isMesh && object.geometry)
+      {
+        const geometry = object.geometry;
+        const positionAttribute = geometry.getAttribute('position');
+        if (positionAttribute)
+        {
+          // Count unique vertices (position attribute length / 3)
+          totalVertices += positionAttribute.count;
+        }
+      }
+    });
+    
+    return totalVertices;
   }
 
   /**
@@ -1170,6 +1199,17 @@ class SteelSimulator
         this.scope.resetDial();
         break;
     }
+    // Update HUD after dial change
+    this.updateHudDial();
+  }
+
+  updateHudDial()
+  {
+    if (this.hud && this.scope)
+    {
+      const dialPos = this.scope.getDialPositionMRAD();
+      this.hud.updateDial(dialPos.elevation, dialPos.windage);
+    }
   }
 
   startDialRepeat(action)
@@ -1271,6 +1311,7 @@ class SteelSimulator
       {
         event.preventDefault();
         this.scope.resetDial();
+        this.updateHudDial();
         return;
       }
 
@@ -1283,24 +1324,28 @@ class SteelSimulator
       {
         event.preventDefault();
         this.scope.dialUp(clicks);
+        this.updateHudDial();
         return;
       }
       if (event.key === 'ArrowDown')
       {
         event.preventDefault();
         this.scope.dialDown(clicks);
+        this.updateHudDial();
         return;
       }
       if (event.key === 'ArrowLeft')
       {
         event.preventDefault();
         this.scope.dialLeft(clicks);
+        this.updateHudDial();
         return;
       }
       if (event.key === 'ArrowRight')
       {
         event.preventDefault();
         this.scope.dialRight(clicks);
+        this.updateHudDial();
         return;
       }
     }
@@ -1910,22 +1955,12 @@ class SteelSimulator
       }
     }
 
-    // Render scopes (composites 3D scene + reticle into their render targets)
-    if (this.spottingScope)
-    {
-      this.spottingScope.render(dt);
-    }
+    this.spottingScope.render(dt);
     this.scope.render(dt);
 
     // Composite everything to screen
     this.compositionRenderer.render();
 
-    // Update HUD with current scope dial position
-    if (this.hud && this.scope)
-    {
-      const dialPos = this.scope.getDialPositionMRAD();
-      this.hud.updateDial(dialPos.elevation, dialPos.windage);
-    }
 
     // Track FPS
     const frameEndTime = performance.now();
@@ -1951,7 +1986,14 @@ class SteelSimulator
       const avgFrameTime = this.fpsTotalFrameTime / this.fpsFrameCount;
       const theoreticalFps = 1000.0 / avgFrameTime;
 
-      console.log(`FPS: Actual=${actualFps.toFixed(1)} (limited by requestAnimationFrame), Theoretical=${theoreticalFps.toFixed(1)} (if unlimited)`);
+      const movingTargets = SteelTargetFactory.getMovingCount();
+      console.log(`FPS: Actual=${actualFps.toFixed(1)} (limited by requestAnimationFrame), Theoretical=${theoreticalFps.toFixed(1)} (if unlimited), Moving targets=${movingTargets}`);
+
+      // Update HUD frame rate display
+      if (this.hud)
+      {
+        this.hud.updateFrameRate(actualFps);
+      }
 
       // Reset counters
       this.fpsFrameCount = 0;

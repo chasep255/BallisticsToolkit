@@ -71,6 +71,7 @@ export class Scope
     // Get render target dimensions
     const renderWidth = this.outputRenderTarget.width;
     const renderHeight = this.outputRenderTarget.height;
+    console.log(`[Scope] Initial render target: ${renderWidth}x${renderHeight}`);
 
     // Zoom/FOV settings based on real scope spec
     this.currentZoomX = this.minZoomX; // Start fully zoomed out
@@ -753,6 +754,7 @@ export class Scope
         (this.sceneRenderTarget.width !== outputWidth ||
          this.sceneRenderTarget.height !== outputHeight))
     {
+      console.log(`[Scope] Render target resized: ${outputWidth}x${outputHeight}`);
       this.sceneRenderTarget.setSize(outputWidth, outputHeight);
       
       // Update camera aspect to match new size

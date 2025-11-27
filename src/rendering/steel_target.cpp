@@ -24,6 +24,7 @@ namespace btk::rendering
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(0.0f, 0.0f, -1.0f),
       orientation_(btk::math::Quaternion()),                                                 // Identity orientation (no rotation)
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
+      time_below_threshold_s_(0.0f),
       mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
   {
     // Default colors: bright red paint, gray metal
@@ -42,6 +43,7 @@ namespace btk::rendering
   SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal)
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(position), normal_(normal.normalized()), orientation_(btk::math::Quaternion()),
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
+      time_below_threshold_s_(0.0f),
       mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
   {
     // Default colors: bright red paint, gray metal
@@ -116,6 +118,8 @@ namespace btk::rendering
     float transfer_ratio = calculateMomentumTransferRatio(angle_to_normal);
 
     // Apply impulse
+    is_moving_ = true;
+    time_below_threshold_s_ = 0.0f;
     btk::math::Vector3D impulse = bullet_momentum * transfer_ratio;
     applyImpulse(impulse, impact_point);
 
@@ -348,9 +352,6 @@ namespace btk::rendering
     // 5) Convert angular acceleration back to world space and accumulate
     btk::math::Vector3D ang_acc_world = orientation_.rotate(ang_acc_local);
     angular_velocity_ += ang_acc_world;
-
-    // Impulse applied - target is now moving
-    is_moving_ = true;
   }
 
   void SteelTarget::applyForce(const btk::math::Vector3D& force, const btk::math::Vector3D& world_position, float dt)
@@ -418,10 +419,34 @@ namespace btk::rendering
       }
     }
 
-    // Update is_moving flag based on velocity thresholds
+    // Update is_moving flag based on velocity thresholds with time-window settle detection
     float linear_speed = velocity_ms_.magnitude();
     float angular_speed = angular_velocity_.magnitude();
-    is_moving_ = !(linear_speed < VELOCITY_THRESHOLD && angular_speed < ANGULAR_VELOCITY_THRESHOLD);
+
+    if(linear_speed < VELOCITY_THRESHOLD && angular_speed < ANGULAR_VELOCITY_THRESHOLD)
+    {
+      // Accumulate time spent below thresholds
+      time_below_threshold_s_ += dt;
+#ifdef __EMSCRIPTEN__
+      if(debug_)
+      {
+        std::string msg = "SteelTarget time below threshold: " + std::to_string(time_below_threshold_s_) + " dt: " + std::to_string(dt);
+        logToConsole(msg);
+      }
+#endif
+
+      // Only settle after sustained period below threshold (avoids settling at swing apex)
+      if(time_below_threshold_s_ >= SETTLE_TIME_THRESHOLD_S)
+      {
+        is_moving_ = false;
+      }
+    }
+    else
+    {
+      // Reset settle timer when speeds exceed thresholds
+      time_below_threshold_s_ = 0.0f;
+      is_moving_ = true;
+    }
   }
 
   void SteelTarget::applyChainForces(float dt)

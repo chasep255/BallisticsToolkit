@@ -54,6 +54,12 @@ export class HUD
     // Start from top-left (actual X position will be set per-element based on aspect)
     let currentY = 1.0 - margin - displayHeight / 2;
 
+    // Frame Rate
+    this.frameRateCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
+    this.frameRateMesh = this.createHudMesh(this.frameRateCanvas, displayWidth, displayHeight, margin, currentY);
+    this.updateFrameRate(0); // Initialize with 0
+    currentY -= lineHeight;
+
     // Scope Dial - Elevation
     this.elevationCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
     this.elevationMesh = this.createHudMesh(this.elevationCanvas, displayWidth, displayHeight, margin, currentY);
@@ -67,6 +73,7 @@ export class HUD
     // Impact/Miss Status
     this.impactCanvas = this.createHudCanvas(textureCanvasWidth, textureCanvasHeight);
     this.impactMesh = this.createHudMesh(this.impactCanvas, displayWidth, displayHeight, margin, currentY);
+    currentY -= lineHeight;
 
     // Initialize dial display
     this.updateDial(0, 0);
@@ -167,6 +174,23 @@ export class HUD
       {
         this.windageMesh.material.map.needsUpdate = true;
       }
+    }
+  }
+
+  /**
+   * Update frame rate display
+   * @param {number} fps - Frames per second to display
+   */
+  updateFrameRate(fps)
+  {
+    if (!this.frameRateCanvas) return;
+
+    const ctx = this.frameRateCanvas.getContext('2d');
+    const fpsStr = `${fps.toFixed(1)} FPS`;
+    this.drawText(ctx, 'Frame Rate:', fpsStr, this.frameRateCanvas);
+    if (this.frameRateMesh && this.frameRateMesh.material.map)
+    {
+      this.frameRateMesh.material.map.needsUpdate = true;
     }
   }
 

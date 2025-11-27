@@ -177,11 +177,10 @@ export class SteelTarget
     texture.magFilter = THREE.LinearFilter;
 
     // Create material with texture.
-    // Use Lambert material for better performance (simpler lighting than Standard)
     // Render both sides so the back of the plate is visible when it swings,
     // but apply a small polygon offset so the plate as a whole wins the depth
     // test against the background terrain (reduces flicker/see-through).
-    const material = new THREE.MeshLambertMaterial(
+    const material = new THREE.MeshStandardMaterial(
     {
       map: texture,
       side: THREE.DoubleSide,
@@ -189,7 +188,9 @@ export class SteelTarget
       depthWrite: true,
       polygonOffset: true,
       polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1
+      polygonOffsetUnits: -1,
+      roughness: 0.5,
+      metalness: 0.1
     });
 
     // Create mesh
@@ -217,29 +218,23 @@ export class SteelTarget
     this.chainBaseLength = 1.0;
 
     // Create unit-length cylinder geometry (height = 1.0)
-    // Use many segments (128) for very smooth appearance on thin cylinders
-    // More segments = smoother curves, especially important when viewed from distance
-    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, this.chainBaseLength, 16);
+    // Reduced segments for better performance (8 instead of 16)
+    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, this.chainBaseLength, 8);
     chainGeometry.computeVertexNormals();
 
-    // Use MeshPhysicalMaterial for better edge rendering and anti-aliasing
-    // Physical material has better handling of thin geometry edges
-    const materialLeft = new THREE.MeshPhysicalMaterial(
+    // Use MeshStandardMaterial for PBR lighting
+    const materialLeft = new THREE.MeshStandardMaterial(
     {
       color: 0x666666,
-      metalness: 0.6,
       roughness: 0.5,
-      clearcoat: 0.1, // Slight clearcoat for metallic look
-      clearcoatRoughness: 0.3
+      metalness: 0.6
     });
 
-    const materialRight = new THREE.MeshPhysicalMaterial(
+    const materialRight = new THREE.MeshStandardMaterial(
     {
       color: 0x666666,
-      metalness: 0.6,
       roughness: 0.5,
-      clearcoat: 0.1, // Slight clearcoat for metallic look
-      clearcoatRoughness: 0.3
+      metalness: 0.6
     });
 
     // Left chain cylinder
@@ -291,6 +286,9 @@ export class SteelTarget
 
     // Mark buffer as needing update
     this.mesh.geometry.attributes.position.needsUpdate = true;
+
+    // Recompute normals after vertex positions change (needed when target rotates)
+    this.mesh.geometry.computeVertexNormals();
 
   }
 
@@ -403,6 +401,9 @@ export class SteelTarget
     if (!this.steelTarget) return;
     this.steelTarget.hit(bullet);
     this.updateTexture();
+    
+    // If target was settled, move it back to moving set
+    SteelTargetFactory._moveToMoving(this);
   }
 
   /**
@@ -463,21 +464,50 @@ export class SteelTarget
 export class SteelTargetFactory
 {
   /**
-   * Static collection of all active steel targets
-   * @type {SteelTarget[]}
+   * Static collection of all targets (for getAll, getCount, etc.)
+   * @type {Set<SteelTarget>}
    */
-  static targets = [];
+  static allTargets = new Set();
 
   /**
-   * Create a new steel target and add it to the collection
+   * Static collection of moving targets (actively simulating)
+   * @type {Set<SteelTarget>}
+   */
+  static movingTargets = new Set();
+
+  /**
+   * Create a new steel target and add it to both collections
    * @param {Object} options - Configuration options for SteelTarget
    * @returns {SteelTarget} The created target instance
    */
   static create(options)
   {
     const target = new SteelTarget(options);
-    SteelTargetFactory.targets.push(target);
+    SteelTargetFactory.allTargets.add(target);
+    SteelTargetFactory.movingTargets.add(target);
     return target;
+  }
+
+  /**
+   * Move a target from settled to moving (called when target is hit)
+   * @param {SteelTarget} target - The target instance to move
+   * @private
+   */
+  static _moveToMoving(target)
+  {
+    // Just add to moving - idempotent if already there
+    SteelTargetFactory.movingTargets.add(target);
+  }
+
+  /**
+   * Move a target from moving to settled (called when target settles)
+   * @param {SteelTarget} target - The target instance to move
+   * @private
+   */
+  static _moveToSettled(target)
+  {
+    // Just remove from moving - stays in allTargets
+    SteelTargetFactory.movingTargets.delete(target);
   }
 
   /**
@@ -487,33 +517,14 @@ export class SteelTargetFactory
    */
   static delete(target)
   {
-    const index = SteelTargetFactory.targets.indexOf(target);
-    if (index === -1)
+    if (SteelTargetFactory.allTargets.delete(target))
     {
-      return false;
+      SteelTargetFactory.movingTargets.delete(target);
+      target.dispose();
+      return true;
     }
-
-    target.dispose();
-    SteelTargetFactory.targets.splice(index, 1);
-    return true;
-  }
-
-  /**
-   * Delete a target by index
-   * @param {number} index - Index of target to delete
-   * @returns {boolean} True if target was found and deleted, false otherwise
-   */
-  static deleteAt(index)
-  {
-    if (index < 0 || index >= SteelTargetFactory.targets.length)
-    {
-      return false;
-    }
-
-    const target = SteelTargetFactory.targets[index];
-    target.dispose();
-    SteelTargetFactory.targets.splice(index, 1);
-    return true;
+    
+    return false;
   }
 
   /**
@@ -521,38 +532,42 @@ export class SteelTargetFactory
    */
   static deleteAll()
   {
-    for (const target of SteelTargetFactory.targets)
+    for (const target of SteelTargetFactory.allTargets)
     {
       target.dispose();
     }
-    SteelTargetFactory.targets = [];
+    SteelTargetFactory.allTargets.clear();
+    SteelTargetFactory.movingTargets.clear();
   }
 
   /**
-   * Step physics for all targets (only updates targets that are moving)
+   * Step physics for all moving targets
    * @param {number} dt - Time step in seconds
    */
   static stepPhysics(dt)
   {
-    for (const target of SteelTargetFactory.targets)
+    // Convert to array to avoid modification during iteration
+    const targetsToProcess = [...SteelTargetFactory.movingTargets];
+    
+    for (const target of targetsToProcess)
     {
-      // Skip physics for stationary targets
-      if (!target.isMoving()) continue;
-
       target.stepPhysics(dt);
+
+      // Check if target has settled and move it to settled set
+      if (!target.isMoving())
+      {
+        SteelTargetFactory._moveToSettled(target);
+      }
     }
   }
 
   /**
-   * Update display/rendering for all targets (only updates targets that are moving)
+   * Update display/rendering for all moving targets
    */
   static updateDisplay()
   {
-    for (const target of SteelTargetFactory.targets)
+    for (const target of SteelTargetFactory.movingTargets)
     {
-      // Skip rendering updates for stationary targets
-      if (!target.isMoving()) continue;
-
       target.updateMesh();
       target.updateChainLines();
     }
@@ -564,7 +579,7 @@ export class SteelTargetFactory
    */
   static getAll()
   {
-    return SteelTargetFactory.targets;
+    return [...SteelTargetFactory.allTargets];
   }
 
   /**
@@ -573,20 +588,15 @@ export class SteelTargetFactory
    */
   static getCount()
   {
-    return SteelTargetFactory.targets.length;
+    return SteelTargetFactory.allTargets.size;
   }
 
   /**
-   * Get a target by index
-   * @param {number} index - Index of target to get
-   * @returns {SteelTarget|null} Target instance or null if index is invalid
+   * Get moving target count
+   * @returns {number} Number of moving targets
    */
-  static getAt(index)
+  static getMovingCount()
   {
-    if (index < 0 || index >= SteelTargetFactory.targets.length)
-    {
-      return null;
-    }
-    return SteelTargetFactory.targets[index];
+    return SteelTargetFactory.movingTargets.size;
   }
 }

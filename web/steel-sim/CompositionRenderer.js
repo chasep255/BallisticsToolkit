@@ -116,13 +116,12 @@ export class CompositionRenderer
     {
       canvas,
       antialias: true,
-      powerPreference: "high-performance",
       logarithmicDepthBuffer: true
     });
     // Match internal render size to current CSS size, but let CSS
     // continue to control the displayed size (width: 100%, aspect-ratio).
     this.renderer.setSize(this.canvasWidth, this.canvasHeight, false);
-    this.renderer.setPixelRatio(2);
+    this.renderer.setPixelRatio(1);
     this.renderer.setClearColor(0x3a3d41, 1.0); // Lighter grey background
 
     // Create composition scene (2D orthographic, aspect-aware)
@@ -224,8 +223,8 @@ export class CompositionRenderer
     const
     {
       renderOrder = 1,
-        transparent = false,
-        supersampleFactor = 2
+      transparent = false,
+      supersampleFactor = 2
     } = options;
 
     // Convert normalized size to pixels

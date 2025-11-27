@@ -24,7 +24,7 @@ export function initConfig()
   Config.TIME_MANAGER_MIN_DT_S = 0; // No minimum (clamp to 0)
 
   // ===== FPS TRACKING =====
-  Config.FPS_LOG_INTERVAL_S = 5.0; // Log FPS every 10 seconds
+  Config.FPS_LOG_INTERVAL_S = 1.0; // Log FPS every second
 
   // ===== CAMERA & SCENE CONSTANTS =====
   Config.SHOOTER_HEIGHT = btk.Conversions.yardsToMeters(3);
@@ -103,7 +103,6 @@ export function initConfig()
 
   // ===== WIND FLAG PLACEMENTS =====
   // Individual flags placed at specific positions (all in meters)
-  // Varied X positions like a real PRS range
   Config.WIND_FLAGS = [
     {
       x: btk.Conversions.yardsToMeters(-3),
@@ -191,7 +190,7 @@ export function initConfig()
 
   // ===== ENVIRONMENT CONFIGURATIONS =====
   Config.MOUNTAIN_CONFIG = {
-    count: 16,
+    count: 10,
     heightMin: btk.Conversions.yardsToMeters(50), // 50 yards
     heightMax: btk.Conversions.yardsToMeters(150), // 150 yards
     distanceMin: btk.Conversions.yardsToMeters(2200), // 2200 yards
@@ -204,21 +203,8 @@ export function initConfig()
     behindTargetWidth: btk.Conversions.yardsToMeters(200), // 200 yards
     behindTargetMin: btk.Conversions.yardsToMeters(10), // 10 yards
     behindTargetMax: btk.Conversions.yardsToMeters(100), // 100 yards
-    countSides: 160,
+    countSides: 200,
     countBehind: 80
-  };
-
-  Config.ROCK_CONFIG = {
-    count: 40,
-    sizeMin: btk.Conversions.yardsToMeters(0.2), // 0.2 yards
-    sizeMax: btk.Conversions.yardsToMeters(0.6) // 0.6 yards
-  };
-
-  Config.MARKER_CONFIG = {
-    count: 15,
-    heightMin: btk.Conversions.yardsToMeters(1.0), // 1.0 yards
-    heightMax: btk.Conversions.yardsToMeters(1.5), // 1.5 yards
-    postRadius: btk.Conversions.yardsToMeters(0.05) // 0.05 yards (~2 inches)
   };
 
   // ===== RANGE SIGN CONFIGURATION =====
@@ -238,7 +224,6 @@ export function initConfig()
   // All positions in meters, all dimensions in meters
   Config.TARGET_RACKS_CONFIG = [
 
-    // Zero confirmation rack at 100 yards, at eye height
     {
       x: 0,
       z: btk.Conversions.yardsToMeters(-100), // -100 yards (zero distance)
