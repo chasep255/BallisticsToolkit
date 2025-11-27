@@ -30,7 +30,6 @@ export class CompositionLayer
     this.renderOrder = renderOrder;
     this._mesh = mesh;
     this._material = material;
-    this._resizeHandler = null;
   }
 
   /**
@@ -43,21 +42,15 @@ export class CompositionLayer
   }
 
   /**
-   * Register a callback to be invoked when this layer's render target
-   * is resized by the CompositionRenderer.
-   * @param {(width:number, height:number) => void} handler
+   * Get the current position of this layer in normalized coordinates
+   * @returns {{x: number, y: number}} Position
    */
-  setResizeHandler(handler)
+  getPosition()
   {
-    this._resizeHandler = typeof handler === 'function' ? handler : null;
-  }
-
-  _invokeResizeHandler(width, height)
-  {
-    if (this._resizeHandler)
-    {
-      this._resizeHandler(width, height);
-    }
+    return {
+      x: this._mesh.position.x,
+      y: this._mesh.position.y
+    };
   }
 
   /**
@@ -352,7 +345,6 @@ export class CompositionRenderer
       element.layer.height = height;
       element.layer.pixelWidth = pixelWidth;
       element.layer.pixelHeight = pixelHeight;
-      element.layer._invokeResizeHandler(element.renderTarget.width, element.renderTarget.height);
     }
   }
 
@@ -437,7 +429,6 @@ export class CompositionRenderer
         layer.renderTarget = renderTarget;
         layer.pixelWidth = pixelWidth;
         layer.pixelHeight = pixelHeight;
-        layer._invokeResizeHandler(renderTarget.width, renderTarget.height);
       }
     }
   }

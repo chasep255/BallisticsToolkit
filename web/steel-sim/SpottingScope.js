@@ -31,6 +31,7 @@ export class SpottingScope
     this.scene = config.scene;
     this.outputRenderTarget = config.renderTarget; // Render target from CompositionLayer
     this.renderer = config.renderer; // Must use the renderer that created the render target
+    this.layer = config.layer; // Reference to CompositionLayer for reading position/size
 
     // Scope specifications
     if (config.minZoomX === undefined) throw new Error('SpottingScope config requires minZoomX');
@@ -84,13 +85,7 @@ export class SpottingScope
       z: -1000
     };
 
-    // Normalized placement within composition
-    this.centerNormalized = config.centerNormalized ||
-    {
-      x: 0,
-      y: 0
-    };
-    this.heightNormalized = config.heightNormalized || 0;
+    // Derived normalized scope radius (computed from layer height)
     this.scopeRadiusNormalized = 0;
 
     // Pan speed scaling factor (like fclass sim)
@@ -103,9 +98,9 @@ export class SpottingScope
 
     // Derive normalized scope radius
     const hudScopeRadius = 0.98;
-    if (this.heightNormalized > 0)
+    if (this.layer && this.layer.height > 0)
     {
-      this.scopeRadiusNormalized = (this.heightNormalized / 2) * hudScopeRadius;
+      this.scopeRadiusNormalized = (this.layer.height / 2) * hudScopeRadius;
     }
   }
 
@@ -135,24 +130,6 @@ export class SpottingScope
       this.cameraPosition.z
     );
     this.updateCameraLookAt();
-  }
-
-  /**
-   * Resize internal render targets and camera aspect when the scope's
-   * output render target has been resized.
-   */
-  resizeRenderTargets(outputWidth, outputHeight)
-  {
-    if (this.sceneRenderTarget)
-    {
-      this.sceneRenderTarget.setSize(outputWidth, outputHeight);
-    }
-
-    if (this.camera)
-    {
-      this.camera.aspect = outputWidth / outputHeight;
-      this.camera.updateProjectionMatrix();
-    }
   }
 
   updateCameraLookAt()
@@ -290,10 +267,11 @@ export class SpottingScope
    */
   isPointInside(normX, normY)
   {
-    if (!this.scopeRadiusNormalized) return false;
+    if (!this.scopeRadiusNormalized || !this.layer) return false;
 
-    const dx = normX - this.centerNormalized.x;
-    const dy = normY - this.centerNormalized.y;
+    const pos = this.layer.getPosition();
+    const dx = normX - pos.x;
+    const dy = normY - pos.y;
     return dx * dx + dy * dy <= this.scopeRadiusNormalized * this.scopeRadiusNormalized;
   }
 
@@ -373,6 +351,24 @@ export class SpottingScope
 
   render(dt = 0)
   {
+    // Lazy resize: update internal render target if output size changed
+    const outputWidth = this.outputRenderTarget.width;
+    const outputHeight = this.outputRenderTarget.height;
+
+    if (this.sceneRenderTarget &&
+        (this.sceneRenderTarget.width !== outputWidth ||
+         this.sceneRenderTarget.height !== outputHeight))
+    {
+      this.sceneRenderTarget.setSize(outputWidth, outputHeight);
+      
+      // Update camera aspect to match new size
+      if (this.camera)
+      {
+        this.camera.aspect = outputWidth / outputHeight;
+        this.camera.updateProjectionMatrix();
+      }
+    }
+
     // Step 1: Render 3D scene to internal render target
     this.renderer.setRenderTarget(this.sceneRenderTarget);
     this.renderer.clear();

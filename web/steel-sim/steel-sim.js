@@ -588,7 +588,7 @@ class SteelSimulator
       scene: this.scene,
       renderTarget: this.spottingScopeLayer.renderTarget,
       renderer: this.spottingScopeLayer.getRenderer(),
-      // Scope optical spec (4–40x, 25 ft @ 100 yd at 4x)
+      layer: this.spottingScopeLayer,
       minZoomX: 4.0,
       maxZoomX: 40.0,
       lowFovFeet: 25,
@@ -604,12 +604,6 @@ class SteelSimulator
         y: Config.SHOOTER_HEIGHT, // Look at horizon (same height as camera)
         z: -Config.LANDSCAPE_CONFIG.groundLength
       },
-      centerNormalized:
-      {
-        x: scopePositions.spotting.x,
-        y: scopePositions.spotting.y
-      },
-      heightNormalized: scopePositions.spotting.height,
       panSpeedBase: 0.1 // radians per second base speed
     });
 
@@ -629,6 +623,7 @@ class SteelSimulator
       scene: this.scene,
       renderTarget: this.scopeLayer.renderTarget,
       renderer: this.scopeLayer.getRenderer(), // Must use the renderer that created the render target
+      layer: this.scopeLayer,
       audioManager: this.audioManager, // Pass audio manager for scope click sounds
       // Scope optical spec (4–40x, 25 ft @ 100 yd at 4x)
       minZoomX: 4.0,
@@ -645,13 +640,7 @@ class SteelSimulator
         x: 0,
         y: Config.SHOOTER_HEIGHT, // Look at horizon (same height as camera)
         z: -Config.LANDSCAPE_CONFIG.groundLength
-      },
-      centerNormalized:
-      {
-        x: scopePositions.rifle.x,
-        y: scopePositions.rifle.y
-      },
-      heightNormalized: scopePositions.rifle.height
+      }
     });
     this.camera = this.scope.getCamera(); // For raycasting
 
@@ -660,17 +649,6 @@ class SteelSimulator
 
     // Create impact detector and register steel targets
     this.setupImpactDetector();
-
-    // When the scope layers' render targets are resized by the composition
-    // renderer, update the scopes' internal render targets and camera aspects.
-    this.scopeLayer.setResizeHandler((w, h) =>
-    {
-      this.scope.resizeRenderTargets(w, h);
-    });
-    this.spottingScopeLayer.setResizeHandler((w, h) =>
-    {
-      this.spottingScope.resizeRenderTargets(w, h);
-    });
 
     // Setup raycaster for scope-based shooting
     this.raycaster = new THREE.Raycaster();
@@ -827,28 +805,22 @@ class SteelSimulator
     // Reposition scopes using unified positioning logic
     const scopePositions = this.calculateScopePositions();
     
-    if (this.spottingScopeLayer && this.spottingScope)
+    if (this.spottingScopeLayer)
     {
       this.compositionRenderer.setElementPosition(
         this.spottingScopeLayer, 
         scopePositions.spotting.x, 
         scopePositions.spotting.y
       );
-      this.spottingScope.centerNormalized.x = scopePositions.spotting.x;
-      this.spottingScope.centerNormalized.y = scopePositions.spotting.y;
-      this.spottingScope.heightNormalized = scopePositions.spotting.height;
     }
     
-    if (this.scopeLayer && this.scope)
+    if (this.scopeLayer)
     {
       this.compositionRenderer.setElementPosition(
         this.scopeLayer, 
         scopePositions.rifle.x, 
         scopePositions.rifle.y
       );
-      this.scope.centerNormalized.x = scopePositions.rifle.x;
-      this.scope.centerNormalized.y = scopePositions.rifle.y;
-      this.scope.heightNormalized = scopePositions.rifle.height;
     }
 
     // Update HUD positions (reads from updated camera bounds)
