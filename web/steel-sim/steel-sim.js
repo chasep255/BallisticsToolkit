@@ -1379,9 +1379,6 @@ class SteelSimulator
 
   onTouchStart(event)
   {
-    // Prevent default to stop page scrolling/zooming
-    event.preventDefault();
-
     const touches = event.touches;
     if (touches.length === 0) return;
 
@@ -1393,6 +1390,7 @@ class SteelSimulator
     const dialAction = this.hud.getDialButtonHit(norm.x, norm.y);
     if (dialAction)
     {
+      event.preventDefault(); // Prevent default for dial buttons
       this.handleDialAction(dialAction);
       this.startDialRepeat(dialAction);
       this.touchState.activeDialAction = dialAction;
@@ -1410,6 +1408,12 @@ class SteelSimulator
     else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
     {
       activeScope = 'spotting';
+    }
+
+    // Only prevent default if touching a scope (allow browser zoom outside scopes)
+    if (activeScope !== null)
+    {
+      event.preventDefault();
     }
 
     // Store start position and time for all touches (for dial buttons too)
@@ -1432,7 +1436,16 @@ class SteelSimulator
   {
     if (!this.touchState.active) return;
 
-    event.preventDefault();
+    // Only prevent default if actively interacting with a scope or dial button (allow browser zoom outside scopes)
+    if (this.touchState.activeScope !== null || this.touchState.activeDialAction !== null)
+    {
+      event.preventDefault();
+    }
+    else
+    {
+      // Not interacting with scopes - allow browser default behavior
+      return;
+    }
 
     const touches = event.touches;
     if (touches.length === 0) return;
@@ -1500,7 +1513,11 @@ class SteelSimulator
 
   onTouchEnd(event)
   {
-    event.preventDefault();
+    // Only prevent default if we were interacting with something
+    if (this.touchState.activeScope !== null || this.touchState.activeDialAction !== null)
+    {
+      event.preventDefault();
+    }
 
     // Always stop dial repeat on touch end
     this.stopDialRepeat();
