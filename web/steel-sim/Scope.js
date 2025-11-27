@@ -221,7 +221,7 @@ export class Scope
 
     // Main scope view: circle mapped with lit 3D scene texture
     const scopeRadius = 0.98;
-    const scopeGeom = new THREE.CircleGeometry(scopeRadius, 128);
+    const scopeGeom = new THREE.CircleGeometry(scopeRadius, 64);
     const scopeTexture = this.sceneRenderTarget.texture;
     const scopeMat = new THREE.MeshBasicMaterial(
     {
@@ -236,7 +236,7 @@ export class Scope
     this.internalScene.add(scopeMesh);
 
     // Stencil mask: defines circular aperture for reticle elements
-    const maskGeom = new THREE.CircleGeometry(scopeRadius, 128);
+    const maskGeom = new THREE.CircleGeometry(scopeRadius, 64);
     const maskMat = new THREE.MeshBasicMaterial(
     {
       colorWrite: false,

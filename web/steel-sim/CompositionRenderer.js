@@ -129,7 +129,7 @@ export class CompositionRenderer
     // Match internal render size to current CSS size, but let CSS
     // continue to control the displayed size (width: 100%, aspect-ratio).
     this.renderer.setSize(this.canvasWidth, this.canvasHeight, false);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(2);
     this.renderer.setClearColor(0x3a3d41, 1.0); // Lighter grey background
 
     // Create composition scene (2D orthographic, aspect-aware)

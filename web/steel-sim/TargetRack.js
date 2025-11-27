@@ -201,7 +201,7 @@ export class TargetRack
     // Create beam (2" diameter)
     // Beam radius from config (already in meters)
     const beamRadius = Config.TARGET_CONFIG.beamRadius;
-    const beamGeometry = new THREE.CylinderGeometry(beamRadius, beamRadius, this.width, 16);
+    const beamGeometry = new THREE.CylinderGeometry(beamRadius, beamRadius, this.width, 8);
     const beamMaterial = new THREE.MeshStandardMaterial(
     {
       color: 0xaaaaaa, // Light gray steel
@@ -222,7 +222,7 @@ export class TargetRack
     // Create support posts (vertical posts spanning from bottom to top, 2" diameter)
     // Post radius from config (already in meters)
     const postRadius = Config.TARGET_CONFIG.postRadius;
-    const postGeometry = new THREE.CylinderGeometry(postRadius, postRadius, this.height, 16);
+    const postGeometry = new THREE.CylinderGeometry(postRadius, postRadius, this.height, 8);
     const postMaterial = new THREE.MeshStandardMaterial(
     {
       color: 0xaaaaaa, // Light gray steel

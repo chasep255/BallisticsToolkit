@@ -78,7 +78,7 @@ export class Berm
     }
 
     // Create berm geometry - flat-topped mound with sloping sides
-    const segments = 32; // Smooth curve resolution
+    const segments = 16; // Smooth curve resolution (reduced from 32 for performance)
     const geometry = new THREE.PlaneGeometry(width * 2, depth, segments, segments); // Wider base for tapering
 
     // Modify vertices to create a flat-topped berm with sloping sides

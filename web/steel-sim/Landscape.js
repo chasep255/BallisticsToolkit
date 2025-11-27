@@ -52,7 +52,6 @@ export class Landscape
     // Environment object arrays
     this.mountains = [];
     this.trees = [];
-    this.rocks = [];
 
     // Create green ground plane (flat)
     // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
@@ -239,7 +238,6 @@ export class Landscape
   {
     this.createMountains();
     this.createTrees();
-    this.createRocks();
   }
 
   /**
@@ -448,68 +446,6 @@ export class Landscape
     }
   }
 
-  /**
-   * Create rocks scattered on the range
-   */
-  createRocks()
-  {
-    // Rock material - use rock textures if available
-    let rockMaterial;
-    if (this.textureManager)
-    {
-      const rockColor = this.textureManager.getTexture('rock_color');
-      const rockNormal = this.textureManager.getTexture('rock_normal');
-      const rockRoughness = this.textureManager.getTexture('rock_roughness');
-
-      rockMaterial = new THREE.MeshStandardMaterial(
-      {
-        map: rockColor,
-        normalMap: rockNormal,
-        roughnessMap: rockRoughness,
-        color: 0xa89d8f, // Lighter brown-gray tint (original was 0x6b5d4f)
-        roughness: 0.9,
-        metalness: 0.1
-      });
-    }
-    else
-    {
-      // Fallback to plain color if textures not available
-      rockMaterial = new THREE.MeshStandardMaterial(
-      {
-        color: 0x6b5d4f, // Brown-gray
-        roughness: 0.9,
-        metalness: 0.1
-      });
-    }
-
-    for (let i = 0; i < Config.ROCK_CONFIG.count; i++)
-    {
-      // Random position within range bounds
-      const x = (Math.random() - 0.5) * this.groundWidth * 0.8; // Stay within 80% of range width
-      const z = -Math.random() * this.groundLength * 0.95; // 0 to 95% downrange
-
-      // Get ground height at this position
-      const groundHeight = this.getHeightAt(x, z) || 0;
-
-      const rockSize = Config.ROCK_CONFIG.sizeMin + Math.random() * (Config.ROCK_CONFIG.sizeMax - Config.ROCK_CONFIG.sizeMin);
-      const geometry = new THREE.SphereGeometry(rockSize, 8, 6);
-      // Squash it a bit to make it look more like a rock
-      geometry.scale(1, 0.6, 1);
-
-      const rock = new THREE.Mesh(geometry, rockMaterial.clone());
-      rock.position.set(x, groundHeight + rockSize * 0.3, z);
-      rock.rotation.set(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI * 2,
-        Math.random() * Math.PI
-      );
-      rock.castShadow = true;
-      rock.receiveShadow = true;
-
-      this.scene.add(rock);
-      this.rocks.push(rock);
-    }
-  }
 
 
   /**
@@ -542,21 +478,9 @@ export class Landscape
       }
     }
 
-    // Remove rocks
-    for (const rock of this.rocks)
-    {
-      this.scene.remove(rock);
-      rock.geometry.dispose();
-      if (rock.material)
-      {
-        rock.material.dispose();
-      }
-    }
-
     // Clear arrays
     this.mountains = [];
     this.trees = [];
-    this.rocks = [];
 
     if (this.greenGroundMesh)
     {
@@ -592,64 +516,5 @@ export class Landscape
   {
     if (!impactDetector) return;
 
-    // Register rocks - need to apply world transform to geometry
-    let rockCount = 0;
-    for (const rock of this.rocks)
-    {
-      // Clone geometry and apply the rock's world transform
-      const transformedGeometry = rock.geometry.clone();
-      rock.updateMatrixWorld();
-      transformedGeometry.applyMatrix4(rock.matrixWorld);
-
-      const rockIndex = rockCount;
-      const handle = impactDetector.addMeshFromGeometry(
-        transformedGeometry,
-        {
-          name: `Rock ${rockIndex}`,
-          soundName: null, // Rocks are silent
-          mesh: rock, // Store mesh reference for decal projection
-          onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
-          {
-            const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
-
-            // Big chunky particles for rocks
-            const dustColor = {
-              r: 192,
-              g: 192,
-              b: 192
-            }; // Light grey rock dust
-            DustCloudFactory.create(
-            {
-              position: pos,
-              scene: scene,
-              numParticles: 500,
-              color: dustColor,
-              windGenerator: windGenerator,
-              initialRadius: 0.05,
-              growthRate: 0.1,
-              particleDiameter: 1
-            });
-
-            // Impact mark - stretched based on impact angle
-            ImpactMarkFactory.create(
-            {
-              position: pos,
-              normal: normal,
-              velocity: velocity,
-              mesh: targetMesh,
-              color: 0x4a4a4a, // Dark grey
-              size: 0.8
-            });
-          }
-        }
-      );
-
-      if (handle >= 0)
-      {
-        rockCount++;
-      }
-    }
-
-    console.log(`[Landscape] Registered ${rockCount} rocks with ImpactDetector`);
   }
 }

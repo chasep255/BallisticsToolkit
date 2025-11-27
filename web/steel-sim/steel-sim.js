@@ -816,24 +816,8 @@ class SteelSimulator
   {
     if (!this.canvas || !this.compositionRenderer) return;
 
-    // In fullscreen, use viewport dimensions; otherwise use CSS-computed size
-    let width, height;
-    if (document.fullscreenElement)
-    {
-      width = window.innerWidth;
-      height = window.innerHeight;
-      // Also update canvas CSS to match viewport exactly
-      this.canvas.style.width = width + 'px';
-      this.canvas.style.height = height + 'px';
-    }
-    else
-    {
-      // Reset to CSS-controlled sizing
-      this.canvas.style.width = '';
-      this.canvas.style.height = '';
-      width = this.canvas.clientWidth;
-      height = this.canvas.clientHeight;
-    }
+    const width = this.canvas.clientWidth;
+    const height = this.canvas.clientHeight;
 
     // Resize main renderer, composition camera, and all layer render targets.
     // Layer-specific resize callbacks (like Scope) are invoked by the
@@ -850,11 +834,6 @@ class SteelSimulator
         scopePositions.spotting.x, 
         scopePositions.spotting.y
       );
-      this.compositionRenderer.resizeElement(
-        this.spottingScopeLayer,
-        scopePositions.spotting.width,
-        scopePositions.spotting.height
-      );
       this.spottingScope.centerNormalized.x = scopePositions.spotting.x;
       this.spottingScope.centerNormalized.y = scopePositions.spotting.y;
       this.spottingScope.heightNormalized = scopePositions.spotting.height;
@@ -866,11 +845,6 @@ class SteelSimulator
         this.scopeLayer, 
         scopePositions.rifle.x, 
         scopePositions.rifle.y
-      );
-      this.compositionRenderer.resizeElement(
-        this.scopeLayer,
-        scopePositions.rifle.width,
-        scopePositions.rifle.height
       );
       this.scope.centerNormalized.x = scopePositions.rifle.x;
       this.scope.centerNormalized.y = scopePositions.rifle.y;
@@ -1729,7 +1703,7 @@ class SteelSimulator
         }
         else
         {
-          // Hit something that's not a target (berm, rock, ground) - count as miss
+          // Hit something that's not a target (berm, ground) - count as miss
           if (this.hud)
           {
             this.hud.updateImpactStatus(
