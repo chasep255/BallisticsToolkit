@@ -563,6 +563,7 @@ namespace btk::rendering
   {
     vertices_buffer_.clear();
     uvs_buffer_.clear();
+    normals_buffer_.clear();
     float halfThickness = thickness_ / 2.0f;
 
     // Use full orientation quaternion to rotate from local (-Z-normal) frame to world
@@ -821,6 +822,63 @@ namespace btk::rendering
       pushVertex(v2);
       pushBlankUV();
     }
+
+    // Compute vertex normals
+    // Since we use non-indexed geometry, we compute face normals for each triangle
+    // and assign them to all three vertices of that triangle (flat shading)
+    normals_buffer_.resize(vertices_buffer_.size(), 0.0f);
+
+    // Process each triangle (9 floats = 3 vertices * 3 components)
+    for(size_t i = 0; i < vertices_buffer_.size(); i += 9)
+    {
+      // Get vertex positions for this triangle
+      const float* v0 = &vertices_buffer_[i];
+      const float* v1 = &vertices_buffer_[i + 3];
+      const float* v2 = &vertices_buffer_[i + 6];
+
+      // Compute edge vectors
+      const float edge1x = v1[0] - v0[0];
+      const float edge1y = v1[1] - v0[1];
+      const float edge1z = v1[2] - v0[2];
+
+      const float edge2x = v2[0] - v0[0];
+      const float edge2y = v2[1] - v0[1];
+      const float edge2z = v2[2] - v0[2];
+
+      // Compute face normal (cross product)
+      float nx = edge1y * edge2z - edge1z * edge2y;
+      float ny = edge1z * edge2x - edge1x * edge2z;
+      float nz = edge1x * edge2y - edge1y * edge2x;
+
+      // Normalize face normal
+      const float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+      if(len > 1e-6f)
+      {
+        nx /= len;
+        ny /= len;
+        nz /= len;
+      }
+      else
+      {
+        // Fallback to default normal if degenerate
+        nx = 0.0f;
+        ny = 1.0f;
+        nz = 0.0f;
+      }
+
+      // Assign face normal to all three vertices of this triangle
+      normals_buffer_[i] = nx;
+      normals_buffer_[i + 1] = ny;
+      normals_buffer_[i + 2] = nz;
+
+      normals_buffer_[i + 3] = nx;
+      normals_buffer_[i + 4] = ny;
+      normals_buffer_[i + 5] = nz;
+
+      normals_buffer_[i + 6] = nx;
+      normals_buffer_[i + 7] = ny;
+      normals_buffer_[i + 8] = nz;
+    }
   }
 
 #ifdef __EMSCRIPTEN__
@@ -842,6 +900,16 @@ namespace btk::rendering
       return val::global("Float32Array").new_(0);
     }
     return val(typed_memory_view(uvs_buffer_.size(), uvs_buffer_.data()));
+  }
+
+  emscripten::val SteelTarget::getNormals() const
+  {
+    using namespace emscripten;
+    if(normals_buffer_.empty())
+    {
+      return val::global("Float32Array").new_(0);
+    }
+    return val(typed_memory_view(normals_buffer_.size(), normals_buffer_.data()));
   }
 
   emscripten::val SteelTarget::getTexture() const

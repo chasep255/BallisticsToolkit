@@ -180,10 +180,11 @@ export class WindFlag
     // Update display to generate initial geometry
     this.windFlag.updateDisplay();
 
-    // Get vertices, UVs, and indices from C++
+    // Get vertices, UVs, indices, and normals from C++
     const vertexView = this.windFlag.getVertices();
     const uvView = this.windFlag.getUVs();
     const indexView = this.windFlag.getIndices();
+    const normalView = this.windFlag.getNormals();
 
     if (!vertexView || vertexView.length === 0)
     {
@@ -198,6 +199,9 @@ export class WindFlag
     const uvs = new Float32Array(uvView.length);
     uvs.set(uvView);
 
+    const normals = new Float32Array(normalView.length);
+    normals.set(normalView);
+
     const indices = new Uint32Array(indexView.length);
     indices.set(indexView);
 
@@ -205,11 +209,12 @@ export class WindFlag
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-    geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
-    geometry.computeVertexNormals();
-    geometry.computeBoundingBox();
-    geometry.computeBoundingSphere();
+    
+    // Mark position and normal as stream (updated every frame, rendered once)
+    geometry.attributes.position.setUsage(THREE.StreamDrawUsage);
+    geometry.attributes.normal.setUsage(THREE.StreamDrawUsage);
 
     // Create material with flag texture
     const material = new THREE.MeshStandardMaterial(
@@ -239,44 +244,26 @@ export class WindFlag
   {
     if (!this.windFlag || !this.flagMesh || !windGenerator) return;
 
-    const btk = window.btk;
     const pos = this.windFlag.getPosition();
 
-    // Convert Three.js position (meters) to BTK position (meters) - same coordinate system, same units
-    const posBtk = new btk.Vector3D(
-      pos.x, // X = crossrange
-      pos.y, // Y = up
-      pos.z // Z = -downrange
-    );
-
-    // Sample wind in BTK coordinates (m/s)
-    const windBtk = windGenerator.sample(posBtk.x, posBtk.y, posBtk.z);
-    posBtk.delete();
+    // Sample wind in BTK coordinates (m/s) - pos is already a Vector3D
+    const windBtk = windGenerator.sample(pos.x, pos.y, pos.z);
 
     // Update C++ flag physics
     this.windFlag.update(deltaTime, windBtk);
     windBtk.delete();
 
-    // Update display geometry
+    // Update display geometry (includes normals computation in C++)
     this.windFlag.updateDisplay();
 
     // Update Three.js geometry from C++ buffers
-    const vertexView = this.windFlag.getVertices();
-    const uvView = this.windFlag.getUVs();
+    const positions = this.flagMesh.geometry.attributes.position.array;
+    positions.set(this.windFlag.getVertices());
+    this.flagMesh.geometry.attributes.position.needsUpdate = true;
 
-    if (vertexView && vertexView.length > 0)
-    {
-      const positions = this.flagMesh.geometry.attributes.position.array;
-      positions.set(vertexView);
-      this.flagMesh.geometry.attributes.position.needsUpdate = true;
-    }
-
-    if (uvView && uvView.length > 0)
-    {
-      const uvs = this.flagMesh.geometry.attributes.uv.array;
-      uvs.set(uvView);
-      this.flagMesh.geometry.attributes.uv.needsUpdate = true;
-    }
+    const normals = this.flagMesh.geometry.attributes.normal.array;
+    normals.set(this.windFlag.getNormals());
+    this.flagMesh.geometry.attributes.normal.needsUpdate = true;
   }
 
   /**

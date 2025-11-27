@@ -351,6 +351,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("updateDisplay", &btk::rendering::SteelTarget::updateDisplay)
     .function("getVertices", &btk::rendering::SteelTarget::getVertices)
     .function("getUVs", &btk::rendering::SteelTarget::getUVs)
+    .function("getNormals", &btk::rendering::SteelTarget::getNormals)
     .function("initializeTexture", &btk::rendering::SteelTarget::initializeTexture)
     .function("getTextureWidth", &btk::rendering::SteelTarget::getTextureWidth)
     .function("getTextureHeight", &btk::rendering::SteelTarget::getTextureHeight)
@@ -377,7 +378,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("updateDisplay", &btk::rendering::WindFlag::updateDisplay)
     .function("getVertices", &btk::rendering::WindFlag::getVertices)
     .function("getUVs", &btk::rendering::WindFlag::getUVs)
-    .function("getIndices", &btk::rendering::WindFlag::getIndices);
+    .function("getIndices", &btk::rendering::WindFlag::getIndices)
+    .function("getNormals", &btk::rendering::WindFlag::getNormals);
 
   // Impact detection
   value_object<btk::rendering::ImpactResult>("ImpactResult")

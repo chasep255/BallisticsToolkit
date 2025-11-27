@@ -113,6 +113,7 @@ namespace btk::rendering
     vertices_buffer_.clear();
     uvs_buffer_.clear();
     indices_buffer_.clear();
+    normals_buffer_.clear();
 
     const float halfThickness = flag_thickness_ / 2.0f;
 
@@ -203,6 +204,79 @@ namespace btk::rendering
       indices_buffer_.push_back(idx + 7);
       indices_buffer_.push_back(idx + 5); // Second triangle
     }
+
+    // Compute vertex normals
+    const size_t numVertices = vertices_buffer_.size() / 3;
+    normals_buffer_.resize(vertices_buffer_.size(), 0.0f);
+
+    // For each triangle, compute face normal and accumulate to vertex normals
+    for(size_t i = 0; i < indices_buffer_.size(); i += 3)
+    {
+      const uint32_t i0 = indices_buffer_[i];
+      const uint32_t i1 = indices_buffer_[i + 1];
+      const uint32_t i2 = indices_buffer_[i + 2];
+
+      // Get vertex positions
+      const float* v0 = &vertices_buffer_[i0 * 3];
+      const float* v1 = &vertices_buffer_[i1 * 3];
+      const float* v2 = &vertices_buffer_[i2 * 3];
+
+      // Compute edge vectors
+      const float edge1x = v1[0] - v0[0];
+      const float edge1y = v1[1] - v0[1];
+      const float edge1z = v1[2] - v0[2];
+
+      const float edge2x = v2[0] - v0[0];
+      const float edge2y = v2[1] - v0[1];
+      const float edge2z = v2[2] - v0[2];
+
+      // Compute face normal (cross product)
+      float nx = edge1y * edge2z - edge1z * edge2y;
+      float ny = edge1z * edge2x - edge1x * edge2z;
+      float nz = edge1x * edge2y - edge1y * edge2x;
+
+      // Normalize face normal
+      const float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+      if(len > 1e-6f)
+      {
+        nx /= len;
+        ny /= len;
+        nz /= len;
+      }
+
+      // Accumulate to vertex normals
+      normals_buffer_[i0 * 3] += nx;
+      normals_buffer_[i0 * 3 + 1] += ny;
+      normals_buffer_[i0 * 3 + 2] += nz;
+
+      normals_buffer_[i1 * 3] += nx;
+      normals_buffer_[i1 * 3 + 1] += ny;
+      normals_buffer_[i1 * 3 + 2] += nz;
+
+      normals_buffer_[i2 * 3] += nx;
+      normals_buffer_[i2 * 3 + 1] += ny;
+      normals_buffer_[i2 * 3 + 2] += nz;
+    }
+
+    // Normalize all vertex normals
+    for(size_t i = 0; i < numVertices; ++i)
+    {
+      float* n = &normals_buffer_[i * 3];
+      const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+      if(len > 1e-6f)
+      {
+        n[0] /= len;
+        n[1] /= len;
+        n[2] /= len;
+      }
+      else
+      {
+        // Fallback to default normal if degenerate
+        n[0] = 0.0f;
+        n[1] = 1.0f;
+        n[2] = 0.0f;
+      }
+    }
   }
 
 #ifdef __EMSCRIPTEN__
@@ -234,6 +308,16 @@ namespace btk::rendering
       return val::global("Uint32Array").new_(0);
     }
     return val(typed_memory_view(indices_buffer_.size(), indices_buffer_.data()));
+  }
+
+  emscripten::val WindFlag::getNormals() const
+  {
+    using namespace emscripten;
+    if(normals_buffer_.empty())
+    {
+      return val::global("Float32Array").new_(0);
+    }
+    return val(typed_memory_view(normals_buffer_.size(), normals_buffer_.data()));
   }
 #endif
 

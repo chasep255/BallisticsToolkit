@@ -526,8 +526,8 @@ class SteelSimulator
 
     // Setup lighting first
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(0, 0, 1000);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    directionalLight.position.set(1000, 1000, 1000);
     this.scene.add(directionalLight);
 
     // Setup composition renderer

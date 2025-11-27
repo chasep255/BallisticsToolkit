@@ -105,6 +105,18 @@ namespace btk::rendering
     const std::vector<uint32_t>& getIndices() const { return indices_buffer_; }
 #endif
 
+    /**
+     * @brief Get normal buffer as a JS-typed array view for zero-copy access
+     *
+     * Returns normals as [nx,ny,nz, nx,ny,nz, ...] for vertex normals.
+     * Buffer is updated by calling updateDisplay() before this.
+     */
+#ifdef __EMSCRIPTEN__
+    emscripten::val getNormals() const;
+#else
+    const std::vector<float>& getNormals() const { return normals_buffer_; }
+#endif
+
     private:
     // Configuration parameters
     float flag_base_width_;
@@ -132,6 +144,7 @@ namespace btk::rendering
     std::vector<float> vertices_buffer_;   // Flat array: x,y,z,x,y,z,... in Three.js coordinates
     std::vector<float> uvs_buffer_;        // Flat array: u,v,u,v,... for texture mapping
     std::vector<uint32_t> indices_buffer_; // Triangle indices
+    std::vector<float> normals_buffer_;    // Flat array: nx,ny,nz,nx,ny,nz,... for vertex normals
 
     // Helper methods
     void calculateFlagSegmentPosition(int segmentIndex, float angleDeg, float direction, float flapPhase, float& outX, float& outY, float& outZ, float& outHalfWidth);

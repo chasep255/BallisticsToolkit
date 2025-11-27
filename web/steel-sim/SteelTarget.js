@@ -133,36 +133,25 @@ export class SteelTarget
     // Ensure display buffer is up to date
     this.steelTarget.updateDisplay();
 
-    // Get vertex buffer as memory view (already in Three.js coordinates)
+    // Get buffers from C++ (already in Three.js coordinates)
     const vertexView = this.steelTarget.getVertices();
-    if (!vertexView || vertexView.length === 0)
-    {
-      console.error('getVertices returned empty or invalid view');
-      return null;
-    }
+    const uvView = this.steelTarget.getUVs();
+    const normalView = this.steelTarget.getNormals();
 
-    // Create Float32Array from the memory view
     const positions = new Float32Array(vertexView.length);
     positions.set(vertexView);
-
-    // Get UV buffer from C++
-    const uvView = this.steelTarget.getUVs();
-    if (!uvView || uvView.length === 0)
-    {
-      console.error('getUVs returned empty or invalid view');
-      return null;
-    }
-
-    // Copy UVs from memory view
     const uvs = new Float32Array(uvView.length);
     uvs.set(uvView);
+    const normals = new Float32Array(normalView.length);
+    normals.set(normalView);
 
     // Create geometry
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
-    geometry.computeVertexNormals();
+    geometry.attributes.normal.setUsage(THREE.DynamicDrawUsage);
 
     // Get texture from C++ (already initialized with paint color)
     const textureData = this.steelTarget.getTexture();
@@ -279,17 +268,15 @@ export class SteelTarget
 
     // Get vertex buffer as memory view (already in Three.js coordinates)
     const vertexView = this.steelTarget.getVertices();
-
-    // Update position buffer in-place (vertices already in Three.js space)
     const positions = this.mesh.geometry.attributes.position.array;
     positions.set(vertexView);
-
-    // Mark buffer as needing update
     this.mesh.geometry.attributes.position.needsUpdate = true;
 
-    // Recompute normals after vertex positions change (needed when target rotates)
-    this.mesh.geometry.computeVertexNormals();
-
+    // Update normals from C++
+    const normalView = this.steelTarget.getNormals();
+    const normals = this.mesh.geometry.attributes.normal.array;
+    normals.set(normalView);
+    this.mesh.geometry.attributes.normal.needsUpdate = true;
   }
 
   /**

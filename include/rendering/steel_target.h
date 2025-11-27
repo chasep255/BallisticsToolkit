@@ -232,6 +232,19 @@ namespace btk::rendering
 #endif
 
     /**
+     * @brief Get normal buffer as a JS-typed array view for zero-copy access
+     *
+     * Returns normals as [nx,ny,nz, nx,ny,nz, ...] for lighting.
+     * Each 9 consecutive floats form one triangle (3 vertices * 3 components).
+     * Buffer is updated by calling updateDisplay() before this.
+     */
+#ifdef __EMSCRIPTEN__
+    emscripten::val getNormals() const;
+#else
+    const std::vector<float>& getNormals() const { return normals_buffer_; }
+#endif
+
+    /**
      * @brief Get texture buffer as memory view for zero-copy access
      *
      * Returns RGBA texture data as [r,g,b,a, r,g,b,a, ...] ready for WebGL texture.
@@ -353,6 +366,7 @@ namespace btk::rendering
     // Display buffer
     std::vector<float> vertices_buffer_; // Flat array: x,y,z,x,y,z,... in Three.js coordinates
     std::vector<float> uvs_buffer_;      // Flat array: u,v,u,v,... for texture mapping
+    std::vector<float> normals_buffer_;  // Flat array: nx,ny,nz,nx,ny,nz,... for lighting
     int segments_per_circle_;            // Number of segments for circular shapes
 
     // Texture buffer (RGBA format) - single texture with front on left half, back on right half
