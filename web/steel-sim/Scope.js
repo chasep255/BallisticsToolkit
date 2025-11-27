@@ -158,7 +158,7 @@ export class Scope
     this.camera = new THREE.PerspectiveCamera(
       this.currentFOV,
       this.outputRenderTarget.width / this.outputRenderTarget.height,
-      0.1,
+      Config.CAMERA_NEAR_PLANE,
       Config.CAMERA_FAR_PLANE
     );
     this.camera.position.set(

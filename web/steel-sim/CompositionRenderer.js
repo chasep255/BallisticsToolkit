@@ -111,12 +111,11 @@ export class CompositionRenderer
     // Single pixels→normalized scale so horizontal/vertical feel identical
     this.pixelToNormScale = 2 / this.canvasHeight;
 
-    // Create renderer with logarithmic depth buffer for better precision at distance
+    // Create renderer without logarithmic depth buffer
     this.renderer = new THREE.WebGLRenderer(
     {
       canvas,
-      antialias: true,
-      logarithmicDepthBuffer: true
+      antialias: true
     });
     // Match internal render size to current CSS size, but let CSS
     // continue to control the displayed size (width: 100%, aspect-ratio).

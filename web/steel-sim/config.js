@@ -29,6 +29,7 @@ export function initConfig()
   // ===== CAMERA & SCENE CONSTANTS =====
   Config.SHOOTER_HEIGHT = btk.Conversions.yardsToMeters(3);
   Config.CAMERA_FOV = 35; // degrees (Three.js uses degrees)
+  Config.CAMERA_NEAR_PLANE = btk.Conversions.yardsToMeters(2); // 2 yards near plane
   Config.CAMERA_FAR_PLANE = btk.Conversions.yardsToMeters(2500); // 2500 yards
   Config.SCOPE_MAX_PAN_DEG = 10; // Limit scope movement to ±10°
 
