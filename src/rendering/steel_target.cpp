@@ -24,8 +24,7 @@ namespace btk::rendering
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(0.0f, 0.0f, -1.0f),
       orientation_(btk::math::Quaternion()),                                                 // Identity orientation (no rotation)
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
-      time_below_threshold_s_(0.0f),
-      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
+      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
@@ -43,8 +42,7 @@ namespace btk::rendering
   SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal)
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(position), normal_(normal.normalized()), orientation_(btk::math::Quaternion()),
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
-      time_below_threshold_s_(0.0f),
-      mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
+      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
@@ -563,32 +561,32 @@ namespace btk::rendering
   {
     vertices_buffer_.clear();
     normals_buffer_.clear();
-    
+
     // Generate UVs once if not already computed (they're static based on geometry)
     if(uvs_buffer_.empty())
     {
       float halfThickness = thickness_ / 2.0f;
-      
+
       if(is_oval_)
       {
         float rx = width_ / 2.0f;
         float ry = height_ / 2.0f;
-        
+
         for(int i = 0; i < segments_per_circle_; ++i)
         {
           float angle1 = (2.0f * M_PI_F * i) / segments_per_circle_;
           float angle2 = (2.0f * M_PI_F * (i + 1)) / segments_per_circle_;
-          
+
           float cos1 = std::cos(angle1), sin1 = std::sin(angle1);
           float cos2 = std::cos(angle2), sin2 = std::sin(angle2);
-          
+
           btk::math::Vector3D centerFront_local(0.0f, 0.0f, -halfThickness);
           btk::math::Vector3D v1Front_local(rx * cos1, ry * sin1, -halfThickness);
           btk::math::Vector3D v2Front_local(rx * cos2, ry * sin2, -halfThickness);
           btk::math::Vector3D centerBack_local(0.0f, 0.0f, halfThickness);
           btk::math::Vector3D v1Back_local(rx * cos1, ry * sin1, halfThickness);
           btk::math::Vector3D v2Back_local(rx * cos2, ry * sin2, halfThickness);
-          
+
           auto pushUVFront = [&](const btk::math::Vector3D& local)
           {
             float u = 0.5f + local.x / width_;
@@ -597,7 +595,7 @@ namespace btk::rendering
             uvs_buffer_.push_back(u);
             uvs_buffer_.push_back(v);
           };
-          
+
           auto pushUVBack = [&](const btk::math::Vector3D& local)
           {
             float u = 0.5f + local.x / width_;
@@ -606,23 +604,23 @@ namespace btk::rendering
             uvs_buffer_.push_back(u);
             uvs_buffer_.push_back(v);
           };
-          
+
           auto pushBlankUV = [&]()
           {
             uvs_buffer_.push_back(-1.0f);
             uvs_buffer_.push_back(-1.0f);
           };
-          
+
           // Front face (3 vertices)
           pushUVFront(centerFront_local);
           pushUVFront(v1Front_local);
           pushUVFront(v2Front_local);
-          
+
           // Back face (3 vertices)
           pushUVBack(centerBack_local);
           pushUVBack(v2Back_local);
           pushUVBack(v1Back_local);
-          
+
           // Edge face (6 vertices)
           pushBlankUV();
           pushBlankUV();
@@ -636,7 +634,7 @@ namespace btk::rendering
       {
         float hw = width_ / 2.0f;
         float hh = height_ / 2.0f;
-        
+
         btk::math::Vector3D v0_local(-hw, -hh, -halfThickness);
         btk::math::Vector3D v1_local(+hw, -hh, -halfThickness);
         btk::math::Vector3D v2_local(+hw, +hh, -halfThickness);
@@ -645,7 +643,7 @@ namespace btk::rendering
         btk::math::Vector3D v5_local(+hw, -hh, +halfThickness);
         btk::math::Vector3D v6_local(+hw, +hh, +halfThickness);
         btk::math::Vector3D v7_local(-hw, +hh, +halfThickness);
-        
+
         auto pushUVFront = [&](const btk::math::Vector3D& local)
         {
           float u = 0.5f + local.x / width_;
@@ -654,7 +652,7 @@ namespace btk::rendering
           uvs_buffer_.push_back(u);
           uvs_buffer_.push_back(v);
         };
-        
+
         auto pushUVBack = [&](const btk::math::Vector3D& local)
         {
           float u = 0.5f + local.x / width_;
@@ -663,13 +661,13 @@ namespace btk::rendering
           uvs_buffer_.push_back(u);
           uvs_buffer_.push_back(v);
         };
-        
+
         auto pushBlankUV = [&]()
         {
           uvs_buffer_.push_back(-1.0f);
           uvs_buffer_.push_back(-1.0f);
         };
-        
+
         // Front face (6 vertices)
         pushUVFront(v0_local);
         pushUVFront(v1_local);
@@ -677,7 +675,7 @@ namespace btk::rendering
         pushUVFront(v0_local);
         pushUVFront(v2_local);
         pushUVFront(v3_local);
-        
+
         // Back face (6 vertices)
         pushUVBack(v4_local);
         pushUVBack(v6_local);
@@ -685,7 +683,7 @@ namespace btk::rendering
         pushUVBack(v4_local);
         pushUVBack(v7_local);
         pushUVBack(v6_local);
-        
+
         // Edge faces (24 vertices = 4 edges * 6 vertices each)
         for(int i = 0; i < 24; ++i)
         {
@@ -693,7 +691,7 @@ namespace btk::rendering
         }
       }
     }
-    
+
     float halfThickness = thickness_ / 2.0f;
 
     // Use full orientation quaternion to rotate from local (-Z-normal) frame to world

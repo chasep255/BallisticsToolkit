@@ -82,8 +82,9 @@ export class TargetRack
 
     this.targets = []; // Array of SteelTarget instances
     this.beamMesh = null;
-    this.leftPostMesh = null;
-    this.rightPostMesh = null;
+    this.leftPostMesh = null; // Deprecated - kept for impact detection compatibility
+    this.rightPostMesh = null; // Deprecated - kept for impact detection compatibility
+    this.postInstanceIndices = [null, null]; // [leftIndex, rightIndex] - tracked by factory
     this.outwardOffset = outwardOffset; // Store default outward offset for all targets
   }
 
@@ -219,9 +220,12 @@ export class TargetRack
 
     this.scene.add(this.beamMesh);
 
-    // Create support posts (vertical posts spanning from bottom to top, 2" diameter)
-    // Post radius from config (already in meters)
+    // Posts will be created as instances by TargetRackFactory
+    // Store post data for factory initialization
     const postRadius = Config.TARGET_CONFIG.postRadius;
+    const postCenterY = this.bottomLeft.y + this.height / 2;
+
+    // Create temporary meshes for impact detection (not added to scene)
     const postGeometry = new THREE.CylinderGeometry(postRadius, postRadius, this.height, 8);
     const postMaterial = new THREE.MeshStandardMaterial(
     {
@@ -230,23 +234,15 @@ export class TargetRack
       roughness: 0.5
     });
 
-    // Posts extend from bottom to top
-    // Cylinder center is at midpoint: bottom + height/2
-    const postCenterY = this.bottomLeft.y + this.height / 2;
-
-    // Left post - at left edge, spanning from bottom to top
-    this.leftPostMesh = new THREE.Mesh(postGeometry, postMaterial);
+    // Left post - for impact detection only
+    this.leftPostMesh = new THREE.Mesh(postGeometry.clone(), postMaterial);
     this.leftPostMesh.position.set(this.bottomLeft.x, postCenterY, this.center.z);
-    this.leftPostMesh.castShadow = true;
-    this.leftPostMesh.receiveShadow = true;
-    this.scene.add(this.leftPostMesh);
+    // Don't add to scene - will be instanced
 
-    // Right post - at right edge, spanning from bottom to top
-    this.rightPostMesh = new THREE.Mesh(postGeometry, postMaterial.clone());
+    // Right post - for impact detection only
+    this.rightPostMesh = new THREE.Mesh(postGeometry.clone(), postMaterial.clone());
     this.rightPostMesh.position.set(this.topRight.x, postCenterY, this.center.z);
-    this.rightPostMesh.castShadow = true;
-    this.rightPostMesh.receiveShadow = true;
-    this.scene.add(this.rightPostMesh);
+    // Don't add to scene - will be instanced
   }
 
   /**
@@ -336,9 +332,9 @@ export class TargetRack
       this.beamMesh = null;
     }
 
+    // Post meshes are not in scene (instanced), but dispose geometries for impact detection
     if (this.leftPostMesh)
     {
-      this.scene.remove(this.leftPostMesh);
       if (this.leftPostMesh.geometry) this.leftPostMesh.geometry.dispose();
       if (this.leftPostMesh.material) this.leftPostMesh.material.dispose();
       this.leftPostMesh = null;
@@ -346,7 +342,6 @@ export class TargetRack
 
     if (this.rightPostMesh)
     {
-      this.scene.remove(this.rightPostMesh);
       if (this.rightPostMesh.geometry) this.rightPostMesh.geometry.dispose();
       if (this.rightPostMesh.material) this.rightPostMesh.material.dispose();
       this.rightPostMesh = null;
@@ -401,6 +396,13 @@ export class TargetRackFactory
    * @type {TargetRack[]}
    */
   static racks = [];
+
+  /**
+   * Instanced mesh for all posts (shared across all racks)
+   * @type {THREE.InstancedMesh|null}
+   */
+  static postMesh = null;
+  static postScene = null;
 
   /**
    * Create a new target rack and add it to the collection
@@ -473,5 +475,95 @@ export class TargetRackFactory
       allTargets.push(...rack.getTargets());
     }
     return allTargets;
+  }
+
+  /**
+   * Initialize instanced post mesh (call once after all racks are created)
+   * @param {THREE.Scene} scene - Three.js scene
+   */
+  static initializePostInstancing(scene)
+  {
+    // Count total posts (2 per rack)
+    const totalPosts = this.racks.length * 2;
+    if (totalPosts === 0) return;
+
+    this.postScene = scene;
+
+    // Post radius from config (already in meters)
+    const postRadius = Config.TARGET_CONFIG.postRadius;
+    const basePostHeight = 1.0; // Unit height for scaling
+
+    // Create base cylinder geometry (will be scaled per instance)
+    const postGeometry = new THREE.CylinderGeometry(postRadius, postRadius, basePostHeight, 8);
+    postGeometry.computeVertexNormals();
+
+    // Shared material for all posts
+    const postMaterial = new THREE.MeshStandardMaterial(
+    {
+      color: 0xaaaaaa, // Light gray steel
+      metalness: 0.6,
+      roughness: 0.5
+    });
+
+    // Create instanced mesh for all posts
+    this.postMesh = new THREE.InstancedMesh(postGeometry, postMaterial, totalPosts);
+    this.postMesh.castShadow = true;
+    this.postMesh.receiveShadow = true;
+    scene.add(this.postMesh);
+
+    // Assign instance indices and set matrices for each rack's posts
+    const instanceMatrix = new THREE.Matrix4();
+    const identityRotation = new THREE.Quaternion();
+    let instanceIndex = 0;
+
+    for (const rack of this.racks)
+    {
+      // Calculate post center Y position
+      const postCenterY = rack.bottomLeft.y + rack.height / 2;
+
+      // Left post
+      const leftScale = new THREE.Vector3(1, rack.height / basePostHeight, 1);
+      instanceMatrix.compose(
+        new THREE.Vector3(rack.bottomLeft.x, postCenterY, rack.center.z),
+        identityRotation,
+        leftScale
+      );
+      this.postMesh.setMatrixAt(instanceIndex, instanceMatrix);
+      rack.postInstanceIndices[0] = instanceIndex++;
+
+      // Right post
+      const rightScale = new THREE.Vector3(1, rack.height / basePostHeight, 1);
+      instanceMatrix.compose(
+        new THREE.Vector3(rack.topRight.x, postCenterY, rack.center.z),
+        identityRotation,
+        rightScale
+      );
+      this.postMesh.setMatrixAt(instanceIndex, instanceMatrix);
+      rack.postInstanceIndices[1] = instanceIndex++;
+    }
+
+    this.postMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /**
+   * Delete all target racks
+   */
+  static deleteAll()
+  {
+    for (const rack of TargetRackFactory.racks)
+    {
+      rack.dispose();
+    }
+    TargetRackFactory.racks = [];
+
+    // Dispose instanced post mesh
+    if (this.postMesh && this.postScene)
+    {
+      this.postScene.remove(this.postMesh);
+      this.postMesh.geometry.dispose();
+      this.postMesh.material.dispose();
+      this.postMesh = null;
+    }
+    this.postScene = null;
   }
 }

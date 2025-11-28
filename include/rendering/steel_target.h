@@ -334,7 +334,7 @@ namespace btk::rendering
     static constexpr float ANGULAR_VELOCITY_THRESHOLD = 0.2f; // rad/s
 
     // Time window for settle detection (must be below thresholds for this long)
-    static constexpr float SETTLE_TIME_THRESHOLD_S = 1.0f;     // seconds
+    static constexpr float SETTLE_TIME_THRESHOLD_S = 1.0f; // seconds
 
     // Maximum acceleration to prevent numerical instability
     static constexpr float MAX_ACCELERATION = 50.0f; // m/s²
@@ -346,14 +346,14 @@ namespace btk::rendering
     bool is_oval_;
 
     // Physics state
-    btk::math::Vector3D position_;          // Center of mass position
-    btk::math::Vector3D normal_;            // Current surface normal direction
-    btk::math::Quaternion orientation_;     // Full 3D orientation (from local +X-normal frame to world)
-    btk::math::Vector3D velocity_ms_;       // Linear velocity
-    btk::math::Vector3D angular_velocity_;  // Angular velocity (rad/s)
-    bool is_moving_;                        // True if target is moving (updated during timeStep)
-    float time_below_threshold_s_ = 0.0f;   // Time spent below velocity thresholds
-    bool debug_ = false;                    // Verbose debug logging flag
+    btk::math::Vector3D position_;         // Center of mass position
+    btk::math::Vector3D normal_;           // Current surface normal direction
+    btk::math::Quaternion orientation_;    // Full 3D orientation (from local +X-normal frame to world)
+    btk::math::Vector3D velocity_ms_;      // Linear velocity
+    btk::math::Vector3D angular_velocity_; // Angular velocity (rad/s)
+    bool is_moving_;                       // True if target is moving (updated during timeStep)
+    float time_below_threshold_s_ = 0.0f;  // Time spent below velocity thresholds
+    bool debug_ = false;                   // Verbose debug logging flag
 
     // Physical properties
     float mass_kg_;

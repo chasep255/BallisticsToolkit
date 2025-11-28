@@ -116,11 +116,12 @@ export class SteelTarget
     // Create Three.js mesh
     this.mesh = this.createMesh();
 
-    // Create chain lines
-    this.chainLines = this.createChainLines();
+    // Chain lines will be created as instances by SteelTargetFactory
+    this.chainLines = null; // Will be set by factory
+    this.chainInstanceIndices = [null, null]; // [leftIndex, rightIndex] - tracked by factory
 
     // Initialize chain line positions (target may be stationary after settling)
-    this.updateChainLines();
+    // Note: updateChainLines() will be called after factory sets up instancing
   }
 
 
@@ -195,46 +196,12 @@ export class SteelTarget
   }
 
   /**
-   * Create chain cylinder geometries
+   * Store base length for scaling (unit length = 1.0 meter)
    * @private
    */
-  createChainLines()
+  getChainBaseLength()
   {
-    // Chain radius from config (already in meters)
-    const chainRadius = Config.TARGET_CONFIG.chainRadius;
-
-    // Store base length for scaling (unit length = 1.0 meter)
-    this.chainBaseLength = 1.0;
-
-    // Create unit-length cylinder geometry (height = 1.0)
-    // Reduced segments for better performance (8 instead of 16)
-    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, this.chainBaseLength, 8);
-    chainGeometry.computeVertexNormals();
-
-    // Use MeshStandardMaterial for PBR lighting
-    const materialLeft = new THREE.MeshStandardMaterial(
-    {
-      color: 0x666666,
-      roughness: 0.5,
-      metalness: 0.6
-    });
-
-    const materialRight = new THREE.MeshStandardMaterial(
-    {
-      color: 0x666666,
-      roughness: 0.5,
-      metalness: 0.6
-    });
-
-    // Left chain cylinder
-    const leftCylinder = new THREE.Mesh(chainGeometry.clone(), materialLeft);
-    this.scene.add(leftCylinder);
-
-    // Right chain cylinder
-    const rightCylinder = new THREE.Mesh(chainGeometry.clone(), materialRight);
-    this.scene.add(rightCylinder);
-
-    return [leftCylinder, rightCylinder];
+    return 1.0;
   }
 
   /**
@@ -284,7 +251,7 @@ export class SteelTarget
    */
   updateChainLines()
   {
-    if (!this.chainLines || !this.steelTarget) return;
+    if (!this.steelTarget) return;
 
     // Get actual anchor data from C++ physics engine (already updated by simulation)
     const anchors = this.steelTarget.getAnchors();
@@ -295,52 +262,59 @@ export class SteelTarget
       return;
     }
 
-    // Update each chain cylinder for each anchor
-    const numAnchors = anchors.size();
-    const numChainLines = this.chainLines.length;
-
-    for (let i = 0; i < Math.min(numAnchors, numChainLines); i++)
+    // Update instance matrices for instanced chains
+    if (SteelTargetFactory.chainMesh && this.chainInstanceIndices[0] !== null)
     {
-      const anchor = anchors.get(i);
-
-      // Transform local attachment to world space
-      const attachWorld = this.steelTarget.localToWorld(anchor.localAttachment);
-
-      // Convert BTK positions (meters) to Three.js (meters) - same coordinate system, same units
-      const fixed = new THREE.Vector3(
-        anchor.worldFixed.x,
-        anchor.worldFixed.y,
-        anchor.worldFixed.z
-      );
-      const attach = new THREE.Vector3(
-        attachWorld.x,
-        attachWorld.y,
-        attachWorld.z
-      );
-
-      // Calculate chain length and direction
-      const chainDirection = new THREE.Vector3();
-      chainDirection.subVectors(attach, fixed);
-      const chainLength = chainDirection.length();
-
-      // Update scale to match new length (much faster than recreating geometry)
-      this.chainLines[i].scale.y = chainLength / this.chainBaseLength;
-
-      // Position cylinder at midpoint
-      const midpoint = new THREE.Vector3();
-      midpoint.addVectors(fixed, attach);
-      midpoint.multiplyScalar(0.5);
-      this.chainLines[i].position.copy(midpoint);
-
-      // Rotate cylinder to align with chain direction
-      // Cylinder default orientation is along Y-axis, so we need to rotate to match chain direction
+      const chainBaseLength = this.getChainBaseLength();
+      const instanceMatrix = new THREE.Matrix4();
       const up = new THREE.Vector3(0, 1, 0);
-      const quaternion = new THREE.Quaternion();
-      quaternion.setFromUnitVectors(up, chainDirection.normalize());
-      this.chainLines[i].quaternion.copy(quaternion);
+      const chainDirection = new THREE.Vector3();
 
-      // Cleanup WASM objects
-      attachWorld.delete();
+      for (let i = 0; i < Math.min(anchors.size(), 2); i++)
+      {
+        const instanceIndex = this.chainInstanceIndices[i];
+        if (instanceIndex === null) continue;
+
+        const anchor = anchors.get(i);
+
+        // Transform local attachment to world space
+        const attachWorld = this.steelTarget.localToWorld(anchor.localAttachment);
+
+        // Convert BTK positions (meters) to Three.js (meters)
+        const fixed = new THREE.Vector3(
+          anchor.worldFixed.x,
+          anchor.worldFixed.y,
+          anchor.worldFixed.z
+        );
+        const attach = new THREE.Vector3(
+          attachWorld.x,
+          attachWorld.y,
+          attachWorld.z
+        );
+
+        // Calculate chain length and direction
+        chainDirection.subVectors(attach, fixed);
+        const chainLength = chainDirection.length();
+        chainDirection.normalize();
+
+        // Position cylinder at midpoint
+        const midpoint = new THREE.Vector3();
+        midpoint.addVectors(fixed, attach);
+        midpoint.multiplyScalar(0.5);
+
+        // Create transform matrix: position at midpoint, rotate to chain direction, scale by length
+        const quaternion = new THREE.Quaternion();
+        quaternion.setFromUnitVectors(up, chainDirection);
+        const scale = new THREE.Vector3(1, chainLength / chainBaseLength, 1);
+
+        instanceMatrix.compose(midpoint, quaternion, scale);
+        SteelTargetFactory.chainMesh.setMatrixAt(instanceIndex, instanceMatrix);
+
+        // Cleanup WASM objects
+        attachWorld.delete();
+      }
+
+      SteelTargetFactory.chainMesh.instanceMatrix.needsUpdate = true;
     }
 
     anchors.delete();
@@ -388,7 +362,7 @@ export class SteelTarget
     if (!this.steelTarget) return;
     this.steelTarget.hit(bullet);
     this.updateTexture();
-    
+
     // If target was settled, move it back to moving set
     SteelTargetFactory._moveToMoving(this);
   }
@@ -431,17 +405,9 @@ export class SteelTarget
       this.mesh = null;
     }
 
-    // Clean up chain lines
-    if (this.chainLines)
-    {
-      for (const line of this.chainLines)
-      {
-        this.scene.remove(line);
-        if (line.geometry) line.geometry.dispose();
-        if (line.material) line.material.dispose();
-      }
-      this.chainLines = null;
-    }
+    // Chain lines are managed by factory - no cleanup needed here
+    this.chainLines = null;
+    this.chainInstanceIndices = [null, null];
   }
 }
 
@@ -463,6 +429,62 @@ export class SteelTargetFactory
   static movingTargets = new Set();
 
   /**
+   * Instanced mesh for all chains (shared across all targets)
+   * @type {THREE.InstancedMesh|null}
+   */
+  static chainMesh = null;
+  static chainScene = null;
+  static nextChainInstanceIndex = 0;
+
+  /**
+   * Initialize instanced chain mesh (call once after all targets are created)
+   * @param {THREE.Scene} scene - Three.js scene
+   */
+  static initializeChainInstancing(scene)
+  {
+    // Count total chains (2 per target)
+    const totalChains = this.allTargets.size * 2;
+    if (totalChains === 0) return;
+
+    this.chainScene = scene;
+
+    // Chain radius from config (already in meters)
+    const chainRadius = Config.TARGET_CONFIG.chainRadius;
+    const chainBaseLength = 1.0; // Unit length
+
+    // Create unit-length cylinder geometry (height = 1.0)
+    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, chainBaseLength, 8);
+    chainGeometry.computeVertexNormals();
+
+    // Shared material for all chains
+    const chainMaterial = new THREE.MeshStandardMaterial(
+    {
+      color: 0x666666,
+      roughness: 0.5,
+      metalness: 0.6
+    });
+
+    // Create instanced mesh for all chains
+    this.chainMesh = new THREE.InstancedMesh(chainGeometry, chainMaterial, totalChains);
+    this.chainMesh.castShadow = true;
+    this.chainMesh.receiveShadow = true;
+    scene.add(this.chainMesh);
+
+    // Assign instance indices to each target's chains
+    let instanceIndex = 0;
+    for (const target of this.allTargets)
+    {
+      target.chainInstanceIndices = [instanceIndex++, instanceIndex++];
+    }
+
+    // Initialize chain positions
+    for (const target of this.allTargets)
+    {
+      target.updateChainLines();
+    }
+  }
+
+  /**
    * Create a new steel target and add it to both collections
    * @param {Object} options - Configuration options for SteelTarget
    * @returns {SteelTarget} The created target instance
@@ -472,6 +494,20 @@ export class SteelTargetFactory
     const target = new SteelTarget(options);
     SteelTargetFactory.allTargets.add(target);
     SteelTargetFactory.movingTargets.add(target);
+
+    // If instanced chain mesh exists, add instances for this target's chains
+    if (this.chainMesh)
+    {
+      // Need to recreate the instanced mesh with more capacity
+      // For now, just assign indices - we'll handle expansion if needed
+      const instanceIndex = this.nextChainInstanceIndex;
+      target.chainInstanceIndices = [instanceIndex, instanceIndex + 1];
+      this.nextChainInstanceIndex += 2;
+
+      // Initialize chain positions
+      target.updateChainLines();
+    }
+
     return target;
   }
 
@@ -510,7 +546,7 @@ export class SteelTargetFactory
       target.dispose();
       return true;
     }
-    
+
     return false;
   }
 
@@ -525,6 +561,17 @@ export class SteelTargetFactory
     }
     SteelTargetFactory.allTargets.clear();
     SteelTargetFactory.movingTargets.clear();
+
+    // Dispose instanced chain mesh
+    if (this.chainMesh && this.chainScene)
+    {
+      this.chainScene.remove(this.chainMesh);
+      this.chainMesh.geometry.dispose();
+      this.chainMesh.material.dispose();
+      this.chainMesh = null;
+    }
+    this.chainScene = null;
+    this.nextChainInstanceIndex = 0;
   }
 
   /**
@@ -535,7 +582,7 @@ export class SteelTargetFactory
   {
     // Convert to array to avoid modification during iteration
     const targetsToProcess = [...SteelTargetFactory.movingTargets];
-    
+
     for (const target of targetsToProcess)
     {
       target.stepPhysics(dt);

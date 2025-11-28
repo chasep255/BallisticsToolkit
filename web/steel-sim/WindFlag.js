@@ -211,7 +211,7 @@ export class WindFlag
     geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-    
+
     // Mark position and normal as stream (updated every frame, rendered once)
     geometry.attributes.position.setUsage(THREE.StreamDrawUsage);
     geometry.attributes.normal.setUsage(THREE.StreamDrawUsage);
@@ -367,6 +367,9 @@ export class WindFlag
 export class WindFlagFactory
 {
   static flags = [];
+  static poleMesh = null; // InstancedMesh for all poles
+  static polePositions = []; // Track pole positions for instance matrices
+  static scene = null; // Scene reference for cleanup
 
   /**
    * Create a single wind flag
@@ -378,6 +381,52 @@ export class WindFlagFactory
     const flag = new WindFlag(options);
     this.flags.push(flag);
     return flag;
+  }
+
+  /**
+   * Initialize instanced pole mesh (call after all flags are created)
+   * @param {THREE.Scene} scene - Three.js scene
+   */
+  static initializePoleInstancing(scene)
+  {
+    if (this.flags.length === 0) return;
+
+    // Store scene reference for cleanup
+    this.scene = scene;
+
+    // Create shared pole geometry and material
+    const poleThickness = Config.WIND_FLAG_CONFIG.poleThickness;
+    const poleHeight = Config.WIND_FLAG_CONFIG.poleHeight;
+    const poleRadius = poleThickness / 2;
+    const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, poleHeight, 16);
+    const poleMaterial = new THREE.MeshStandardMaterial(
+    {
+      color: 0x606060, // Darker metal gray
+      metalness: 0.4,
+      roughness: 0.6
+    });
+
+    // Create instanced mesh for all poles
+    this.poleMesh = new THREE.InstancedMesh(poleGeometry, poleMaterial, this.flags.length);
+    this.poleMesh.castShadow = true;
+    this.poleMesh.receiveShadow = true;
+    scene.add(this.poleMesh);
+
+    // Set instance matrices for all poles
+    const instanceMatrix = new THREE.Matrix4();
+    for (let i = 0; i < this.flags.length; i++)
+    {
+      const flag = this.flags[i];
+      const polePosition = flag.pole.position;
+      instanceMatrix.makeTranslation(polePosition.x, polePosition.y, polePosition.z);
+      this.poleMesh.setMatrixAt(i, instanceMatrix);
+      this.polePositions.push(polePosition.clone());
+
+      // Remove individual pole from scene
+      scene.remove(flag.pole);
+    }
+
+    this.poleMesh.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -442,6 +491,9 @@ export class WindFlagFactory
       });
       this.flags.push(rightFlag);
     }
+
+    // Initialize pole instancing after all flags are created
+    this.initializePoleInstancing(scene);
   }
 
   /**
@@ -467,6 +519,17 @@ export class WindFlagFactory
       flag.dispose();
     }
     this.flags = [];
+
+    // Dispose instanced pole mesh
+    if (this.poleMesh && this.scene)
+    {
+      this.scene.remove(this.poleMesh);
+      this.poleMesh.geometry.dispose();
+      this.poleMesh.material.dispose();
+      this.poleMesh = null;
+    }
+    this.polePositions = [];
+    this.scene = null;
   }
 
   /**

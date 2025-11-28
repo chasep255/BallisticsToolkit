@@ -30,7 +30,7 @@ export class HUD
     // Create HUD elements
     this.createHudElements();
     this.createDialButtons();
-    
+
     // Initial position update
     this.updatePositions();
   }
@@ -250,12 +250,12 @@ export class HUD
     const buttonSize = 0.16; // Normalized size
     const gap = 0.025;
     const step = buttonSize + gap;
-    
+
     // Calculate position based on HUD dimensions
     const hudMargin = 0.05;
     const hudWidth = 0.6;
     const padding = 0.08; // Gap between HUD and dial buttons
-    
+
     // dialButtonBaseX is where the CENTER button goes
     // Left button is at (dialButtonBaseX - step), so its left edge is at (dialButtonBaseX - step - buttonSize/2)
     // We want: hudMargin + hudWidth + padding = dialButtonBaseX - step - buttonSize/2
@@ -267,7 +267,7 @@ export class HUD
     //     U
     //   L ⟲ R
     //     D
-    
+
     // offsetX is relative to dialButtonBaseX, Y is absolute
     // Up (top center)
     this.dialButtons.push(this.createDialButton('U', buttonSize, 0, centerY + step, 'dialUp'));
@@ -309,7 +309,8 @@ export class HUD
     this.hudTextures.push(texture);
     this.hudCanvases.push(canvas);
 
-    const material = new THREE.MeshBasicMaterial({
+    const material = new THREE.MeshBasicMaterial(
+    {
       map: texture,
       transparent: true,
       depthTest: false,
@@ -330,7 +331,7 @@ export class HUD
       mesh,
       action,
       offsetX, // Offset from dialButtonBaseX
-      x: 0,    // Actual X position, updated by updatePositions()
+      x: 0, // Actual X position, updated by updatePositions()
       y,
       size
     };
@@ -348,7 +349,7 @@ export class HUD
     {
       const halfSize = btn.size / 2;
       if (normX >= btn.x - halfSize && normX <= btn.x + halfSize &&
-          normY >= btn.y - halfSize && normY <= btn.y + halfSize)
+        normY >= btn.y - halfSize && normY <= btn.y + halfSize)
       {
         return btn.action;
       }

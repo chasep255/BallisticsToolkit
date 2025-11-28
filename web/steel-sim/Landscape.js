@@ -285,10 +285,12 @@ export class Landscape
 
     // Spread mountains across the full brown ground width, ensuring coverage at edges
     const mountainSpread = this.brownGroundWidth * 0.9; // Use 90% of brown ground width for spread
-    const dummyMatrix = new THREE.Matrix4();
-    const dummyScale = new THREE.Vector3();
-    const dummyPosition = new THREE.Vector3();
-    const dummyQuat = new THREE.Quaternion(); // identity rotation
+
+    // Reusable objects for building instance transform matrices
+    const instanceMatrix = new THREE.Matrix4();
+    const instanceScale = new THREE.Vector3();
+    const instancePosition = new THREE.Vector3();
+    const identityRotation = new THREE.Quaternion(); // No rotation needed
 
     for (let i = 0; i < mountainCount; i++)
     {
@@ -301,16 +303,16 @@ export class Landscape
       const radius = height * 1.8; // Radius proportional to height
 
       // Scale: radius in X/Z, height in Y
-      dummyScale.set(radius / baseRadius, height / baseHeight, radius / baseRadius);
+      instanceScale.set(radius / baseRadius, height / baseHeight, radius / baseRadius);
 
       // Position matching original: center at height/2 - 5
       // ConeGeometry extends from y=0 (base) to y=height (tip), center is at height/2
       // Original code: mountain.position.set(x, height/2 - 5, z)
       const centerY = height / 2 - 5;
-      dummyPosition.set(x, centerY, z);
+      instancePosition.set(x, centerY, z);
 
-      dummyMatrix.compose(dummyPosition, dummyQuat, dummyScale);
-      mountainMesh.setMatrixAt(i, dummyMatrix);
+      instanceMatrix.compose(instancePosition, identityRotation, instanceScale);
+      mountainMesh.setMatrixAt(i, instanceMatrix);
     }
 
     mountainMesh.instanceMatrix.needsUpdate = true;
@@ -394,7 +396,7 @@ export class Landscape
       metalness: 0.0,
       side: THREE.DoubleSide
     });
-   
+
 
     // Base tree geometries (single geometry for trunks and foliage)
     const trunkRadius = 0.25;
@@ -418,8 +420,10 @@ export class Landscape
     this.scene.add(foliageMesh);
     this.treeFoliageMesh = foliageMesh;
 
-    const dummyMatrix = new THREE.Matrix4();
-    const dummyScale = new THREE.Vector3();
+    // Reusable objects for building instance transform matrices
+    const instanceMatrix = new THREE.Matrix4();
+    const instanceScale = new THREE.Vector3();
+    const identityRotation = new THREE.Quaternion(); // No rotation needed
 
     // Create trees as instances in the instanced meshes
     for (let i = 0; i < treeCount; i++)
@@ -447,26 +451,26 @@ export class Landscape
       // Simple size variation using uniform scale
       const sizeVariant = Math.random(); // 0..1
       const scale = 0.85 + sizeVariant * 0.6; // ~0.85x to 1.45x
-      dummyScale.set(scale, scale, scale);
+      instanceScale.set(scale, scale, scale);
 
       // Trunk instance matrix
       const trunkHeightScaled = trunkHeight * scale;
-      dummyMatrix.compose(
+      instanceMatrix.compose(
         new THREE.Vector3(x, groundHeight + trunkHeightScaled / 2, z),
-        new THREE.Quaternion(),
-        dummyScale
+        identityRotation,
+        instanceScale
       );
-      trunkMesh.setMatrixAt(i, dummyMatrix);
+      trunkMesh.setMatrixAt(i, instanceMatrix);
 
       // Foliage instance matrix
       const foliageHeightScaled = foliageHeight * scale;
       const foliageY = groundHeight + trunkHeightScaled + foliageHeightScaled / 2 - foliageHeightScaled * 0.25;
-      dummyMatrix.compose(
+      instanceMatrix.compose(
         new THREE.Vector3(x, foliageY, z),
-        new THREE.Quaternion(),
-        dummyScale
+        identityRotation,
+        instanceScale
       );
-      foliageMesh.setMatrixAt(i, dummyMatrix);
+      foliageMesh.setMatrixAt(i, instanceMatrix);
     }
 
     trunkMesh.instanceMatrix.needsUpdate = true;

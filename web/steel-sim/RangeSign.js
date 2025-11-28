@@ -48,7 +48,7 @@ export class RangeSign
     const postHeight = config.postHeight || Config.RANGE_SIGN_CONFIG.postHeight;
     const postWidth = config.postWidth || Config.RANGE_SIGN_CONFIG.postWidth;
     const postGeometry = new THREE.BoxGeometry(postWidth, postHeight, postWidth);
-    
+
     // Use bark textures if available, otherwise fallback to plain color
     let postMaterial;
     if (textureManager)

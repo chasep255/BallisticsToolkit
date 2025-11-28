@@ -86,7 +86,7 @@ export class Scope
     this.pitch = 0;
     const maxPanDeg = (config.maxPanDeg !== undefined) ? config.maxPanDeg : (Config.SCOPE_MAX_PAN_DEG || 20);
     this.maxPanAngleRad = THREE.MathUtils.degToRad(maxPanDeg); // Limit scope horizontal movement
-    
+
     // Separate limits for pitch up and down
     const maxPitchUpDeg = (config.maxPitchUpDeg !== undefined) ? config.maxPitchUpDeg : (Config.SCOPE_MAX_PITCH_UP_DEG || 10);
     const maxPitchDownDeg = (config.maxPitchDownDeg !== undefined) ? config.maxPitchDownDeg : (Config.SCOPE_MAX_PITCH_DOWN_DEG || 10);
@@ -100,6 +100,9 @@ export class Scope
     // Scope dial adjustments (integer clicks to avoid floating-point errors)
     // Only used if hasDials is true
     this.elevationClicks = 0; // Positive = dial up (bullet impacts high)
+
+    // Frame counter for throttling render stats logging
+    this.renderStatsFrameCount = 0;
     this.windageClicks = 0; // Positive = dial right (bullet impacts right)
 
     // Dial constants
@@ -286,8 +289,15 @@ export class Scope
       });
       this.reticleMaterial = reticleMaterial;
 
+      // Initialize instanced reticle system
+      this.reticleLineInstances = []; // Store instance data for lines
+      this.reticleLineMesh = null; // InstancedMesh for all reticle lines
+
       // Build reticle using MRAD-space helpers
       this.buildReticle();
+
+      // Create instanced mesh after collecting all line data
+      this.createInstancedReticle();
 
       // Apply initial FFP scaling (and map from [-0.5,0.5] reticle space to [-1,1] HUD space)
       this.updateReticleScale();
@@ -296,6 +306,8 @@ export class Scope
     {
       this.reticleGroup = null;
       this.reticleMaterial = null;
+      this.reticleLineInstances = null;
+      this.reticleLineMesh = null;
     }
 
     // Local lighting for metallic look on housing + reticle
@@ -390,6 +402,7 @@ export class Scope
 
   /**
    * Add a line segment defined in MRAD space to the reticle group.
+   * Stores instance data for later instanced mesh creation.
    */
   addLineMrad(x1Mrad, y1Mrad, x2Mrad, y2Mrad, thicknessMrad)
   {
@@ -406,14 +419,48 @@ export class Scope
     if (length <= 0.0) return;
 
     const thickness = this.mradToReticleUnitsAtFov(thicknessMrad, this.initialFOV);
-
-    const geom = new THREE.PlaneGeometry(length, thickness);
-    const mesh = new THREE.Mesh(geom, this.reticleMaterial);
-
     const angle = Math.atan2(dy, dx);
-    mesh.position.set((x1 + x2) * 0.5, (y1 + y2) * 0.5, 0);
-    mesh.rotation.z = angle;
-    this.reticleGroup.add(mesh);
+    const centerX = (x1 + x2) * 0.5;
+    const centerY = (y1 + y2) * 0.5;
+
+    // Store instance data for instanced mesh creation
+    this.reticleLineInstances.push({
+      position: new THREE.Vector3(centerX, centerY, 0),
+      quaternion: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle),
+      scale: new THREE.Vector3(length, thickness, 1)
+    });
+  }
+
+  /**
+   * Create instanced mesh for all reticle lines after collecting instance data.
+   */
+  createInstancedReticle()
+  {
+    if (!this.hasReticle || this.reticleLineInstances.length === 0) return;
+
+    // Create base unit-length plane geometry (will be scaled per instance)
+    const baseGeometry = new THREE.PlaneGeometry(1, 1);
+    baseGeometry.computeVertexNormals();
+
+    // Create instanced mesh for all lines
+    this.reticleLineMesh = new THREE.InstancedMesh(
+      baseGeometry,
+      this.reticleMaterial,
+      this.reticleLineInstances.length
+    );
+
+    // Set instance matrices
+    const instanceMatrix = new THREE.Matrix4();
+    for (let i = 0; i < this.reticleLineInstances.length; i++)
+    {
+      const instance = this.reticleLineInstances[i];
+      instanceMatrix.compose(instance.position, instance.quaternion, instance.scale);
+      this.reticleLineMesh.setMatrixAt(i, instanceMatrix);
+    }
+    this.reticleLineMesh.instanceMatrix.needsUpdate = true;
+
+    // Add to reticle group
+    this.reticleGroup.add(this.reticleLineMesh);
   }
 
   /**
@@ -716,7 +763,10 @@ export class Scope
    */
   getDialPositionMRAD()
   {
-    if (!this.hasDials) return { elevation: 0, windage: 0 };
+    if (!this.hasDials) return {
+      elevation: 0,
+      windage: 0
+    };
     return {
       elevation: this.elevationClicks * this.CLICK_VALUE_MRAD,
       windage: this.windageClicks * this.CLICK_VALUE_MRAD
@@ -757,12 +807,12 @@ export class Scope
     const outputHeight = this.outputRenderTarget.height;
 
     if (this.sceneRenderTarget &&
-        (this.sceneRenderTarget.width !== outputWidth ||
-         this.sceneRenderTarget.height !== outputHeight))
+      (this.sceneRenderTarget.width !== outputWidth ||
+        this.sceneRenderTarget.height !== outputHeight))
     {
       console.log(`[Scope] Render target resized: ${outputWidth}x${outputHeight}`);
       this.sceneRenderTarget.setSize(outputWidth, outputHeight);
-      
+
       // Update camera aspect to match new size
       if (this.camera)
       {
@@ -774,7 +824,17 @@ export class Scope
     // Step 1: Render 3D scene to internal render target
     this.renderer.setRenderTarget(this.sceneRenderTarget);
     this.renderer.clear();
+    this.renderer.info.reset(); // Reset render stats before rendering
     this.renderer.render(this.scene, this.camera);
+
+    // Log render stats every 60 frames (~1 second at 60fps)
+    this.renderStatsFrameCount++;
+    if (this.renderStatsFrameCount >= 60)
+    {
+      const info = this.renderer.info.render;
+      console.log(`[Scope] Triangles: ${info.triangles}, Draw calls: ${info.calls}, Points: ${info.points}, Lines: ${info.lines}`);
+      this.renderStatsFrameCount = 0;
+    }
 
     // Step 2: Composite scene + reticle to output render target
     // Clear with transparent color to preserve alpha channel

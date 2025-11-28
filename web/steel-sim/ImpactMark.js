@@ -13,7 +13,7 @@ from 'three/addons/geometries/DecalGeometry.js';
  */
 export class ImpactMarkFactory
 {
-  static MAX_MARKS = 500;
+  static MAX_MARKS = 32;
   static MARK_SIZE = 0.10; // Base size 10cm
 
   // Stretch limits for grazing angles

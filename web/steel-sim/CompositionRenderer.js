@@ -224,8 +224,8 @@ export class CompositionRenderer
     const
     {
       renderOrder = 1,
-      transparent = false,
-      supersampleFactor = 2
+        transparent = false,
+        supersampleFactor = 2
     } = options;
 
     // Convert normalized size to pixels

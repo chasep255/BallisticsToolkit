@@ -169,8 +169,16 @@ class SteelSimulator
     this.touchState = {
       active: false,
       lastPinchDistance: 0,
-      lastTouchPos: { x: 0, y: 0 },
-      lastThreeFingerPos: { x: 0, y: 0 }, // For three-finger dial adjustment
+      lastTouchPos:
+      {
+        x: 0,
+        y: 0
+      },
+      lastThreeFingerPos:
+      {
+        x: 0,
+        y: 0
+      }, // For three-finger dial adjustment
       touchStartTime: 0,
       touchMoved: false,
       activeScope: null, // 'rifle' | 'spotting' | null
@@ -567,16 +575,16 @@ class SteelSimulator
 
     // Create scope layers using unified positioning logic
     const scopePositions = this.calculateScopePositions();
-    
+
     this.spottingScopeLayer = this.compositionRenderer.createElement(
-      scopePositions.spotting.x, 
-      scopePositions.spotting.y, 
-      scopePositions.spotting.width, 
+      scopePositions.spotting.x,
+      scopePositions.spotting.y,
+      scopePositions.spotting.width,
       scopePositions.spotting.height,
-    {
-      renderOrder: 1,
-      transparent: true
-    });
+      {
+        renderOrder: 1,
+        transparent: true
+      });
 
     this.spottingScope = new Scope(
     {
@@ -606,14 +614,14 @@ class SteelSimulator
 
     // Rifle scope: centered vertically, max height, padding on left
     this.scopeLayer = this.compositionRenderer.createElement(
-      scopePositions.rifle.x, 
-      scopePositions.rifle.y, 
-      scopePositions.rifle.width, 
+      scopePositions.rifle.x,
+      scopePositions.rifle.y,
+      scopePositions.rifle.width,
       scopePositions.rifle.height,
-    {
-      renderOrder: 1,
-      transparent: true
-    });
+      {
+        renderOrder: 1,
+        transparent: true
+      });
 
     this.scope = new Scope(
     {
@@ -644,6 +652,12 @@ class SteelSimulator
     // Create target racks (independent of scope setup)
     this.createTargetRacks();
 
+    // Initialize instanced post mesh for all racks
+    TargetRackFactory.initializePostInstancing(this.scene);
+
+    // Initialize instanced chain mesh for all targets
+    SteelTargetFactory.initializeChainInstancing(this.scene);
+
     // Create impact detector and register steel targets
     this.setupImpactDetector();
 
@@ -668,7 +682,7 @@ class SteelSimulator
   countSceneVertices(scene)
   {
     let totalVertices = 0;
-    
+
     scene.traverse((object) =>
     {
       if (object.isMesh && object.geometry)
@@ -682,7 +696,7 @@ class SteelSimulator
         }
       }
     });
-    
+
     return totalVertices;
   }
 
@@ -709,8 +723,20 @@ class SteelSimulator
     const rifleX = aspect - padding - rifleWidth / 2; // Right edge - padding - half width
 
     return {
-      spotting: { x: spottingX, y: spottingY, width: spottingWidth, height: spottingHeight },
-      rifle: { x: rifleX, y: rifleY, width: rifleWidth, height: rifleHeight }
+      spotting:
+      {
+        x: spottingX,
+        y: spottingY,
+        width: spottingWidth,
+        height: spottingHeight
+      },
+      rifle:
+      {
+        x: rifleX,
+        y: rifleY,
+        width: rifleWidth,
+        height: rifleHeight
+      }
     };
   }
 
@@ -785,9 +811,10 @@ class SteelSimulator
     window.addEventListener('keyup', this.boundHandlers.onKeyUp);
     document.addEventListener('pointerlockchange', this.boundHandlers.onPointerLockChange);
     window.addEventListener('resize', this.boundHandlers.onWindowResize);
-    
+
     // Fullscreen change needs delayed resize to let layout update
-    this.boundHandlers.onFullscreenChange = async () => {
+    this.boundHandlers.onFullscreenChange = async () =>
+    {
       // Lock orientation when entering fullscreen
       if (document.fullscreenElement)
       {
@@ -797,10 +824,12 @@ class SteelSimulator
       {
         unlockOrientation();
       }
-      
+
       // Wait for layout to update before resizing
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
+      requestAnimationFrame(() =>
+      {
+        requestAnimationFrame(() =>
+        {
           this.onWindowResize();
         });
       });
@@ -811,9 +840,18 @@ class SteelSimulator
     this.boundHandlers.onTouchStart = (e) => this.onTouchStart(e);
     this.boundHandlers.onTouchMove = (e) => this.onTouchMove(e);
     this.boundHandlers.onTouchEnd = (e) => this.onTouchEnd(e);
-    this.canvas.addEventListener('touchstart', this.boundHandlers.onTouchStart, { passive: false });
-    this.canvas.addEventListener('touchmove', this.boundHandlers.onTouchMove, { passive: false });
-    this.canvas.addEventListener('touchend', this.boundHandlers.onTouchEnd, { passive: false });
+    this.canvas.addEventListener('touchstart', this.boundHandlers.onTouchStart,
+    {
+      passive: false
+    });
+    this.canvas.addEventListener('touchmove', this.boundHandlers.onTouchMove,
+    {
+      passive: false
+    });
+    this.canvas.addEventListener('touchend', this.boundHandlers.onTouchEnd,
+    {
+      passive: false
+    });
   }
 
   onWindowResize()
@@ -830,21 +868,21 @@ class SteelSimulator
 
     // Reposition scopes using unified positioning logic
     const scopePositions = this.calculateScopePositions();
-    
+
     if (this.spottingScopeLayer)
     {
       this.compositionRenderer.setElementPosition(
-        this.spottingScopeLayer, 
-        scopePositions.spotting.x, 
+        this.spottingScopeLayer,
+        scopePositions.spotting.x,
         scopePositions.spotting.y
       );
     }
-    
+
     if (this.scopeLayer)
     {
       this.compositionRenderer.setElementPosition(
-        this.scopeLayer, 
-        scopePositions.rifle.x, 
+        this.scopeLayer,
+        scopePositions.rifle.x,
         scopePositions.rifle.y
       );
     }
@@ -967,6 +1005,9 @@ class SteelSimulator
         {}
       });
     }
+
+    // Initialize instanced pole mesh after all flags are created
+    WindFlagFactory.initializePoleInstancing(this.scene);
   }
 
   setupImpactDetector()
@@ -1022,61 +1063,8 @@ class SteelSimulator
       this.landscape.registerWithImpactDetector(this.impactDetector);
     }
 
-    // Register all berms with impact detector
-    const berms = BermFactory.getAll();
-    for (const berm of berms)
-    {
-      const bermMesh = berm.getMesh();
-      if (bermMesh)
-      {
-        // Clone geometry and apply the berm's world transform
-        const transformedGeometry = bermMesh.geometry.clone();
-        bermMesh.updateMatrixWorld();
-        transformedGeometry.applyMatrix4(bermMesh.matrixWorld);
-
-        this.impactDetector.addMeshFromGeometry(
-          transformedGeometry,
-          {
-            name: 'Berm',
-            soundName: null, // Berms are silent
-            mesh: bermMesh, // Store mesh reference for decal projection
-            onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
-            {
-              const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
-
-              // Sand dust for berm impacts
-              const dustColor = {
-                r: 245,
-                g: 220,
-                b: 170
-              }; // Light sandy/yellow-tan
-              DustCloudFactory.create(
-              {
-                position: pos,
-                scene: scene,
-                numParticles: 1000,
-                color: dustColor,
-                windGenerator: windGenerator,
-                initialRadius: 0.05,
-                growthRate: 0.15,
-                particleDiameter: 0.5
-              });
-
-              // Impact mark - stretched based on impact angle
-              ImpactMarkFactory.create(
-              {
-                position: pos,
-                normal: normal,
-                velocity: velocity,
-                mesh: targetMesh,
-                color: 0x8b7a65, // Sandy tan
-                size: 1.0
-              });
-            }
-          }
-        );
-      }
-    }
+    // Merge all berms into a single mesh and register for impact detection
+    BermFactory.mergeBerms(this.scene, this.impactDetector);
 
     // Register target rack frames (beam and posts)
     const racks = TargetRackFactory.getAll();
@@ -1217,10 +1205,12 @@ class SteelSimulator
   {
     // Don't repeat the reset action
     if (action === 'dialReset') return;
-    
+
     // Initial delay before repeat starts (250ms), then repeat every 55ms
-    this.dialRepeatTimeout = setTimeout(() => {
-      this.dialRepeatInterval = setInterval(() => {
+    this.dialRepeatTimeout = setTimeout(() =>
+    {
+      this.dialRepeatInterval = setInterval(() =>
+      {
         this.handleDialAction(action);
       }, 55);
     }, 250);
@@ -1400,7 +1390,7 @@ class SteelSimulator
 
     // Determine which scope is being touched
     let activeScope = null;
-    
+
     // Check rifle scope first (it has priority if there's overlap)
     if (this.scope && this.scope.isPointInside(norm.x, norm.y))
     {
@@ -1423,8 +1413,14 @@ class SteelSimulator
     this.touchState.activeDialAction = null;
     this.touchState.touchStartTime = performance.now();
     this.touchState.touchMoved = false;
-    this.touchState.touchStartPos = { x: touch.clientX, y: touch.clientY };
-    this.touchState.lastTouchPos = { x: touch.clientX, y: touch.clientY };
+    this.touchState.touchStartPos = {
+      x: touch.clientX,
+      y: touch.clientY
+    };
+    this.touchState.lastTouchPos = {
+      x: touch.clientX,
+      y: touch.clientY
+    };
 
     // Track pinch distance if two fingers
     if (touches.length >= 2)
@@ -1470,7 +1466,7 @@ class SteelSimulator
     {
       // Pinch zoom - proportional to finger spread
       const newPinchDistance = this.getPinchDistance(touches[0], touches[1]);
-      
+
       if (this.touchState.lastPinchDistance > 0)
       {
         // Calculate zoom ratio from pinch ratio
@@ -1479,7 +1475,7 @@ class SteelSimulator
         const newZoom = currentZoom * pinchRatio;
         scopeObj.setZoomX(newZoom); // setZoomX clamps to min/max
       }
-      
+
       this.touchState.lastPinchDistance = newPinchDistance;
       this.touchState.touchMoved = true;
     }
@@ -1488,12 +1484,12 @@ class SteelSimulator
       // Single finger - pan if moved enough distance
       const touch = touches[0];
       const DRAG_DISTANCE_THRESHOLD = 5; // pixels - start dragging if moved this far
-      
+
       // Calculate distance moved from start position
       const deltaXFromStart = touch.clientX - this.touchState.touchStartPos.x;
       const deltaYFromStart = touch.clientY - this.touchState.touchStartPos.y;
       const distanceFromStart = Math.sqrt(deltaXFromStart * deltaXFromStart + deltaYFromStart * deltaYFromStart);
-      
+
       // Start panning if moved enough distance
       if (distanceFromStart > DRAG_DISTANCE_THRESHOLD)
       {
@@ -1502,13 +1498,20 @@ class SteelSimulator
         const deltaY = touch.clientY - this.touchState.lastTouchPos.y;
 
         const normDelta = this.compositionRenderer.movementToNormalized(-deltaX, -deltaY);
-        const { deltaYaw, deltaPitch } = scopeObj.normalizedDeltaToAngles(normDelta.x, normDelta.y);
+        const
+        {
+          deltaYaw,
+          deltaPitch
+        } = scopeObj.normalizedDeltaToAngles(normDelta.x, normDelta.y);
         scopeObj.panBy(deltaYaw, deltaPitch);
 
         this.touchState.touchMoved = true;
       }
-      
-      this.touchState.lastTouchPos = { x: touch.clientX, y: touch.clientY };
+
+      this.touchState.lastTouchPos = {
+        x: touch.clientX,
+        y: touch.clientY
+      };
     }
   }
 
@@ -2229,7 +2232,7 @@ function setupUI()
   if (fullscreenBtn)
   {
     fullscreenBtn.addEventListener('click', toggleFullscreen);
-    
+
     // Update button text when fullscreen changes
     document.addEventListener('fullscreenchange', () =>
     {
@@ -2317,7 +2320,7 @@ function unlockOrientation()
 async function toggleFullscreen()
 {
   const canvasContainer = document.querySelector('.canvas-container');
-  
+
   if (!document.fullscreenElement)
   {
     // Start the game if it hasn't started yet
@@ -2325,7 +2328,7 @@ async function toggleFullscreen()
     {
       await startGame();
     }
-    
+
     // Enter fullscreen
     try
     {
@@ -2341,7 +2344,7 @@ async function toggleFullscreen()
       {
         await canvasContainer.msRequestFullscreen(); // IE/Edge
       }
-      
+
       // Lock orientation to landscape after entering fullscreen
       await lockOrientationLandscape();
     }
@@ -2354,7 +2357,7 @@ async function toggleFullscreen()
   {
     // Unlock orientation before exiting fullscreen
     unlockOrientation();
-    
+
     // Exit fullscreen
     if (document.exitFullscreen)
     {
@@ -2406,13 +2409,19 @@ document.addEventListener('DOMContentLoaded', async () =>
         await lockOrientationLandscape();
       }
     };
-    
+
     // Try immediately (may fail without user gesture)
     await lockOrientationLandscape();
-    
+
     // Also try on first click/touch (user gesture required on some browsers)
-    document.addEventListener('click', tryLockOrientation, { once: true });
-    document.addEventListener('touchstart', tryLockOrientation, { once: true });
+    document.addEventListener('click', tryLockOrientation,
+    {
+      once: true
+    });
+    document.addEventListener('touchstart', tryLockOrientation,
+    {
+      once: true
+    });
 
     // Don't auto-start - wait for Start button
   }

@@ -1,9 +1,19 @@
 import * as THREE from 'three';
 import
 {
+  mergeGeometries
+}
+from 'three/addons/utils/BufferGeometryUtils.js';
+import
+{
   DustCloudFactory
 }
 from './DustCloud.js';
+import
+{
+  ImpactMarkFactory
+}
+from './ImpactMark.js';
 
 /**
  * Berm - A sand/dirt mound behind a target rack to catch missed shots
@@ -181,6 +191,8 @@ export class Berm
 export class BermFactory
 {
   static berms = [];
+  static mergedMesh = null; // Merged mesh for all berms
+  static scene = null; // Scene reference for cleanup
 
   /**
    * Create a berm
@@ -195,6 +207,111 @@ export class BermFactory
   }
 
   /**
+   * Merge all berm geometries into a single mesh and register for impact detection
+   * @param {THREE.Scene} scene - Three.js scene
+   * @param {Object} impactDetector - Impact detector instance (optional)
+   */
+  static mergeBerms(scene, impactDetector = null)
+  {
+    if (this.berms.length === 0) return;
+
+    // Store scene reference for cleanup
+    this.scene = scene;
+
+    // Collect geometries with transforms
+    const geometriesToMerge = [];
+    let sharedMaterial = null;
+
+    for (const berm of this.berms)
+    {
+      if (!berm.mesh) continue;
+
+      // Clone geometry and apply world transform
+      const clonedGeometry = berm.mesh.geometry.clone();
+      berm.mesh.updateMatrixWorld();
+      clonedGeometry.applyMatrix4(berm.mesh.matrixWorld);
+      geometriesToMerge.push(clonedGeometry);
+
+      // Use first berm's material (they should all be similar)
+      if (!sharedMaterial)
+      {
+        sharedMaterial = berm.mesh.material;
+      }
+
+      // Remove individual mesh from scene
+      scene.remove(berm.mesh);
+    }
+
+    if (geometriesToMerge.length === 0) return;
+
+    // Merge all geometries
+    const mergedGeometry = mergeGeometries(geometriesToMerge);
+
+    // Create merged mesh
+    this.mergedMesh = new THREE.Mesh(mergedGeometry, sharedMaterial);
+    this.mergedMesh.castShadow = true;
+    this.mergedMesh.receiveShadow = true;
+    scene.add(this.mergedMesh);
+
+    // Register merged geometry for impact detection
+    if (impactDetector)
+    {
+      // Clone geometry for impact detection (it needs its own copy)
+      const impactGeometry = mergedGeometry.clone();
+      impactDetector.addMeshFromGeometry(
+        impactGeometry,
+        {
+          name: 'Berm',
+          soundName: null, // Berms are silent
+          mesh: this.mergedMesh, // Use merged mesh for decal projection
+          onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+          {
+            const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+
+            // Sand dust for berm impacts
+            const dustColor = {
+              r: 245,
+              g: 220,
+              b: 170
+            }; // Light sandy/yellow-tan
+            DustCloudFactory.create(
+            {
+              position: pos,
+              scene: scene,
+              numParticles: 1000,
+              color: dustColor,
+              windGenerator: windGenerator,
+              initialRadius: 0.05,
+              growthRate: 0.15,
+              particleDiameter: 0.5
+            });
+
+            // Impact mark - stretched based on impact angle
+            ImpactMarkFactory.create(
+            {
+              position: pos,
+              normal: normal,
+              velocity: velocity,
+              mesh: targetMesh,
+              color: 0x8b7a65, // Sandy tan
+              size: 1.0
+            });
+          }
+        }
+      );
+    }
+
+    // Dispose original geometries (they've been cloned and merged)
+    for (const berm of this.berms)
+    {
+      if (berm.mesh && berm.mesh.geometry)
+      {
+        berm.mesh.geometry.dispose();
+      }
+    }
+  }
+
+  /**
    * Delete all berms
    */
   static deleteAll()
@@ -204,6 +321,16 @@ export class BermFactory
       berm.dispose();
     }
     this.berms = [];
+
+    // Dispose merged mesh
+    if (this.mergedMesh && this.scene)
+    {
+      this.scene.remove(this.mergedMesh);
+      if (this.mergedMesh.geometry) this.mergedMesh.geometry.dispose();
+      if (this.mergedMesh.material) this.mergedMesh.material.dispose();
+      this.mergedMesh = null;
+    }
+    this.scene = null;
   }
 
   /**
