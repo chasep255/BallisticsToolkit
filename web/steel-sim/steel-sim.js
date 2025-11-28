@@ -1066,18 +1066,14 @@ class SteelSimulator
     // Merge all berms into a single mesh and register for impact detection
     BermFactory.mergeBerms(this.scene, this.impactDetector);
 
+    // Merge all range signs into single meshes with texture atlas and register for impact detection
+    RangeSignFactory.mergeSigns(this.scene, this.impactDetector);
+
     // Register target rack frames (beam and posts)
     const racks = TargetRackFactory.getAll();
     for (const rack of racks)
     {
       rack.registerWithImpactDetector(this.impactDetector);
-    }
-
-    // Register range signs (post and sign board)
-    const signs = RangeSignFactory.getAll();
-    for (const sign of signs)
-    {
-      sign.registerWithImpactDetector(this.impactDetector);
     }
 
     // Register wind flag poles
@@ -1087,6 +1083,7 @@ class SteelSimulator
       flag.registerWithImpactDetector(this.impactDetector);
     }
 
+    const signs = RangeSignFactory.getAll();
     console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets, ${racks.length} racks, ${signs.length} signs, ${flags.length} flags`);
     console.log('[SteelSim] ImpactDetector stats:', this.impactDetector.getStats());
   }

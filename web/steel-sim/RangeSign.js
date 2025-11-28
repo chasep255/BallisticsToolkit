@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import
 {
+  mergeGeometries
+}
+from 'three/addons/utils/BufferGeometryUtils.js';
+import
+{
   Config
 }
 from './config.js';
@@ -92,16 +97,21 @@ export class RangeSign
     this.postMesh.receiveShadow = true;
     this.group.add(this.postMesh);
 
-    // Create sign board (white background)
+    // Create text canvas texture first
+    this.createTextTexture(text);
+
+    // Create sign board with text texture applied
     const signWidth = config.signWidth || Config.RANGE_SIGN_CONFIG.signWidth;
     const signHeight = config.signHeight || Config.RANGE_SIGN_CONFIG.signHeight;
     const signThickness = config.signThickness || Config.RANGE_SIGN_CONFIG.signThickness;
     const signGeometry = new THREE.BoxGeometry(signWidth, signHeight, signThickness);
     const signMaterial = new THREE.MeshStandardMaterial(
     {
-      color: 0xffffff, // White
+      map: this.textTexture, // Apply text texture directly to sign board
+      color: 0xffffff, // White background
       roughness: 0.5,
-      metalness: 0.1
+      metalness: 0.1,
+      transparent: true // Allow transparency for text
     });
     this.signBoardMesh = new THREE.Mesh(signGeometry, signMaterial);
     this.signBoardMesh.position.y = postHeight - signHeight / 2 - 0.05; // Near top of post
@@ -110,24 +120,6 @@ export class RangeSign
     this.signBoardMesh.castShadow = true;
     this.signBoardMesh.receiveShadow = true;
     this.group.add(this.signBoardMesh);
-
-    // Create text canvas texture
-    this.createTextTexture(text);
-
-    // Create text plane on sign (facing forward in local space)
-    const textGeometry = new THREE.PlaneGeometry(signWidth * 0.9, signHeight * 0.9);
-    const textMaterial = new THREE.MeshBasicMaterial(
-    {
-      map: this.textTexture,
-      transparent: true,
-      depthTest: true,
-      depthWrite: false
-    });
-    const textPlane = new THREE.Mesh(textGeometry, textMaterial);
-    textPlane.position.y = this.signBoardMesh.position.y;
-    textPlane.position.x = 0;
-    textPlane.position.z = signThickness / 2 + 0.002; // In front of sign board
-    this.group.add(textPlane);
 
     // Position the post behind the sign (in local space, before rotation)
     this.postMesh.position.z = -postWidth / 2 - signThickness / 2;
@@ -313,6 +305,10 @@ export class RangeSign
 export class RangeSignFactory
 {
   static signs = [];
+  static mergedPostMesh = null;
+  static mergedSignBoardMesh = null;
+  static textureAtlas = null;
+  static scene = null;
 
   /**
    * Create a range sign
@@ -327,6 +323,285 @@ export class RangeSignFactory
   }
 
   /**
+   * Merge all signs into single meshes with a texture atlas for text
+   * @param {THREE.Scene} scene - Three.js scene
+   * @param {Object} impactDetector - Impact detector instance (optional)
+   */
+  static mergeSigns(scene, impactDetector = null)
+  {
+    if (this.signs.length === 0) return;
+
+    // Store scene reference for cleanup
+    this.scene = scene;
+
+    // Create texture atlas with all text
+    this.createTextureAtlas();
+
+    // Collect geometries for merging
+    const postGeometries = [];
+    const signBoardGeometries = [];
+    let postMaterial = null;
+    let signBoardMaterial = null;
+
+    const canvasWidth = Config.RANGE_SIGN_CONFIG.canvasWidth;
+    const canvasHeight = Config.RANGE_SIGN_CONFIG.canvasHeight;
+
+    // Calculate atlas layout (assume square-ish layout)
+    const cols = Math.ceil(Math.sqrt(this.signs.length));
+    const rows = Math.ceil(this.signs.length / cols);
+    const atlasWidth = cols * canvasWidth;
+    const atlasHeight = rows * canvasHeight;
+
+    // UV scale factors for mapping to atlas
+    const uScale = canvasWidth / atlasWidth;
+    const vScale = canvasHeight / atlasHeight;
+
+    for (let i = 0; i < this.signs.length; i++)
+    {
+      const sign = this.signs[i];
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+
+      // Calculate UV offset for this sign in the atlas
+      const uOffset = col * uScale;
+      const vOffset = 1.0 - (row + 1) * vScale; // Flip V coordinate
+
+      // Update group matrix world before processing
+      sign.group.updateMatrixWorld();
+
+      // Process post
+      if (sign.postMesh)
+      {
+        const clonedPostGeom = sign.postMesh.geometry.clone();
+        sign.postMesh.updateMatrixWorld();
+        clonedPostGeom.applyMatrix4(sign.postMesh.matrixWorld);
+        postGeometries.push(clonedPostGeom);
+        if (!postMaterial)
+        {
+          postMaterial = sign.postMesh.material;
+        }
+      }
+
+      // Process sign board with UV remapping for texture atlas
+      if (sign.signBoardMesh)
+      {
+        const clonedBoardGeom = sign.signBoardMesh.geometry.clone();
+        sign.signBoardMesh.updateMatrixWorld();
+        clonedBoardGeom.applyMatrix4(sign.signBoardMesh.matrixWorld);
+
+        // Remap UVs to point to this sign's region in the atlas
+        // BoxGeometry has 6 faces, we need to remap the front face (facing +Z) to the text region
+        // Other faces should map to a white region (we'll use the first sign's region which is white)
+        const uvAttribute = clonedBoardGeom.attributes.uv;
+        if (uvAttribute)
+        {
+          // BoxGeometry UV layout: each face has 4 vertices
+          // Face order: right (+X), left (-X), top (+Y), bottom (-Y), front (+Z), back (-Z)
+          // Front face is indices 16-19 (4 vertices * 4 faces before it)
+          const frontFaceStart = 16;
+          const frontFaceEnd = 20;
+          
+          // Use first sign's region for non-front faces (white background)
+          const whiteUOffset = 0;
+          const whiteVOffset = 1.0 - vScale; // First row, flipped
+          
+          for (let j = 0; j < uvAttribute.count; j++)
+          {
+            const u = uvAttribute.getX(j);
+            const v = uvAttribute.getY(j);
+            
+            if (j >= frontFaceStart && j < frontFaceEnd)
+            {
+              // Front face: map to this sign's text region in the atlas
+              uvAttribute.setXY(j, uOffset + u * uScale, vOffset + v * vScale);
+            }
+            else
+            {
+              // Other faces: map to white region (first sign's region)
+              uvAttribute.setXY(j, whiteUOffset + u * uScale, whiteVOffset + v * vScale);
+            }
+          }
+          uvAttribute.needsUpdate = true;
+        }
+
+        signBoardGeometries.push(clonedBoardGeom);
+        if (!signBoardMaterial)
+        {
+          signBoardMaterial = sign.signBoardMesh.material;
+        }
+      }
+
+      // Remove sign group from scene (this removes all children)
+      scene.remove(sign.group);
+    }
+
+    // Merge posts
+    if (postGeometries.length > 0)
+    {
+      const mergedPostGeometry = mergeGeometries(postGeometries);
+      this.mergedPostMesh = new THREE.Mesh(mergedPostGeometry, postMaterial);
+      this.mergedPostMesh.castShadow = true;
+      this.mergedPostMesh.receiveShadow = true;
+      scene.add(this.mergedPostMesh);
+    }
+
+    // Merge sign boards with texture atlas
+    if (signBoardGeometries.length > 0)
+    {
+      const mergedBoardGeometry = mergeGeometries(signBoardGeometries);
+      // Create material with texture atlas
+      const boardMaterialWithAtlas = signBoardMaterial.clone();
+      boardMaterialWithAtlas.map = this.textureAtlas;
+      this.mergedSignBoardMesh = new THREE.Mesh(mergedBoardGeometry, boardMaterialWithAtlas);
+      this.mergedSignBoardMesh.castShadow = true;
+      this.mergedSignBoardMesh.receiveShadow = true;
+      scene.add(this.mergedSignBoardMesh);
+    }
+
+    // Register merged meshes for impact detection
+    if (impactDetector)
+    {
+      if (this.mergedPostMesh)
+      {
+        const impactGeometry = this.mergedPostMesh.geometry.clone();
+        impactDetector.addMeshFromGeometry(
+          impactGeometry,
+          {
+            name: 'SignPost',
+            soundName: null,
+            mesh: this.mergedPostMesh,
+            onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+            {
+              const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+              const dustColor = {
+                r: 139,
+                g: 90,
+                b: 43
+              };
+              DustCloudFactory.create(
+              {
+                position: pos,
+                scene: scene,
+                numParticles: 150,
+                color: dustColor,
+                windGenerator: windGenerator,
+                initialRadius: 0.02,
+                growthRate: 0.06,
+                particleDiameter: 0.4
+              });
+              ImpactMarkFactory.create(
+              {
+                position: pos,
+                normal: normal,
+                velocity: velocity,
+                mesh: targetMesh,
+                color: 0xd4c4a8,
+                size: 0.2
+              });
+            }
+          }
+        );
+      }
+
+      if (this.mergedSignBoardMesh)
+      {
+        const impactGeometry = this.mergedSignBoardMesh.geometry.clone();
+        impactDetector.addMeshFromGeometry(
+          impactGeometry,
+          {
+            name: 'SignBoard',
+            soundName: null,
+            mesh: this.mergedSignBoardMesh,
+            onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+            {
+              const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+              const dustColor = {
+                r: 220,
+                g: 220,
+                b: 220
+              };
+              DustCloudFactory.create(
+              {
+                position: pos,
+                scene: scene,
+                numParticles: 150,
+                color: dustColor,
+                windGenerator: windGenerator,
+                initialRadius: 0.02,
+                growthRate: 0.06,
+                particleDiameter: 0.4
+              });
+              ImpactMarkFactory.create(
+              {
+                position: pos,
+                normal: normal,
+                velocity: velocity,
+                mesh: targetMesh,
+                color: 0x404040,
+                size: 0.2
+              });
+            }
+          }
+        );
+      }
+    }
+
+    // Dispose original geometries
+    for (const sign of this.signs)
+    {
+      if (sign.textTexture) sign.textTexture.dispose();
+      if (sign.postMesh && sign.postMesh.geometry) sign.postMesh.geometry.dispose();
+      if (sign.signBoardMesh && sign.signBoardMesh.geometry) sign.signBoardMesh.geometry.dispose();
+    }
+  }
+
+  /**
+   * Create a texture atlas containing all sign text
+   */
+  static createTextureAtlas()
+  {
+    const canvasWidth = Config.RANGE_SIGN_CONFIG.canvasWidth;
+    const canvasHeight = Config.RANGE_SIGN_CONFIG.canvasHeight;
+
+    // Calculate atlas layout
+    const cols = Math.ceil(Math.sqrt(this.signs.length));
+    const rows = Math.ceil(this.signs.length / cols);
+    const atlasWidth = cols * canvasWidth;
+    const atlasHeight = rows * canvasHeight;
+
+    // Create canvas for atlas
+    const atlasCanvas = document.createElement('canvas');
+    atlasCanvas.width = atlasWidth;
+    atlasCanvas.height = atlasHeight;
+    const atlasCtx = atlasCanvas.getContext('2d');
+
+    // Fill entire atlas with white background
+    atlasCtx.fillStyle = '#ffffff';
+    atlasCtx.fillRect(0, 0, atlasWidth, atlasHeight);
+
+    // Draw each sign's text into the atlas
+    for (let i = 0; i < this.signs.length; i++)
+    {
+      const sign = this.signs[i];
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = col * canvasWidth;
+      const y = row * canvasHeight;
+
+      // Draw text on white background
+      atlasCtx.fillStyle = '#000000';
+      atlasCtx.font = Config.RANGE_SIGN_CONFIG.textFont;
+      atlasCtx.textAlign = 'center';
+      atlasCtx.textBaseline = 'middle';
+      atlasCtx.fillText(sign.text, x + canvasWidth / 2, y + canvasHeight / 2);
+    }
+
+    // Create texture from atlas
+    this.textureAtlas = new THREE.CanvasTexture(atlasCanvas);
+    this.textureAtlas.needsUpdate = true;
+  }
+
+  /**
    * Delete all range signs
    */
   static deleteAll()
@@ -336,6 +611,31 @@ export class RangeSignFactory
       sign.dispose();
     }
     this.signs = [];
+
+    // Dispose merged meshes
+    if (this.mergedPostMesh && this.scene)
+    {
+      this.scene.remove(this.mergedPostMesh);
+      if (this.mergedPostMesh.geometry) this.mergedPostMesh.geometry.dispose();
+      if (this.mergedPostMesh.material) this.mergedPostMesh.material.dispose();
+      this.mergedPostMesh = null;
+    }
+
+    if (this.mergedSignBoardMesh && this.scene)
+    {
+      this.scene.remove(this.mergedSignBoardMesh);
+      if (this.mergedSignBoardMesh.geometry) this.mergedSignBoardMesh.geometry.dispose();
+      if (this.mergedSignBoardMesh.material) this.mergedSignBoardMesh.material.dispose();
+      this.mergedSignBoardMesh = null;
+    }
+
+    if (this.textureAtlas)
+    {
+      this.textureAtlas.dispose();
+      this.textureAtlas = null;
+    }
+
+    this.scene = null;
   }
 
   /**
