@@ -14,7 +14,6 @@
 #include "math/vector.h"
 #include "physics/atmosphere.h"
 #include "physics/wind_generator.h"
-#include "rendering/dust_cloud.h"
 #include "rendering/impact_detector.h"
 #include "rendering/steel_target.h"
 #include "rendering/wind_flag.h"
@@ -358,16 +357,6 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getTexture", &btk::rendering::SteelTarget::getTexture)
     .function("setColors", &btk::rendering::SteelTarget::setColors)
     .function("localToWorld", &btk::rendering::SteelTarget::localToWorld);
-
-  // Dust Cloud class
-  class_<DustCloud>("DustCloud")
-    .constructor<int, const btk::math::Vector3D&, float, float>()
-    .function("timeStep", &DustCloud::timeStep)
-    .function("getPositions", &DustCloud::getPositions)
-    .function("getAlpha", &DustCloud::getAlpha)
-    .function("isDone", &DustCloud::isDone)
-    .function("getParticleCount", &DustCloud::getParticleCount)
-    .function("getCenterPosition", &DustCloud::getCenterPosition);
 
   // Wind Flag class
   class_<btk::rendering::WindFlag>("WindFlag")

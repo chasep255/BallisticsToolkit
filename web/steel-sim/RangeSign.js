@@ -220,7 +220,6 @@ export class RangeSign
               scene: scene,
               numParticles: dustConfig.numParticles,
               color: dustConfig.color,
-              windGenerator: windGenerator,
               initialRadius: dustConfig.initialRadius,
               growthRate: dustConfig.growthRate,
               particleDiameter: dustConfig.particleDiameter
@@ -467,7 +466,6 @@ export class RangeSignFactory
                 scene: scene,
                 numParticles: Config.WOOD_DUST_CONFIG.numParticles,
                 color: Config.WOOD_DUST_CONFIG.color,
-                windGenerator: windGenerator,
                 initialRadius: Config.WOOD_DUST_CONFIG.initialRadius,
                 growthRate: Config.WOOD_DUST_CONFIG.growthRate,
                 particleDiameter: Config.WOOD_DUST_CONFIG.particleDiameter
@@ -503,7 +501,6 @@ export class RangeSignFactory
                 scene: scene,
                 numParticles: Config.SIGN_BOARD_DUST_CONFIG.numParticles,
                 color: Config.SIGN_BOARD_DUST_CONFIG.color,
-                windGenerator: windGenerator,
                 initialRadius: Config.SIGN_BOARD_DUST_CONFIG.initialRadius,
                 growthRate: Config.SIGN_BOARD_DUST_CONFIG.growthRate,
                 particleDiameter: Config.SIGN_BOARD_DUST_CONFIG.particleDiameter

@@ -1,22 +1,58 @@
 import * as THREE from 'three';
 
 /**
- * DustCloud - Pure JavaScript dust cloud implementation matching C++ dust_cloud.cpp logic
- * Particles use Gaussian distribution, radius grows linearly, alpha decays inversely with radius
+ * DustCloud - GPU-accelerated dust cloud using shaders
+ * Relative positions stored as instance attributes, world positions calculated on GPU
+ * This avoids JavaScript loops - all position calculations happen in parallel on the GPU
  */
 
-const ALPHA_THRESHOLD = 0.01;
+const ALPHA_THRESHOLD = 0.01; // Threshold for cloud visibility
+
+const DUST_VERTEX_SHADER = `
+attribute vec3 instanceRelativePosition;
+
+uniform vec3 centerPosition;
+uniform float radiusScale;
+uniform float particleScale;
+
+void main() {
+  // Calculate world position: center + scaled relative position
+  vec3 worldPos = centerPosition + instanceRelativePosition * radiusScale;
+  
+  // Transform sphere vertex position relative to world position
+  vec3 localPos = position * particleScale;
+  vec4 worldPosition = vec4(worldPos + localPos, 1.0);
+  
+  gl_Position = projectionMatrix * modelViewMatrix * worldPosition;
+}
+`;
+
+const DUST_FRAGMENT_SHADER = `
+uniform vec3 color;
+uniform float alpha;
+
+void main() {
+  gl_FragColor = vec4(color, alpha);
+}
+`;
 
 /**
  * Generate a Gaussian random number using Box-Muller transform
+ * Resamples if outside 2 standard deviations
  * @private
  */
-function gaussianRandom()
+function truncatedNormalRandom()
 {
-  let u = 0, v = 0;
-  while(u === 0) u = Math.random(); // Converting [0,1) to (0,1)
-  while(v === 0) v = Math.random();
-  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  let value;
+  do
+  {
+    let u = 0, v = 0;
+    while(u === 0) u = Math.random(); // Converting [0,1) to (0,1)
+    while(v === 0) v = Math.random();
+    value = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
+  while(Math.abs(value) > 2.0); // Reject if outside 2 standard deviations
+  return value;
 }
 
 export class DustCloud
@@ -28,7 +64,6 @@ export class DustCloud
    * @param {THREE.Scene} options.scene - Three.js scene to add mesh to (required)
    * @param {number} options.numParticles - Number of particles (required)
    * @param {Object} options.color - RGB color {r, g, b} 0-255 (required)
-   * @param {Object} options.windGenerator - Wind generator instance (required)
    * @param {number} options.initialRadius - Initial cloud radius in meters (required)
    * @param {number} options.growthRate - Cloud radius growth rate in m/s (required)
    * @param {number} options.particleDiameter - Particle diameter in meters (required)
@@ -41,7 +76,6 @@ export class DustCloud
       scene,
       numParticles,
       color,
-      windGenerator,
       initialRadius,
       growthRate,
       particleDiameter
@@ -49,200 +83,103 @@ export class DustCloud
 
     if (!scene) throw new Error('Scene is required');
     if (!position) throw new Error('Position is required');
-    if (!windGenerator) throw new Error('WindGenerator is required');
 
     this.scene = scene;
-    this.windGenerator = windGenerator;
 
-    // Store state matching C++ implementation
+    // Store state
     this.centerPosition = position.clone();
     this.initialRadius = initialRadius;
     this.growthRate = growthRate;
     this.radius = initialRadius;
     this.alpha = 1.0;
     this.particleDiameter = particleDiameter;
+    this.particleScale = Math.max(particleDiameter / 2, 0.01); // Constant particle radius
+    this.numParticles = numParticles; // Store for later use
+    
+    // Scale alpha to account for particle overlap (many particles overlap at center)
+    // Use inverse square root to reduce alpha without making it too transparent
+    this.alphaScale = 1.0 / Math.sqrt(numParticles);
+    
 
-    // Generate relative positions using Gaussian distribution (matching C++ logic)
-    // Gaussian distribution creates denser distribution at center, tapering off at edges
-    this.relativePositions = [];
+    // Generate relative positions using truncated normal distribution (reject outside 2 std dev)
+    const relativePositions = new Float32Array(numParticles * 3);
     for (let i = 0; i < numParticles; i++)
     {
-      // Relative position using Gaussian distribution (normal random, mean=0, stddev=1)
-      // Scale by initial radius so particles are distributed within the initial cloud size
-      const relX = gaussianRandom() * initialRadius;
-      const relY = gaussianRandom() * initialRadius;
-      const relZ = gaussianRandom() * initialRadius;
-      this.relativePositions.push(new THREE.Vector3(relX, relY, relZ));
+      // Scale by initialRadius so particles are distributed within the cloud size
+      // Truncated at 2 standard deviations (about 95% of particles within radius)
+      const relX = truncatedNormalRandom() * initialRadius;
+      const relY = truncatedNormalRandom() * initialRadius;
+      const relZ = truncatedNormalRandom() * initialRadius;
+      relativePositions[i * 3 + 0] = relX;
+      relativePositions[i * 3 + 1] = relY;
+      relativePositions[i * 3 + 2] = relZ;
     }
 
-    // Generate colors once (with jitter for variation)
-    this.particleColors = this.generateColors(numParticles, color);
+    // Convert color to normalized RGB
+    const baseR = color.r / 255.0;
+    const baseG = color.g / 255.0;
+    const baseB = color.b / 255.0;
+    const avgColor = new THREE.Color(baseR, baseG, baseB);
 
-    // Create instanced spheres for rendering
-    this.mesh = this.createInstancedSpheres(numParticles, particleDiameter, color);
-    this.scene.add(this.mesh);
-    
-    // Initialize instance matrices immediately with initial positions
-    this._hasLoggedPositions = false;
-    this.updateInstanceMatrices();
-  }
-
-  /**
-   * Generate colors for particles with random jitter
-   * @private
-   */
-  generateColors(numParticles, baseColor)
-  {
-    const colors = new Float32Array(numParticles * 3);
-    const baseR = baseColor.r / 255.0;
-    const baseG = baseColor.g / 255.0;
-    const baseB = baseColor.b / 255.0;
-
-    for (let i = 0; i < numParticles; ++i)
-    {
-      // Add random color jitter (±20% variation)
-      const jitterR = baseR + (Math.random() - 0.5) * baseR * 0.4;
-      const jitterG = baseG + (Math.random() - 0.5) * baseG * 0.4;
-      const jitterB = baseB + (Math.random() - 0.5) * baseB * 0.4;
-
-      colors[i * 3 + 0] = Math.max(0, Math.min(1, jitterR));
-      colors[i * 3 + 1] = Math.max(0, Math.min(1, jitterG));
-      colors[i * 3 + 2] = Math.max(0, Math.min(1, jitterB));
-    }
-
-    return colors;
-  }
-
-  /**
-   * Create instanced spheres for dust particles
-   * @private
-   */
-  createInstancedSpheres(numParticles, particleDiameter, baseColor)
-  {
-    // Low-poly sphere geometry (icosahedron with 1 subdivision = 80 triangles)
-    const sphereGeometry = new THREE.IcosahedronGeometry(0.5, 1); // Unit radius, will be scaled by instance matrix
-    
-    // Convert base color to THREE.Color (average of particle colors for simplicity)
-    const avgR = Array.from({length: numParticles}, (_, i) => this.particleColors[i * 3 + 0]).reduce((a, b) => a + b) / numParticles;
-    const avgG = Array.from({length: numParticles}, (_, i) => this.particleColors[i * 3 + 1]).reduce((a, b) => a + b) / numParticles;
-    const avgB = Array.from({length: numParticles}, (_, i) => this.particleColors[i * 3 + 2]).reduce((a, b) => a + b) / numParticles;
-    
-    const color = new THREE.Color(avgR, avgG, avgB);
-
-    // Create simple material
-    this.material = new THREE.MeshBasicMaterial({
-      color: color,
+    // Create shader material - GPU calculates positions, no JavaScript loop needed
+    this.material = new THREE.ShaderMaterial({
+      vertexShader: DUST_VERTEX_SHADER,
+      fragmentShader: DUST_FRAGMENT_SHADER,
+      uniforms: {
+        centerPosition: { value: this.centerPosition },
+        radiusScale: { value: 1.0 },
+        particleScale: { value: this.particleScale },
+        color: { value: avgColor },
+        alpha: { value: 1.0 }
+      },
       transparent: true,
-      opacity: 1.0
+      depthWrite: false, // Don't write depth - allows proper alpha blending between overlapping dust clouds
+      depthTest: true // Still test depth to occlude opaque objects
     });
 
+    // Create sphere geometry (unit radius, scaled by shader)
+    const sphereGeometry = new THREE.IcosahedronGeometry(0.5, 1);
+
+    // Add relative positions as instance attribute (GPU reads this directly)
+    const relativePositionAttribute = new THREE.InstancedBufferAttribute(relativePositions, 3);
+    sphereGeometry.setAttribute('instanceRelativePosition', relativePositionAttribute);
+
     // Create instanced mesh
-    const instancedMesh = new THREE.InstancedMesh(sphereGeometry, this.material, numParticles);
-    instancedMesh.frustumCulled = false;
-
-    // Initialize instance matrix (will be updated each frame)
-    this.instanceMatrix = new THREE.Matrix4();
-
-    return instancedMesh;
-  }
-
-  /**
-   * Update instance matrices with current particle positions
-   * @private
-   */
-  updateInstanceMatrices()
-  {
-    if (!this.mesh || this.alpha < ALPHA_THRESHOLD)
-    {
-      if (this.mesh)
-      {
-        this.mesh.count = 0;
-      }
-      return;
-    }
-
-    const numParticles = this.relativePositions.length;
-    const minSize = 0.01; // 1cm minimum
-    const scale = Math.max(this.particleDiameter / 2, minSize);
-    const scaleVec = new THREE.Vector3(scale, scale, scale);
-    const quaternion = new THREE.Quaternion(); // No rotation
-    const positionVec = new THREE.Vector3();
-    const radiusScale = this.radius / this.initialRadius;
-
-    for (let i = 0; i < numParticles; i++)
-    {
-      // Calculate world position: center + scaled relative position
-      const relPos = this.relativePositions[i];
-      positionVec.set(
-        this.centerPosition.x + relPos.x * radiusScale,
-        this.centerPosition.y + relPos.y * radiusScale,
-        this.centerPosition.z + relPos.z * radiusScale
-      );
-
-      // Compose matrix from position, rotation, and scale
-      this.instanceMatrix.compose(positionVec, quaternion, scaleVec);
-      this.mesh.setMatrixAt(i, this.instanceMatrix);
-    }
-
-    // Debug: log first few positions on first update
-    if (!this._hasLoggedPositions && numParticles > 0)
-    {
-      const firstPos = new THREE.Vector3(
-        this.centerPosition.x + this.relativePositions[0].x * radiusScale,
-        this.centerPosition.y + this.relativePositions[0].y * radiusScale,
-        this.centerPosition.z + this.relativePositions[0].z * radiusScale
-      );
-      console.log('[DustCloud] First update - numParticles:', numParticles, 'alpha:', this.alpha.toFixed(3));
-      console.log('[DustCloud] Center position:', this.centerPosition.x.toFixed(2), this.centerPosition.y.toFixed(2), this.centerPosition.z.toFixed(2));
-      console.log('[DustCloud] First particle position:', firstPos.x.toFixed(2), firstPos.y.toFixed(2), firstPos.z.toFixed(2));
-      console.log('[DustCloud] Sphere scale:', scale.toFixed(4), 'm (particleDiameter:', this.particleDiameter.toFixed(4), 'm)');
-      this._hasLoggedPositions = true;
-    }
-
-    this.mesh.instanceMatrix.needsUpdate = true;
-    this.mesh.count = numParticles;
+    this.mesh = new THREE.InstancedMesh(sphereGeometry, this.material, numParticles);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 2; // Render after decals (renderOrder 1) so dust appears on top
+    this.scene.add(this.mesh);
   }
 
   /**
    * Update physics and rendering
-   * @param {Object} windGenerator - Wind generator for sampling wind at cloud center
    * @param {number} dt - Time step in seconds
    */
-  update(windGenerator, dt)
+  update(dt)
   {
-    if (!this.mesh || !windGenerator) return;
+    if (!this.mesh)
+    {
+      return;
+    }
 
-    // Match C++ timeStep logic:
-    // 1. Grow radius linearly over time
+    // 1. Grow cloud radius linearly over time
     this.radius += this.growthRate * dt;
+    
+    // 2. Fade alpha by 1/growth^2 (as cloud expands, color density decreases)
+    // As radius grows, area grows as radius^2, so alpha should be 1/(radius/initialRadius)^2
+    const growthRatio = this.radius / this.initialRadius;
+    // Clamp growthRatio to prevent division issues and ensure alpha stays valid
+    this.alpha = 1.0 / Math.max(growthRatio * growthRatio, 1.0);
 
-    // 2. Calculate alpha inversely proportional to radius: alpha = (initial_radius / current_radius)³
-    if (this.radius > 0.0)
-    {
-      this.alpha = this.initialRadius / this.radius;
-      this.alpha = this.alpha * this.alpha * this.alpha; // Cube it
-      if (this.alpha < 0.0)
-      {
-        this.alpha = 0.0;
-      }
-    }
-    else
-    {
-      this.alpha = 0.0;
-    }
+    // 3. Update uniforms - GPU does all the position calculations in parallel
+    const uniforms = this.material.uniforms;
+    uniforms.centerPosition.value.copy(this.centerPosition);
+    uniforms.radiusScale.value = this.radius / this.initialRadius;
+    uniforms.particleScale.value = this.particleScale;
+    uniforms.alpha.value = this.alpha;
 
-    // 3. Advect cloud center with wind (move with the air velocity)
-    const wind = windGenerator.sample(this.centerPosition.x, this.centerPosition.y, this.centerPosition.z);
-    this.centerPosition.x += wind.x * dt;
-    this.centerPosition.y += wind.y * dt;
-    this.centerPosition.z += wind.z * dt;
-    wind.delete();
-
-    // 4. Update instance matrices with new positions
-    this.updateInstanceMatrices();
-
-    // 5. Update material opacity with global alpha
-    this.material.opacity = this.alpha;
+    // 4. Ensure mesh stays visible
+    this.mesh.visible = true;
   }
 
   /**
@@ -251,6 +188,7 @@ export class DustCloud
    */
   isDone()
   {
+    // Check scaled alpha (what's actually rendered), not raw alpha
     return this.alpha < ALPHA_THRESHOLD;
   }
 
@@ -356,10 +294,9 @@ export class DustCloudFactory
   /**
    * Update all dust clouds (physics and rendering)
    * Automatically disposes clouds when animation is complete
-   * @param {Object} windGenerator - Wind generator for sampling wind
    * @param {number} dt - Time step in seconds
    */
-  static updateAll(windGenerator, dt)
+  static updateAll(dt)
   {
     // Iterate backwards to safely remove items while iterating
     for (let i = DustCloudFactory.clouds.length - 1; i >= 0; i--)
@@ -367,7 +304,7 @@ export class DustCloudFactory
       const cloud = DustCloudFactory.clouds[i];
 
       // Update physics and rendering
-      cloud.update(windGenerator, dt);
+      cloud.update(dt);
 
       // Check if animation is complete and auto-dispose
       if (cloud.isDone())

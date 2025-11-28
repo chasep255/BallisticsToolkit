@@ -280,7 +280,6 @@ export class BermFactory
               scene: scene,
               numParticles: Config.BERM_DUST_CONFIG.numParticles,
               color: Config.BERM_DUST_CONFIG.color,
-              windGenerator: windGenerator,
               initialRadius: Config.BERM_DUST_CONFIG.initialRadius,
               growthRate: Config.BERM_DUST_CONFIG.growthRate,
               particleDiameter: Config.BERM_DUST_CONFIG.particleDiameter

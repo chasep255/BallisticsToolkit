@@ -305,7 +305,6 @@ export class WindFlag
             scene: scene,
             numParticles: Config.METAL_FRAME_DUST_CONFIG.numParticles,
             color: Config.METAL_FRAME_DUST_CONFIG.color,
-            windGenerator: windGenerator,
             initialRadius: Config.METAL_FRAME_DUST_CONFIG.initialRadius,
             growthRate: Config.METAL_FRAME_DUST_CONFIG.growthRate,
             particleDiameter: Config.METAL_FRAME_DUST_CONFIG.particleDiameter

@@ -1051,7 +1051,6 @@ class SteelSimulator
               scene: scene,
               numParticles: Config.METAL_DUST_CONFIG.numParticles,
               color: Config.METAL_DUST_CONFIG.color,
-              windGenerator: windGenerator,
               initialRadius: Config.METAL_DUST_CONFIG.initialRadius,
               growthRate: Config.METAL_DUST_CONFIG.growthRate,
               particleDiameter: Config.METAL_DUST_CONFIG.particleDiameter
@@ -1664,7 +1663,6 @@ class SteelSimulator
       scene: this.scene,
       numParticles: Config.GROUND_DUST_CONFIG.numParticles,
       color: Config.GROUND_DUST_CONFIG.color,
-      windGenerator: this.windGenerator,
       initialRadius: Config.GROUND_DUST_CONFIG.initialRadius, // Already in meters from config
       growthRate: Config.GROUND_DUST_CONFIG.growthRate, // Already in m/s from config
       particleDiameter: Config.GROUND_DUST_CONFIG.particleDiameter // Already in meters from config
@@ -1686,7 +1684,6 @@ class SteelSimulator
       scene: this.scene,
       numParticles: Config.METAL_DUST_CONFIG.numParticles,
       color: Config.METAL_DUST_CONFIG.color,
-      windGenerator: this.windGenerator,
       initialRadius: Config.METAL_DUST_CONFIG.initialRadius, // Already in meters from config
       growthRate: Config.METAL_DUST_CONFIG.growthRate, // Already in m/s from config
       particleDiameter: Config.METAL_DUST_CONFIG.particleDiameter // Already in meters from config
@@ -1933,7 +1930,7 @@ class SteelSimulator
     SteelTargetFactory.stepPhysics(dt);
     SteelTargetFactory.updateDisplay();
 
-    DustCloudFactory.updateAll(this.windGenerator, dt);
+    DustCloudFactory.updateAll(dt);
     WindFlagFactory.updateAll(this.windGenerator, dt);
 
     // Update spotting scope camera from key states (WASD for panning, E/Q for zoom)

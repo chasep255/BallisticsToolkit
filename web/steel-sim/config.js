@@ -44,33 +44,34 @@ export function initConfig()
   };
   // ===== DUST CLOUD CONFIGURATIONS =====
   Config.GROUND_DUST_CONFIG = {
-    numParticles: 250,
+    numParticles: 200,
     color:
     {
       r: 139,
       g: 115,
       b: 85
     }, // Brown/tan
-    initialRadius: 0.05, // 5cm
-    growthRate: 0.15, // 0.15 m/s
-    particleDiameter: 0.1 // 5cm
+    initialRadius: 0.02, // 5cm
+    growthRate: 0.25, // 0.15 m/s
+    windSmoothing: 1.0, // 2.0 1/s (smooth wind response)
+    particleDiameter: 0.1 // 30cm
   };
 
   Config.BERM_DUST_CONFIG = {
-    numParticles: 250,
+    numParticles: 200,
     color:
     {
-      r: 245,
-      g: 220,
-      b: 170
-    }, // Light sandy/yellow-tan
-    initialRadius: 0.01, // 5cm
-    growthRate: 0.05, // 0.15 m/s
-    particleDiameter: 0.2
+      r: 139,
+      g: 115,
+      b: 85
+    }, // Brown/tan
+    initialRadius: 0.02, // 5cm
+    growthRate: 0.25, // 0.15 m/s
+    particleDiameter: 0.1 // 10cm
   };
 
   Config.WOOD_DUST_CONFIG = {
-    numParticles: 150,
+    numParticles: 50,
     color:
     {
       r: 139,
@@ -78,47 +79,47 @@ export function initConfig()
       b: 43
     }, // Brown wood splinter color
     initialRadius: 0.02, // 2cm
-    growthRate: 0.06, // 0.06 m/s
-    particleDiameter: 0.1
+    growthRate: 0.25, // 0.06 m/s
+    particleDiameter: 0.05 // 5cm
   };
 
   Config.SIGN_BOARD_DUST_CONFIG = {
-    numParticles: 150,
-    color:
-    {
-      r: 220,
-      g: 220,
-      b: 220
-    }, // White/light grey for sign board
-    initialRadius: 0.02, // 2cm
-    growthRate: 0.06, // 0.06 m/s
-    particleDiameter: 0.1
-  };
-
-  Config.METAL_FRAME_DUST_CONFIG = {
-    numParticles: 150,
-    color:
-    {
-      r: 170,
-      g: 170,
-      b: 170
-    }, // Light grey for metal frames/poles
-    initialRadius: 0.02, // 2cm
-    growthRate: 0.06, // 0.06 m/s
-    particleDiameter: 0.1
-  };
-
-  Config.METAL_DUST_CONFIG = {
-    numParticles: 250,
+    numParticles: 100,
     color:
     {
       r: 192,
       g: 192,
       b: 192
     }, // Silver/gray
-    initialRadius: btk.Conversions.inchesToMeters(1), // 1 inch
-    growthRate: btk.Conversions.feetToMeters(1.0), // 1.0 feet/second
-    particleDiameter: btk.Conversions.inchesToMeters(0.3) // 0.3 inches
+    initialRadius: 0.02,
+    growthRate: 1.0,
+    particleDiameter: 0.01
+  };
+
+  Config.METAL_FRAME_DUST_CONFIG = {
+    numParticles: 100,
+    color:
+    {
+      r: 192,
+      g: 192,
+      b: 192
+    }, // Silver/gray
+    initialRadius: 0.02,
+    growthRate: 1.0,
+    particleDiameter: 0.01
+  };
+
+  Config.METAL_DUST_CONFIG = {
+    numParticles: 150,
+    color:
+    {
+      r: 192,
+      g: 192,
+      b: 192
+    }, // Silver/gray
+    initialRadius: 0.02,
+    growthRate: 0.25,
+    particleDiameter: 0.01
   };
 
   // ===== LANDSCAPE CONFIGURATION =====
