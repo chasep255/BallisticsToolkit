@@ -65,6 +65,56 @@ namespace btk::rendering
     }
   }
 
+  bool MeshCollider::segmentIntersectsAABB(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, const btk::math::Vector3D& min_bounds, const btk::math::Vector3D& max_bounds) const
+  {
+    // Slab method: project segment onto each axis and check for overlap
+    // Segment: start_m + t * (end_m - start_m) for t in [0, 1]
+    btk::math::Vector3D dir = end_m - start_m;
+    btk::math::Vector3D inv_dir;
+    inv_dir.x = (std::fabs(dir.x) > 1e-6f) ? (1.0f / dir.x) : std::numeric_limits<float>::max();
+    inv_dir.y = (std::fabs(dir.y) > 1e-6f) ? (1.0f / dir.y) : std::numeric_limits<float>::max();
+    inv_dir.z = (std::fabs(dir.z) > 1e-6f) ? (1.0f / dir.z) : std::numeric_limits<float>::max();
+
+    float t_min = 0.0f;
+    float t_max = 1.0f;
+
+    // Test X axis
+    float t1 = (min_bounds.x - start_m.x) * inv_dir.x;
+    float t2 = (max_bounds.x - start_m.x) * inv_dir.x;
+    float t_min_x = std::min(t1, t2);
+    float t_max_x = std::max(t1, t2);
+    t_min = std::max(t_min, t_min_x);
+    t_max = std::min(t_max, t_max_x);
+
+    if(t_min > t_max)
+    {
+      return false;
+    }
+
+    // Test Y axis
+    t1 = (min_bounds.y - start_m.y) * inv_dir.y;
+    t2 = (max_bounds.y - start_m.y) * inv_dir.y;
+    float t_min_y = std::min(t1, t2);
+    float t_max_y = std::max(t1, t2);
+    t_min = std::max(t_min, t_min_y);
+    t_max = std::min(t_max, t_max_y);
+
+    if(t_min > t_max)
+    {
+      return false;
+    }
+
+    // Test Z axis
+    t1 = (min_bounds.z - start_m.z) * inv_dir.z;
+    t2 = (max_bounds.z - start_m.z) * inv_dir.z;
+    float t_min_z = std::min(t1, t2);
+    float t_max_z = std::max(t1, t2);
+    t_min = std::max(t_min, t_min_z);
+    t_max = std::min(t_max, t_max_z);
+
+    return t_min <= t_max;
+  }
+
   std::optional<float> MeshCollider::intersectTriangle(const btk::math::Vector3D& ray_origin, const btk::math::Vector3D& ray_dir, const btk::math::Vector3D& v0, const btk::math::Vector3D& v1,
                                                        const btk::math::Vector3D& v2) const
   {
@@ -112,6 +162,12 @@ namespace btk::rendering
                                                              int object_id) const
   {
     using btk::math::Vector3D;
+
+    // Early rejection: check if segment intersects mesh AABB
+    if(!segmentIntersectsAABB(start_m, end_m, min_bounds_m_, max_bounds_m_))
+    {
+      return std::nullopt;
+    }
 
     Vector3D ray_dir = end_m - start_m;
     float closest_t = std::numeric_limits<float>::max();
@@ -226,28 +282,18 @@ namespace btk::rendering
 #ifdef __EMSCRIPTEN__
   int ImpactDetector::addMeshCollider(emscripten::val vertices_val, emscripten::val indices_val, int object_id)
   {
-    // Convert JS typed arrays to C++ vectors
+    // Convert JS typed arrays to C++ vectors using fast bulk conversion
     std::vector<float> vertices;
     std::vector<uint32_t> indices;
 
     if(!vertices_val.isNull() && !vertices_val.isUndefined())
     {
-      unsigned int vlen = vertices_val["length"].as<unsigned int>();
-      vertices.reserve(vlen);
-      for(unsigned int i = 0; i < vlen; ++i)
-      {
-        vertices.push_back(vertices_val[i].as<float>());
-      }
+      vertices = emscripten::convertJSArrayToNumberVector<float>(vertices_val);
     }
 
     if(!indices_val.isNull() && !indices_val.isUndefined())
     {
-      unsigned int ilen = indices_val["length"].as<unsigned int>();
-      indices.reserve(ilen);
-      for(unsigned int i = 0; i < ilen; ++i)
-      {
-        indices.push_back(indices_val[i].as<uint32_t>());
-      }
+      indices = emscripten::convertJSArrayToNumberVector<uint32_t>(indices_val);
     }
 
     auto collider = std::make_unique<MeshCollider>(vertices, indices);

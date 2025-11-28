@@ -1931,29 +1931,16 @@ class SteelSimulator
 
     this.windGenerator.advanceTime(this.timeManager.getElapsedTime());
 
-    // Break dt into fixed-size substeps (max 5ms each)
-    const numSubsteps = Math.ceil(dt / Config.INTEGRATION_STEP_S);
-    const stepDt = dt / numSubsteps;
-
-    for (let i = 0; i < numSubsteps; i++)
-    {
-      // Update active bullets (physics)
-      ShotFactory.updateAll(stepDt);
-
-      // Check collisions
-      this.checkBulletTargetCollisions();
-      this.checkBulletGroundCollisions();
-
-      // Clean up dead shots
-      ShotFactory.cleanupDeadShots();
-
-      // Step all steel target physics
-      SteelTargetFactory.stepPhysics(stepDt);
-    }
-
-    // // Update visual animations
+    //Update the shot
+    ShotFactory.updateAll(dt);
+    this.checkBulletTargetCollisions();
+    this.checkBulletGroundCollisions();
+    ShotFactory.cleanupDeadShots();
     ShotFactory.updateAnimations();
+
+    SteelTargetFactory.stepPhysics(dt);
     SteelTargetFactory.updateDisplay();
+
     DustCloudFactory.updateAll(this.windGenerator, dt);
     WindFlagFactory.updateAll(this.windGenerator, dt);
 

@@ -20,9 +20,8 @@ export class TimeManager
     this.paused = false;
     this.visibilityHandler = null;
     this.lastDeltaTime = 0;
-    this.lastElapsedTime = 0;
+    this.accumulatedElapsedTime = 0; // Accumulated from deltas
     this.pauseStartTime = 0; // When pause started
-    this.totalPausedTime = 0; // Total time spent paused
 
     console.log(`${LOG_PREFIX} Initialized`);
   }
@@ -40,8 +39,7 @@ export class TimeManager
     }
     this.clock.start();
     this.lastDeltaTime = 0;
-    this.lastElapsedTime = 0;
-    this.totalPausedTime = 0;
+    this.accumulatedElapsedTime = 0;
   }
 
   /**
@@ -57,8 +55,8 @@ export class TimeManager
     // Get delta and clamp to prevent physics issues
     const rawDelta = this.clock.getDelta();
     this.lastDeltaTime = Math.min(Config.TIME_MANAGER_MAX_DT_S, Math.max(Config.TIME_MANAGER_MIN_DT_S, rawDelta));
-    // Subtract total paused time from elapsed time to get actual game time
-    this.lastElapsedTime = this.clock.getElapsedTime() - this.totalPausedTime;
+    // Accumulate delta to get elapsed time
+    this.accumulatedElapsedTime += this.lastDeltaTime;
 
     // Log if delta time is unusually large (potential performance issue, not just tab switching)
     if (rawDelta > 1.0)
@@ -76,11 +74,11 @@ export class TimeManager
   }
 
   /**
-   * Get elapsed time since start - returns cached value from last update()
+   * Get elapsed time since start - accumulated from deltas
    */
   getElapsedTime()
   {
-    return this.lastElapsedTime;
+    return this.accumulatedElapsedTime;
   }
 
   /**
@@ -91,9 +89,7 @@ export class TimeManager
     if (this.clock && !this.paused)
     {
       this.paused = true;
-      // Record when we paused (using raw clock time)
-      this.pauseStartTime = this.clock.getElapsedTime();
-      console.log(`${LOG_PREFIX} Paused at game time ${this.lastElapsedTime.toFixed(2)}s`);
+      console.log(`${LOG_PREFIX} Paused at game time ${this.accumulatedElapsedTime.toFixed(2)}s`);
     }
   }
 
@@ -104,15 +100,11 @@ export class TimeManager
   {
     if (this.clock && this.paused)
     {
-      // Calculate how long we were paused and add it to total
-      const pauseDuration = this.clock.getElapsedTime() - this.pauseStartTime;
-      this.totalPausedTime += pauseDuration;
-
       // Call getDelta() once to reset the delta accumulator after pause
       // This prevents a large delta spike when resuming
       this.clock.getDelta();
       this.paused = false;
-      console.log(`${LOG_PREFIX} Resumed after ${pauseDuration.toFixed(2)}s pause, game time still ${this.lastElapsedTime.toFixed(2)}s`);
+      console.log(`${LOG_PREFIX} Resumed, game time ${this.accumulatedElapsedTime.toFixed(2)}s`);
     }
   }
 

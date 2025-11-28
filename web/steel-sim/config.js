@@ -18,9 +18,9 @@ export function initConfig()
   const btk = window.btk;
 
   // ===== PHYSICS INTEGRATION CONSTANTS =====
-  Config.INTEGRATION_STEP_S = 0.005; // 5ms physics step
+  Config.INTEGRATION_STEP_S = 0.5; // 50ms physics step
   Config.BULLET_SUBSTEP_S = 0.001; // 1ms BTK integration
-  Config.TIME_MANAGER_MAX_DT_S = 0.05; // 50ms max frame time
+  Config.TIME_MANAGER_MAX_DT_S = 0.2; // 500ms max frame time
   Config.TIME_MANAGER_MIN_DT_S = 0; // No minimum (clamp to 0)
 
   // ===== FPS TRACKING =====

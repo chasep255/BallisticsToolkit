@@ -83,6 +83,8 @@ namespace btk::rendering
 
     void computeBounds();
 
+    bool segmentIntersectsAABB(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, const btk::math::Vector3D& min_bounds, const btk::math::Vector3D& max_bounds) const;
+
     std::optional<float> intersectTriangle(const btk::math::Vector3D& ray_origin, const btk::math::Vector3D& ray_dir, const btk::math::Vector3D& v0, const btk::math::Vector3D& v1,
                                            const btk::math::Vector3D& v2) const;
   };
@@ -125,11 +127,11 @@ namespace btk::rendering
     /**
      * @brief Register a static mesh collider from geometry.
      *
+     * Uses fast bulk conversion (convertJSArrayToNumberVector) for efficient JS → C++ data transfer.
      * JS should pass a Float32Array of vertices and optional Uint32Array of indices.
      *
      * @param vertices_val Emscripten val wrapping Float32Array [x0,y0,z0, ...]
      * @param indices_val  Emscripten val wrapping Uint32Array (optional, empty for sequential)
-     * @param object_type  Application type tag
      * @param object_id    Application ID
      * @return Collider handle (>=0) or -1 on error
      */
