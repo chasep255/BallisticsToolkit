@@ -50,7 +50,7 @@ export class Landscape
     this.textureManager = textureManager;
 
     // Environment objects
-    this.mountains = [];
+    this.mountainMesh = null;
 
     // Instanced meshes for trees (no per-tree tracking)
     this.treeTrunkMesh = null;
@@ -266,36 +266,56 @@ export class Landscape
 
     const mountainTexture = new THREE.CanvasTexture(canvas);
 
-    // Create mountains
+    // Shared mountain material
+    const mountainMaterial = new THREE.MeshLambertMaterial(
+    {
+      map: mountainTexture,
+      side: THREE.FrontSide
+    });
+
+    // Base cone geometry (unit height, unit radius); per-mountain variation via instance scale
+    const baseHeight = 1.0;
+    const baseRadius = 1.0;
+    const mountainGeometry = new THREE.ConeGeometry(baseRadius, baseHeight, 8);
+
+    const mountainCount = Config.MOUNTAIN_CONFIG.count;
+    const mountainMesh = new THREE.InstancedMesh(mountainGeometry, mountainMaterial, mountainCount);
+    mountainMesh.castShadow = true;
+    mountainMesh.receiveShadow = true;
+
     // Spread mountains across the full brown ground width, ensuring coverage at edges
     const mountainSpread = this.brownGroundWidth * 0.9; // Use 90% of brown ground width for spread
-    for (let i = 0; i < Config.MOUNTAIN_CONFIG.count; i++)
+    const dummyMatrix = new THREE.Matrix4();
+    const dummyScale = new THREE.Vector3();
+    const dummyPosition = new THREE.Vector3();
+    const dummyQuat = new THREE.Quaternion(); // identity rotation
+
+    for (let i = 0; i < mountainCount; i++)
     {
       // Distribute evenly across width with some randomness, ensuring coverage at edges
-      const normalizedPos = Config.MOUNTAIN_CONFIG.count > 1 ? i / (Config.MOUNTAIN_CONFIG.count - 1) : 0.5; // 0 to 1, or 0.5 if only one mountain
+      const normalizedPos = mountainCount > 1 ? i / (mountainCount - 1) : 0.5; // 0 to 1, or 0.5 if only one mountain
       const baseX = (normalizedPos - 0.5) * mountainSpread;
-      const x = baseX + (Math.random() - 0.5) * (mountainSpread / Math.max(Config.MOUNTAIN_CONFIG.count, 1)); // Add small random offset
+      const x = baseX + (Math.random() - 0.5) * (mountainSpread / Math.max(mountainCount, 1)); // Add small random offset
       const height = Config.MOUNTAIN_CONFIG.heightMin + Math.random() * (Config.MOUNTAIN_CONFIG.heightMax - Config.MOUNTAIN_CONFIG.heightMin);
       const z = -(Config.MOUNTAIN_CONFIG.distanceMin + Math.random() * (Config.MOUNTAIN_CONFIG.distanceMax - Config.MOUNTAIN_CONFIG.distanceMin));
       const radius = height * 1.8; // Radius proportional to height
 
-      const geometry = new THREE.ConeGeometry(radius, height, 8);
-      const material = new THREE.MeshLambertMaterial(
-      {
-        map: mountainTexture,
-        side: THREE.FrontSide
-      });
+      // Scale: radius in X/Z, height in Y
+      dummyScale.set(radius / baseRadius, height / baseHeight, radius / baseRadius);
 
-      const mountain = new THREE.Mesh(geometry, material);
-      // Position so base aligns with brown ground at y = -0.1
-      // ConeGeometry base is at y = 0 relative to geometry center, so position at -0.1
-      mountain.position.set(x, -0.1, z);
-      mountain.castShadow = true;
-      mountain.receiveShadow = true;
+      // Position matching original: center at height/2 - 5
+      // ConeGeometry extends from y=0 (base) to y=height (tip), center is at height/2
+      // Original code: mountain.position.set(x, height/2 - 5, z)
+      const centerY = height / 2 - 5;
+      dummyPosition.set(x, centerY, z);
 
-      this.scene.add(mountain);
-      this.mountains.push(mountain);
+      dummyMatrix.compose(dummyPosition, dummyQuat, dummyScale);
+      mountainMesh.setMatrixAt(i, dummyMatrix);
     }
+
+    mountainMesh.instanceMatrix.needsUpdate = true;
+    this.scene.add(mountainMesh);
+    this.mountainMesh = mountainMesh;
 
     // Store texture reference for cleanup
     this.mountainTexture = mountainTexture;
@@ -461,11 +481,12 @@ export class Landscape
   dispose()
   {
     // Remove mountains
-    for (const mountain of this.mountains)
+    if (this.mountainMesh)
     {
-      this.scene.remove(mountain);
-      mountain.geometry.dispose();
-      mountain.material.dispose();
+      this.scene.remove(this.mountainMesh);
+      this.mountainMesh.geometry.dispose();
+      this.mountainMesh.material.dispose();
+      this.mountainMesh = null;
     }
     // Dispose shared mountain texture
     if (this.mountainTexture)
@@ -489,9 +510,6 @@ export class Landscape
       this.treeFoliageMesh.material.dispose();
       this.treeFoliageMesh = null;
     }
-
-    // Clear arrays
-    this.mountains = [];
 
     if (this.greenGroundMesh)
     {
