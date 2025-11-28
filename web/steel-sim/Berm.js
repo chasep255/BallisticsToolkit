@@ -14,6 +14,11 @@ import
   ImpactMarkFactory
 }
 from './ImpactMark.js';
+import
+{
+  Config
+}
+from './config.js';
 
 /**
  * Berm - A sand/dirt mound behind a target rack to catch missed shots
@@ -269,21 +274,16 @@ export class BermFactory
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
 
             // Sand dust for berm impacts
-            const dustColor = {
-              r: 245,
-              g: 220,
-              b: 170
-            }; // Light sandy/yellow-tan
             DustCloudFactory.create(
             {
               position: pos,
               scene: scene,
-              numParticles: 1000,
-              color: dustColor,
+              numParticles: Config.BERM_DUST_CONFIG.numParticles,
+              color: Config.BERM_DUST_CONFIG.color,
               windGenerator: windGenerator,
-              initialRadius: 0.05,
-              growthRate: 0.15,
-              particleDiameter: 0.5
+              initialRadius: Config.BERM_DUST_CONFIG.initialRadius,
+              growthRate: Config.BERM_DUST_CONFIG.growthRate,
+              particleDiameter: Config.BERM_DUST_CONFIG.particleDiameter
             });
 
             // Impact mark - stretched based on impact angle

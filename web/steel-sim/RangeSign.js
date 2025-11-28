@@ -213,27 +213,17 @@ export class RangeSign
             const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
 
             // Wood splinter dust for post, white dust for sign board
-            const dustColor = isPost ?
-            {
-              r: 139,
-              g: 90,
-              b: 43
-            } :
-            {
-              r: 220,
-              g: 220,
-              b: 220
-            };
+            const dustConfig = isPost ? Config.WOOD_DUST_CONFIG : Config.SIGN_BOARD_DUST_CONFIG;
             DustCloudFactory.create(
             {
               position: pos,
               scene: scene,
-              numParticles: 150,
-              color: dustColor,
+              numParticles: dustConfig.numParticles,
+              color: dustConfig.color,
               windGenerator: windGenerator,
-              initialRadius: 0.02,
-              growthRate: 0.06,
-              particleDiameter: 0.4
+              initialRadius: dustConfig.initialRadius,
+              growthRate: dustConfig.growthRate,
+              particleDiameter: dustConfig.particleDiameter
             });
 
             if (isPost)
@@ -471,21 +461,16 @@ export class RangeSignFactory
             onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
             {
               const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
-              const dustColor = {
-                r: 139,
-                g: 90,
-                b: 43
-              };
               DustCloudFactory.create(
               {
                 position: pos,
                 scene: scene,
-                numParticles: 150,
-                color: dustColor,
+                numParticles: Config.WOOD_DUST_CONFIG.numParticles,
+                color: Config.WOOD_DUST_CONFIG.color,
                 windGenerator: windGenerator,
-                initialRadius: 0.02,
-                growthRate: 0.06,
-                particleDiameter: 0.4
+                initialRadius: Config.WOOD_DUST_CONFIG.initialRadius,
+                growthRate: Config.WOOD_DUST_CONFIG.growthRate,
+                particleDiameter: Config.WOOD_DUST_CONFIG.particleDiameter
               });
               ImpactMarkFactory.create(
               {
@@ -512,21 +497,16 @@ export class RangeSignFactory
             onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
             {
               const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
-              const dustColor = {
-                r: 220,
-                g: 220,
-                b: 220
-              };
               DustCloudFactory.create(
               {
                 position: pos,
                 scene: scene,
-                numParticles: 150,
-                color: dustColor,
+                numParticles: Config.SIGN_BOARD_DUST_CONFIG.numParticles,
+                color: Config.SIGN_BOARD_DUST_CONFIG.color,
                 windGenerator: windGenerator,
-                initialRadius: 0.02,
-                growthRate: 0.06,
-                particleDiameter: 0.4
+                initialRadius: Config.SIGN_BOARD_DUST_CONFIG.initialRadius,
+                growthRate: Config.SIGN_BOARD_DUST_CONFIG.growthRate,
+                particleDiameter: Config.SIGN_BOARD_DUST_CONFIG.particleDiameter
               });
               ImpactMarkFactory.create(
               {

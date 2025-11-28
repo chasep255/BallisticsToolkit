@@ -303,17 +303,12 @@ export class WindFlag
           {
             position: pos,
             scene: scene,
-            numParticles: 150,
-            color:
-            {
-              r: 160,
-              g: 160,
-              b: 160
-            }, // Light grey
+            numParticles: Config.METAL_FRAME_DUST_CONFIG.numParticles,
+            color: Config.METAL_FRAME_DUST_CONFIG.color,
             windGenerator: windGenerator,
-            initialRadius: 0.02,
-            growthRate: 0.06,
-            particleDiameter: 0.3
+            initialRadius: Config.METAL_FRAME_DUST_CONFIG.initialRadius,
+            growthRate: Config.METAL_FRAME_DUST_CONFIG.growthRate,
+            particleDiameter: Config.METAL_FRAME_DUST_CONFIG.particleDiameter
           });
 
           // Small dark impact mark (1cm)

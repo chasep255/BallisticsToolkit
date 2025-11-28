@@ -44,16 +44,68 @@ export function initConfig()
   };
   // ===== DUST CLOUD CONFIGURATIONS =====
   Config.GROUND_DUST_CONFIG = {
-    numParticles: 1000,
+    numParticles: 250,
     color:
     {
       r: 139,
       g: 115,
       b: 85
     }, // Brown/tan
-    initialRadius: btk.Conversions.inchesToMeters(3), // 3 inches
-    growthRate: btk.Conversions.feetToMeters(0.1), // 0.1 feet/second
-    particleDiameter: btk.Conversions.inchesToMeters(0.2) // 0.2 inches
+    initialRadius: 0.05, // 5cm
+    growthRate: 0.15, // 0.15 m/s
+    particleDiameter: 0.1 // 5cm
+  };
+
+  Config.BERM_DUST_CONFIG = {
+    numParticles: 250,
+    color:
+    {
+      r: 245,
+      g: 220,
+      b: 170
+    }, // Light sandy/yellow-tan
+    initialRadius: 0.01, // 5cm
+    growthRate: 0.05, // 0.15 m/s
+    particleDiameter: 0.2
+  };
+
+  Config.WOOD_DUST_CONFIG = {
+    numParticles: 150,
+    color:
+    {
+      r: 139,
+      g: 90,
+      b: 43
+    }, // Brown wood splinter color
+    initialRadius: 0.02, // 2cm
+    growthRate: 0.06, // 0.06 m/s
+    particleDiameter: 0.1
+  };
+
+  Config.SIGN_BOARD_DUST_CONFIG = {
+    numParticles: 150,
+    color:
+    {
+      r: 220,
+      g: 220,
+      b: 220
+    }, // White/light grey for sign board
+    initialRadius: 0.02, // 2cm
+    growthRate: 0.06, // 0.06 m/s
+    particleDiameter: 0.1
+  };
+
+  Config.METAL_FRAME_DUST_CONFIG = {
+    numParticles: 150,
+    color:
+    {
+      r: 170,
+      g: 170,
+      b: 170
+    }, // Light grey for metal frames/poles
+    initialRadius: 0.02, // 2cm
+    growthRate: 0.06, // 0.06 m/s
+    particleDiameter: 0.1
   };
 
   Config.METAL_DUST_CONFIG = {
@@ -66,7 +118,7 @@ export function initConfig()
     }, // Silver/gray
     initialRadius: btk.Conversions.inchesToMeters(1), // 1 inch
     growthRate: btk.Conversions.feetToMeters(1.0), // 1.0 feet/second
-    particleDiameter: btk.Conversions.inchesToMeters(0.2) // 0.2 inches
+    particleDiameter: btk.Conversions.inchesToMeters(0.3) // 0.3 inches
   };
 
   // ===== LANDSCAPE CONFIGURATION =====
