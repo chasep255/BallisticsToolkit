@@ -12,6 +12,11 @@
  */
 
 import * as THREE from 'three';
+import
+{
+  RenderStats
+}
+from './RenderStats.js';
 
 /**
  * CompositionLayer - Represents a composited layer with its own render target
@@ -82,7 +87,17 @@ export class CompositionLayer
       renderer.clear();
     }
 
-    renderer.render(scene, camera);
+    const renderStats = this._compositionRenderer.renderStats;
+    if (renderStats)
+    {
+      renderStats.render(renderer, scene, camera, `CompositionLayer.${this.handle}`);
+    }
+    else
+    {
+      renderer.info.reset();
+      renderer.render(scene, camera);
+    }
+
     renderer.setRenderTarget(prevTarget);
   }
 
@@ -137,6 +152,9 @@ export class CompositionRenderer
     // Track elements by handle
     this.elements = new Map();
     this.nextHandle = 1;
+
+    // Render statistics collector (optional, passed from parent)
+    this.renderStats = config.renderStats || null;
   }
 
   /**
@@ -375,7 +393,15 @@ export class CompositionRenderer
     // Ensure clear color is set before clearing
     this.renderer.setClearColor(0x3a3d41, 1.0);
     this.renderer.clear();
-    this.renderer.render(this.compositionScene, this.compositionCamera);
+    
+    if (this.renderStats)
+    {
+      this.renderStats.render(this.renderer, this.compositionScene, this.compositionCamera, 'CompositionRenderer.final');
+    }
+    else
+    {
+      this.renderer.render(this.compositionScene, this.compositionCamera);
+    }
   }
 
   /**

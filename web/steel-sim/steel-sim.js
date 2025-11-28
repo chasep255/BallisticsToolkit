@@ -52,6 +52,11 @@ import
 from './HUD.js';
 import
 {
+  RenderStats
+}
+from './RenderStats.js';
+import
+{
   ImpactDetector
 }
 from './ImpactDetector.js';
@@ -205,11 +210,8 @@ class SteelSimulator
     // Event handler references for cleanup
     this.boundHandlers = {};
 
-    // FPS tracking
-    this.fpsFrameCount = 0;
-    this.fpsStartTime = null;
-    this.fpsLastLogTime = null;
-    this.fpsTotalFrameTime = 0;
+    // Render statistics collector (handles both render stats and FPS tracking)
+    this.renderStats = new RenderStats();
   }
 
   // ===== LIFECYCLE METHODS =====
@@ -541,7 +543,8 @@ class SteelSimulator
     // Setup composition renderer
     this.compositionRenderer = new CompositionRenderer(
     {
-      canvas: this.canvas
+      canvas: this.canvas,
+      renderStats: this.renderStats // Pass render stats collector
     });
 
     // Load textures now that renderer is available
@@ -592,6 +595,7 @@ class SteelSimulator
       renderTarget: this.spottingScopeLayer.renderTarget,
       renderer: this.spottingScopeLayer.getRenderer(),
       layer: this.spottingScopeLayer,
+      renderStats: this.renderStats, // Pass render stats collector
       minZoomX: 4.0,
       maxZoomX: 40.0,
       lowFovFeet: 25,
@@ -629,6 +633,7 @@ class SteelSimulator
       renderTarget: this.scopeLayer.renderTarget,
       renderer: this.scopeLayer.getRenderer(), // Must use the renderer that created the render target
       layer: this.scopeLayer,
+      renderStats: this.renderStats, // Pass render stats collector
       audioManager: this.audioManager, // Pass audio manager for scope click sounds
       // Scope optical spec (4–40x, 25 ft @ 100 yd at 4x)
       minZoomX: 4.0,
@@ -1911,6 +1916,12 @@ class SteelSimulator
     if (!this.isRunning) return;
 
     const frameStartTime = performance.now();
+    
+    // Mark frame start in render stats
+    if (this.renderStats)
+    {
+      this.renderStats.frameStart();
+    }
 
     this.animationId = requestAnimationFrame(() => this.animate());
 
@@ -1918,18 +1929,14 @@ class SteelSimulator
     this.timeManager.update();
     const dt = this.timeManager.getDeltaTime();
 
+    this.windGenerator.advanceTime(this.timeManager.getElapsedTime());
+
     // Break dt into fixed-size substeps (max 5ms each)
     const numSubsteps = Math.ceil(dt / Config.INTEGRATION_STEP_S);
     const stepDt = dt / numSubsteps;
 
     for (let i = 0; i < numSubsteps; i++)
     {
-      // Update wind generator time
-      if (this.windGenerator)
-      {
-        this.windGenerator.advanceTime(this.timeManager.getElapsedTime());
-      }
-
       // Update active bullets (physics)
       ShotFactory.updateAll(stepDt);
 
@@ -1979,44 +1986,30 @@ class SteelSimulator
     // Composite everything to screen
     this.compositionRenderer.render();
 
-
-    // Track FPS
-    const frameEndTime = performance.now();
-    const frameTime = frameEndTime - frameStartTime;
-    this.fpsTotalFrameTime += frameTime;
-    this.fpsFrameCount++;
-
-    // Initialize timing on first frame
-    if (this.fpsStartTime === null)
+    // Mark frame complete in render stats
+    if (this.renderStats)
     {
-      this.fpsStartTime = frameStartTime;
-      this.fpsLastLogTime = frameStartTime;
-    }
+      this.renderStats.frameComplete();
 
-    // Log FPS at configured interval
-    const timeSinceLastLog = (frameEndTime - this.fpsLastLogTime) / 1000.0;
-    if (timeSinceLastLog >= Config.FPS_LOG_INTERVAL_S)
-    {
-      // Calculate actual FPS (frames rendered over wall clock time)
-      const actualFps = this.fpsFrameCount / timeSinceLastLog;
-
-      // Calculate theoretical FPS (if we rendered as fast as possible)
-      const avgFrameTime = this.fpsTotalFrameTime / this.fpsFrameCount;
-      const theoreticalFps = 1000.0 / avgFrameTime;
-
-      const movingTargets = SteelTargetFactory.getMovingCount();
-      console.log(`FPS: Actual=${actualFps.toFixed(1)} (limited by requestAnimationFrame), Theoretical=${theoreticalFps.toFixed(1)} (if unlimited), Moving targets=${movingTargets}`);
-
-      // Update HUD frame rate display
-      if (this.hud)
+      // Update HUD FPS every second
+      const now = performance.now();
+      if (!this.lastHudUpdateTime) this.lastHudUpdateTime = now;
+      if (now - this.lastHudUpdateTime >= 1000 && this.hud)
       {
-        this.hud.updateFrameRate(actualFps);
+        const elapsedSeconds = (now - this.lastHudUpdateTime) / 1000.0;
+        const framesSinceLastUpdate = this.renderStats.getTotalFrameCount() - (this.lastHudFrameCount || 0);
+        const fps = framesSinceLastUpdate / elapsedSeconds;
+        this.hud.updateFrameRate(fps);
+        this.lastHudUpdateTime = now;
+        this.lastHudFrameCount = this.renderStats.getTotalFrameCount();
       }
 
-      // Reset counters
-      this.fpsFrameCount = 0;
-      this.fpsLastLogTime = frameEndTime;
-      this.fpsTotalFrameTime = 0;
+      // Log render statistics every 300 frames
+      if (this.renderStats.getFrameCount() >= 300)
+      {
+        this.renderStats.logStats();
+        this.renderStats.reset();
+      }
     }
   }
 }

@@ -14,6 +14,11 @@ import
   Config
 }
 from './config.js';
+import
+{
+  RenderStats
+}
+from './RenderStats.js';
 
 // Reticle mapping constant.
 // In the original shader-based implementation, the relationship between
@@ -101,8 +106,8 @@ export class Scope
     // Only used if hasDials is true
     this.elevationClicks = 0; // Positive = dial up (bullet impacts high)
 
-    // Frame counter for throttling render stats logging
-    this.renderStatsFrameCount = 0;
+    // Render statistics collector (optional, passed from parent)
+    this.renderStats = config.renderStats || null;
     this.windageClicks = 0; // Positive = dial right (bullet impacts right)
 
     // Dial constants
@@ -824,16 +829,14 @@ export class Scope
     // Step 1: Render 3D scene to internal render target
     this.renderer.setRenderTarget(this.sceneRenderTarget);
     this.renderer.clear();
-    this.renderer.info.reset(); // Reset render stats before rendering
-    this.renderer.render(this.scene, this.camera);
-
-    // Log render stats every 60 frames (~1 second at 60fps)
-    this.renderStatsFrameCount++;
-    if (this.renderStatsFrameCount >= 60)
+    
+    if (this.renderStats)
     {
-      const info = this.renderer.info.render;
-      console.log(`[Scope] Triangles: ${info.triangles}, Draw calls: ${info.calls}, Points: ${info.points}, Lines: ${info.lines}`);
-      this.renderStatsFrameCount = 0;
+      this.renderStats.render(this.renderer, this.scene, this.camera, `Scope.${this.hasReticle ? 'rifle' : 'spotting'}.3DScene`);
+    }
+    else
+    {
+      this.renderer.render(this.scene, this.camera);
     }
 
     // Step 2: Composite scene + reticle to output render target
@@ -841,7 +844,15 @@ export class Scope
     this.renderer.setRenderTarget(this.outputRenderTarget);
     this.renderer.setClearColor(0x000000, 0.0); // Transparent black
     this.renderer.clear();
-    this.renderer.render(this.internalScene, this.internalCamera);
+    
+    if (this.renderStats)
+    {
+      this.renderStats.render(this.renderer, this.internalScene, this.internalCamera, `Scope.${this.hasReticle ? 'rifle' : 'spotting'}.InternalScene`);
+    }
+    else
+    {
+      this.renderer.render(this.internalScene, this.internalCamera);
+    }
 
     // Mark output texture as updated
     this.outputRenderTarget.texture.needsUpdate = true;
