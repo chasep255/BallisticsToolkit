@@ -291,7 +291,6 @@ export class BermFactory
             {
               position: pos,
               normal: normal,
-              velocity: velocity,
               mesh: targetMesh,
               color: 0x8b7a65, // Sandy tan
               size: 1.0

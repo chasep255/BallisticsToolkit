@@ -14,30 +14,23 @@ from 'three/addons/geometries/DecalGeometry.js';
 export class ImpactMarkFactory
 {
   static MAX_MARKS = 32;
-  static MARK_SIZE = 0.10; // Base size 10cm
-
-  // Stretch limits for grazing angles
-  static MAX_STRETCH = 4.0;
-  static MIN_COS_ANGLE = 0.15;
+  static MARK_SIZE = 0.1;
 
   // Static state
   static scene = null;
   static texture = null;
   static decals = []; // Array of decal meshes
-  static materials = new Map(); // Cache materials by color
 
   // Temporary vectors
   static _orientation = new THREE.Euler();
   static _size = new THREE.Vector3();
-  static _velocityDir = new THREE.Vector3();
-  static _projectedVelocity = new THREE.Vector3();
 
   /**
-   * Create a procedural splat texture
+   * Create a procedural dirt impact texture (dark divot with soft edges)
    */
   static createSplatTexture()
   {
-    const size = 128;
+    const size = 512; // Higher resolution for sharper detail
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
@@ -47,63 +40,76 @@ export class ImpactMarkFactory
 
     const centerX = size / 2;
     const centerY = size / 2;
-    const radius = size / 2 - 4;
+    const radius = size / 2 - 4; // Soft outer edge
 
-    // Radial gradient for soft edges
+    // Single smooth radial gradient - grayscale (material color will tint this)
     const gradient = ctx.createRadialGradient(
       centerX, centerY, 0,
       centerX, centerY, radius
     );
-
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-    gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.8)');
-    gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.5)');
-    gradient.addColorStop(0.85, 'rgba(255, 255, 255, 0.2)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    gradient.addColorStop(0, 'rgba(20, 20, 20, 0.95)'); // Very dark center
+    gradient.addColorStop(0.3, 'rgba(40, 40, 40, 0.8)'); // Dark
+    gradient.addColorStop(0.6, 'rgba(80, 80, 80, 0.4)'); // Medium
+    gradient.addColorStop(0.85, 'rgba(120, 120, 120, 0.15)'); // Light
+    gradient.addColorStop(1, 'rgba(140, 140, 140, 0)'); // Transparent edge
 
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Add noise
+    // Add irregular edge noise for realism
     const imageData = ctx.getImageData(0, 0, size, size);
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4)
     {
-      const noise = (Math.random() - 0.5) * 30;
-      data[i + 3] = Math.max(0, Math.min(255, data[i + 3] + noise));
+      const x = (i / 4) % size;
+      const y = Math.floor((i / 4) / size);
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      // Add noise to alpha channel for irregular edges (only in outer region)
+      if (dist > radius * 0.5 && dist < radius)
+      {
+        const noise = (Math.random() - 0.5) * 20;
+        data[i + 3] = Math.max(0, Math.min(255, data[i + 3] + noise));
+      }
     }
     ctx.putImageData(imageData, 0, 0);
 
     const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter; // Disable mipmapping for sharper detail
+    texture.generateMipmaps = false;
     texture.needsUpdate = true;
     return texture;
   }
 
   /**
-   * Get or create a material for a given color
+   * Create a material for a given color
    */
-  static getMaterial(color)
+  static createMaterial(color)
   {
-    const colorKey = typeof color === 'number' ? color : color.getHex();
-
-    if (!ImpactMarkFactory.materials.has(colorKey))
+    if (!ImpactMarkFactory.texture)
     {
-      const material = new THREE.MeshBasicMaterial(
-      {
-        map: ImpactMarkFactory.texture,
-        color: colorKey,
-        transparent: true,
-        depthWrite: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -4, // Push decal towards camera to avoid z-fighting
-        polygonOffsetUnits: -4
-      });
-      ImpactMarkFactory.materials.set(colorKey, material);
+      console.error('[ImpactMarkFactory] Texture not initialized. Call init(scene) first.');
+      return null;
     }
 
-    return ImpactMarkFactory.materials.get(colorKey);
+    const colorKey = typeof color === 'number' ? color : color.getHex();
+
+    return new THREE.MeshBasicMaterial(
+    {
+      map: ImpactMarkFactory.texture,
+      color: colorKey,
+      transparent: true,
+      blending: THREE.MultiplyBlending, // Darken surface instead of brightening
+      premultipliedAlpha: true, // Required for MultiplyBlending
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -4, // Push decal towards camera to avoid z-fighting
+      polygonOffsetUnits: -4
+    });
   }
 
   /**
@@ -125,8 +131,7 @@ export class ImpactMarkFactory
    * @param {Object} options
    * @param {THREE.Vector3} options.position - Impact position
    * @param {THREE.Vector3} options.normal - Surface normal
-   * @param {THREE.Vector3} options.velocity - Bullet velocity (optional)
-   * @param {THREE.Mesh} options.mesh - Target mesh to project onto (optional)
+   * @param {THREE.Mesh} options.mesh - Target mesh to project onto (required)
    * @param {number} options.color - Color (default: dark brown)
    * @param {number} options.size - Size multiplier (default: 1.0)
    */
@@ -136,7 +141,6 @@ export class ImpactMarkFactory
     {
       position,
       normal,
-      velocity,
       mesh,
       color = 0x3d2817,
       size = 1.0
@@ -148,81 +152,49 @@ export class ImpactMarkFactory
       return;
     }
 
-    // Calculate stretch based on impact angle
-    let stretchX = 1.0;
-    let stretchY = 1.0;
-    const normalNorm = normal.clone().normalize();
-
-    if (velocity && velocity.lengthSq() > 0)
+    // Require a mesh for DecalGeometry projection
+    if (!mesh)
     {
-      ImpactMarkFactory._velocityDir.copy(velocity).normalize();
-      const cosAngle = Math.abs(ImpactMarkFactory._velocityDir.dot(normalNorm));
-      const clampedCos = Math.max(cosAngle, ImpactMarkFactory.MIN_COS_ANGLE);
-      const stretch = Math.min(1.0 / clampedCos, ImpactMarkFactory.MAX_STRETCH);
-      stretchX = stretch;
+      console.warn('[ImpactMarkFactory] No mesh provided, cannot create impact mark');
+      return;
     }
 
     // Calculate orientation from normal
     // DecalGeometry expects orientation as Euler angles pointing in the decal's direction
+    const normalNorm = normal.clone().normalize();
     const lookTarget = position.clone().add(normalNorm);
     const helper = new THREE.Object3D();
     helper.position.copy(position);
     helper.lookAt(lookTarget);
-
-    // If we have velocity, rotate around normal to align stretch with velocity direction
-    if (velocity && velocity.lengthSq() > 0)
-    {
-      // Project velocity onto surface plane
-      const dotVN = ImpactMarkFactory._velocityDir.dot(normalNorm);
-      ImpactMarkFactory._projectedVelocity.copy(ImpactMarkFactory._velocityDir);
-      ImpactMarkFactory._projectedVelocity.addScaledVector(normalNorm, -dotVN);
-
-      if (ImpactMarkFactory._projectedVelocity.lengthSq() > 0.0001)
-      {
-        ImpactMarkFactory._projectedVelocity.normalize();
-        // Calculate rotation angle around normal
-        const angle = Math.atan2(
-          ImpactMarkFactory._projectedVelocity.x,
-          -ImpactMarkFactory._projectedVelocity.z
-        );
-        helper.rotateZ(angle);
-      }
-    }
-
     ImpactMarkFactory._orientation.copy(helper.rotation);
 
-    // Set size with stretch
+    // Set size (circular mark)
     const baseSize = ImpactMarkFactory.MARK_SIZE * size;
-    ImpactMarkFactory._size.set(baseSize * stretchX, baseSize * stretchY, baseSize);
+    ImpactMarkFactory._size.set(baseSize, baseSize, baseSize);
 
-    // Get material for this color
-    const material = ImpactMarkFactory.getMaterial(color);
-
-    let decalMesh;
-
-    if (mesh)
+    // Create material for this color
+    const material = ImpactMarkFactory.createMaterial(color);
+    if (!material)
     {
-      // Use DecalGeometry to project onto the mesh
-      try
-      {
-        const decalGeometry = new DecalGeometry(
-          mesh,
-          position,
-          ImpactMarkFactory._orientation,
-          ImpactMarkFactory._size
-        );
-        decalMesh = new THREE.Mesh(decalGeometry, material);
-      }
-      catch (e)
-      {
-        // Fallback to plane if DecalGeometry fails
-        decalMesh = ImpactMarkFactory.createPlaneMark(position, normalNorm, stretchX, stretchY, baseSize, material, velocity);
-      }
+      return; // Texture not initialized
     }
-    else
+
+    // Use DecalGeometry to project onto the mesh
+    let decalMesh;
+    try
     {
-      // No mesh provided - use simple plane (for ground, etc.)
-      decalMesh = ImpactMarkFactory.createPlaneMark(position, normalNorm, stretchX, stretchY, baseSize, material, velocity);
+      const decalGeometry = new DecalGeometry(
+        mesh,
+        position,
+        ImpactMarkFactory._orientation,
+        ImpactMarkFactory._size
+      );
+      decalMesh = new THREE.Mesh(decalGeometry, material);
+    }
+    catch (e)
+    {
+      console.error('[ImpactMarkFactory] Failed to create DecalGeometry:', e);
+      return;
     }
 
     decalMesh.renderOrder = 1; // Render after regular geometry
@@ -234,67 +206,17 @@ export class ImpactMarkFactory
     {
       const oldDecal = ImpactMarkFactory.decals.shift();
       ImpactMarkFactory.scene.remove(oldDecal);
-      if (oldDecal.geometry) oldDecal.geometry.dispose();
+      if (oldDecal.geometry)
+      {
+        oldDecal.geometry.dispose();
+      }
+      if (oldDecal.material)
+      {
+        oldDecal.material.dispose();
+      }
     }
   }
 
-  /**
-   * Create a simple plane mark (fallback when no mesh available)
-   */
-  static createPlaneMark(position, normal, stretchX, stretchY, baseSize, material, velocity)
-  {
-    const geometry = new THREE.PlaneGeometry(baseSize * stretchX * 2, baseSize * stretchY * 2);
-    const planeMesh = new THREE.Mesh(geometry, material);
-
-    // Position slightly above surface
-    planeMesh.position.copy(position);
-    planeMesh.position.addScaledVector(normal, 0.005);
-
-    // Build orientation from basis vectors (same as DecalGeometry approach)
-    const normalNorm = normal.clone().normalize();
-    let xAxis, yAxis, zAxis;
-    zAxis = normalNorm.clone();
-
-    if (velocity && velocity.lengthSq() > 0)
-    {
-      // Project velocity onto surface to get stretch direction
-      const velocityDir = velocity.clone().normalize();
-      const dotVN = velocityDir.dot(normalNorm);
-      const projectedVel = velocityDir.clone().addScaledVector(normalNorm, -dotVN);
-
-      if (projectedVel.lengthSq() > 0.0001)
-      {
-        xAxis = projectedVel.normalize();
-        yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
-        xAxis.crossVectors(yAxis, zAxis).normalize();
-      }
-      else
-      {
-        // Velocity is perpendicular to surface - use arbitrary orientation
-        const arbitrary = Math.abs(normalNorm.y) < 0.9 ?
-          new THREE.Vector3(0, 1, 0) :
-          new THREE.Vector3(1, 0, 0);
-        yAxis = new THREE.Vector3().crossVectors(zAxis, arbitrary).normalize();
-        xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
-      }
-    }
-    else
-    {
-      // No velocity - use arbitrary orientation
-      const arbitrary = Math.abs(normalNorm.y) < 0.9 ?
-        new THREE.Vector3(0, 1, 0) :
-        new THREE.Vector3(1, 0, 0);
-      yAxis = new THREE.Vector3().crossVectors(zAxis, arbitrary).normalize();
-      xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
-    }
-
-    // Build rotation matrix and apply
-    const rotMatrix = new THREE.Matrix4();
-    rotMatrix.makeBasis(xAxis, yAxis, zAxis);
-    planeMesh.quaternion.setFromRotationMatrix(rotMatrix);
-
-    return planeMesh;
-  }
 
   /**
    * Delete all impact marks
@@ -307,7 +229,14 @@ export class ImpactMarkFactory
       {
         ImpactMarkFactory.scene.remove(decal);
       }
-      if (decal.geometry) decal.geometry.dispose();
+      if (decal.geometry)
+      {
+        decal.geometry.dispose();
+      }
+      if (decal.material)
+      {
+        decal.material.dispose();
+      }
     }
     ImpactMarkFactory.decals = [];
   }
@@ -319,18 +248,14 @@ export class ImpactMarkFactory
   {
     ImpactMarkFactory.deleteAll();
 
+    // Dispose texture
     if (ImpactMarkFactory.texture)
     {
       ImpactMarkFactory.texture.dispose();
       ImpactMarkFactory.texture = null;
     }
 
-    for (const material of ImpactMarkFactory.materials.values())
-    {
-      material.dispose();
-    }
-    ImpactMarkFactory.materials.clear();
-
+    // Clear scene reference
     ImpactMarkFactory.scene = null;
   }
 

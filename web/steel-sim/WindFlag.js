@@ -321,7 +321,6 @@ export class WindFlag
           {
             position: pos,
             normal: normal,
-            velocity: velocity,
             mesh: targetMesh,
             color: 0x2a2a2a, // Dark grey
             size: 0.2 // 1cm

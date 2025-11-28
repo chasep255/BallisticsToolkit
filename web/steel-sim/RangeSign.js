@@ -243,7 +243,6 @@ export class RangeSign
               {
                 position: pos,
                 normal: normal,
-                velocity: velocity,
                 mesh: targetMesh,
                 color: 0xd4c4a8, // Light tan
                 size: 0.2 // 2.5cm patch
@@ -256,7 +255,6 @@ export class RangeSign
               {
                 position: pos,
                 normal: normal,
-                velocity: velocity,
                 mesh: targetMesh,
                 color: 0x404040, // Dark grey for sign
                 size: 0.2 // 1cm
@@ -493,7 +491,6 @@ export class RangeSignFactory
               {
                 position: pos,
                 normal: normal,
-                velocity: velocity,
                 mesh: targetMesh,
                 color: 0xd4c4a8,
                 size: 0.2
@@ -535,7 +532,6 @@ export class RangeSignFactory
               {
                 position: pos,
                 normal: normal,
-                velocity: velocity,
                 mesh: targetMesh,
                 color: 0x404040,
                 size: 0.2

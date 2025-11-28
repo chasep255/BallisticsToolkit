@@ -1882,15 +1882,7 @@ class SteelSimulator
 
         this.createDustCloud(impactPoint);
 
-        // Create impact mark on ground - stretched based on impact angle
-        ImpactMarkFactory.create(
-        {
-          position: new THREE.Vector3(impactPoint.x, impactPoint.y, impactPoint.z),
-          normal: new THREE.Vector3(0, 1, 0),
-          velocity: impactVelocity,
-          color: 0x4d4837, // Dark brown
-          size: 1.5 // Ground marks are bigger
-        });
+        // Note: No decal mark for ground impacts - dust cloud only
 
         impactPoint.delete();
 
