@@ -49,9 +49,12 @@ export class Landscape
     this.brownGroundLength = brownGroundLength;
     this.textureManager = textureManager;
 
-    // Environment object arrays
+    // Environment objects
     this.mountains = [];
-    this.trees = [];
+
+    // Instanced meshes for trees (no per-tree tracking)
+    this.treeTrunkMesh = null;
+    this.treeFoliageMesh = null;
 
     // Create green ground plane (flat)
     // Three.js: X=right, Y=up, Z=towards-camera (negative Z = downrange)
@@ -373,24 +376,32 @@ export class Landscape
     });
    
 
-    // Cache tree geometries - multiple sizes
-    const trunkGeometries = [];
-    const foliageGeometries = [];
+    // Base tree geometries (single geometry for trunks and foliage)
+    const trunkRadius = 0.25;
+    const trunkHeight = 3.5;
+    const trunkGeometry = new THREE.CylinderGeometry(trunkRadius, trunkRadius * 1.2, trunkHeight, 8);
 
-    for (let i = 0; i < 3; i++)
-    {
-      const trunkRadius = 0.2 + i * 0.1;
-      const trunkHeight = 3 + i * 0.5;
-      const trunkGeo = new THREE.CylinderGeometry(trunkRadius, trunkRadius * 1.2, trunkHeight, 8);
-      trunkGeometries.push(trunkGeo);
+    const foliageRadius = 2.5;
+    const foliageHeight = 5.5;
+    const foliageGeometry = new THREE.ConeGeometry(foliageRadius, foliageHeight, 8);
 
-      const foliageRadius = 2 + i * 0.5;
-      const foliageHeight = 5 + i * 1;
-      const foliageGeo = new THREE.ConeGeometry(foliageRadius, foliageHeight, 8);
-      foliageGeometries.push(foliageGeo);
-    }
+    // Create instanced meshes (one for all trunks, one for all foliage)
+    const trunkMesh = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, treeCount);
+    trunkMesh.castShadow = true;
+    trunkMesh.receiveShadow = true;
+    this.scene.add(trunkMesh);
+    this.treeTrunkMesh = trunkMesh;
 
-    // Create trees
+    const foliageMesh = new THREE.InstancedMesh(foliageGeometry, foliageMaterial, treeCount);
+    foliageMesh.castShadow = true;
+    foliageMesh.receiveShadow = true;
+    this.scene.add(foliageMesh);
+    this.treeFoliageMesh = foliageMesh;
+
+    const dummyMatrix = new THREE.Matrix4();
+    const dummyScale = new THREE.Vector3();
+
+    // Create trees as instances in the instanced meshes
     for (let i = 0; i < treeCount; i++)
     {
       let x, z;
@@ -413,30 +424,33 @@ export class Landscape
       // Get ground height at this position
       const groundHeight = this.getHeightAt(x, z) || 0;
 
-      // Vary tree size
-      const sizeVariant = Math.floor(Math.random() * 3);
-      const trunkGeo = trunkGeometries[sizeVariant];
-      const foliageGeo = foliageGeometries[sizeVariant];
+      // Simple size variation using uniform scale
+      const sizeVariant = Math.random(); // 0..1
+      const scale = 0.85 + sizeVariant * 0.6; // ~0.85x to 1.45x
+      dummyScale.set(scale, scale, scale);
 
-      const actualTrunkHeight = 3 + sizeVariant * 0.5;
-      const actualFoliageHeight = 5 + sizeVariant * 1;
+      // Trunk instance matrix
+      const trunkHeightScaled = trunkHeight * scale;
+      dummyMatrix.compose(
+        new THREE.Vector3(x, groundHeight + trunkHeightScaled / 2, z),
+        new THREE.Quaternion(),
+        dummyScale
+      );
+      trunkMesh.setMatrixAt(i, dummyMatrix);
 
-      // Create trunk - positioned so bottom is at ground
-      const trunk = new THREE.Mesh(trunkGeo, trunkMaterial);
-      trunk.position.set(x, groundHeight + actualTrunkHeight / 2, z);
-      trunk.castShadow = true;
-      trunk.receiveShadow = true;
-      this.scene.add(trunk);
-      this.trees.push(trunk);
-
-      // Create foliage - positioned so base overlaps with top of trunk
-      const foliage = new THREE.Mesh(foliageGeo, foliageMaterial);
-      foliage.position.set(x, groundHeight + actualTrunkHeight + actualFoliageHeight / 2 - actualFoliageHeight * 0.25, z);
-      foliage.castShadow = true;
-      foliage.receiveShadow = true;
-      this.scene.add(foliage);
-      this.trees.push(foliage);
+      // Foliage instance matrix
+      const foliageHeightScaled = foliageHeight * scale;
+      const foliageY = groundHeight + trunkHeightScaled + foliageHeightScaled / 2 - foliageHeightScaled * 0.25;
+      dummyMatrix.compose(
+        new THREE.Vector3(x, foliageY, z),
+        new THREE.Quaternion(),
+        dummyScale
+      );
+      foliageMesh.setMatrixAt(i, dummyMatrix);
     }
+
+    trunkMesh.instanceMatrix.needsUpdate = true;
+    foliageMesh.instanceMatrix.needsUpdate = true;
   }
 
 
@@ -460,20 +474,24 @@ export class Landscape
       this.mountainTexture = null;
     }
 
-    // Remove trees
-    for (const tree of this.trees)
+    // Remove instanced tree meshes
+    if (this.treeTrunkMesh)
     {
-      this.scene.remove(tree);
-      tree.geometry.dispose();
-      if (tree.material)
-      {
-        tree.material.dispose();
-      }
+      this.scene.remove(this.treeTrunkMesh);
+      this.treeTrunkMesh.geometry.dispose();
+      this.treeTrunkMesh.material.dispose();
+      this.treeTrunkMesh = null;
+    }
+    if (this.treeFoliageMesh)
+    {
+      this.scene.remove(this.treeFoliageMesh);
+      this.treeFoliageMesh.geometry.dispose();
+      this.treeFoliageMesh.material.dispose();
+      this.treeFoliageMesh = null;
     }
 
     // Clear arrays
     this.mountains = [];
-    this.trees = [];
 
     if (this.greenGroundMesh)
     {
