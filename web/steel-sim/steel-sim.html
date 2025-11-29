@@ -139,10 +139,10 @@
       <!-- Quick Key Guide -->
       <div class="quick-keys">
         <div class="quick-keys-section">
-          <strong>Desktop:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/<kbd>E</kbd><kbd>Q</kbd> Spotting scope • Click rifle scope to enter • <kbd>Arrows</kbd> dial • <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> focus (when Experimental Optical Effects enabled) • <kbd>Esc</kbd> exit
+          <strong>Desktop:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/<kbd>E</kbd><kbd>Q</kbd> Spotting scope • Click rifle scope to enter • <kbd>Arrows</kbd> dial • <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> focus at center (when Experimental Optical Effects enabled) • <kbd>Esc</kbd> exit
         </div>
         <div class="quick-keys-section">
-          <strong>Mobile:</strong> Drag to pan • Pinch to zoom • Tap to fire • Long-press inside scope to refocus (when Experimental Optical Effects enabled) • Dial buttons next to HUD (hold to fast-dial)
+          <strong>Mobile:</strong> Drag to pan • Pinch to zoom • Tap to fire • Long-press inside scope to refocus where you press (when Experimental Optical Effects enabled) • Dial buttons next to HUD (hold to fast-dial)
         </div>
       </div>
     </div>
@@ -184,7 +184,7 @@
             - Move mouse to pan/aim the scope (reticle moves with cursor at 1:1 speed)<br>
             - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (4× to 40× magnification)<br>
             - Click to fire bullet from scope crosshair<br>
-            - <kbd>F</kbd> refocus rifle scope at crosshair distance (requires Experimental Optical Effects to be enabled)<br>
+            - <kbd>F</kbd> refocus rifle scope at center crosshair distance (requires Experimental Optical Effects to be enabled)<br>
             - <kbd>Shift</kbd>+<kbd>F</kbd> refocus spotting scope at center distance (requires Experimental Optical Effects to be enabled)<br>
             - <kbd>Esc</kbd> to exit scope mode (releases pointer lock)<br>
             - FFP reticle scales with zoom (maintains MRAD subtensions)<br><br>
@@ -207,7 +207,7 @@
 
             <strong>Rifle Scope:</strong><br>
             - <strong>Tap:</strong> Fire a shot (quick tap &lt; 150ms)<br>
-            - <strong>Long press (≈ 450ms) with minimal movement:</strong> Refocus scope at crosshair distance (requires Experimental Optical Effects to be enabled)<br><br>
+            - <strong>Long press (≈ 450ms) with minimal movement:</strong> Refocus scope at the point where you press (requires Experimental Optical Effects to be enabled)<br><br>
 
             <strong>Dial Buttons (on-screen, next to HUD):</strong><br>
             - <strong>U/D:</strong> Adjust elevation up/down (0.1 mrad per tap, hold to fast-dial)<br>
@@ -306,9 +306,18 @@
             <strong>Experimental Optical Effects:</strong><br>
             - Toggle via the \"Experimental Optical Effects\" checkbox in the settings bar (off by default).<br>
             - Enables physically-inspired depth-of-field blur and scope optics (56mm objective, zoom-dependent DOF).<br>
-            - Desktop: Use <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> to refocus rifle/spotting scopes at the crosshair distance.<br>
-            - Mobile: Long-press inside a scope (≈ 450ms, minimal movement) to refocus at the crosshair distance.<br>
-            - Increases GPU load; turn off on low-power or thermally constrained devices.
+            - Desktop: Use <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> to refocus rifle/spotting scopes at the center crosshair distance.<br>
+            - Mobile: Long-press inside a scope (≈ 450ms, minimal movement) to refocus at the point where you press.<br>
+            - Increases GPU load; turn off on low-power or thermally constrained devices.<br><br>
+            
+            <strong>Technical Details:</strong><br>
+            - Uses a thin-lens circle of confusion (CoC) model for physically accurate depth-of-field blur.<br>
+            - Lens parameters: 56mm objective diameter, focal length and f-number derived from scope FOV/zoom.<br>
+            - Blur radius calculated from CoC using: CoC = |(F²/(N·(df-F)))·((d-df)/d)| where F=focal length, N=f-number, df=focus distance, d=object distance.<br>
+            - Implements separable Gaussian blur (horizontal then vertical passes) for performance (O(2n) vs O(n²)).<br>
+            - Depth texture captured from scene render, decoded using THREE.js perspective depth reconstruction.<br>
+            - Default focal distance: 100 yards. Blur strength scales with zoom level (higher zoom = stronger blur).<br>
+            - Resolution-independent blur calculation ensures consistent appearance across different screen sizes.
           </div>
         </div>
         
