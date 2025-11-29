@@ -191,7 +191,13 @@ export class Scope
     // Store reference to depth texture
     this.depthTexture = this.sceneRenderTarget.depthTexture;
     
-    // Blur render target for depth-of-field effect
+    // Blur render targets for separable Gaussian blur (horizontal then vertical)
+    this.blurRenderTargetHorizontal = new THREE.WebGLRenderTarget(width, height,
+    {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat
+    });
     this.blurRenderTarget = new THREE.WebGLRenderTarget(width, height,
     {
       minFilter: THREE.LinearFilter,
@@ -210,21 +216,20 @@ export class Scope
     const METERS_PER_YARD = 0.9144;
     const focalDistanceMeters = this.focalDistance * METERS_PER_YARD;
     
-    // Blur shader that samples scene texture and depth texture
-    // Physically-inspired thin-lens DOF using circle of confusion (CoC)
-    const blurShader = new THREE.ShaderMaterial({
+    // Separable Gaussian blur shader (horizontal pass)
+    // This shader calculates blur radius from depth and performs horizontal blur
+    const blurShaderHorizontal = new THREE.ShaderMaterial({
       uniforms: {
         sceneTexture:    { value: this.sceneRenderTarget.texture },
         depthTexture:    { value: this.depthTexture },
-        resolution:      { value: new THREE.Vector2(this.blurRenderTarget.width, this.blurRenderTarget.height) },
-        focalDistance:   { value: focalDistanceMeters },           // focus distance in meters (updated per-frame)
+        resolution:      { value: new THREE.Vector2(this.blurRenderTargetHorizontal.width, this.blurRenderTargetHorizontal.height) },
+        focalDistance:   { value: focalDistanceMeters },
         cameraNear:      { value: Config.CAMERA_NEAR_PLANE },
         cameraFar:       { value: Config.CAMERA_FAR_PLANE },
-        maxBlurRadius:   { value: 8.0 },                          // Maximum blur radius in pixels
-        // Lens parameters (updated per-frame from current zoom/FOV)
-        lensFocalLength: { value: 0.3 },                           // placeholder, will be overridden
-        lensFNumber:     { value: 4.0 },                           // placeholder, will be overridden
-        sensorWidth:     { value: this.sensorWidth }               // virtual sensor width behind the scope
+        maxBlurRadius:   { value: 8.0 },
+        lensFocalLength: { value: 0.3 },
+        lensFNumber:     { value: 4.0 },
+        sensorWidth:     { value: this.sensorWidth }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -237,88 +242,158 @@ export class Scope
         uniform sampler2D sceneTexture;
         uniform sampler2D depthTexture;
         uniform vec2  resolution;
-        uniform float focalDistance;    // meters
+        uniform float focalDistance;
         uniform float cameraNear;
         uniform float cameraFar;
-        uniform float maxBlurRadius;    // pixels
-        uniform float lensFocalLength;  // meters
+        uniform float maxBlurRadius;
+        uniform float lensFocalLength;
         uniform float lensFNumber;
-        uniform float sensorWidth;      // meters
+        uniform float sensorWidth;
         varying vec2 vUv;
         
-        // THREE.js-style depth reconstruction from depthTexture
-        // depth is non-linear clip-space depth in [0,1]
         float perspectiveDepthToViewZ(const in float fragCoordZ,
                                       const in float near,
                                       const in float far) {
-          // See THREE.PerspectiveCamera depth packing docs / examples
           return (near * far) / ((far - near) * fragCoordZ - far);
         }
         
-        // Convert depth texture sample to positive view-space distance (meters)
         float depthToDistance(float depth) {
           float viewZ = perspectiveDepthToViewZ(depth, cameraNear, cameraFar);
-          return -viewZ; // distance in front of camera is positive
+          return -viewZ;
         }
         
         void main() {
-          // Sample depth and convert to distance in meters
           float depth    = texture2D(depthTexture, vUv).r;
           float distance = depthToDistance(depth);
           
-          // Treat everything in front of the near plane or behind far as clamped
           float eps = 0.001;
           float d   = clamp(distance, cameraNear + eps, cameraFar);
           
-          // Thin-lens circle of confusion (CoC) model.
-          // F  = lens focal length (meters)
-          // N  = f-number
-          // df = focal distance (meters)
-          // d  = object distance from depth buffer (meters)
           float F  = lensFocalLength;
           float N  = lensFNumber;
-          float df = max(focalDistance, F + eps); // avoid df == F singularity
+          float df = max(focalDistance, F + eps);
           
-          // CoC in meters on image plane:
-          // CoC = | (F^2 / (N * (df - F))) * ((d - df) / d) |
           float CoC = abs((F * F / (N * (df - F))) * ((d - df) / d));
           
-          // Convert CoC (meters on sensor) to a resolution-independent pixel radius.
-          // Use optics only: larger focal length (higher zoom) → stronger blur.
-          // Derived from blur angle ~ CoC / sensorWidth and FOV from F and sensorWidth.
-          const float DOF_STRENGTH = 20.0; // Global DOF strength scale
+          const float DOF_STRENGTH = 5.0;
           float blurPixels = DOF_STRENGTH * CoC * (2.0 * lensFocalLength) / (sensorWidth * sensorWidth);
           
-          // Clamp to max blur radius
           float blurRadius = clamp(blurPixels, 0.0, maxBlurRadius);
           
-          // If blur radius is very small, just sample center pixel
           if (blurRadius < 0.1) {
             gl_FragColor = texture2D(sceneTexture, vUv);
             return;
           }
           
-          // Gaussian blur with variable radius
-          vec2 texelSize    = 1.0 / resolution;
-          vec4 color        = vec4(0.0);
+          // Separable horizontal Gaussian blur
+          vec2 texelSize = vec2(1.0 / resolution.x, 0.0);
+          vec4 color = vec4(0.0);
           float totalWeight = 0.0;
           
-          // Sample in a circular pattern
           int samples = int(ceil(blurRadius * 2.0));
-          samples = min(samples, 16); // Limit samples for performance
+          samples = min(samples, 16);
           
           for (int i = -samples; i <= samples; i++) {
-            for (int j = -samples; j <= samples; j++) {
-              vec2 offset = vec2(float(i), float(j)) * texelSize;
-              float dist   = length(offset * resolution);
-              
-              if (dist > blurRadius) continue;
-              
-              // Gaussian weight
-              float weight = exp(-(dist * dist) / (2.0 * blurRadius * blurRadius));
-              color       += texture2D(sceneTexture, vUv + offset) * weight;
-              totalWeight += weight;
-            }
+            vec2 offset = vec2(float(i), 0.0) * texelSize;
+            float dist = abs(float(i));
+            
+            if (dist > blurRadius) continue;
+            
+            float weight = exp(-(dist * dist) / (2.0 * blurRadius * blurRadius));
+            color += texture2D(sceneTexture, vUv + offset) * weight;
+            totalWeight += weight;
+          }
+          
+          gl_FragColor = color / max(totalWeight, 0.0001);
+        }
+      `
+    });
+    
+    // Vertical blur shader (uses horizontal blur result as input)
+    const blurShaderVertical = new THREE.ShaderMaterial({
+      uniforms: {
+        sceneTexture:    { value: this.blurRenderTargetHorizontal.texture },
+        depthTexture:    { value: this.depthTexture },
+        resolution:      { value: new THREE.Vector2(this.blurRenderTarget.width, this.blurRenderTarget.height) },
+        focalDistance:   { value: focalDistanceMeters },
+        cameraNear:      { value: Config.CAMERA_NEAR_PLANE },
+        cameraFar:       { value: Config.CAMERA_FAR_PLANE },
+        maxBlurRadius:   { value: 8.0 },
+        lensFocalLength: { value: 0.3 },
+        lensFNumber:     { value: 4.0 },
+        sensorWidth:     { value: this.sensorWidth }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D sceneTexture;
+        uniform sampler2D depthTexture;
+        uniform vec2  resolution;
+        uniform float focalDistance;
+        uniform float cameraNear;
+        uniform float cameraFar;
+        uniform float maxBlurRadius;
+        uniform float lensFocalLength;
+        uniform float lensFNumber;
+        uniform float sensorWidth;
+        varying vec2 vUv;
+        
+        float perspectiveDepthToViewZ(const in float fragCoordZ,
+                                      const in float near,
+                                      const in float far) {
+          return (near * far) / ((far - near) * fragCoordZ - far);
+        }
+        
+        float depthToDistance(float depth) {
+          float viewZ = perspectiveDepthToViewZ(depth, cameraNear, cameraFar);
+          return -viewZ;
+        }
+        
+        void main() {
+          float depth    = texture2D(depthTexture, vUv).r;
+          float distance = depthToDistance(depth);
+          
+          float eps = 0.001;
+          float d   = clamp(distance, cameraNear + eps, cameraFar);
+          
+          float F  = lensFocalLength;
+          float N  = lensFNumber;
+          float df = max(focalDistance, F + eps);
+          
+          float CoC = abs((F * F / (N * (df - F))) * ((d - df) / d));
+          
+          const float DOF_STRENGTH = 5.0;
+          float blurPixels = DOF_STRENGTH * CoC * (2.0 * lensFocalLength) / (sensorWidth * sensorWidth);
+          
+          float blurRadius = clamp(blurPixels, 0.0, maxBlurRadius);
+          
+          if (blurRadius < 0.1) {
+            gl_FragColor = texture2D(sceneTexture, vUv);
+            return;
+          }
+          
+          // Separable vertical Gaussian blur
+          vec2 texelSize = vec2(0.0, 1.0 / resolution.y);
+          vec4 color = vec4(0.0);
+          float totalWeight = 0.0;
+          
+          int samples = int(ceil(blurRadius * 2.0));
+          samples = min(samples, 16);
+          
+          for (int i = -samples; i <= samples; i++) {
+            vec2 offset = vec2(0.0, float(i)) * texelSize;
+            float dist = abs(float(i));
+            
+            if (dist > blurRadius) continue;
+            
+            float weight = exp(-(dist * dist) / (2.0 * blurRadius * blurRadius));
+            color += texture2D(sceneTexture, vUv + offset) * weight;
+            totalWeight += weight;
           }
           
           gl_FragColor = color / max(totalWeight, 0.0001);
@@ -327,8 +402,10 @@ export class Scope
     });
     
     const quad = new THREE.PlaneGeometry(2, 2);
-    this.blurMesh = new THREE.Mesh(quad, blurShader);
-    this.blurScene.add(this.blurMesh);
+    this.blurMeshHorizontal = new THREE.Mesh(quad, blurShaderHorizontal);
+    this.blurMeshVertical = new THREE.Mesh(quad, blurShaderVertical);
+    this.blurScene.add(this.blurMeshHorizontal);
+    this.blurScene.add(this.blurMeshVertical);
   }
 
   createCamera()
@@ -992,13 +1069,21 @@ export class Scope
         this.depthTexture.needsUpdate = true;
       }
       
-      // Resize blur render target
+      // Resize blur render targets
+      if (this.blurRenderTargetHorizontal)
+      {
+        this.blurRenderTargetHorizontal.setSize(outputWidth, outputHeight);
+        if (this.blurMeshHorizontal)
+        {
+          this.blurMeshHorizontal.material.uniforms.resolution.value.set(outputWidth, outputHeight);
+        }
+      }
       if (this.blurRenderTarget)
       {
         this.blurRenderTarget.setSize(outputWidth, outputHeight);
-        if (this.blurMesh)
+        if (this.blurMeshVertical)
         {
-          this.blurMesh.material.uniforms.resolution.value.set(outputWidth, outputHeight);
+          this.blurMeshVertical.material.uniforms.resolution.value.set(outputWidth, outputHeight);
         }
       }
 
@@ -1024,40 +1109,52 @@ export class Scope
     }
     
     // Step 1.5: Apply depth-of-field blur (if optical effects enabled)
-    if (this.opticalEffectsEnabled && this.blurRenderTarget && this.blurScene && this.depthTexture)
+    // Uses separable Gaussian blur: horizontal pass, then vertical pass
+    if (this.opticalEffectsEnabled && this.blurRenderTarget && this.blurRenderTargetHorizontal && this.blurScene && this.depthTexture)
     {
-      const uniforms = this.blurMesh.material.uniforms;
       const METERS_PER_YARD = 0.9144;
       
-      // Focus distance in meters (from yards)
-      uniforms.focalDistance.value = this.focalDistance * METERS_PER_YARD;
-      uniforms.sceneTexture.value = this.sceneRenderTarget.texture;
-      uniforms.depthTexture.value = this.depthTexture;
-      
       // Derive effective lens focal length and f-number from current FOV and 56mm objective
-      // FOV is the scope's horizontal spec FOV; treat sensorWidth as the corresponding image width.
       const fovRad = THREE.MathUtils.degToRad(this.currentFOV);
       const sensorWidth = this.sensorWidth;
       const eps = 1e-6;
       const F = sensorWidth / (2.0 * Math.tan(Math.max(fovRad * 0.5, eps))); // meters
       const N = F / this.objectiveDiameter; // f-number from focal length & objective diameter
       
-      uniforms.lensFocalLength.value = F;
-      uniforms.lensFNumber.value = Math.max(N, 1.0); // clamp to at least f/1 for stability
-      uniforms.sensorWidth.value = sensorWidth;
+      const lensParams = {
+        focalDistance: this.focalDistance * METERS_PER_YARD,
+        lensFocalLength: F,
+        lensFNumber: Math.max(N, 1.0),
+        sensorWidth: sensorWidth
+      };
       
-      // Render blur pass
+      // Update horizontal blur shader uniforms
+      const uniformsH = this.blurMeshHorizontal.material.uniforms;
+      uniformsH.focalDistance.value = lensParams.focalDistance;
+      uniformsH.sceneTexture.value = this.sceneRenderTarget.texture;
+      uniformsH.depthTexture.value = this.depthTexture;
+      uniformsH.lensFocalLength.value = lensParams.lensFocalLength;
+      uniformsH.lensFNumber.value = lensParams.lensFNumber;
+      uniformsH.sensorWidth.value = lensParams.sensorWidth;
+      
+      // Render horizontal blur pass
+      this.renderer.setRenderTarget(this.blurRenderTargetHorizontal);
+      this.renderer.clear();
+      this.renderer.render(this.blurMeshHorizontal, this.blurCamera);
+      
+      // Update vertical blur shader uniforms
+      const uniformsV = this.blurMeshVertical.material.uniforms;
+      uniformsV.focalDistance.value = lensParams.focalDistance;
+      uniformsV.sceneTexture.value = this.blurRenderTargetHorizontal.texture; // Use horizontal blur result
+      uniformsV.depthTexture.value = this.depthTexture;
+      uniformsV.lensFocalLength.value = lensParams.lensFocalLength;
+      uniformsV.lensFNumber.value = lensParams.lensFNumber;
+      uniformsV.sensorWidth.value = lensParams.sensorWidth;
+      
+      // Render vertical blur pass (final result)
       this.renderer.setRenderTarget(this.blurRenderTarget);
       this.renderer.clear();
-      
-      if (this.renderStats)
-      {
-        this.renderStats.render(this.renderer, this.blurScene, this.blurCamera, `Scope.${this.hasReticle ? 'rifle' : 'spotting'}.Blur`);
-      }
-      else
-      {
-        this.renderer.render(this.blurScene, this.blurCamera);
-      }
+      this.renderer.render(this.blurMeshVertical, this.blurCamera);
     }
     
     // Step 2: Composite scene (blurred or unblurred) + reticle to output render target
@@ -1103,6 +1200,7 @@ export class Scope
   dispose()
   {
     this.sceneRenderTarget.dispose();
+    if (this.blurRenderTargetHorizontal) this.blurRenderTargetHorizontal.dispose();
     if (this.blurRenderTarget) this.blurRenderTarget.dispose();
     
     // Dispose blur pass resources

@@ -116,9 +116,9 @@
         <label for="scopeHeight" title="Scope height above bore in inches">Scope Ht (in)</label>
         <input type="number" id="scopeHeight" value="2.0" step="0.1" min="0.5" max="10.0" title="Scope height above bore in inches" style="width: 100px; padding: 5px;">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: row; align-items: center; gap: 5px;">
-        <input type="checkbox" id="opticalEffects" checked title="Enable depth-of-field blur effects in scopes">
-        <label for="opticalEffects" title="Enable depth-of-field blur effects in scopes">Optical Effects</label>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="opticalEffects" title="Experimental depth-of-field and optical effects inside scopes">Experimental Optical Effects</label>
+        <input type="checkbox" id="opticalEffects" title="Experimental depth-of-field and optical effects inside scopes" style="width: auto;">
       </div>
     </div>
 
@@ -139,10 +139,10 @@
       <!-- Quick Key Guide -->
       <div class="quick-keys">
         <div class="quick-keys-section">
-          <strong>Desktop:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/<kbd>E</kbd><kbd>Q</kbd> Spotting scope • Click rifle scope to enter • <kbd>Arrows</kbd> dial • <kbd>Esc</kbd> exit
+          <strong>Desktop:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/<kbd>E</kbd><kbd>Q</kbd> Spotting scope • Click rifle scope to enter • <kbd>Arrows</kbd> dial • <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> focus (when Experimental Optical Effects enabled) • <kbd>Esc</kbd> exit
         </div>
         <div class="quick-keys-section">
-          <strong>Mobile:</strong> Drag to pan • Pinch to zoom • Tap to fire • Dial buttons next to HUD (hold to fast-dial)
+          <strong>Mobile:</strong> Drag to pan • Pinch to zoom • Tap to fire • Long-press inside scope to refocus (when Experimental Optical Effects enabled) • Dial buttons next to HUD (hold to fast-dial)
         </div>
       </div>
     </div>
@@ -184,8 +184,9 @@
             - Move mouse to pan/aim the scope (reticle moves with cursor at 1:1 speed)<br>
             - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (4× to 40× magnification)<br>
             - Click to fire bullet from scope crosshair<br>
+            - <kbd>F</kbd> refocus rifle scope at crosshair distance (requires Experimental Optical Effects to be enabled)<br>
+            - <kbd>Shift</kbd>+<kbd>F</kbd> refocus spotting scope at center distance (requires Experimental Optical Effects to be enabled)<br>
             - <kbd>Esc</kbd> to exit scope mode (releases pointer lock)<br>
-            - <kbd>S</kbd> toggle scope overlay visibility on/off<br>
             - FFP reticle scales with zoom (maintains MRAD subtensions)<br><br>
 
             <strong>MRAD Dial Controls:</strong><br>
@@ -201,11 +202,12 @@
           <h3>Mobile/Touch Controls</h3>
           <div class="param-help">
             <strong>Both Scopes:</strong><br>
-            - <strong>Single-finger drag:</strong> Pan the scope view (hold ~150ms then drag)<br>
+            - <strong>Single-finger drag:</strong> Pan the scope view<br>
             - <strong>Pinch:</strong> Zoom in/out (4× to 40× magnification)<br><br>
 
             <strong>Rifle Scope:</strong><br>
-            - <strong>Tap:</strong> Fire a shot (quick tap < 150ms)<br><br>
+            - <strong>Tap:</strong> Fire a shot (quick tap &lt; 150ms)<br>
+            - <strong>Long press (≈ 450ms) with minimal movement:</strong> Refocus scope at crosshair distance (requires Experimental Optical Effects to be enabled)<br><br>
 
             <strong>Dial Buttons (on-screen, next to HUD):</strong><br>
             - <strong>U/D:</strong> Adjust elevation up/down (0.1 mrad per tap, hold to fast-dial)<br>
@@ -299,7 +301,14 @@
             
             <strong>Dust Effects:</strong> Metallic dust particles (silver-gray) fly back when hitting targets. Brown dust clouds appear when missing and hitting the ground. Particles fade out over time.<br><br>
             
-            <strong>Audio:</strong> Shot sounds play immediately on fire. Impact sounds (ping) play with distance-based delay and volume attenuation (full volume at 100 yards, fading to 10% at max range).
+            <strong>Audio:</strong> Shot sounds play immediately on fire. Impact sounds (ping) play with distance-based delay and volume attenuation (full volume at 100 yards, fading to 10% at max range).<br><br>
+            
+            <strong>Experimental Optical Effects:</strong><br>
+            - Toggle via the \"Experimental Optical Effects\" checkbox in the settings bar (off by default).<br>
+            - Enables physically-inspired depth-of-field blur and scope optics (56mm objective, zoom-dependent DOF).<br>
+            - Desktop: Use <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> to refocus rifle/spotting scopes at the crosshair distance.<br>
+            - Mobile: Long-press inside a scope (≈ 450ms, minimal movement) to refocus at the crosshair distance.<br>
+            - Increases GPU load; turn off on low-power or thermally constrained devices.
           </div>
         </div>
         

@@ -131,9 +131,10 @@ class SteelSimulator
     if (params.mv_mps === undefined || params.diameter_m === undefined || params.weight_kg === undefined ||
       params.length_m === undefined || params.twist_mPerTurn === undefined || params.mvSd_mps === undefined ||
       params.rifleAccuracy_rad === undefined || params.bc === undefined || params.dragFunction === undefined ||
-      params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined)
+      params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined ||
+      params.opticalEffectsEnabled === undefined)
     {
-      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m). Use getGameParams() to convert from frontend inputs.');
+      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled). Use getGameParams() to convert from frontend inputs.');
     }
 
     // Store all params (all must be in SI units, no defaults)
@@ -149,6 +150,7 @@ class SteelSimulator
     this.windPreset = params.windPreset;
     this.zeroDistance_m = params.zeroDistance_m;
     this.scopeHeight_m = params.scopeHeight_m;
+    this.opticalEffectsEnabled = params.opticalEffectsEnabled;
 
     // State
     this.isRunning = false;
@@ -197,7 +199,8 @@ class SteelSimulator
       touchStartTime: 0,
       touchMoved: false,
       activeScope: null, // 'rifle' | 'spotting' | null
-      activeDialAction: null // For dial button hold-to-repeat
+      activeDialAction: null, // For dial button hold-to-repeat
+      focusTriggered: false // Track if long-press focus has been triggered for this touch
     };
 
     // Dial repeat state
@@ -615,6 +618,7 @@ class SteelSimulator
       lowFovFeet: 25,
       hasReticle: false, // Spotting scope has no reticle
       hasDials: false, // Spotting scope has no dials
+      opticalEffectsEnabled: this.opticalEffectsEnabled,
       cameraPosition:
       {
         x: 0,
@@ -653,6 +657,7 @@ class SteelSimulator
       minZoomX: 4.0,
       maxZoomX: 40.0,
       lowFovFeet: 25,
+      opticalEffectsEnabled: this.opticalEffectsEnabled,
       cameraPosition:
       {
         x: 0,
@@ -1439,7 +1444,7 @@ class SteelSimulator
     }
   }
 
-  setFocalDistanceFromRaycast(scope)
+  setFocalDistanceFromRaycast(scope, normX = null, normY = null)
   {
     if (!scope || !this.scene) return;
 
@@ -1447,8 +1452,43 @@ class SteelSimulator
     const camera = scope.getCamera();
     if (!camera) return;
 
-    // Raycast from camera center through the view center (normalized coordinates 0, 0 = center)
-    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    // Convert normalized composition coordinates to NDC coordinates for the scope camera
+    let ndcX = 0;
+    let ndcY = 0;
+    
+    if (normX !== null && normY !== null && scope.layer)
+    {
+      // Get scope layer position and size in normalized composition space
+      const layerPos = scope.layer.getPosition();
+      // Layer stores width and height as properties (normalized composition units)
+      const layerWidth = scope.layer.width || 2.0;
+      const layerHeight = scope.layer.height || 2.0;
+      
+      // Convert from composition coordinates to relative position within scope layer
+      // Composition: X spans [-aspect, +aspect], Y spans [-1, +1]
+      // Layer: centered at layerPos, with size layerWidth x layerHeight
+      const relativeX = (normX - layerPos.x) / (layerWidth / 2);
+      const relativeY = (normY - layerPos.y) / (layerHeight / 2);
+      
+      // Clamp to scope circle (scope radius is 0.98 in normalized layer space)
+      const scopeRadius = 0.98;
+      const distFromCenter = Math.sqrt(relativeX * relativeX + relativeY * relativeY);
+      if (distFromCenter > scopeRadius)
+      {
+        // Clamp to circle edge
+        const scale = scopeRadius / distFromCenter;
+        ndcX = relativeX * scale;
+        ndcY = relativeY * scale;
+      }
+      else
+      {
+        ndcX = relativeX;
+        ndcY = relativeY;
+      }
+    }
+    
+    // Raycast from camera through the specified point (or center if not provided)
+    this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
     
     // Intersect with all objects in the scene (recursive = true to check all children)
     const intersects = this.raycaster.intersectObjects(this.scene.children, true);
@@ -1519,16 +1559,31 @@ class SteelSimulator
       return;
     }
 
-    // Don't determine scope yet - will be evaluated when movement actually begins
-    // This fixes iOS delay where Safari takes 0.2-0.3s before delivering deltas
+    // Detect scope immediately for long-press detection (even if finger is held still)
+    // Also detect in onTouchMove for iOS delay handling, but we need it here too
     let activeScope = null;
+    if (this.scope && this.scope.isPointInside(norm.x, norm.y))
+    {
+      activeScope = 'rifle';
+    }
+    else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
+    {
+      activeScope = 'spotting';
+    }
 
     // Store start position and time for all touches (for dial buttons too)
     this.touchState.active = true;
-    this.touchState.activeScope = null; // Will be set in onTouchMove when movement begins
+    this.touchState.activeScope = activeScope; // Set immediately for long-press detection
     this.touchState.activeDialAction = null;
+    
+    // Prevent default iOS long-press context menu when touching a scope
+    if (activeScope !== null)
+    {
+      event.preventDefault();
+    }
     this.touchState.touchStartTime = performance.now();
     this.touchState.touchMoved = false;
+    this.touchState.focusTriggered = false; // Reset focus trigger flag
     this.touchState.touchStartPos = {
       x: touch.clientX,
       y: touch.clientY
@@ -1549,38 +1604,17 @@ class SteelSimulator
   {
     if (!this.touchState.active) return;
 
-    // Allow events through until we know what the user is doing.
-    // Only preventDefault AFTER we detect we're actually interacting with a scope or dial.
-    if (this.touchState.activeScope !== null || this.touchState.activeDialAction !== null)
+    // If not touching a scope or dial, allow browser default behavior
+    if (this.touchState.activeScope === null && this.touchState.activeDialAction === null)
     {
-      event.preventDefault();
+      return;
     }
+
+    // Prevent default for scope/dial interactions
+    event.preventDefault();
 
     const touches = event.touches;
     if (touches.length === 0) return;
-
-    // Detect scope immediately when movement begins (no delay)
-    // This fixes iOS delay where Safari takes 0.2-0.3s before delivering deltas
-    // On Android, touchMove fires immediately, so this detection runs right away
-    if (this.touchState.activeScope === null)
-    {
-      const touch = touches[0];
-      const norm = this.compositionRenderer.screenToNormalized(touch.clientX, touch.clientY);
-
-      if (this.scope && this.scope.isPointInside(norm.x, norm.y))
-      {
-        this.touchState.activeScope = 'rifle';
-      }
-      else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
-      {
-        this.touchState.activeScope = 'spotting';
-      }
-      else
-      {
-        // Not touching any scope - allow browser default behavior
-        return;
-      }
-    }
 
     // Get the active scope object
     let scopeObj;
@@ -1596,10 +1630,6 @@ class SteelSimulator
     {
       return; // No scope selected, ignore gesture
     }
-
-    // Prevent default once we know we're interacting with a scope
-    // This prevents browser scrolling from interfering with panning
-    event.preventDefault();
 
     if (touches.length >= 2)
     {
@@ -1664,30 +1694,11 @@ class SteelSimulator
 
     if (!this.touchState.active) return;
 
-    // Re-evaluate scope selection for tap detection if not already set
-    // This ensures taps work even if scope detection didn't complete in onTouchMove
-    if (this.touchState.activeScope === null)
-    {
-      const touch = event.changedTouches[0];
-      if (touch)
-      {
-        const norm = this.compositionRenderer.screenToNormalized(touch.clientX, touch.clientY);
-
-        if (this.scope && this.scope.isPointInside(norm.x, norm.y))
-        {
-          this.touchState.activeScope = 'rifle';
-        }
-        else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
-        {
-          this.touchState.activeScope = 'spotting';
-        }
-      }
-    }
-
     // Check for tap on scope to fire (under duration AND minimal movement)
+    // Note: Long-press focus is handled in onTouchMove, not here
     const elapsed = performance.now() - this.touchState.touchStartTime;
     const TAP_MAX_DURATION = 200; // milliseconds
-    const TAP_MAX_DISTANCE = 10; // pixels - maximum movement allowed for a tap
+    const TAP_MAX_DISTANCE = 5; // pixels - maximum movement allowed for a tap
 
     // Calculate distance moved from start position
     const touch = event.changedTouches[0];
@@ -1697,7 +1708,8 @@ class SteelSimulator
       const deltaYFromStart = touch.clientY - this.touchState.touchStartPos.y;
       const distanceFromStart = Math.sqrt(deltaXFromStart * deltaXFromStart + deltaYFromStart * deltaYFromStart);
 
-      if (elapsed < TAP_MAX_DURATION && distanceFromStart <= TAP_MAX_DISTANCE)
+      // Only fire if it was a quick tap (not a long-press that already triggered focus)
+      if (elapsed < TAP_MAX_DURATION && distanceFromStart <= TAP_MAX_DISTANCE && !this.touchState.focusTriggered)
       {
         if (this.touchState.activeScope === 'rifle')
         {
@@ -1711,6 +1723,77 @@ class SteelSimulator
     this.touchState.active = false;
     this.touchState.activeScope = null;
     this.touchState.touchMoved = false;
+    this.touchState.focusTriggered = false;
+    this.touchState.lastPinchDistance = 0; // Reset pinch distance
+  }
+
+  // ===== TOUCH GESTURES =====
+
+  /**
+   * Check for long-press focus gesture (handles both still and moving touches)
+   * This runs every frame, so it works even if onTouchMove doesn't fire (perfectly still finger)
+   * Don't trigger during pinch zoom (two fingers) or if touch has moved significantly
+   */
+  checkLongPressFocus()
+  {
+    if (!this.touchState.active || this.touchState.focusTriggered || this.touchState.activeDialAction)
+    {
+      return;
+    }
+
+    // Skip if pinch zoom is active (two fingers detected via lastPinchDistance)
+    if (this.touchState.lastPinchDistance > 0)
+    {
+      return; // Don't trigger focus during pinch zoom
+    }
+
+    const elapsed = performance.now() - this.touchState.touchStartTime;
+    const FOCUS_MIN_HOLD_MS = 450; // milliseconds - minimum hold time for focus gesture
+    const FOCUS_MAX_MOVE_PX = 5; // pixels - maximum movement allowed for focus
+
+    if (elapsed < FOCUS_MIN_HOLD_MS)
+    {
+      return;
+    }
+
+    // Check if we're touching a scope
+    let scopeObj = null;
+    if (this.touchState.activeScope === 'rifle' && this.scope && this.scope.opticalEffectsEnabled)
+    {
+      scopeObj = this.scope;
+    }
+    else if (this.touchState.activeScope === 'spotting' && this.spottingScope && this.spottingScope.opticalEffectsEnabled)
+    {
+      scopeObj = this.spottingScope;
+    }
+
+    if (!scopeObj)
+    {
+      return;
+    }
+
+    // Check movement distance - use current position if available, otherwise start position
+    let distanceFromStart = 0;
+    let touchX = this.touchState.touchStartPos.x;
+    let touchY = this.touchState.touchStartPos.y;
+
+    // If touch has moved, calculate distance from start
+    if (this.touchState.touchMoved && this.touchState.lastTouchPos)
+    {
+      const deltaX = this.touchState.lastTouchPos.x - this.touchState.touchStartPos.x;
+      const deltaY = this.touchState.lastTouchPos.y - this.touchState.touchStartPos.y;
+      distanceFromStart = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      // Use current position for more accurate raycast
+      touchX = this.touchState.lastTouchPos.x;
+      touchY = this.touchState.lastTouchPos.y;
+    }
+
+    if (distanceFromStart <= FOCUS_MAX_MOVE_PX)
+    {
+      const norm = this.compositionRenderer.screenToNormalized(touchX, touchY);
+      this.setFocalDistanceFromRaycast(scopeObj, norm.x, norm.y);
+      this.touchState.focusTriggered = true; // Prevent multiple triggers
+    }
   }
 
   // ===== SHOOTING =====
@@ -2136,6 +2219,9 @@ class SteelSimulator
     WindFlagFactory.updateAll(this.windGenerator, dt);
     PrairieDogFactory.updateAll(dt);
 
+    // Check for long-press focus gesture
+    this.checkLongPressFocus();
+
     // Update spotting scope camera from key states (WASD for panning, E/Q for zoom)
     if (this.spottingScope)
     {
@@ -2229,6 +2315,8 @@ function getGameParams()
   const windPreset = document.getElementById('windPreset').value;
   const zeroDistanceYards = parseFloat(document.getElementById('zeroDistance').value);
   const scopeHeightInches = parseFloat(document.getElementById('scopeHeight').value);
+  const opticalEffectsCheckbox = document.getElementById('opticalEffects');
+  const opticalEffectsEnabled = opticalEffectsCheckbox ? opticalEffectsCheckbox.checked : true;
 
   // Convert to SI units (all parameters required, no defaults)
   return {
@@ -2243,7 +2331,8 @@ function getGameParams()
     rifleAccuracy_rad: btk.Conversions.moaToRadians(rifleAccuracyMoa),
     windPreset: windPreset,
     zeroDistance_m: btk.Conversions.yardsToMeters(zeroDistanceYards),
-    scopeHeight_m: btk.Conversions.inchesToMeters(scopeHeightInches)
+    scopeHeight_m: btk.Conversions.inchesToMeters(scopeHeightInches),
+    opticalEffectsEnabled: opticalEffectsEnabled
   };
 }
 
@@ -2315,19 +2404,6 @@ async function startGame()
     // Create new simulator instance
     const canvas = document.getElementById('steelCanvas');
     steelSimulator = new SteelSimulator(canvas, params);
-    
-    // Apply optical effects setting from checkbox
-    const opticalEffectsCheckbox = document.getElementById('opticalEffects');
-    if (opticalEffectsCheckbox && steelSimulator.scope)
-    {
-      const enabled = opticalEffectsCheckbox.checked;
-      steelSimulator.scope.opticalEffectsEnabled = enabled;
-      if (steelSimulator.spottingScope)
-      {
-        steelSimulator.spottingScope.opticalEffectsEnabled = enabled;
-      }
-    }
-    
     await steelSimulator.start();
 
     // Update UI
@@ -2361,19 +2437,6 @@ async function restartGame()
     // Create new simulator instance with updated parameters
     const canvas = document.getElementById('steelCanvas');
     steelSimulator = new SteelSimulator(canvas, params);
-    
-    // Apply optical effects setting from checkbox
-    const opticalEffectsCheckbox = document.getElementById('opticalEffects');
-    if (opticalEffectsCheckbox && steelSimulator.scope)
-    {
-      const enabled = opticalEffectsCheckbox.checked;
-      steelSimulator.scope.opticalEffectsEnabled = enabled;
-      if (steelSimulator.spottingScope)
-      {
-        steelSimulator.spottingScope.opticalEffectsEnabled = enabled;
-      }
-    }
-    
     await steelSimulator.start();
 
     // Wind presets already populated during initialization
@@ -2394,23 +2457,6 @@ function setupUI()
   const helpClose = document.querySelector('.help-close');
   const startBtn = document.getElementById('startBtn');
   const restartBtn = document.getElementById('restartBtn');
-  const opticalEffectsCheckbox = document.getElementById('opticalEffects');
-  
-  // Wire up optical effects checkbox
-  if (opticalEffectsCheckbox)
-  {
-    opticalEffectsCheckbox.addEventListener('change', (e) => {
-      const enabled = e.target.checked;
-      if (steelSimulator && steelSimulator.scope)
-      {
-        steelSimulator.scope.opticalEffectsEnabled = enabled;
-        if (steelSimulator.spottingScope)
-        {
-          steelSimulator.spottingScope.opticalEffectsEnabled = enabled;
-        }
-      }
-    });
-  }
 
   if (startBtn)
   {
