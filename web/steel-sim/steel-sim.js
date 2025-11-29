@@ -132,9 +132,9 @@ class SteelSimulator
       params.length_m === undefined || params.twist_mPerTurn === undefined || params.mvSd_mps === undefined ||
       params.rifleAccuracy_rad === undefined || params.bc === undefined || params.dragFunction === undefined ||
       params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined ||
-      params.opticalEffectsEnabled === undefined)
+      params.opticalEffectsEnabled === undefined || params.scopeType === undefined)
     {
-      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled). Use getGameParams() to convert from frontend inputs.');
+      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled, scopeType). Use getGameParams() to convert from frontend inputs.');
     }
 
     // Store all params (all must be in SI units, no defaults)
@@ -151,6 +151,7 @@ class SteelSimulator
     this.zeroDistance_m = params.zeroDistance_m;
     this.scopeHeight_m = params.scopeHeight_m;
     this.opticalEffectsEnabled = params.opticalEffectsEnabled;
+    this.scopeType = params.scopeType;
 
     // State
     this.isRunning = false;
@@ -262,6 +263,9 @@ class SteelSimulator
 
       // Setup scene (will load textures after renderer is available)
       await this.setupScene();
+
+      // Update HUD with correct scope type after scope is created
+      this.updateHudDial();
 
       // Start animation loop
       this.isRunning = true;
@@ -619,6 +623,7 @@ class SteelSimulator
       hasReticle: false, // Spotting scope has no reticle
       hasDials: false, // Spotting scope has no dials
       opticalEffectsEnabled: this.opticalEffectsEnabled,
+      scopeType: this.scopeType,
       cameraPosition:
       {
         x: 0,
@@ -658,6 +663,7 @@ class SteelSimulator
       maxZoomX: 40.0,
       lowFovFeet: 25,
       opticalEffectsEnabled: this.opticalEffectsEnabled,
+      scopeType: this.scopeType,
       cameraPosition:
       {
         x: 0,
@@ -1267,7 +1273,7 @@ class SteelSimulator
     if (this.hud && this.scope)
     {
       const dialPos = this.scope.getDialPositionMRAD();
-      this.hud.updateDial(dialPos.elevation, dialPos.windage);
+      this.hud.updateDial(dialPos.elevation, dialPos.windage, this.scope.scopeType);
     }
   }
 
@@ -1377,35 +1383,35 @@ class SteelSimulator
       }
 
       // Arrow keys: Dial adjustments
-      // Arrow alone: 0.1 MRAD (1 click) - small adjustment
-      // Shift + Arrow: 1.0 MRAD (10 clicks) - large adjustment
-      const clicks = event.shiftKey ? 10 : 1;
+      // Arrow alone: minor click - small adjustment
+      // Shift + Arrow: major click - large adjustment
+      const isMajor = event.shiftKey;
 
       if (event.key === 'ArrowUp')
       {
         event.preventDefault();
-        this.scope.dialUp(clicks);
+        this.scope.dialUp(1, isMajor);
         this.updateHudDial();
         return;
       }
       if (event.key === 'ArrowDown')
       {
         event.preventDefault();
-        this.scope.dialDown(clicks);
+        this.scope.dialDown(1, isMajor);
         this.updateHudDial();
         return;
       }
       if (event.key === 'ArrowLeft')
       {
         event.preventDefault();
-        this.scope.dialLeft(clicks);
+        this.scope.dialLeft(1, isMajor);
         this.updateHudDial();
         return;
       }
       if (event.key === 'ArrowRight')
       {
         event.preventDefault();
-        this.scope.dialRight(clicks);
+        this.scope.dialRight(1, isMajor);
         this.updateHudDial();
         return;
       }
@@ -2317,6 +2323,8 @@ function getGameParams()
   const scopeHeightInches = parseFloat(document.getElementById('scopeHeight').value);
   const opticalEffectsCheckbox = document.getElementById('opticalEffects');
   const opticalEffectsEnabled = opticalEffectsCheckbox ? opticalEffectsCheckbox.checked : true;
+  const scopeTypeSelect = document.getElementById('scopeType');
+  const scopeType = scopeTypeSelect ? scopeTypeSelect.value : 'mrad';
 
   // Convert to SI units (all parameters required, no defaults)
   return {
@@ -2332,7 +2340,8 @@ function getGameParams()
     windPreset: windPreset,
     zeroDistance_m: btk.Conversions.yardsToMeters(zeroDistanceYards),
     scopeHeight_m: btk.Conversions.inchesToMeters(scopeHeightInches),
-    opticalEffectsEnabled: opticalEffectsEnabled
+    opticalEffectsEnabled: opticalEffectsEnabled,
+    scopeType: scopeType
   };
 }
 

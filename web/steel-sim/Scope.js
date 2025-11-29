@@ -30,6 +30,7 @@ from './RenderStats.js';
 // so this geometry-based reticle matches the old visual behavior.
 const MRAD_PER_UNIT_SLOPE = 1000.0 / 60.0;
 
+// MOA to MRAD conversion constant (from conversions.h)
 // Scope FOV specs are always quoted "width in feet at 100 yards".
 // Keep the 100 yards and 3 ft/yd factors explicit so there are no magic numbers.
 const SCOPE_SPEC_DISTANCE_YARDS = 100;
@@ -110,10 +111,35 @@ export class Scope
     this.renderStats = config.renderStats || null;
     this.windageClicks = 0; // Positive = dial right (bullet impacts right)
 
-    // Dial constants
-    this.CLICK_VALUE_MRAD = 0.1; // Each click is 0.1 MRAD
-    this.maxDialMRAD = config.maxDialMRAD || 30.0; // Maximum dial adjustment in MRAD (±30 MRAD default)
-    this.maxDialClicks = Math.floor(this.maxDialMRAD / this.CLICK_VALUE_MRAD);
+    // Scope type: 'mrad' or 'moa'
+    this.scopeType = config.scopeType || 'mrad';
+
+    // Dial click increments (stored internally in MRAD)
+    if (this.scopeType === 'moa')
+    {
+      this.MINOR_CLICK_MRAD = btk.Conversions.moaToMrad(0.25);  // 0.25 MOA
+      this.MAJOR_CLICK_MRAD = btk.Conversions.moaToMrad(1.0);   // 1.0 MOA (shift key)
+    }
+    else
+    {
+      this.MINOR_CLICK_MRAD = 0.1;  // 0.1 MRAD
+      this.MAJOR_CLICK_MRAD = 1.0;  // 1.0 MRAD
+    }
+
+    // Reticle tick spacing (stored internally in MRAD)
+    if (this.scopeType === 'moa')
+    {
+      this.MINOR_TICK_MRAD = btk.Conversions.moaToMrad(2.0);  
+      this.MAJOR_TICK_MRAD = btk.Conversions.moaToMrad(4.0);
+    }
+    else
+    {
+      this.MINOR_TICK_MRAD = 0.5;  // 0.5 MRAD
+      this.MAJOR_TICK_MRAD = 1.0;  // 1.0 MRAD
+    }
+
+    this.maxDialMRAD = config.maxDialMRAD || 30.0;
+    this.maxDialClicks = Math.floor(this.maxDialMRAD / this.MINOR_CLICK_MRAD);
 
     // Audio manager for scope click sounds (optional)
     this.audioManager = config.audioManager || null;
@@ -275,7 +301,7 @@ export class Scope
           
           float CoC = abs((F * F / (N * (df - F))) * ((d - df) / d));
           
-          const float DOF_STRENGTH = 5.0;
+          const float DOF_STRENGTH = 2.5;
           float blurPixels = DOF_STRENGTH * CoC * (2.0 * lensFocalLength) / (sensorWidth * sensorWidth);
           
           float blurRadius = clamp(blurPixels, 0.0, maxBlurRadius);
@@ -367,7 +393,7 @@ export class Scope
           
           float CoC = abs((F * F / (N * (df - F))) * ((d - df) / d));
           
-          const float DOF_STRENGTH = 5.0;
+          const float DOF_STRENGTH = 2.5;
           float blurPixels = DOF_STRENGTH * CoC * (2.0 * lensFocalLength) / (sensorWidth * sensorWidth);
           
           float blurRadius = clamp(blurPixels, 0.0, maxBlurRadius);
@@ -686,6 +712,8 @@ export class Scope
   {
     if (!this.hasReticle || this.reticleLineInstances.length === 0) return;
 
+    console.log(`[Scope] createInstancedReticle: Creating ${this.reticleLineInstances.length} line instances`);
+
     // Create base unit-length plane geometry (will be scaled per instance)
     const baseGeometry = new THREE.PlaneGeometry(1, 1);
     baseGeometry.computeVertexNormals();
@@ -757,26 +785,37 @@ export class Scope
    */
   buildReticle()
   {
-    const maxExtentMrad = 10.0; // how far ticks extend from center in mrad
+    const baseExtentMrad = 10.0; // nominal max extent from center in mrad
 
-    const mainLineThicknessMrad = 0.06;
-    const minorLineThicknessMrad = 0.03;
+    const mainLineThicknessMrad = 0.07;
+    const minorLineThicknessMrad = 0.04;
 
-    // Main crosshair lines (through center)
+    // Tick spacing based on scope type
+    const majorStep = this.MAJOR_TICK_MRAD;
+    const minorStep = this.MINOR_TICK_MRAD;
+    console.log(`[Scope] buildReticle: scopeType=${this.scopeType}, minorStep=${minorStep.toFixed(4)}, majorStep=${majorStep.toFixed(4)}`);
+
+    // How many minor ticks between majors (avoid floating-point % with non-integer steps)
+    const majorEvery = Math.max(1, Math.round(majorStep / minorStep));
+
+    // Align overall extent so that the last position is exactly on a major tick
+    const maxExtentMrad = Math.max(
+      majorStep,
+      Math.floor(baseExtentMrad / majorStep) * majorStep
+    );
+
+    // Main crosshair lines (through center), matching last major mark extent
     this.addLineMrad(-maxExtentMrad, 0, maxExtentMrad, 0, mainLineThicknessMrad);
     this.addLineMrad(0, -maxExtentMrad, 0, maxExtentMrad, mainLineThicknessMrad);
-
-    // Major ticks every 1 mrad, minor ticks every 0.5 mrad
-    const majorStep = 1.0;
-    const minorStep = 0.5;
 
     const majorTickLengthMrad = 0.6;
     const minorTickLengthMrad = 0.3;
 
     // Horizontal axis ticks
-    for (let m = minorStep; m <= maxExtentMrad; m += minorStep)
+    let stepIndex = 1;
+    for (let m = minorStep; m <= maxExtentMrad; m += minorStep, stepIndex++)
     {
-      const isMajor = Math.abs(m % majorStep) < 1e-4;
+      const isMajor = (stepIndex % majorEvery) === 0;
       const lengthMrad = isMajor ? majorTickLengthMrad : minorTickLengthMrad;
       const thicknessMrad = isMajor ? mainLineThicknessMrad : minorLineThicknessMrad;
 
@@ -800,9 +839,10 @@ export class Scope
     }
 
     // Vertical axis ticks
-    for (let m = minorStep; m <= maxExtentMrad; m += minorStep)
+    stepIndex = 1;
+    for (let m = minorStep; m <= maxExtentMrad; m += minorStep, stepIndex++)
     {
-      const isMajor = Math.abs(m % majorStep) < 1e-4;
+      const isMajor = (stepIndex % majorEvery) === 0;
       const lengthMrad = isMajor ? majorTickLengthMrad : minorTickLengthMrad;
       const thicknessMrad = isMajor ? mainLineThicknessMrad : minorLineThicknessMrad;
 
@@ -912,11 +952,13 @@ export class Scope
    * Dial scope up (increase elevation - bullet impacts higher)
    * @param {number} clicks - Number of clicks to dial (default 1)
    */
-  dialUp(clicks = 1)
+  dialUp(clicks = 1, isMajor = false)
   {
     if (!this.hasDials) return;
+    const clickValue = isMajor ? this.MAJOR_CLICK_MRAD : this.MINOR_CLICK_MRAD;
+    const clicksToAdd = Math.round((clicks * clickValue) / this.MINOR_CLICK_MRAD);
     const oldClicks = this.elevationClicks;
-    const newClicks = oldClicks + clicks;
+    const newClicks = oldClicks + clicksToAdd;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.elevationClicks = newClicks;
@@ -932,11 +974,13 @@ export class Scope
    * Dial scope down (decrease elevation - bullet impacts lower)
    * @param {number} clicks - Number of clicks to dial (default 1)
    */
-  dialDown(clicks = 1)
+  dialDown(clicks = 1, isMajor = false)
   {
     if (!this.hasDials) return;
+    const clickValue = isMajor ? this.MAJOR_CLICK_MRAD : this.MINOR_CLICK_MRAD;
+    const clicksToSubtract = Math.round((clicks * clickValue) / this.MINOR_CLICK_MRAD);
     const oldClicks = this.elevationClicks;
-    const newClicks = oldClicks - clicks;
+    const newClicks = oldClicks - clicksToSubtract;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.elevationClicks = newClicks;
@@ -952,11 +996,13 @@ export class Scope
    * Dial scope left (decrease windage - bullet impacts left)
    * @param {number} clicks - Number of clicks to dial (default 1)
    */
-  dialLeft(clicks = 1)
+  dialLeft(clicks = 1, isMajor = false)
   {
     if (!this.hasDials) return;
+    const clickValue = isMajor ? this.MAJOR_CLICK_MRAD : this.MINOR_CLICK_MRAD;
+    const clicksToAdd = Math.round((clicks * clickValue) / this.MINOR_CLICK_MRAD);
     const oldClicks = this.windageClicks;
-    const newClicks = oldClicks + clicks;
+    const newClicks = oldClicks + clicksToAdd;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.windageClicks = newClicks;
@@ -972,11 +1018,13 @@ export class Scope
    * Dial scope right (increase windage - bullet impacts right)
    * @param {number} clicks - Number of clicks to dial (default 1)
    */
-  dialRight(clicks = 1)
+  dialRight(clicks = 1, isMajor = false)
   {
     if (!this.hasDials) return;
+    const clickValue = isMajor ? this.MAJOR_CLICK_MRAD : this.MINOR_CLICK_MRAD;
+    const clicksToSubtract = Math.round((clicks * clickValue) / this.MINOR_CLICK_MRAD);
     const oldClicks = this.windageClicks;
-    const newClicks = oldClicks - clicks;
+    const newClicks = oldClicks - clicksToSubtract;
     if (Math.abs(newClicks) <= this.maxDialClicks)
     {
       this.windageClicks = newClicks;
@@ -986,6 +1034,29 @@ export class Scope
         this.audioManager.playSound('scope_click');
       }
     }
+  }
+
+  /**
+   * Convert MRAD to display units (MRAD or MOA)
+   * @param {number} mrad Value in MRAD
+   * @returns {number} Value in display units
+   */
+  mradToDisplayUnits(mrad)
+  {
+    if (this.scopeType === 'moa')
+    {
+      return btk.Conversions.mradToMoa(mrad); // Convert to MOA
+    }
+    return mrad; // Keep as MRAD
+  }
+
+  /**
+   * Get display units label
+   * @returns {string} 'MOA' or 'MRAD'
+   */
+  getDisplayUnitsLabel()
+  {
+    return this.scopeType === 'moa' ? 'MOA' : 'MRAD';
   }
 
   /**
@@ -1016,8 +1087,8 @@ export class Scope
       windage: 0
     };
     return {
-      elevation: this.elevationClicks * this.CLICK_VALUE_MRAD,
-      windage: this.windageClicks * this.CLICK_VALUE_MRAD
+      elevation: this.elevationClicks * this.MINOR_CLICK_MRAD,
+      windage: this.windageClicks * this.MINOR_CLICK_MRAD
     };
   }
 
@@ -1039,8 +1110,8 @@ export class Scope
    */
   getTotalAngleMRAD()
   {
-    const dialElevation = this.hasDials ? this.elevationClicks * this.CLICK_VALUE_MRAD : 0;
-    const dialWindage = this.hasDials ? this.windageClicks * this.CLICK_VALUE_MRAD : 0;
+    const dialElevation = this.hasDials ? this.elevationClicks * this.MINOR_CLICK_MRAD : 0;
+    const dialWindage = this.hasDials ? this.windageClicks * this.MINOR_CLICK_MRAD : 0;
     return {
       elevation: dialElevation + this.pitch * 1000,
       windage: dialWindage + this.yaw * 1000

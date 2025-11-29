@@ -148,14 +148,32 @@ export class HUD
     ctx.fillText(value, canvas.width - 10, canvas.height / 2);
   }
 
-  updateDial(elevationMRAD, windageMRAD)
+  updateDial(elevationMRAD, windageMRAD, scopeType = 'mrad')
   {
+    // Convert to display units using BTK conversion functions
+    let elevationValue, windageValue, unitsLabel;
+    if (scopeType === 'moa')
+    {
+      elevationValue = btk.Conversions.mradToMoa(elevationMRAD);
+      windageValue = btk.Conversions.mradToMoa(windageMRAD);
+      unitsLabel = 'MOA';
+    }
+    else
+    {
+      elevationValue = elevationMRAD;
+      windageValue = windageMRAD;
+      unitsLabel = 'MRAD';
+    }
+
+    // Decimal precision: 2 for MOA, 1 for MRAD
+    const decimals = (unitsLabel === 'MOA') ? 2 : 1;
+
     // Update elevation display
     if (this.elevationCanvas)
     {
       const ctx = this.elevationCanvas.getContext('2d');
-      // Format: "2.3U" or "1.5D" (show 1 decimal place, U=up, D=down)
-      const elevStr = `${Math.abs(elevationMRAD).toFixed(1)}${elevationMRAD >= 0 ? 'U' : 'D'}`;
+      // Format: "2.34U MOA" or "1.5D MRAD"
+      const elevStr = `${Math.abs(elevationValue).toFixed(decimals)}${elevationValue >= 0 ? 'U' : 'D'} ${unitsLabel}`;
       this.drawText(ctx, 'Elevation:', elevStr, this.elevationCanvas);
       if (this.elevationMesh && this.elevationMesh.material.map)
       {
@@ -167,8 +185,8 @@ export class HUD
     if (this.windageCanvas)
     {
       const ctx = this.windageCanvas.getContext('2d');
-      // Format: "1.5R" or "0.3L" (show 1 decimal place, R=right, L=left)
-      const windageStr = `${Math.abs(windageMRAD).toFixed(1)}${windageMRAD <= 0 ? 'R' : 'L'}`;
+      // Format: "1.23R MOA" or "0.3L MRAD"
+      const windageStr = `${Math.abs(windageValue).toFixed(decimals)}${windageValue <= 0 ? 'R' : 'L'} ${unitsLabel}`;
       this.drawText(ctx, 'Windage:', windageStr, this.windageCanvas);
       if (this.windageMesh && this.windageMesh.material.map)
       {
