@@ -127,6 +127,11 @@ export class Scope
     // Focal distance for depth-of-field blur (in yards)
     this.focalDistance = config.focalDistance || 100; // Default 100 yards
     
+    // Physical scope parameters
+    // 56mm objective lens (diameter) and virtual sensor width behind the scope
+    this.objectiveDiameter = 0.056; // meters (56mm)
+    this.sensorWidth = 0.024;       // meters (24mm effective sensor/eye width)
+    
     // Optical effects (depth-of-field blur) enabled flag
     this.opticalEffectsEnabled = config.opticalEffectsEnabled !== undefined ? config.opticalEffectsEnabled : true;
     
@@ -212,13 +217,14 @@ export class Scope
         sceneTexture:    { value: this.sceneRenderTarget.texture },
         depthTexture:    { value: this.depthTexture },
         resolution:      { value: new THREE.Vector2(this.blurRenderTarget.width, this.blurRenderTarget.height) },
-        focalDistance:   { value: focalDistanceMeters },           // focus distance in meters
+        focalDistance:   { value: focalDistanceMeters },           // focus distance in meters (updated per-frame)
         cameraNear:      { value: Config.CAMERA_NEAR_PLANE },
         cameraFar:       { value: Config.CAMERA_FAR_PLANE },
-        maxBlurRadius:   { value: 16.0 },                          // Maximum blur radius in pixels
-        lensFocalLength: { value: 0.300 },                         // 300mm effective focal length (meters)
-        lensFNumber:     { value: 2.0 },                           // f/2 for very shallow DOF
-        sensorWidth:     { value: 0.024 }                          // 24mm effective sensor width (more pixels per CoC)
+        maxBlurRadius:   { value: 8.0 },                          // Maximum blur radius in pixels
+        // Lens parameters (updated per-frame from current zoom/FOV)
+        lensFocalLength: { value: 0.3 },                           // placeholder, will be overridden
+        lensFNumber:     { value: 4.0 },                           // placeholder, will be overridden
+        sensorWidth:     { value: this.sensorWidth }               // virtual sensor width behind the scope
       },
       vertexShader: `
         varying vec2 vUv;
@@ -277,15 +283,17 @@ export class Scope
           // CoC = | (F^2 / (N * (df - F))) * ((d - df) / d) |
           float CoC = abs((F * F / (N * (df - F))) * ((d - df) / d));
           
-          // Convert CoC (meters on sensor) to pixel radius.
-          // Use horizontal resolution as reference.
-          float blurPixels = (CoC / sensorWidth) * resolution.x;
+          // Convert CoC (meters on sensor) to a resolution-independent pixel radius.
+          // Use optics only: larger focal length (higher zoom) → stronger blur.
+          // Derived from blur angle ~ CoC / sensorWidth and FOV from F and sensorWidth.
+          const float DOF_STRENGTH = 20.0; // Global DOF strength scale
+          float blurPixels = DOF_STRENGTH * CoC * (2.0 * lensFocalLength) / (sensorWidth * sensorWidth);
           
           // Clamp to max blur radius
           float blurRadius = clamp(blurPixels, 0.0, maxBlurRadius);
           
           // If blur radius is very small, just sample center pixel
-          if (blurRadius < 0.25) {
+          if (blurRadius < 0.1) {
             gl_FragColor = texture2D(sceneTexture, vUv);
             return;
           }
@@ -1018,11 +1026,25 @@ export class Scope
     // Step 1.5: Apply depth-of-field blur (if optical effects enabled)
     if (this.opticalEffectsEnabled && this.blurRenderTarget && this.blurScene && this.depthTexture)
     {
-      // Update blur shader uniforms
+      const uniforms = this.blurMesh.material.uniforms;
       const METERS_PER_YARD = 0.9144;
-      this.blurMesh.material.uniforms.focalDistance.value = this.focalDistance * METERS_PER_YARD;
-      this.blurMesh.material.uniforms.sceneTexture.value = this.sceneRenderTarget.texture;
-      this.blurMesh.material.uniforms.depthTexture.value = this.depthTexture;
+      
+      // Focus distance in meters (from yards)
+      uniforms.focalDistance.value = this.focalDistance * METERS_PER_YARD;
+      uniforms.sceneTexture.value = this.sceneRenderTarget.texture;
+      uniforms.depthTexture.value = this.depthTexture;
+      
+      // Derive effective lens focal length and f-number from current FOV and 56mm objective
+      // FOV is the scope's horizontal spec FOV; treat sensorWidth as the corresponding image width.
+      const fovRad = THREE.MathUtils.degToRad(this.currentFOV);
+      const sensorWidth = this.sensorWidth;
+      const eps = 1e-6;
+      const F = sensorWidth / (2.0 * Math.tan(Math.max(fovRad * 0.5, eps))); // meters
+      const N = F / this.objectiveDiameter; // f-number from focal length & objective diameter
+      
+      uniforms.lensFocalLength.value = F;
+      uniforms.lensFNumber.value = Math.max(N, 1.0); // clamp to at least f/1 for stability
+      uniforms.sensorWidth.value = sensorWidth;
       
       // Render blur pass
       this.renderer.setRenderTarget(this.blurRenderTarget);
