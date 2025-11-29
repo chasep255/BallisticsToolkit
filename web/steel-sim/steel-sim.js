@@ -1453,28 +1453,13 @@ class SteelSimulator
       return;
     }
 
-    // Determine which scope is being touched
+    // Don't determine scope yet - will be evaluated when movement actually begins
+    // This fixes iOS delay where Safari takes 0.2-0.3s before delivering deltas
     let activeScope = null;
-
-    // Check rifle scope first (it has priority if there's overlap)
-    if (this.scope && this.scope.isPointInside(norm.x, norm.y))
-    {
-      activeScope = 'rifle';
-    }
-    else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
-    {
-      activeScope = 'spotting';
-    }
-
-    // Only prevent default if touching a scope (allow browser zoom outside scopes)
-    if (activeScope !== null)
-    {
-      event.preventDefault();
-    }
 
     // Store start position and time for all touches (for dial buttons too)
     this.touchState.active = true;
-    this.touchState.activeScope = activeScope; // may be null if outside scopes
+    this.touchState.activeScope = null; // Will be set in onTouchMove when movement begins
     this.touchState.activeDialAction = null;
     this.touchState.touchStartTime = performance.now();
     this.touchState.touchMoved = false;
@@ -1498,21 +1483,40 @@ class SteelSimulator
   {
     if (!this.touchState.active) return;
 
-    // Only prevent default if actively interacting with a scope or dial button (allow browser zoom outside scopes)
+    // Allow events through until we know what the user is doing.
+    // Only preventDefault AFTER we detect we're actually interacting with a scope or dial.
     if (this.touchState.activeScope !== null || this.touchState.activeDialAction !== null)
     {
       event.preventDefault();
-    }
-    else
-    {
-      // Not interacting with scopes - allow browser default behavior
-      return;
     }
 
     const touches = event.touches;
     if (touches.length === 0) return;
 
-    // Get the active scope object (chosen by first touch in onTouchStart)
+    // Detect scope immediately when movement begins (no delay)
+    // This fixes iOS delay where Safari takes 0.2-0.3s before delivering deltas
+    // On Android, touchMove fires immediately, so this detection runs right away
+    if (this.touchState.activeScope === null)
+    {
+      const touch = touches[0];
+      const norm = this.compositionRenderer.screenToNormalized(touch.clientX, touch.clientY);
+
+      if (this.scope && this.scope.isPointInside(norm.x, norm.y))
+      {
+        this.touchState.activeScope = 'rifle';
+      }
+      else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
+      {
+        this.touchState.activeScope = 'spotting';
+      }
+      else
+      {
+        // Not touching any scope - allow browser default behavior
+        return;
+      }
+    }
+
+    // Get the active scope object
     let scopeObj;
     if (this.touchState.activeScope === 'rifle')
     {
@@ -1524,8 +1528,12 @@ class SteelSimulator
     }
     else
     {
-      return; // No scope was chosen at touch start, ignore gesture
+      return; // No scope selected, ignore gesture
     }
+
+    // Prevent default once we know we're interacting with a scope
+    // This prevents browser scrolling from interfering with panning
+    event.preventDefault();
 
     if (touches.length >= 2)
     {
@@ -1546,33 +1554,22 @@ class SteelSimulator
     }
     else if (touches.length === 1)
     {
-      // Single finger - pan if moved enough distance
+      // Single finger - pan immediately (no distance threshold)
       const touch = touches[0];
-      // iOS already provides a built-in threshold, so use 0; otherwise use 5 pixels
-      const DRAG_DISTANCE_THRESHOLD = isIOS ? 0 : 3;
+      
+      // Pan the view
+      const deltaX = touch.clientX - this.touchState.lastTouchPos.x;
+      const deltaY = touch.clientY - this.touchState.lastTouchPos.y;
 
-      // Calculate distance moved from start position
-      const deltaXFromStart = touch.clientX - this.touchState.touchStartPos.x;
-      const deltaYFromStart = touch.clientY - this.touchState.touchStartPos.y;
-      const distanceFromStart = Math.sqrt(deltaXFromStart * deltaXFromStart + deltaYFromStart * deltaYFromStart);
-
-      // Start panning if moved enough distance
-      if (distanceFromStart > DRAG_DISTANCE_THRESHOLD)
+      const normDelta = this.compositionRenderer.movementToNormalized(-deltaX, -deltaY);
+      const
       {
-        // It's a drag now - pan the view
-        const deltaX = touch.clientX - this.touchState.lastTouchPos.x;
-        const deltaY = touch.clientY - this.touchState.lastTouchPos.y;
+        deltaYaw,
+        deltaPitch
+      } = scopeObj.normalizedDeltaToAngles(normDelta.x, normDelta.y);
+      scopeObj.panBy(deltaYaw, deltaPitch);
 
-        const normDelta = this.compositionRenderer.movementToNormalized(-deltaX, -deltaY);
-        const
-        {
-          deltaYaw,
-          deltaPitch
-        } = scopeObj.normalizedDeltaToAngles(normDelta.x, normDelta.y);
-        scopeObj.panBy(deltaYaw, deltaPitch);
-
-        this.touchState.touchMoved = true;
-      }
+      this.touchState.touchMoved = true;
 
       this.touchState.lastTouchPos = {
         x: touch.clientX,
@@ -1601,16 +1598,46 @@ class SteelSimulator
 
     if (!this.touchState.active) return;
 
-    // Check for tap on scope to fire
-    const elapsed = performance.now() - this.touchState.touchStartTime;
-    const TAP_MAX_DURATION = 300; // milliseconds
-
-    if (!this.touchState.touchMoved && elapsed < TAP_MAX_DURATION)
+    // Re-evaluate scope selection for tap detection if not already set
+    // This ensures taps work even if scope detection didn't complete in onTouchMove
+    if (this.touchState.activeScope === null)
     {
-      if (this.touchState.activeScope === 'rifle')
+      const touch = event.changedTouches[0];
+      if (touch)
       {
-        // Quick tap on rifle scope - fire!
-        this.fireFromScope();
+        const norm = this.compositionRenderer.screenToNormalized(touch.clientX, touch.clientY);
+
+        if (this.scope && this.scope.isPointInside(norm.x, norm.y))
+        {
+          this.touchState.activeScope = 'rifle';
+        }
+        else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
+        {
+          this.touchState.activeScope = 'spotting';
+        }
+      }
+    }
+
+    // Check for tap on scope to fire (under duration AND minimal movement)
+    const elapsed = performance.now() - this.touchState.touchStartTime;
+    const TAP_MAX_DURATION = 200; // milliseconds
+    const TAP_MAX_DISTANCE = 10; // pixels - maximum movement allowed for a tap
+
+    // Calculate distance moved from start position
+    const touch = event.changedTouches[0];
+    if (touch)
+    {
+      const deltaXFromStart = touch.clientX - this.touchState.touchStartPos.x;
+      const deltaYFromStart = touch.clientY - this.touchState.touchStartPos.y;
+      const distanceFromStart = Math.sqrt(deltaXFromStart * deltaXFromStart + deltaYFromStart * deltaYFromStart);
+
+      if (elapsed < TAP_MAX_DURATION && distanceFromStart <= TAP_MAX_DISTANCE)
+      {
+        if (this.touchState.activeScope === 'rifle')
+        {
+          // Quick tap on rifle scope with minimal movement - fire!
+          this.fireFromScope();
+        }
       }
     }
 
