@@ -143,6 +143,29 @@ export class ImpactDetector
   }
 
   /**
+   * Enable or disable a collider by handle.
+   * Disabled colliders are skipped during collision detection.
+   * 
+   * @param {number} handle Collider handle returned from addMeshFromGeometry or addSteelTarget
+   * @param {boolean} enabled True to enable, false to disable
+   */
+  setColliderEnabled(handle, enabled)
+  {
+    this.detector.setColliderEnabled(handle, enabled);
+  }
+
+  /**
+   * Check if a collider is enabled.
+   * 
+   * @param {number} handle Collider handle
+   * @returns {boolean} True if enabled, false if disabled or invalid handle
+   */
+  isColliderEnabled(handle)
+  {
+    return this.detector.isColliderEnabled(handle);
+  }
+
+  /**
    * Get statistics about registered colliders.
    */
   getStats()

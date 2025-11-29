@@ -50,6 +50,15 @@ namespace btk::rendering
      */
     virtual std::optional<ImpactResult> intersectSegment(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, float t_start_s, float t_end_s, float bullet_radius,
                                                          int object_id) const = 0;
+
+    /// Check if this collider is enabled
+    bool isEnabled() const { return enabled_; }
+
+    /// Set enabled state
+    void setEnabled(bool enabled) { enabled_ = enabled; }
+
+    protected:
+    bool enabled_ = true; ///< Enabled state (disabled colliders are skipped)
   };
 
   /**
@@ -158,6 +167,24 @@ namespace btk::rendering
      * @return ImpactResult if hit, std::nullopt otherwise
      */
     std::optional<ImpactResult> findFirstImpact(const btk::ballistics::Trajectory& trajectory, float t0_s, float t1_s) const;
+
+    /**
+     * @brief Enable or disable a collider by handle.
+     *
+     * Disabled colliders are skipped during collision detection.
+     *
+     * @param handle Collider handle returned from addMeshCollider or addSteelCollider
+     * @param enabled True to enable, false to disable
+     */
+    void setColliderEnabled(int handle, bool enabled);
+
+    /**
+     * @brief Check if a collider is enabled.
+     *
+     * @param handle Collider handle
+     * @return True if enabled, false if disabled or invalid handle
+     */
+    bool isColliderEnabled(int handle) const;
 
     private:
     struct ObjectRecord

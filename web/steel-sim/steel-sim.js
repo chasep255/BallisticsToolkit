@@ -47,6 +47,11 @@ import
 from './Berm.js';
 import
 {
+  PrairieDogFactory
+}
+from './PrairieDog.js';
+import
+{
   HUD
 }
 from './HUD.js';
@@ -566,6 +571,9 @@ class SteelSimulator
     {
       textureManager: this.textureManager
     });
+
+    // Create prairie dog hunting targets
+    await this.landscape.createPrairieDogs();
 
     // Initialize impact mark factory for bullet holes
     ImpactMarkFactory.init(this.scene);
@@ -1087,8 +1095,46 @@ class SteelSimulator
       flag.registerWithImpactDetector(this.impactDetector);
     }
 
+    // Register prairie dog hunting targets
+    const prairieDogs = PrairieDogFactory.getAll();
+    const sharedGeometry = PrairieDogFactory.getGeometry();
+    if (sharedGeometry && prairieDogs.length > 0)
+    {
+      // Use computed scale (calculated to achieve target height)
+      const scale = PrairieDogFactory.computedScale;
+      
+      // Create rotation matrix for 90 degrees around X axis (same as instance rendering)
+      const rotationMatrix = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+      
+      for (const prairieDog of prairieDogs)
+      {
+        // Clone geometry and apply transforms to match instance rendering
+        const geometry = sharedGeometry.clone();
+        const basePos = prairieDog.basePosition;
+        
+        // Apply scale first
+        geometry.scale(scale, scale, scale);
+        
+        // Apply rotation (90 degrees around X axis to stand up)
+        geometry.applyMatrix4(rotationMatrix);
+        
+        // Position geometry at the same raised height used by the instanced mesh.
+        // Visual prairie dog position is basePos.y + PrairieDogFactory.raisedOffset,
+        // so we use that here to keep the collider in sync.
+        geometry.translate(basePos.x, basePos.y + PrairieDogFactory.raisedOffset, basePos.z);
+        
+        // Register with ImpactDetector
+        // Store prairie dog index in userData for impact handling
+        const objectId = this.impactDetector.addMeshFromGeometry(geometry, {
+          type: 'prairieDog',
+          index: prairieDog.instanceIndex
+        });
+        prairieDog.objectId = objectId;
+      }
+    }
+
     const signs = RangeSignFactory.getAll();
-    console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets, ${racks.length} racks, ${signs.length} signs, ${flags.length} flags`);
+    console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets, ${racks.length} racks, ${signs.length} signs, ${flags.length} flags, ${prairieDogs.length} prairie dogs`);
     console.log('[SteelSim] ImpactDetector stats:', this.impactDetector.getStats());
   }
 
@@ -1735,6 +1781,50 @@ class SteelSimulator
             });
           }
         }
+        // Handle prairie dog hits
+        else if (userData.type === 'prairieDog')
+        {
+          // Only process impact if prairie dog is raised (if lowered, no impact)
+          const prairieDog = PrairieDogFactory.getAt(userData.index);
+          if (prairieDog && prairieDog.isRaised())
+          {
+            // Create red dust cloud at impact point
+            const impactPointThree = new THREE.Vector3(
+              impactPosition.x,
+              impactPosition.y,
+              impactPosition.z
+            );
+            
+            DustCloudFactory.create(
+            {
+              position: impactPointThree,
+              scene: this.scene,
+              numParticles: 250,
+              color: { r: 255, g: 0, b: 0 }, // Red color
+              initialRadius: 0.05,
+              growthRate: 0.5,
+              particleDiameter: 0.2
+            });
+
+            // Handle hit: shoot up then lower quickly
+            PrairieDogFactory.hit(userData.index);
+
+            // Disable this collider so it won't block future shots
+            if (prairieDog.objectId >= 0)
+            {
+              this.impactDetector.setColliderEnabled(prairieDog.objectId, false);
+            }
+
+            // Update HUD with hit status
+            if (this.hud)
+            {
+              this.hud.updateImpactStatus(
+              {
+                type: 'hit'
+              });
+            }
+          }
+        }
         else
         {
           // Hit something that's not a target (berm, ground) - count as miss
@@ -1932,6 +2022,7 @@ class SteelSimulator
 
     DustCloudFactory.updateAll(dt);
     WindFlagFactory.updateAll(this.windGenerator, dt);
+    PrairieDogFactory.updateAll(dt);
 
     // Update spotting scope camera from key states (WASD for panning, E/Q for zoom)
     if (this.spottingScope)

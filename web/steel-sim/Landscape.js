@@ -14,6 +14,11 @@ import
   ImpactMarkFactory
 }
 from './ImpactMark.js';
+import
+{
+  PrairieDogFactory
+}
+from './PrairieDog.js';
 
 /**
  * Landscape class for managing ground planes and terrain
@@ -241,6 +246,38 @@ export class Landscape
   {
     this.createMountains();
     this.createTrees();
+  }
+
+  /**
+   * Create prairie dog hunting targets
+   * Scattered randomly across the ground
+   * @returns {Promise<void>} Promise that resolves when prairie dogs are created
+   */
+  async createPrairieDogs()
+  {
+    const config = Config.PRAIRIE_DOG_CONFIG;
+
+    // Initialize factory with model loading
+    await PrairieDogFactory.init(this.scene, config);
+
+    // Create prairie dogs at random positions between 100-600 yards
+    for (let i = 0; i < config.count; i++)
+    {
+      // Random scatter across width
+      const x = (Math.random() - 0.5) * config.scatterWidth;
+      
+      // Random range between minRange and maxRange (negative Z = downrange)
+      const range = config.minRange + Math.random() * (config.maxRange - config.minRange);
+      const z = -range; // Negative Z = downrange
+
+      // Get ground height at this position
+      const groundHeight = this.getHeightAt(x, z) || 0;
+
+      // Create prairie dog at ground level
+      // Base position will be adjusted so bottom of model aligns with ground
+      const position = new THREE.Vector3(x, groundHeight, z);
+      PrairieDogFactory.create(position);
+    }
   }
 
   /**

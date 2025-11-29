@@ -130,6 +130,22 @@ export function initConfig()
     brownGroundLength: btk.Conversions.yardsToMeters(2500) // 2500 yards
   };
 
+  // ===== PRAIRIE DOG CONFIGURATION =====
+  Config.PRAIRIE_DOG_CONFIG = {
+    count: 30, // Medium number (20-50 range)
+    modelPath: '../models/prairie dog.glb',
+    scatterWidth: Config.LANDSCAPE_CONFIG.groundWidth * 0.8, // 80% of ground width
+    minRange: btk.Conversions.yardsToMeters(100), // Minimum range (100 yards)
+    maxRange: btk.Conversions.yardsToMeters(600), // Maximum range (600 yards)
+    raisedHeight: 0.3, // Height when raised (meters)
+    loweredHeight: -0.5, // Height when down (meters, negative = underground)
+    animationSpeed: 0.5, // Raise/lower speed (m/s)
+    targetHeight: btk.Conversions.inchesToMeters(16), // Target height in meters (16 inches default)
+    moundRadius: btk.Conversions.inchesToMeters(6), // Mound outer radius (6 inches) - will be auto-calculated to cover prairie dog
+    moundInnerRadius: btk.Conversions.inchesToMeters(2), // Hole inner radius (2 inches)
+    moundHeight: btk.Conversions.inchesToMeters(1) // Mound height above ground (1 inch - shorter)
+  };
+
   // ===== WIND GENERATOR CONFIGURATION =====
   Config.WIND_CONFIG = {
     boxPadding: btk.Conversions.yardsToMeters(50), // 50 yards

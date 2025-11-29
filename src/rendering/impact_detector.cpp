@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <emscripten/console.h>
 
 namespace btk::rendering
 {
@@ -258,6 +259,23 @@ namespace btk::rendering
     grid_.resize(bins_x_ * bins_z_);
   }
 
+  void ImpactDetector::setColliderEnabled(int handle, bool enabled)
+  {
+    if(handle >= 0 && handle < static_cast<int>(colliders_.size()))
+    {
+      colliders_[handle]->setEnabled(enabled);
+    }
+  }
+
+  bool ImpactDetector::isColliderEnabled(int handle) const
+  {
+    if(handle >= 0 && handle < static_cast<int>(colliders_.size()))
+    {
+      return colliders_[handle]->isEnabled();
+    }
+    return false;
+  }
+
   int ImpactDetector::binIndexX(float x_m) const
   {
     int idx = static_cast<int>((x_m - world_min_x_) / bin_size_m_);
@@ -393,6 +411,12 @@ namespace btk::rendering
 
         for(const auto& rec : grid_[gidx])
         {
+          // Skip disabled colliders
+          if(!colliders_[rec.collider_handle]->isEnabled())
+          {
+            continue;
+          }
+
           auto hit_opt = colliders_[rec.collider_handle]->intersectSegment(start_m, end_m, t_start_s, t_end_s, bullet_radius, rec.object_id);
 
           if(hit_opt.has_value() && hit_opt->time_s < earliest_time)
