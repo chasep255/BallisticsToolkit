@@ -127,6 +127,9 @@ export class Scope
     // Focal distance for depth-of-field blur (in yards)
     this.focalDistance = config.focalDistance || 100; // Default 100 yards
     
+    // Optical effects (depth-of-field blur) enabled flag
+    this.opticalEffectsEnabled = config.opticalEffectsEnabled !== undefined ? config.opticalEffectsEnabled : true;
+    
     // Blur render target (blurred scene)
     this.blurRenderTarget = null;
     this.blurScene = null;
@@ -374,10 +377,10 @@ export class Scope
     this.internalCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
     this.internalCamera.position.z = 5;
 
-    // Main scope view: circle mapped with blurred scene texture
+    // Main scope view: circle mapped with scene texture (will be blurred if optical effects enabled)
     const scopeRadius = 0.98;
     const scopeGeom = new THREE.CircleGeometry(scopeRadius, 64);
-    const scopeTexture = this.blurRenderTarget.texture; // Use blurred texture instead of scene texture
+    const scopeTexture = this.sceneRenderTarget.texture; // Start with raw scene texture
     const scopeMat = new THREE.MeshBasicMaterial(
     {
       map: scopeTexture,
@@ -389,6 +392,7 @@ export class Scope
     const scopeMesh = new THREE.Mesh(scopeGeom, scopeMat);
     scopeMesh.position.set(0, 0, 0.01);
     this.internalScene.add(scopeMesh);
+    this.scopeMesh = scopeMesh; // Store reference for texture updates
 
     // Stencil mask: defines circular aperture for reticle elements (only if reticle enabled)
     if (this.hasReticle)
@@ -1011,8 +1015,8 @@ export class Scope
       this.renderer.render(this.scene, this.camera);
     }
     
-    // Step 1.5: Apply depth-of-field blur
-    if (this.blurRenderTarget && this.blurScene && this.depthTexture)
+    // Step 1.5: Apply depth-of-field blur (if optical effects enabled)
+    if (this.opticalEffectsEnabled && this.blurRenderTarget && this.blurScene && this.depthTexture)
     {
       // Update blur shader uniforms
       const METERS_PER_YARD = 0.9144;
@@ -1034,11 +1038,20 @@ export class Scope
       }
     }
     
-    // Step 2: Composite blurred scene + reticle to output render target
+    // Step 2: Composite scene (blurred or unblurred) + reticle to output render target
     // Clear with transparent color to preserve alpha channel
     this.renderer.setRenderTarget(this.outputRenderTarget);
     this.renderer.setClearColor(0x000000, 0.0); // Transparent black
     this.renderer.clear();
+    
+    // Update scope mesh texture: use blurred texture if optical effects enabled, otherwise raw scene
+    if (this.scopeMesh)
+    {
+      this.scopeMesh.material.map = this.opticalEffectsEnabled && this.blurRenderTarget ? 
+        this.blurRenderTarget.texture : 
+        this.sceneRenderTarget.texture;
+      this.scopeMesh.material.needsUpdate = true;
+    }
     
     if (this.renderStats)
     {

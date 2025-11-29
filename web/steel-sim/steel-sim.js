@@ -2315,6 +2315,19 @@ async function startGame()
     // Create new simulator instance
     const canvas = document.getElementById('steelCanvas');
     steelSimulator = new SteelSimulator(canvas, params);
+    
+    // Apply optical effects setting from checkbox
+    const opticalEffectsCheckbox = document.getElementById('opticalEffects');
+    if (opticalEffectsCheckbox && steelSimulator.scope)
+    {
+      const enabled = opticalEffectsCheckbox.checked;
+      steelSimulator.scope.opticalEffectsEnabled = enabled;
+      if (steelSimulator.spottingScope)
+      {
+        steelSimulator.spottingScope.opticalEffectsEnabled = enabled;
+      }
+    }
+    
     await steelSimulator.start();
 
     // Update UI
@@ -2348,6 +2361,19 @@ async function restartGame()
     // Create new simulator instance with updated parameters
     const canvas = document.getElementById('steelCanvas');
     steelSimulator = new SteelSimulator(canvas, params);
+    
+    // Apply optical effects setting from checkbox
+    const opticalEffectsCheckbox = document.getElementById('opticalEffects');
+    if (opticalEffectsCheckbox && steelSimulator.scope)
+    {
+      const enabled = opticalEffectsCheckbox.checked;
+      steelSimulator.scope.opticalEffectsEnabled = enabled;
+      if (steelSimulator.spottingScope)
+      {
+        steelSimulator.spottingScope.opticalEffectsEnabled = enabled;
+      }
+    }
+    
     await steelSimulator.start();
 
     // Wind presets already populated during initialization
@@ -2368,6 +2394,23 @@ function setupUI()
   const helpClose = document.querySelector('.help-close');
   const startBtn = document.getElementById('startBtn');
   const restartBtn = document.getElementById('restartBtn');
+  const opticalEffectsCheckbox = document.getElementById('opticalEffects');
+  
+  // Wire up optical effects checkbox
+  if (opticalEffectsCheckbox)
+  {
+    opticalEffectsCheckbox.addEventListener('change', (e) => {
+      const enabled = e.target.checked;
+      if (steelSimulator && steelSimulator.scope)
+      {
+        steelSimulator.scope.opticalEffectsEnabled = enabled;
+        if (steelSimulator.spottingScope)
+        {
+          steelSimulator.spottingScope.opticalEffectsEnabled = enabled;
+        }
+      }
+    });
+  }
 
   if (startBtn)
   {
