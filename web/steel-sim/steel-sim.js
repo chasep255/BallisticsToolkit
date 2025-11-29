@@ -336,6 +336,7 @@ class SteelSimulator
     RangeSignFactory.deleteAll();
     BermFactory.deleteAll();
     ImpactMarkFactory.dispose();
+    PrairieDogFactory.dispose();
 
     // Clean up BTK objects
     if (this.rifleZero)

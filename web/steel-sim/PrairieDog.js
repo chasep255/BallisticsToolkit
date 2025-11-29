@@ -696,6 +696,7 @@ export class PrairieDogFactory
    */
   static dispose()
   {
+    // Clean up prairie dog mesh
     if (PrairieDogFactory.instancedMesh && PrairieDogFactory.scene)
     {
       PrairieDogFactory.scene.remove(PrairieDogFactory.instancedMesh);
@@ -707,11 +708,35 @@ export class PrairieDogFactory
       PrairieDogFactory.instancedMesh = null;
     }
 
+    // Clean up mound mesh
+    if (PrairieDogFactory.moundMesh && PrairieDogFactory.scene)
+    {
+      PrairieDogFactory.scene.remove(PrairieDogFactory.moundMesh);
+      if (PrairieDogFactory.moundGeometry)
+      {
+        PrairieDogFactory.moundGeometry.dispose();
+        PrairieDogFactory.moundGeometry = null;
+      }
+      if (PrairieDogFactory.moundMaterial)
+      {
+        PrairieDogFactory.moundMaterial.dispose();
+        PrairieDogFactory.moundMaterial = null;
+      }
+      PrairieDogFactory.moundMesh = null;
+    }
+
+    // Reset all static state
     PrairieDogFactory.sharedGeometry = null;
     PrairieDogFactory.sharedMaterial = null;
     PrairieDogFactory.prairieDogs = [];
     PrairieDogFactory.scene = null;
     PrairieDogFactory.config = null;
+    PrairieDogFactory.impactDetector = null;
+    PrairieDogFactory.worldBounds = null;
+    PrairieDogFactory.modelHeight = 0;
+    PrairieDogFactory.raisedOffset = 0;
+    PrairieDogFactory.loweredOffset = 0;
+    PrairieDogFactory.computedScale = 1;
   }
 }
 
