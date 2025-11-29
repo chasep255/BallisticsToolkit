@@ -17,12 +17,31 @@ export class PrairieDog
   {
     this.basePosition = basePosition.clone();
     this.instanceIndex = instanceIndex;
-    this.currentHeight = PrairieDogFactory.raisedOffset; // Start raised
-    this.targetHeight = PrairieDogFactory.raisedOffset; // Start raised
+    
+    // Random starting state: 50% chance to start raised or lowered
+    const startRaised = Math.random() < 0.5;
+    this.currentHeight = startRaised ? PrairieDogFactory.raisedOffset : PrairieDogFactory.loweredOffset;
+    this.targetHeight = this.currentHeight;
     this.animationState = 'idle'; // 'idle', 'raising', 'lowering'
     this.objectId = -1; // Will be set when registered with ImpactDetector
     this.hitAnimationSpeed = null; // Custom speed for hit animation (null = use default)
-    this.isDead = false; // True if prairie dog has been killed (no more impact detection)
+    this.isDead = false; // True if prairie dog has been killed
+    
+    // Random up/down timing (30% raised, 70% lowered)
+    this.stateTimer = 0; // Time in current state
+    // Set initial timer based on starting state
+    if (startRaised)
+    {
+      this.nextStateChange = 5 + Math.random() * 30; // Raised: 5-35 seconds (avg 20s)
+    }
+    else
+    {
+      this.nextStateChange = 15 + Math.random() * 60; // Lowered: 15-75 seconds (avg 45s)
+    }
+    
+    // Respawn timing
+    this.respawnTimer = 0; // Time since death
+    this.respawnDelay = 60; // 1 minute respawn
   }
 
   /**
@@ -131,6 +150,12 @@ export class PrairieDogFactory
    * @type {Object|null}
    */
   static config = null;
+
+  /**
+   * Reference to ImpactDetector for enabling/disabling colliders on respawn
+   * @type {ImpactDetector|null}
+   */
+  static impactDetector = null;
 
   /**
    * Bounding box of the model in *world space* after applying base rotation and scale,
@@ -478,6 +503,29 @@ export class PrairieDogFactory
 
     for (const prairieDog of PrairieDogFactory.prairieDogs)
     {
+      // Handle respawn timer for dead prairie dogs (only when fully lowered)
+      if (prairieDog.isDead && prairieDog.animationState === 'idle')
+      {
+        prairieDog.respawnTimer += dt;
+        if (prairieDog.respawnTimer >= prairieDog.respawnDelay)
+        {
+          // Respawn: reset state and raise
+          prairieDog.isDead = false;
+          prairieDog.respawnTimer = 0;
+          prairieDog.stateTimer = 0;
+          prairieDog.nextStateChange = 5 + Math.random() * 30; // Raised: 5-35 seconds
+          prairieDog.raise();
+          
+          // Re-enable the collider
+          if (prairieDog.objectId >= 0 && PrairieDogFactory.impactDetector)
+          {
+            PrairieDogFactory.impactDetector.setColliderEnabled(prairieDog.objectId, true);
+          }
+          needsUpdate = true;
+        }
+        continue; // Skip random up/down while dead and idle
+      }
+
       // Update animation
       if (prairieDog.animationState === 'raising' || prairieDog.animationState === 'lowering')
       {
@@ -502,6 +550,9 @@ export class PrairieDogFactory
           else
           {
             prairieDog.animationState = 'idle';
+            prairieDog.stateTimer = 0;
+            // Just finished raising - set short timer (30% of time raised)
+            prairieDog.nextStateChange = 5 + Math.random() * 30; // 5-35 seconds
           }
         }
         else if (direction < 0 && newHeight <= prairieDog.targetHeight)
@@ -509,6 +560,9 @@ export class PrairieDogFactory
           prairieDog.currentHeight = prairieDog.targetHeight;
           prairieDog.animationState = 'idle';
           prairieDog.hitAnimationSpeed = null; // Reset custom speed
+          prairieDog.stateTimer = 0;
+          // Just finished lowering - set long timer (70% of time lowered)
+          prairieDog.nextStateChange = 15 + Math.random() * 60; // 15-75 seconds
         }
         else
         {
@@ -520,6 +574,40 @@ export class PrairieDogFactory
         // Mound position doesn't change, but update anyway to ensure sync
         PrairieDogFactory.updateMoundMatrix(prairieDog);
         needsUpdate = true;
+      }
+      // Handle random up/down when idle
+      else if (prairieDog.animationState === 'idle')
+      {
+        prairieDog.stateTimer += dt;
+        if (prairieDog.stateTimer >= prairieDog.nextStateChange)
+        {
+          // Toggle state
+          if (prairieDog.isRaised())
+          {
+            prairieDog.lower();
+            // Disable collider when lowering
+            if (prairieDog.objectId >= 0 && PrairieDogFactory.impactDetector)
+            {
+              PrairieDogFactory.impactDetector.setColliderEnabled(prairieDog.objectId, false);
+            }
+            // Going down - set long timer (70% of time lowered)
+            prairieDog.stateTimer = 0;
+            prairieDog.nextStateChange = 15 + Math.random() * 60; // 15-75 seconds
+          }
+          else
+          {
+            prairieDog.raise();
+            // Enable collider when raising
+            if (prairieDog.objectId >= 0 && PrairieDogFactory.impactDetector)
+            {
+              PrairieDogFactory.impactDetector.setColliderEnabled(prairieDog.objectId, true);
+            }
+            // Going up - set short timer (30% of time raised)
+            prairieDog.stateTimer = 0;
+            prairieDog.nextStateChange = 5 + Math.random() * 30; // 5-35 seconds
+          }
+          needsUpdate = true;
+        }
       }
     }
 

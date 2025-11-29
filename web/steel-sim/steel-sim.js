@@ -1131,6 +1131,18 @@ class SteelSimulator
         });
         prairieDog.objectId = objectId;
       }
+
+      // Store impactDetector reference for respawn re-enabling
+      PrairieDogFactory.impactDetector = this.impactDetector;
+
+      // Disable colliders for prairie dogs that start lowered
+      for (const prairieDog of prairieDogs)
+      {
+        if (!prairieDog.isRaised() && prairieDog.objectId >= 0)
+        {
+          this.impactDetector.setColliderEnabled(prairieDog.objectId, false);
+        }
+      }
     }
 
     const signs = RangeSignFactory.getAll();

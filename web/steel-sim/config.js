@@ -132,11 +132,11 @@ export function initConfig()
 
   // ===== PRAIRIE DOG CONFIGURATION =====
   Config.PRAIRIE_DOG_CONFIG = {
-    count: 30, // Medium number (20-50 range)
+    count: 50, // Medium number (20-50 range)
     modelPath: '../models/prairie dog.glb',
-    scatterWidth: Config.LANDSCAPE_CONFIG.groundWidth * 0.8, // 80% of ground width
+    scatterWidth: Config.LANDSCAPE_CONFIG.groundWidth * 0.75, // 80% of ground width
     minRange: btk.Conversions.yardsToMeters(100), // Minimum range (100 yards)
-    maxRange: btk.Conversions.yardsToMeters(600), // Maximum range (600 yards)
+    maxRange: btk.Conversions.yardsToMeters(1000), // Maximum range (600 yards)
     raisedHeight: 0.3, // Height when raised (meters)
     loweredHeight: -0.5, // Height when down (meters, negative = underground)
     animationSpeed: 0.5, // Raise/lower speed (m/s)
