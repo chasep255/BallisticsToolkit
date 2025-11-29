@@ -196,12 +196,12 @@
             - <kbd>Esc</kbd> to exit scope mode (releases pointer lock)<br>
             - FFP reticle scales with zoom (maintains MRAD subtensions)<br><br>
 
-            <strong>MRAD Dial Controls:</strong><br>
-            - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation up/down (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad) - requires scope mode<br>
-            - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage left/right (0.1 mrad per press; hold <kbd>Shift</kbd> for 1.0 mrad) - requires scope mode<br>
+            <strong>Dial Controls:</strong><br>
+            - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation up/down (0.1 MRAD or 0.25 MOA per press; hold <kbd>Shift</kbd> for 1.0 MRAD or 1.0 MOA) - requires scope mode<br>
+            - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage left/right (0.1 MRAD or 0.25 MOA per press; hold <kbd>Shift</kbd> for 1.0 MRAD or 1.0 MOA) - requires scope mode<br>
             - <kbd>R</kbd> reset both dials to zero (only when in rifle scope mode)<br>
             - On-screen dial buttons (U/D/L/R/⟲) next to HUD - click or hold to fast-dial, works anytime<br>
-            - Dial position shown in HUD (upper-left)
+            - Dial position shown in HUD (upper-left) in the selected scope type units
           </div>
         </div>
 
@@ -217,9 +217,10 @@
             - <strong>Long press (≈ 450ms) with minimal movement:</strong> Refocus scope at the point where you press (requires Experimental Optical Effects to be enabled)<br><br>
 
             <strong>Dial Buttons (on-screen, next to HUD):</strong><br>
-            - <strong>U/D:</strong> Adjust elevation up/down (0.1 mrad per tap, hold to fast-dial)<br>
-            - <strong>L/R:</strong> Adjust windage left/right (0.1 mrad per tap, hold to fast-dial)<br>
-            - <strong>⟲:</strong> Reset both dials to zero<br><br>
+            - <strong>U/D:</strong> Adjust elevation up/down (0.1 MRAD or 0.25 MOA per tap, hold to fast-dial)<br>
+            - <strong>L/R:</strong> Adjust windage left/right (0.1 MRAD or 0.25 MOA per tap, hold to fast-dial)<br>
+            - <strong>⟲:</strong> Reset both dials to zero<br>
+            - Units depend on selected Scope Type (MRAD or MOA)<br><br>
 
             <strong>Fullscreen:</strong><br>
             - Use the Fullscreen button for immersive mobile play<br>
@@ -332,13 +333,15 @@
           <h3>HUD & Dial Buttons (Top-Left)</h3>
           <div class="param-help">
             <strong>HUD Text:</strong><br>
-            - <strong>Elevation:</strong> Current elevation dial setting in mrad (U = up, D = down)<br>
-            - <strong>Windage:</strong> Current windage dial setting in mrad (R = right, L = left)<br>
-            - <strong>Impact Status:</strong> Shows "IMPACT" (green) when hitting targets, "MISS" (red) when missing<br><br>
+            - <strong>Elevation:</strong> Current elevation dial setting (U = up, D = down)<br>
+            - <strong>Windage:</strong> Current windage dial setting (R = right, L = left)<br>
+            - <strong>Impact Status:</strong> Shows "IMPACT" (green) when hitting targets, "MISS" (red) when missing<br>
+            - Units displayed depend on selected Scope Type (MRAD or MOA)<br><br>
             
             <strong>Dial Buttons (next to HUD):</strong><br>
             - U/D elevation, L/R windage, ⟲ reset<br>
-            - Tap for single adjustment (0.1 mrad), hold for fast-dial
+            - Tap for single adjustment (0.1 MRAD or 0.25 MOA), hold for fast-dial<br>
+            - Shift+arrow keys move 1.0 MRAD or 1.0 MOA increments
           </div>
         </div>
 
@@ -356,7 +359,11 @@
 
             <strong>Scope Reticle:</strong><br>
             - Geometry-based reticle using Three.js meshes<br>
-            - FFP behavior scales with zoom, maintaining MRAD subtensions<br><br>
+            - FFP behavior scales with zoom, maintaining angular subtensions<br>
+            - <strong>Scope Type:</strong> Select MRAD or MOA in the settings bar to change reticle tick spacing and dial units<br>
+            - MRAD mode: 0.5 MRAD minor ticks, 1.0 MRAD major ticks<br>
+            - MOA mode: 2.0 MOA minor ticks, 4.0 MOA major ticks<br>
+            - Dial click values and HUD display units match the selected scope type<br><br>
 
             <strong>Impact Detection:</strong><br>
             - Spatial binning system (10m bins) for efficient collision detection<br>
@@ -380,8 +387,9 @@
             - Start with the 100-yard rack to confirm your zero<br>
             - Use wind flags at multiple distances to read wind gradients<br>
             - Watch target movement after impacts to understand hit location (center vs edge)<br>
-            - Make small MRAD adjustments (0.1 mrad increments) for precise corrections<br>
-            - Use <kbd>Shift</kbd>+<kbd>Arrow</kbd> keys for larger 1.0 mrad adjustments when needed<br>
+            - Make small dial adjustments (0.1 MRAD or 0.25 MOA increments) for precise corrections<br>
+            - Use <kbd>Shift</kbd>+<kbd>Arrow</kbd> keys for larger adjustments (1.0 MRAD or 1.0 MOA) when needed<br>
+            - Select your preferred Scope Type (MRAD or MOA) in the settings bar - affects reticle spacing and dial units<br>
             - Higher BC bullets drift less in the wind<br>
             - Lower MV σ = more consistent impacts<br>
             - Practice at shorter distances before attempting 1760 yards (1 mile)<br>
