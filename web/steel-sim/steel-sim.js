@@ -112,6 +112,11 @@ from './ImpactMark.js';
 // X=crossrange (positive = right), Y=up, Z=-downrange (negative = downrange)
 // All internal values are in SI units (meters, m/s, kg, radians)
 
+// ===== PLATFORM DETECTION =====
+// Detect iOS (iPad, iPhone, iPod, or iPadOS on Mac)
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 // ===== STEEL SIMULATOR CLASS =====
 
 class SteelSimulator
@@ -1543,7 +1548,8 @@ class SteelSimulator
     {
       // Single finger - pan if moved enough distance
       const touch = touches[0];
-      const DRAG_DISTANCE_THRESHOLD = 5; // pixels - start dragging if moved this far
+      // iOS already provides a built-in threshold, so use 0; otherwise use 5 pixels
+      const DRAG_DISTANCE_THRESHOLD = isIOS ? 0 : 3;
 
       // Calculate distance moved from start position
       const deltaXFromStart = touch.clientX - this.touchState.touchStartPos.x;
@@ -2297,24 +2303,32 @@ function setupUI()
     });
   }
 
-  // Fullscreen button
+  // Fullscreen button (hide on iOS since fullscreen doesn't work well)
   const fullscreenBtn = document.getElementById('fullscreenBtn');
   if (fullscreenBtn)
   {
-    fullscreenBtn.addEventListener('click', toggleFullscreen);
-
-    // Update button text when fullscreen changes
-    document.addEventListener('fullscreenchange', () =>
+    if (isIOS)
     {
-      if (document.fullscreenElement)
+      // Hide fullscreen button on iOS
+      fullscreenBtn.style.display = 'none';
+    }
+    else
+    {
+      fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+      // Update button text when fullscreen changes
+      document.addEventListener('fullscreenchange', () =>
       {
-        fullscreenBtn.textContent = '⛶ Exit Fullscreen';
-      }
-      else
-      {
-        fullscreenBtn.textContent = '⛶ Fullscreen';
-      }
-    });
+        if (document.fullscreenElement)
+        {
+          fullscreenBtn.textContent = '⛶ Exit Fullscreen';
+        }
+        else
+        {
+          fullscreenBtn.textContent = '⛶ Fullscreen';
+        }
+      });
+    }
   }
 
 }
