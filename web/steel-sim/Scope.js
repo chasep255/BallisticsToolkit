@@ -121,6 +121,18 @@ export class Scope
     // Pan speed for keyboard control (used by spotting scope)
     this.panSpeedBase = config.panSpeedBase || 0.1; // radians per second base speed
 
+    // Depth texture for blur effects (captured from scene render)
+    this.depthTexture = null;
+    
+    // Focal distance for depth-of-field blur (in yards)
+    this.focalDistance = config.focalDistance || 100; // Default 100 yards
+    
+    // Blur render target (blurred scene)
+    this.blurRenderTarget = null;
+    this.blurScene = null;
+    this.blurCamera = null;
+    this.blurMesh = null;
+
     // Shooter position
     this.cameraPosition = config.cameraPosition ||
     {
@@ -141,6 +153,7 @@ export class Scope
     // Create resources
     this.createInternalRenderTarget(renderWidth, renderHeight);
     this.createCamera();
+    this.createBlurPass();
 
     this.createInternalComposition(renderWidth, renderHeight);
 
@@ -157,13 +170,154 @@ export class Scope
   createInternalRenderTarget(width, height)
   {
     // Internal render target for 3D scene before compositing with reticle
+    // Enable depth texture capture for blur effects
     this.sceneRenderTarget = new THREE.WebGLRenderTarget(width, height,
     {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
+      depthTexture: new THREE.DepthTexture(width, height),
       samples: 4 // MSAA
     });
+    
+    // Store reference to depth texture
+    this.depthTexture = this.sceneRenderTarget.depthTexture;
+    
+    // Blur render target for depth-of-field effect
+    this.blurRenderTarget = new THREE.WebGLRenderTarget(width, height,
+    {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat
+    });
+  }
+  
+  createBlurPass()
+  {
+    // Scene for blur pass (fullscreen quad)
+    this.blurScene = new THREE.Scene();
+    this.blurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    
+    // Convert focal distance from yards to meters
+    const METERS_PER_YARD = 0.9144;
+    const focalDistanceMeters = this.focalDistance * METERS_PER_YARD;
+    
+    // Blur shader that samples scene texture and depth texture
+    // Physically-inspired thin-lens DOF using circle of confusion (CoC)
+    const blurShader = new THREE.ShaderMaterial({
+      uniforms: {
+        sceneTexture:    { value: this.sceneRenderTarget.texture },
+        depthTexture:    { value: this.depthTexture },
+        resolution:      { value: new THREE.Vector2(this.blurRenderTarget.width, this.blurRenderTarget.height) },
+        focalDistance:   { value: focalDistanceMeters },           // focus distance in meters
+        cameraNear:      { value: Config.CAMERA_NEAR_PLANE },
+        cameraFar:       { value: Config.CAMERA_FAR_PLANE },
+        maxBlurRadius:   { value: 16.0 },                          // Maximum blur radius in pixels
+        lensFocalLength: { value: 0.300 },                         // 300mm effective focal length (meters)
+        lensFNumber:     { value: 2.0 },                           // f/2 for very shallow DOF
+        sensorWidth:     { value: 0.024 }                          // 24mm effective sensor width (more pixels per CoC)
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D sceneTexture;
+        uniform sampler2D depthTexture;
+        uniform vec2  resolution;
+        uniform float focalDistance;    // meters
+        uniform float cameraNear;
+        uniform float cameraFar;
+        uniform float maxBlurRadius;    // pixels
+        uniform float lensFocalLength;  // meters
+        uniform float lensFNumber;
+        uniform float sensorWidth;      // meters
+        varying vec2 vUv;
+        
+        // THREE.js-style depth reconstruction from depthTexture
+        // depth is non-linear clip-space depth in [0,1]
+        float perspectiveDepthToViewZ(const in float fragCoordZ,
+                                      const in float near,
+                                      const in float far) {
+          // See THREE.PerspectiveCamera depth packing docs / examples
+          return (near * far) / ((far - near) * fragCoordZ - far);
+        }
+        
+        // Convert depth texture sample to positive view-space distance (meters)
+        float depthToDistance(float depth) {
+          float viewZ = perspectiveDepthToViewZ(depth, cameraNear, cameraFar);
+          return -viewZ; // distance in front of camera is positive
+        }
+        
+        void main() {
+          // Sample depth and convert to distance in meters
+          float depth    = texture2D(depthTexture, vUv).r;
+          float distance = depthToDistance(depth);
+          
+          // Treat everything in front of the near plane or behind far as clamped
+          float eps = 0.001;
+          float d   = clamp(distance, cameraNear + eps, cameraFar);
+          
+          // Thin-lens circle of confusion (CoC) model.
+          // F  = lens focal length (meters)
+          // N  = f-number
+          // df = focal distance (meters)
+          // d  = object distance from depth buffer (meters)
+          float F  = lensFocalLength;
+          float N  = lensFNumber;
+          float df = max(focalDistance, F + eps); // avoid df == F singularity
+          
+          // CoC in meters on image plane:
+          // CoC = | (F^2 / (N * (df - F))) * ((d - df) / d) |
+          float CoC = abs((F * F / (N * (df - F))) * ((d - df) / d));
+          
+          // Convert CoC (meters on sensor) to pixel radius.
+          // Use horizontal resolution as reference.
+          float blurPixels = (CoC / sensorWidth) * resolution.x;
+          
+          // Clamp to max blur radius
+          float blurRadius = clamp(blurPixels, 0.0, maxBlurRadius);
+          
+          // If blur radius is very small, just sample center pixel
+          if (blurRadius < 0.25) {
+            gl_FragColor = texture2D(sceneTexture, vUv);
+            return;
+          }
+          
+          // Gaussian blur with variable radius
+          vec2 texelSize    = 1.0 / resolution;
+          vec4 color        = vec4(0.0);
+          float totalWeight = 0.0;
+          
+          // Sample in a circular pattern
+          int samples = int(ceil(blurRadius * 2.0));
+          samples = min(samples, 16); // Limit samples for performance
+          
+          for (int i = -samples; i <= samples; i++) {
+            for (int j = -samples; j <= samples; j++) {
+              vec2 offset = vec2(float(i), float(j)) * texelSize;
+              float dist   = length(offset * resolution);
+              
+              if (dist > blurRadius) continue;
+              
+              // Gaussian weight
+              float weight = exp(-(dist * dist) / (2.0 * blurRadius * blurRadius));
+              color       += texture2D(sceneTexture, vUv + offset) * weight;
+              totalWeight += weight;
+            }
+          }
+          
+          gl_FragColor = color / max(totalWeight, 0.0001);
+        }
+      `
+    });
+    
+    const quad = new THREE.PlaneGeometry(2, 2);
+    this.blurMesh = new THREE.Mesh(quad, blurShader);
+    this.blurScene.add(this.blurMesh);
   }
 
   createCamera()
@@ -220,10 +374,10 @@ export class Scope
     this.internalCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
     this.internalCamera.position.z = 5;
 
-    // Main scope view: circle mapped with lit 3D scene texture
+    // Main scope view: circle mapped with blurred scene texture
     const scopeRadius = 0.98;
     const scopeGeom = new THREE.CircleGeometry(scopeRadius, 64);
-    const scopeTexture = this.sceneRenderTarget.texture;
+    const scopeTexture = this.blurRenderTarget.texture; // Use blurred texture instead of scene texture
     const scopeMat = new THREE.MeshBasicMaterial(
     {
       map: scopeTexture,
@@ -817,6 +971,24 @@ export class Scope
     {
       console.log(`[Scope] Render target resized: ${outputWidth}x${outputHeight}`);
       this.sceneRenderTarget.setSize(outputWidth, outputHeight);
+      
+      // Resize depth texture if it exists
+      if (this.depthTexture)
+      {
+        this.depthTexture.image.width = outputWidth;
+        this.depthTexture.image.height = outputHeight;
+        this.depthTexture.needsUpdate = true;
+      }
+      
+      // Resize blur render target
+      if (this.blurRenderTarget)
+      {
+        this.blurRenderTarget.setSize(outputWidth, outputHeight);
+        if (this.blurMesh)
+        {
+          this.blurMesh.material.uniforms.resolution.value.set(outputWidth, outputHeight);
+        }
+      }
 
       // Update camera aspect to match new size
       if (this.camera)
@@ -838,8 +1010,31 @@ export class Scope
     {
       this.renderer.render(this.scene, this.camera);
     }
-
-    // Step 2: Composite scene + reticle to output render target
+    
+    // Step 1.5: Apply depth-of-field blur
+    if (this.blurRenderTarget && this.blurScene && this.depthTexture)
+    {
+      // Update blur shader uniforms
+      const METERS_PER_YARD = 0.9144;
+      this.blurMesh.material.uniforms.focalDistance.value = this.focalDistance * METERS_PER_YARD;
+      this.blurMesh.material.uniforms.sceneTexture.value = this.sceneRenderTarget.texture;
+      this.blurMesh.material.uniforms.depthTexture.value = this.depthTexture;
+      
+      // Render blur pass
+      this.renderer.setRenderTarget(this.blurRenderTarget);
+      this.renderer.clear();
+      
+      if (this.renderStats)
+      {
+        this.renderStats.render(this.renderer, this.blurScene, this.blurCamera, `Scope.${this.hasReticle ? 'rifle' : 'spotting'}.Blur`);
+      }
+      else
+      {
+        this.renderer.render(this.blurScene, this.blurCamera);
+      }
+    }
+    
+    // Step 2: Composite blurred scene + reticle to output render target
     // Clear with transparent color to preserve alpha channel
     this.renderer.setRenderTarget(this.outputRenderTarget);
     this.renderer.setClearColor(0x000000, 0.0); // Transparent black
@@ -860,9 +1055,31 @@ export class Scope
     this.renderer.setRenderTarget(null);
   }
 
+  /**
+   * Set the focal distance (in yards)
+   * @param {number} yards - Focal distance in yards
+   */
+  setFocalDistance(yards)
+  {
+    this.focalDistance = yards;
+    // The blur shader uniform will be updated automatically in the render loop
+  }
+
   dispose()
   {
     this.sceneRenderTarget.dispose();
+    if (this.blurRenderTarget) this.blurRenderTarget.dispose();
+    
+    // Dispose blur pass resources
+    if (this.blurScene)
+    {
+      this.blurScene.traverse((object) =>
+      {
+        if (object.geometry) object.geometry.dispose();
+        if (object.material) object.material.dispose();
+      });
+    }
+    
     // Dispose all meshes/materials in internal scene
     this.internalScene.traverse((object) =>
     {

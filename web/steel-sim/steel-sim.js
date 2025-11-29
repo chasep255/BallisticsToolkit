@@ -1404,6 +1404,72 @@ class SteelSimulator
         this.updateHudDial();
         return;
       }
+
+      // F key: Set focal distance for rifle scope
+      if ((event.key === 'f' || event.key === 'F') && !event.shiftKey)
+      {
+        event.preventDefault();
+        this.setFocalDistanceFromRaycast(this.scope);
+        return;
+      }
+      
+      // Shift+F: Set focal distance for spotting scope
+      if ((event.key === 'f' || event.key === 'F') && event.shiftKey)
+      {
+        event.preventDefault();
+        this.setFocalDistanceFromRaycast(this.spottingScope);
+        return;
+      }
+    }
+    
+    // F key: Set focal distance for rifle scope (works outside scope mode too)
+    if ((event.key === 'f' || event.key === 'F') && !event.shiftKey)
+    {
+      event.preventDefault();
+      this.setFocalDistanceFromRaycast(this.scope);
+      return;
+    }
+    
+    // Shift+F: Set focal distance for spotting scope (works anytime)
+    if ((event.key === 'f' || event.key === 'F') && event.shiftKey)
+    {
+      event.preventDefault();
+      this.setFocalDistanceFromRaycast(this.spottingScope);
+      return;
+    }
+  }
+
+  setFocalDistanceFromRaycast(scope)
+  {
+    if (!scope || !this.scene) return;
+
+    // Get the scope's camera
+    const camera = scope.getCamera();
+    if (!camera) return;
+
+    // Raycast from camera center through the view center (normalized coordinates 0, 0 = center)
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    
+    // Intersect with all objects in the scene (recursive = true to check all children)
+    const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+    
+    if (intersects.length > 0)
+    {
+      const hit = intersects[0];
+      const distanceMeters = hit.distance;
+      const METERS_PER_YARD = 0.9144;
+      const distanceYards = distanceMeters / METERS_PER_YARD;
+      
+      // Update the scope's focal distance
+      scope.setFocalDistance(distanceYards);
+      
+      const scopeName = scope === this.scope ? 'rifle' : 'spotting';
+      console.log(`[SteelSim] ${scopeName} scope focal distance set to ${distanceYards.toFixed(1)} yards (${distanceMeters.toFixed(2)}m) at ${hit.point.x.toFixed(2)}, ${hit.point.y.toFixed(2)}, ${hit.point.z.toFixed(2)}`);
+    }
+    else
+    {
+      const scopeName = scope === this.scope ? 'rifle' : 'spotting';
+      console.log(`[SteelSim] No intersection found for ${scopeName} scope focal distance`);
     }
   }
 
