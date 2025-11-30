@@ -623,6 +623,7 @@ class SteelSimulator
       hasReticle: false, // Spotting scope has no reticle
       hasDials: false, // Spotting scope has no dials
       opticalEffectsEnabled: this.opticalEffectsEnabled,
+      windGenerator: this.windGenerator,
       scopeType: this.scopeType,
       cameraPosition:
       {
@@ -663,6 +664,7 @@ class SteelSimulator
       maxZoomX: 40.0,
       lowFovFeet: 25,
       opticalEffectsEnabled: this.opticalEffectsEnabled,
+      windGenerator: this.windGenerator,
       scopeType: this.scopeType,
       cameraPosition:
       {
@@ -1503,13 +1505,12 @@ class SteelSimulator
     {
       const hit = intersects[0];
       const distanceMeters = hit.distance;
-      const METERS_PER_YARD = 0.9144;
-      const distanceYards = distanceMeters / METERS_PER_YARD;
       
       // Update the scope's focal distance
-      scope.setFocalDistance(distanceYards);
+      scope.setFocalDistance(distanceMeters);
       
       const scopeName = scope === this.scope ? 'rifle' : 'spotting';
+      const distanceYards = btk.Conversions.metersToYards(distanceMeters);
       console.log(`[SteelSim] ${scopeName} scope focal distance set to ${distanceYards.toFixed(1)} yards (${distanceMeters.toFixed(2)}m) at ${hit.point.x.toFixed(2)}, ${hit.point.y.toFixed(2)}, ${hit.point.z.toFixed(2)}`);
     }
     else

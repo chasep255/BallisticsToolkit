@@ -313,7 +313,7 @@
             
             <strong>Experimental Optical Effects:</strong><br>
             - Toggle via the \"Experimental Optical Effects\" checkbox in the settings bar (off by default).<br>
-            - Enables physically-inspired depth-of-field blur and scope optics (56mm objective, zoom-dependent DOF).<br>
+            - Enables physically-inspired depth-of-field blur, scope optics (56mm objective, zoom-dependent DOF), and a wind-driven heat mirage/shimmer in the scopes.<br>
             - Desktop: Use <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> to refocus rifle/spotting scopes at the center crosshair distance.<br>
             - Mobile: Long-press inside a scope (≈ 450ms, minimal movement) to refocus at the point where you press.<br>
             - Increases GPU load; turn off on low-power or thermally constrained devices.<br><br>
@@ -325,7 +325,8 @@
             - Implements separable Gaussian blur (horizontal then vertical passes) for performance (O(2n) vs O(n²)).<br>
             - Depth texture captured from scene render, decoded using THREE.js perspective depth reconstruction.<br>
             - Default focal distance: 100 yards. Blur strength scales with zoom level (higher zoom = stronger blur).<br>
-            - Resolution-independent blur calculation ensures consistent appearance across different screen sizes.
+            - Heat mirage uses 3D simplex noise on a sphere around the shooter, advected by crosswind at the focus distance with a slow upward drift, and its strength increases with zoom while fading in very strong winds.<br>
+            - Resolution-independent blur and mirage calculations ensure consistent appearance across different screen sizes.
           </div>
         </div>
         

@@ -30,16 +30,15 @@ from './RenderStats.js';
 // so this geometry-based reticle matches the old visual behavior.
 const MRAD_PER_UNIT_SLOPE = 1000.0 / 60.0;
 
-// MOA to MRAD conversion constant (from conversions.h)
 // Scope FOV specs are always quoted "width in feet at 100 yards".
-// Keep the 100 yards and 3 ft/yd factors explicit so there are no magic numbers.
-const SCOPE_SPEC_DISTANCE_YARDS = 100;
-const FEET_PER_YARD = 3;
-
 function fovDegFromFeetAtSpecDistance(widthFeet)
 {
-  const widthYards = widthFeet / FEET_PER_YARD;
-  const halfAngle = Math.atan((widthYards / 2) / SCOPE_SPEC_DISTANCE_YARDS);
+  // Convert scope spec to meters (SI units)
+  const widthMeters = btk.Conversions.feetToMeters(widthFeet);
+  const specDistanceMeters = btk.Conversions.yardsToMeters(100);
+  
+  // Calculate FOV angle in radians, then convert to degrees
+  const halfAngle = Math.atan((widthMeters / 2) / specDistanceMeters);
   return THREE.MathUtils.radToDeg(2 * halfAngle);
 }
 
@@ -144,14 +143,17 @@ export class Scope
     // Audio manager for scope click sounds (optional)
     this.audioManager = config.audioManager || null;
 
+    // BTK wind generator (optional)
+    this.windGenerator = config.windGenerator || null;
+
     // Pan speed for keyboard control (used by spotting scope)
     this.panSpeedBase = config.panSpeedBase || 0.1; // radians per second base speed
 
     // Depth texture for blur effects (captured from scene render)
     this.depthTexture = null;
     
-    // Focal distance for depth-of-field blur (in yards)
-    this.focalDistance = config.focalDistance || 100; // Default 100 yards
+    // Focal distance for depth-of-field blur (in meters)
+    this.focalDistance = config.focalDistance || btk.Conversions.yardsToMeters(100); // Default ~91.44m (100 yards)
     
     // Physical scope parameters
     // 56mm objective lens (diameter) and virtual sensor width behind the scope
@@ -166,6 +168,16 @@ export class Scope
     this.blurScene = null;
     this.blurCamera = null;
     this.blurMesh = null;
+
+    // Mirage post-process state
+    this.mirageScene = null;
+    this.mirageCamera = null;
+    this.mirageMesh = null;
+    this.mirageRenderTarget = null;
+    this.simplexNoiseGLSL = null;
+    this.mirageAdvectionHorizontal = 0.0; // Accumulated horizontal wind advection (radians)
+    this.mirageAdvectionVertical = 0.0; // Accumulated vertical heat rise advection (radians)
+    this.mirageAdvectionTime = 0.0; // Accumulated time for noise animation (seconds)
 
     // Shooter position
     this.cameraPosition = config.cameraPosition ||
@@ -188,6 +200,7 @@ export class Scope
     this.createInternalRenderTarget(renderWidth, renderHeight);
     this.createCamera();
     this.createBlurPass();
+    this.createMiragePass();
 
     this.createInternalComposition(renderWidth, renderHeight);
 
@@ -230,6 +243,14 @@ export class Scope
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat
     });
+
+    // Render target for mirage post-process
+    this.mirageRenderTarget = new THREE.WebGLRenderTarget(width, height,
+    {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat
+    });
   }
   
   createBlurPass()
@@ -238,10 +259,6 @@ export class Scope
     this.blurScene = new THREE.Scene();
     this.blurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     
-    // Convert focal distance from yards to meters
-    const METERS_PER_YARD = 0.9144;
-    const focalDistanceMeters = this.focalDistance * METERS_PER_YARD;
-    
     // Separable Gaussian blur shader (horizontal pass)
     // This shader calculates blur radius from depth and performs horizontal blur
     const blurShaderHorizontal = new THREE.ShaderMaterial({
@@ -249,7 +266,7 @@ export class Scope
         sceneTexture:    { value: this.sceneRenderTarget.texture },
         depthTexture:    { value: this.depthTexture },
         resolution:      { value: new THREE.Vector2(this.blurRenderTargetHorizontal.width, this.blurRenderTargetHorizontal.height) },
-        focalDistance:   { value: focalDistanceMeters },
+        focalDistance:   { value: this.focalDistance },
         cameraNear:      { value: Config.CAMERA_NEAR_PLANE },
         cameraFar:       { value: Config.CAMERA_FAR_PLANE },
         maxBlurRadius:   { value: 8.0 },
@@ -341,7 +358,7 @@ export class Scope
         sceneTexture:    { value: this.blurRenderTargetHorizontal.texture },
         depthTexture:    { value: this.depthTexture },
         resolution:      { value: new THREE.Vector2(this.blurRenderTarget.width, this.blurRenderTarget.height) },
-        focalDistance:   { value: focalDistanceMeters },
+        focalDistance:   { value: this.focalDistance },
         cameraNear:      { value: Config.CAMERA_NEAR_PLANE },
         cameraFar:       { value: Config.CAMERA_FAR_PLANE },
         maxBlurRadius:   { value: 8.0 },
@@ -432,6 +449,169 @@ export class Scope
     this.blurMeshVertical = new THREE.Mesh(quad, blurShaderVertical);
     this.blurScene.add(this.blurMeshHorizontal);
     this.blurScene.add(this.blurMeshVertical);
+  }
+
+  /**
+   * Create mirage post-process pass with empty shaders.
+   * Includes simplex 3D noise function for use in fragment shader.
+   */
+  createMiragePass()
+  {
+    this.mirageScene = new THREE.Scene();
+    this.mirageCamera = this.blurCamera || new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    // Simplex 3D noise (adapted from webgl-noise by Gustavson/Ashima)
+    const simplexNoise = `
+      vec3 permute(vec3 x) { return mod(((x * 34.0) + 1.0) * x, 289.0); }
+      vec4 permute(vec4 x) { return mod(((x * 34.0) + 1.0) * x, 289.0); }
+      vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+      float snoise(vec3 v) {
+        const vec2  C = vec2(1.0 / 6.0, 1.0 / 3.0);
+        const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+
+        // First corner
+        vec3 i  = floor(v + dot(v, C.yyy));
+        vec3 x0 = v - i + dot(i, C.xxx);
+
+        // Other corners
+        vec3 g = step(x0.yzx, x0.xyz);
+        vec3 l = 1.0 - g;
+        vec3 i1 = min(g.xyz, l.zxy);
+        vec3 i2 = max(g.xyz, l.zxy);
+
+        vec3 x1 = x0 - i1 + C.xxx;
+        vec3 x2 = x0 - i2 + C.yyy;
+        vec3 x3 = x0 - D.yyy;
+
+        // Permutations
+        i = mod(i, 289.0);
+        vec4 p = permute(permute(permute(
+                    i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                  + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                  + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+        // Gradients
+        float n_ = 0.142857142857; // 1.0/7.0
+        vec3  ns = n_ * D.wyz - D.xzx;
+
+        vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+        vec4 x_ = floor(j * ns.z);
+        vec4 y_ = floor(j - 7.0 * x_);
+
+        vec4 x = x_ * ns.x + ns.yyyy;
+        vec4 y = y_ * ns.x + ns.yyyy;
+        vec4 h = 1.0 - abs(x) - abs(y);
+
+        vec4 b0 = vec4(x.xy, y.xy);
+        vec4 b1 = vec4(x.zw, y.zw);
+
+        vec4 s0 = floor(b0) * 2.0 + 1.0;
+        vec4 s1 = floor(b1) * 2.0 + 1.0;
+        vec4 sh = -step(h, vec4(0.0));
+
+        vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+        vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+        vec3 p0 = vec3(a0.xy, h.x);
+        vec3 p1 = vec3(a0.zw, h.y);
+        vec3 p2 = vec3(a1.xy, h.z);
+        vec3 p3 = vec3(a1.zw, h.w);
+
+        // Normalise gradients
+        vec4 norm = taylorInvSqrt(vec4(
+          dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+        p0 *= norm.x;
+        p1 *= norm.y;
+        p2 *= norm.z;
+        p3 *= norm.w;
+
+        // Mix final noise value
+        vec4 m = max(0.6 - vec4(
+          dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
+        m = m * m;
+        return 42.0 * dot(m * m, vec4(
+          dot(p0, x0), dot(p1, x1),
+          dot(p2, x2), dot(p3, x3)));
+      }
+    `;
+
+    const vertexShader = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+
+    const fragmentShader = `
+      uniform sampler2D sceneTexture;
+      uniform float cameraTheta;  // Camera azimuth angle + horizontal advection (radians)
+      uniform float cameraPhi;    // Camera elevation angle + vertical advection (radians)
+      uniform float mirageAdvectionTime;  // Time advection for noise animation (seconds)
+      uniform float cameraFov;    // Camera field of view (radians)
+
+      varying vec2 vUv;
+
+      const float MIRAGE_ANGLE_SCALE = 1.0 / 0.001;  // Scale factor for angular noise coordinates
+      const float MIRAGE_TIME_SCALE = 1.0 / 10.0;   // Scale factor for time noise coordinate
+
+      ${simplexNoise}
+
+      void main() {
+        vec4 sceneColor = texture2D(sceneTexture, vUv);
+        
+        // Sample 3D simplex noise at camera angles + time
+        // Map UV to angular offset from center using small-angle approximation: θ ≈ (uv - 0.5) * fov
+        vec2 uvOffset = (vUv - 0.5) * 2.0; // -1 to 1
+        float theta = (cameraTheta + uvOffset.x * cameraFov * 0.5) * MIRAGE_ANGLE_SCALE;
+        float phi = (cameraPhi + uvOffset.y * cameraFov * 0.5) * MIRAGE_ANGLE_SCALE;
+        float time = mirageAdvectionTime * MIRAGE_TIME_SCALE;
+        
+        vec3 noiseCoord = vec3(theta, phi, time);
+        float noise = snoise(noiseCoord);
+        
+        // Use noise to modulate brightness (subtle shading)
+        float noiseFactor = noise * 0.3 + 1.0; // Scale noise to ±30% brightness variation
+        gl_FragColor = sceneColor * noiseFactor;
+      }
+    `;
+
+    const material = new THREE.ShaderMaterial(
+    {
+      uniforms:
+      {
+        sceneTexture:
+        {
+          value: null
+        },
+        cameraTheta:
+        {
+          value: 0.0
+        },
+        cameraPhi:
+        {
+          value: 0.0
+        },
+        mirageAdvectionTime:
+        {
+          value: 0.0
+        },
+        cameraFov:
+        {
+          value: 1.0
+        }
+      },
+      vertexShader,
+      fragmentShader,
+      depthTest: false,
+      depthWrite: false
+    });
+
+    const quad = new THREE.PlaneGeometry(2, 2);
+    this.mirageMesh = new THREE.Mesh(quad, material);
+    this.mirageScene.add(this.mirageMesh);
   }
 
   createCamera()
@@ -1157,6 +1337,10 @@ export class Scope
           this.blurMeshVertical.material.uniforms.resolution.value.set(outputWidth, outputHeight);
         }
       }
+      if (this.mirageRenderTarget)
+      {
+        this.mirageRenderTarget.setSize(outputWidth, outputHeight);
+      }
 
       // Update camera aspect to match new size
       if (this.camera)
@@ -1181,52 +1365,10 @@ export class Scope
     
     // Step 1.5: Apply depth-of-field blur (if optical effects enabled)
     // Uses separable Gaussian blur: horizontal pass, then vertical pass
-    if (this.opticalEffectsEnabled && this.blurRenderTarget && this.blurRenderTargetHorizontal && this.blurScene && this.depthTexture)
-    {
-      const METERS_PER_YARD = 0.9144;
-      
-      // Derive effective lens focal length and f-number from current FOV and 56mm objective
-      const fovRad = THREE.MathUtils.degToRad(this.currentFOV);
-      const sensorWidth = this.sensorWidth;
-      const eps = 1e-6;
-      const F = sensorWidth / (2.0 * Math.tan(Math.max(fovRad * 0.5, eps))); // meters
-      const N = F / this.objectiveDiameter; // f-number from focal length & objective diameter
-      
-      const lensParams = {
-        focalDistance: this.focalDistance * METERS_PER_YARD,
-        lensFocalLength: F,
-        lensFNumber: Math.max(N, 1.0),
-        sensorWidth: sensorWidth
-      };
-      
-      // Update horizontal blur shader uniforms
-      const uniformsH = this.blurMeshHorizontal.material.uniforms;
-      uniformsH.focalDistance.value = lensParams.focalDistance;
-      uniformsH.sceneTexture.value = this.sceneRenderTarget.texture;
-      uniformsH.depthTexture.value = this.depthTexture;
-      uniformsH.lensFocalLength.value = lensParams.lensFocalLength;
-      uniformsH.lensFNumber.value = lensParams.lensFNumber;
-      uniformsH.sensorWidth.value = lensParams.sensorWidth;
-      
-      // Render horizontal blur pass
-      this.renderer.setRenderTarget(this.blurRenderTargetHorizontal);
-      this.renderer.clear();
-      this.renderer.render(this.blurMeshHorizontal, this.blurCamera);
-      
-      // Update vertical blur shader uniforms
-      const uniformsV = this.blurMeshVertical.material.uniforms;
-      uniformsV.focalDistance.value = lensParams.focalDistance;
-      uniformsV.sceneTexture.value = this.blurRenderTargetHorizontal.texture; // Use horizontal blur result
-      uniformsV.depthTexture.value = this.depthTexture;
-      uniformsV.lensFocalLength.value = lensParams.lensFocalLength;
-      uniformsV.lensFNumber.value = lensParams.lensFNumber;
-      uniformsV.sensorWidth.value = lensParams.sensorWidth;
-      
-      // Render vertical blur pass (final result)
-      this.renderer.setRenderTarget(this.blurRenderTarget);
-      this.renderer.clear();
-      this.renderer.render(this.blurMeshVertical, this.blurCamera);
-    }
+    let scopeTexture = this.applyBlurPass(this.sceneRenderTarget.texture);
+    
+    // Step 1.6: Apply mirage effect (pass-through for now)
+    scopeTexture = this.applyMirage(scopeTexture, dt);
     
     // Step 2: Composite scene (blurred or unblurred) + reticle to output render target
     // Clear with transparent color to preserve alpha channel
@@ -1234,12 +1376,10 @@ export class Scope
     this.renderer.setClearColor(0x000000, 0.0); // Transparent black
     this.renderer.clear();
     
-    // Update scope mesh texture: use blurred texture if optical effects enabled, otherwise raw scene
+    // Update scope mesh texture
     if (this.scopeMesh)
     {
-      this.scopeMesh.material.map = this.opticalEffectsEnabled && this.blurRenderTarget ? 
-        this.blurRenderTarget.texture : 
-        this.sceneRenderTarget.texture;
+      this.scopeMesh.material.map = scopeTexture;
       this.scopeMesh.material.needsUpdate = true;
     }
     
@@ -1259,13 +1399,135 @@ export class Scope
   }
 
   /**
-   * Set the focal distance (in yards)
-   * @param {number} yards - Focal distance in yards
+   * Apply depth-of-field blur using separable Gaussian blur (horizontal then vertical pass).
+   * Derives lens parameters from current FOV and updates shader uniforms.
+   * @param {THREE.Texture} inputTexture - Input scene texture to blur
+   * @returns {THREE.Texture} - Blurred texture, or inputTexture if blur is disabled
    */
-  setFocalDistance(yards)
+  applyBlurPass(inputTexture)
   {
-    this.focalDistance = yards;
+    if (!this.opticalEffectsEnabled)
+    {
+      return inputTexture;
+    }
+
+    // Derive effective lens focal length and f-number from current FOV and 56mm objective
+    const fovRad = THREE.MathUtils.degToRad(this.currentFOV);
+    const sensorWidth = this.sensorWidth;
+    const eps = 1e-6;
+    const F = sensorWidth / (2.0 * Math.tan(Math.max(fovRad * 0.5, eps))); // meters
+    const N = F / this.objectiveDiameter; // f-number from focal length & objective diameter
+    
+    const lensParams = {
+      focalDistance: this.focalDistance,
+      lensFocalLength: F,
+      lensFNumber: Math.max(N, 1.0),
+      sensorWidth: sensorWidth
+    };
+    
+    // Update horizontal blur shader uniforms
+    const uniformsH = this.blurMeshHorizontal.material.uniforms;
+    uniformsH.focalDistance.value = lensParams.focalDistance;
+    uniformsH.sceneTexture.value = inputTexture;
+    uniformsH.depthTexture.value = this.depthTexture;
+    uniformsH.lensFocalLength.value = lensParams.lensFocalLength;
+    uniformsH.lensFNumber.value = lensParams.lensFNumber;
+    uniformsH.sensorWidth.value = lensParams.sensorWidth;
+    
+    // Render horizontal blur pass
+    this.renderer.setRenderTarget(this.blurRenderTargetHorizontal);
+    this.renderer.clear();
+    this.renderer.render(this.blurMeshHorizontal, this.blurCamera);
+    
+    // Update vertical blur shader uniforms
+    const uniformsV = this.blurMeshVertical.material.uniforms;
+    uniformsV.focalDistance.value = lensParams.focalDistance;
+    uniformsV.sceneTexture.value = this.blurRenderTargetHorizontal.texture; // Use horizontal blur result
+    uniformsV.depthTexture.value = this.depthTexture;
+    uniformsV.lensFocalLength.value = lensParams.lensFocalLength;
+    uniformsV.lensFNumber.value = lensParams.lensFNumber;
+    uniformsV.sensorWidth.value = lensParams.sensorWidth;
+    
+    // Render vertical blur pass (final result)
+    this.renderer.setRenderTarget(this.blurRenderTarget);
+    this.renderer.clear();
+    this.renderer.render(this.blurMeshVertical, this.blurCamera);
+    
+    return this.blurRenderTarget.texture;
+  }
+
+  /**
+   * Set the focal distance (in meters)
+   * @param {number} meters - Focal distance in meters
+   */
+  setFocalDistance(meters)
+  {
+    this.focalDistance = meters;
     // The blur shader uniform will be updated automatically in the render loop
+  }
+
+  /**
+   * Apply mirage effect to the given texture and return the distorted texture.
+   * Measures perpendicular wind at focal distance to drive the effect.
+   * @param {THREE.Texture} inputTexture - Input scene texture
+   * @param {number} dt - Time delta in seconds
+   * @returns {THREE.Texture} - Processed texture, or inputTexture if mirage is disabled
+   */
+  applyMirage(inputTexture, dt)
+  {
+    if (!this.opticalEffectsEnabled)
+    {
+      return inputTexture;
+    }
+
+    // Calculate perpendicular wind component at focal distance relative to line of sight
+    const camPos = new THREE.Vector3();
+    const forward = new THREE.Vector3();
+    this.camera.getWorldPosition(camPos);
+    this.camera.getWorldDirection(forward);
+    
+    // Sample wind at focal radius in the direction the scope points
+    const samplePos = camPos.clone().addScaledVector(forward, this.focalDistance);
+
+    const windBtk = this.windGenerator.sample(samplePos.x, samplePos.y, samplePos.z);
+    const windVec = new THREE.Vector3(windBtk.x, windBtk.y, windBtk.z); // m/s in world coords
+    windBtk.delete();
+
+    // Compute camera angles (spherical coordinates)
+    // theta: azimuth angle (horizontal), phi: elevation angle (vertical)
+    const cameraTheta = Math.atan2(forward.x, forward.z);
+    const cameraPhi = Math.asin(forward.y);
+    
+    // Get unit vector perpendicular to view direction, pointing right (left-to-right = positive)
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion).normalize();
+    
+    // Signed magnitude of perpendicular wind component: positive for left-to-right
+    const perpendicularWind = windVec.dot(right);
+    
+    // Accumulate horizontal advection: dθ/dt ≈ v_perpendicular / R (small-angle approximation on sphere)
+    this.mirageAdvectionHorizontal += (perpendicularWind / this.focalDistance) * dt;
+    
+    // Accumulate vertical advection (heat rise) - constant upward drift
+    const HEAT_RISE_RATE = 0.01; // radians per second (adjust as needed)
+    this.mirageAdvectionVertical += HEAT_RISE_RATE * dt;
+    
+    // Accumulate time for noise animation
+    this.mirageAdvectionTime += dt;
+
+    // Update shader uniforms with camera angles + advection
+    const uniforms = this.mirageMesh.material.uniforms;
+    uniforms.sceneTexture.value = inputTexture;
+    uniforms.cameraTheta.value = cameraTheta + this.mirageAdvectionHorizontal;
+    uniforms.cameraPhi.value = cameraPhi + this.mirageAdvectionVertical;
+    uniforms.mirageAdvectionTime.value = this.mirageAdvectionTime;
+    uniforms.cameraFov.value = this.camera.fov * Math.PI / 180.0; // Convert degrees to radians
+
+    // Render mirage pass to its own render target
+    this.renderer.setRenderTarget(this.mirageRenderTarget);
+    this.renderer.clear();
+    this.renderer.render(this.mirageScene, this.mirageCamera);
+
+    return this.mirageRenderTarget.texture;
   }
 
   dispose()
@@ -1273,11 +1535,22 @@ export class Scope
     this.sceneRenderTarget.dispose();
     if (this.blurRenderTargetHorizontal) this.blurRenderTargetHorizontal.dispose();
     if (this.blurRenderTarget) this.blurRenderTarget.dispose();
+    if (this.mirageRenderTarget) this.mirageRenderTarget.dispose();
     
     // Dispose blur pass resources
     if (this.blurScene)
     {
       this.blurScene.traverse((object) =>
+      {
+        if (object.geometry) object.geometry.dispose();
+        if (object.material) object.material.dispose();
+      });
+    }
+    
+    // Dispose mirage pass resources
+    if (this.mirageScene)
+    {
+      this.mirageScene.traverse((object) =>
       {
         if (object.geometry) object.geometry.dispose();
         if (object.material) object.material.dispose();
