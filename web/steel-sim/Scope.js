@@ -551,10 +551,11 @@ export class Scope
       uniform float cameraTheta;  // Camera azimuth angle + horizontal advection (radians)
       uniform float cameraPhi;    // Camera elevation angle + vertical advection (radians)
       uniform float mirageAdvectionTime;  // Time advection for noise animation (seconds)
-      uniform float cameraFov;    // Camera field of view (radians)
+      uniform float cameraFov;      // Camera field of view (radians)
       uniform float focalDistance;  // Focal distance in meters
       uniform float cameraNear;     // Camera near plane
       uniform float cameraFar;      // Camera far plane
+      uniform float windSpeedTotal; // Total wind speed magnitude (m/s)
 
       varying vec2 vUv;
 
@@ -564,8 +565,9 @@ export class Scope
       const float MIRAGE_FOV_MIN              = 0.5 * 3.14159265359 / 180.0;  // Full mirage at narrow FOV (radians)
       const float MIRAGE_FOCAL_MIN            = 50.0;          // Minimum focal distance for mirage ramp (meters)
       const float MIRAGE_FOCAL_MAX            = 1000.0;        // Distance where mirage reaches full strength (meters)
-      const float MIRAGE_DISTORTION_STRENGTH  = 0.005;          // Base distortion scale in UV space
-      const float MIRAGE_SHADE_STRENGTH       = 0.2;           // ±30% brightness variation at full attenuation
+      const float MIRAGE_DISTORTION_STRENGTH  = 0.005;         // Base distortion scale in UV space
+      const float MIRAGE_SHADE_STRENGTH       = 0.2;           // ±20% brightness variation at full attenuation
+      const float MIRAGE_WIND_SPEED_MAX       = 6.7;           // ~15 mph, wind speed where mirage fully fades (m/s)
 
       ${simplexNoise}
 
@@ -609,6 +611,10 @@ export class Scope
         float focalT = clamp((focalDistance - MIRAGE_FOCAL_MIN) /
                              (MIRAGE_FOCAL_MAX - MIRAGE_FOCAL_MIN), 0.0, 1.0);
         float focalAttenuation = sqrt(focalT);
+
+        // Attenuate based on total wind speed: follow fclass-sim pattern
+        // Full effect at low wind, fades out as windSpeedTotal approaches MIRAGE_WIND_SPEED_MAX
+        float windAttenuation = clamp(1.0 - (abs(windSpeedTotal) / MIRAGE_WIND_SPEED_MAX), 0.0, 1.0);
         
         // Sample 3D simplex noise at camera angles + time
         // Map UV to angular offset from center using small-angle approximation: θ ≈ (uv - 0.5) * fov
@@ -625,19 +631,21 @@ export class Scope
         float noise = noiseFast * 0.5 + noiseSlow * 0.5;
         float noiseMag = abs(noise);
         
-        // Total attenuation from distance, FOV, and focal distance
-        float totalAttenuation = distanceAttenuation * fovAttenuation * focalAttenuation;
+        // Total attenuation from distance, FOV, focal distance, and wind speed
+        float totalAttenuation = distanceAttenuation * fovAttenuation * focalAttenuation * windAttenuation;
         
-        // Screen-space distortion: primarily vertical, scaled by attenuation (similar to fclass mirage)
+        // Screen-space distortion: primarily vertical, scaled by total attenuation
         vec2 distortion = vec2(0.0, noise) * MIRAGE_DISTORTION_STRENGTH * totalAttenuation;
         vec2 distortedUV = vUv + distortion;
         
         // Sample the scene with distorted UVs
         vec4 color = texture2D(sceneTexture, distortedUV);
         
-        // Brightness modulation (shading) based on noise, also attenuated
-        float noiseFactor = noise * MIRAGE_SHADE_STRENGTH * totalAttenuation + 1.0;
-        gl_FragColor = color * noiseFactor;
+        // Brightness modulation (shading) based on noise magnitude, sharpened for smoke-like edges
+        // Use |noise| and a nonlinear curve so only stronger structures contribute
+        float edge = pow(noiseMag, 1.5); // emphasize stronger features, suppress weak noise
+        float shade = 1.0 - edge * MIRAGE_SHADE_STRENGTH * totalAttenuation;
+        gl_FragColor = vec4(color.rgb * shade, color.a);
       }
     `;
 
@@ -680,6 +688,10 @@ export class Scope
         cameraFar:
         {
           value: 1000.0
+        },
+        windSpeedTotal:
+        {
+          value: 0.0
         }
       },
       vertexShader,
@@ -765,23 +777,21 @@ export class Scope
     this.scopeMesh = scopeMesh; // Store reference for texture updates
 
     // Stencil mask: defines circular aperture for reticle elements (only if reticle enabled)
-    if (this.hasReticle)
+    // Stencil mask circle for reticle clipping (needed for both rifle and spotting scopes)
+    const maskGeom = new THREE.CircleGeometry(scopeRadius, 64);
+    const maskMat = new THREE.MeshBasicMaterial(
     {
-      const maskGeom = new THREE.CircleGeometry(scopeRadius, 64);
-      const maskMat = new THREE.MeshBasicMaterial(
-      {
-        colorWrite: false,
-        depthWrite: false,
-        depthTest: false,
-        stencilWrite: true,
-        stencilRef: 1,
-        stencilFunc: THREE.AlwaysStencilFunc,
-        stencilZPass: THREE.ReplaceStencilOp
-      });
-      const maskMesh = new THREE.Mesh(maskGeom, maskMat);
-      maskMesh.position.set(0, 0, 0.015);
-      this.internalScene.add(maskMesh);
-    }
+      colorWrite: false,
+      depthWrite: false,
+      depthTest: false,
+      stencilWrite: true,
+      stencilRef: 1,
+      stencilFunc: THREE.AlwaysStencilFunc,
+      stencilZPass: THREE.ReplaceStencilOp
+    });
+    const maskMesh = new THREE.Mesh(maskGeom, maskMat);
+    maskMesh.position.set(0, 0, 0.015);
+    this.internalScene.add(maskMesh);
 
     // Thin black housing ring around the glass (simple geometry)
     const housingOuterRadius = 1.0; // controls thickness
@@ -837,10 +847,39 @@ export class Scope
     }
     else
     {
-      this.reticleGroup = null;
-      this.reticleMaterial = null;
-      this.reticleLineInstances = null;
-      this.reticleLineMesh = null;
+      // Spotting scope: simple crosshair
+      this.reticleGroup = new THREE.Group();
+      this.reticleGroup.position.set(0, 0, 0.02);
+      this.internalScene.add(this.reticleGroup);
+
+      // Shared metallic material for reticle elements
+      const reticleMaterial = new THREE.MeshStandardMaterial(
+      {
+        color: 0x050505, // very dark, reads as black but allows specular
+        metalness: 0.9,
+        roughness: 0.25,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+        stencilWrite: true,
+        stencilRef: 1,
+        stencilFunc: THREE.EqualStencilFunc,
+        stencilZPass: THREE.KeepStencilOp
+      });
+      this.reticleMaterial = reticleMaterial;
+
+      // Initialize instanced reticle system
+      this.reticleLineInstances = []; // Store instance data for lines
+      this.reticleLineMesh = null; // InstancedMesh for all reticle lines
+
+      // Build simple 1x1 mrad crosshair
+      this.buildSpottingCrosshair();
+
+      // Create instanced mesh after collecting all line data
+      this.createInstancedReticle();
+
+      // Apply initial FFP scaling (and map from [-0.5,0.5] reticle space to [-1,1] HUD space)
+      this.updateReticleScale();
     }
 
     // Local lighting for metallic look on housing + reticle
@@ -899,7 +938,7 @@ export class Scope
 
     this.camera.fov = this.currentFOV;
     this.camera.updateProjectionMatrix();
-    if (this.hasReticle)
+    if (this.reticleGroup)
     {
       this.updateReticleScale();
     }
@@ -939,7 +978,7 @@ export class Scope
    */
   addLineMrad(x1Mrad, y1Mrad, x2Mrad, y2Mrad, thicknessMrad)
   {
-    if (!this.hasReticle || !this.reticleGroup || !this.reticleMaterial) return;
+    if (!this.reticleGroup || !this.reticleMaterial) return;
 
     const x1 = this.mradToReticleUnitsAtFov(x1Mrad, this.initialFOV);
     const y1 = this.mradToReticleUnitsAtFov(y1Mrad, this.initialFOV);
@@ -969,7 +1008,7 @@ export class Scope
    */
   createInstancedReticle()
   {
-    if (!this.hasReticle || this.reticleLineInstances.length === 0) return;
+    if (!this.reticleGroup || !this.reticleMaterial || this.reticleLineInstances.length === 0) return;
 
     console.log(`[Scope] createInstancedReticle: Creating ${this.reticleLineInstances.length} line instances`);
 
@@ -1003,7 +1042,7 @@ export class Scope
    */
   addRingMrad(centerXMrad, centerYMrad, radiusMrad, thicknessMrad, segments = 96)
   {
-    if (!this.hasReticle || !this.reticleGroup || !this.reticleMaterial) return;
+    if (!this.reticleGroup || !this.reticleMaterial) return;
 
     const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
     const thicknessUnits = this.mradToReticleUnitsAtFov(thicknessMrad, this.initialFOV);
@@ -1025,7 +1064,7 @@ export class Scope
    */
   addDotMrad(centerXMrad, centerYMrad, radiusMrad, segments = 48)
   {
-    if (!this.hasReticle || !this.reticleGroup || !this.reticleMaterial) return;
+    if (!this.reticleGroup || !this.reticleMaterial) return;
 
     const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
     const geom = new THREE.CircleGeometry(radiusUnits, segments);
@@ -1123,6 +1162,20 @@ export class Scope
         thicknessMrad
       );
     }
+  }
+
+  /**
+   * Build a simple 1x1 mrad crosshair for the spotting scope.
+   */
+  buildSpottingCrosshair()
+  {
+    const extentMrad = 0.5; // 0.5 mrad from center = 1x1 mrad total
+    const lineThicknessMrad = 0.05; // Thin line
+
+    // Horizontal line
+    this.addLineMrad(-extentMrad, 0, extentMrad, 0, lineThicknessMrad);
+    // Vertical line
+    this.addLineMrad(0, -extentMrad, 0, extentMrad, lineThicknessMrad);
   }
 
   /**
@@ -1565,12 +1618,24 @@ export class Scope
     this.camera.getWorldPosition(camPos);
     this.camera.getWorldDirection(forward);
     
-    // Sample wind at focal radius in the direction the scope points
-    const samplePos = camPos.clone().addScaledVector(forward, this.focalDistance);
+    // Sample wind along the line of sight at 100%, 90% and 80% of the focal distance
+    const windAccum = new THREE.Vector3(0, 0, 0);
+    const sampleFractions = [1.0, 0.9, 0.8];
+    for (let i = 0; i < sampleFractions.length; ++i)
+    {
+      const t = sampleFractions[i];
+      const samplePos = camPos.clone().addScaledVector(forward, this.focalDistance * t);
+      const windBtk = this.windGenerator.sample(samplePos.x, samplePos.y, samplePos.z);
+      windAccum.x += windBtk.x;
+      windAccum.y += windBtk.y;
+      windAccum.z += windBtk.z;
+      windBtk.delete();
+    }
 
-    const windBtk = this.windGenerator.sample(samplePos.x, samplePos.y, samplePos.z);
-    const windVec = new THREE.Vector3(windBtk.x, windBtk.y, windBtk.z); // m/s in world coords
-    windBtk.delete();
+    // Average wind vector across samples (still in m/s since sampling domain is in meters)
+    windAccum.multiplyScalar(1.0 / sampleFractions.length);
+    const windVec = windAccum;
+    const windSpeedTotal = windVec.length(); // m/s
 
     // Compute camera angles (spherical coordinates)
     // theta: azimuth angle (horizontal), phi: elevation angle (vertical)
@@ -1604,10 +1669,10 @@ export class Scope
     uniforms.mirageAdvectionTime.value = this.mirageAdvectionTime;
     const cameraFovRad = this.camera.fov * Math.PI / 180.0; // Convert degrees to radians
     uniforms.cameraFov.value = cameraFovRad;
-    console.log('FOV:', this.camera.fov, 'degrees (', cameraFovRad, 'radians)');
     uniforms.focalDistance.value = this.focalDistance; // meters
     uniforms.cameraNear.value = Config.CAMERA_NEAR_PLANE;
     uniforms.cameraFar.value = Config.CAMERA_FAR_PLANE;
+    uniforms.windSpeedTotal.value = windSpeedTotal;
 
     // Render mirage pass to its own render target
     this.renderer.setRenderTarget(this.mirageRenderTarget);

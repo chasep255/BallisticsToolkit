@@ -39,12 +39,13 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 
 ### 🔩 Steel Target Simulator
 - **Interactive Steel Range** - Shooting simulator with reactive steel targets and full ballistics. Multiple target racks from 100 to 1760 yards (1 mile) with plates from ~2″ chips to large 6‑ft gongs.
-- **Prairie Dog Hunting** - Realistic prairie dog targets scattered from 100-1000 yards. Prairie dogs pop up and down randomly (30% up, 70% down), and respawn after 1 minute.
+- **Prairie Dog Hunting** - Realistic prairie dog targets scattered from 100-600 yards. Prairie dogs pop up and down randomly (30% up, 70% down), and respawn after 1 minute.
 - **Realistic Ballistics** - 4DOF trajectory simulation with G1/G7 drag models, wind presets, spin drift, and crosswind jump. Muzzle velocity variation (MV σ) and rifle accuracy (MOA) model real-world shot-to-shot spreads.
 - **Target Physics** - Steel targets hang from virtual chains with momentum transfer, damping, and rotation. Center hits drive linear swing; edge hits kick targets into rotation. Impacts leave visible mark splatter and spawn metal dust.
 - **Impact Detection** - Spatial binning system for efficient collision detection. Accurate hit/miss detection with visual feedback (HUD shows impact status).
 - **Wind & Environment** - 3D landscape with wind flags along the range driven by the same curl‑noise wind field used for the f-class sim. Brown ground dust when you miss; silver‑gray metallic dust when you hit steel.
-- **Scope & HUD** - Mouse-based FFP scope with pointer lock: click scope to enter, move mouse to pan, wheel or `+`/`-` to zoom (4×–40×), click to fire, `Esc` to exit. MRAD elevation/windage dials adjust point of impact with arrow keys (Shift for 1.0 mrad steps), with a HUD readout showing current dial settings.
+- **Scope & HUD** - Mouse-based FFP scope with pointer lock: click scope to enter, move mouse to pan, wheel or `+`/`-` to zoom (4×–40×), click to fire, `Esc` to exit. MRAD or MOA scope type selection with matching reticle ticks and dial units. HUD shows current dial settings.
+- **Mirage/Optical Effects** - Optional heat mirage simulation that moves with the wind, letting you read wind speed and direction through the shimmer. Includes depth-of-field blur based on focus distance. Refocus with `F` key (desktop) or long-press (mobile).
 - **Audio Feedback** - Shot sounds play immediately; impact sounds (ping) play with distance-based delay and volume attenuation.
 
 ## Quick Start

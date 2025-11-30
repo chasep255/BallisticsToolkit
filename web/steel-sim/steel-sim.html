@@ -117,15 +117,15 @@
         <input type="number" id="scopeHeight" value="2.0" step="0.1" min="0.5" max="10.0" title="Scope height above bore in inches" style="width: 100px; padding: 5px;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
-        <label for="opticalEffects" title="Experimental depth-of-field and optical effects inside scopes">Experimental Optical Effects</label>
-        <input type="checkbox" id="opticalEffects" title="Experimental depth-of-field and optical effects inside scopes" style="width: auto;">
-      </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="scopeType" title="Scope type determines reticle and dial units">Scope Type</label>
         <select id="scopeType" title="Scope type determines reticle and dial units" style="width: 100px; padding: 5px;">
           <option value="mrad" selected>MRAD</option>
           <option value="moa">MOA</option>
         </select>
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="opticalEffects" title="Enable heat mirage effect in scopes">Mirage/Optical Effects</label>
+        <input type="checkbox" id="opticalEffects" title="Enable heat mirage and depth-of-field effects in scopes" style="width: auto;">
       </div>
     </div>
 
@@ -146,10 +146,10 @@
       <!-- Quick Key Guide -->
       <div class="quick-keys">
         <div class="quick-keys-section">
-          <strong>Desktop:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/<kbd>E</kbd><kbd>Q</kbd> Spotting scope • Click rifle scope to enter • <kbd>Arrows</kbd> dial • <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> focus at center (when Experimental Optical Effects enabled) • <kbd>Esc</kbd> exit
+          <strong>Desktop:</strong> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/<kbd>E</kbd><kbd>Q</kbd> Spotting scope • Click rifle scope to enter • <kbd>Arrows</kbd> dial • <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> focus at center (when Mirage enabled) • <kbd>Esc</kbd> exit
         </div>
         <div class="quick-keys-section">
-          <strong>Mobile:</strong> Drag to pan • Pinch to zoom • Tap to fire • Long-press inside scope to refocus where you press (when Experimental Optical Effects enabled) • Dial buttons next to HUD (hold to fast-dial)
+          <strong>Mobile:</strong> Drag to pan • Pinch to zoom • Tap to fire • Long-press inside scope to refocus where you press (when Mirage enabled) • Dial buttons next to HUD (hold to fast-dial)
         </div>
       </div>
     </div>
@@ -163,6 +163,7 @@
         <span class="help-close">&times;</span>
       </div>
       <div class="help-modal-body">
+        <!-- Contact/Support -->
         <div class="help-section" style="padding: 15px 0; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
           <h3 style="margin-top: 0;">Need Help or Found an Issue?</h3>
           <div class="param-help">
@@ -171,230 +172,175 @@
           </div>
         </div>
         
+        <!-- Overview -->
         <div class="help-section">
           <h3>Overview</h3>
-          <p>Steel Target Simulator is an interactive steel range with full ballistics and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and realistic target responses to bullet impacts. A pointer-lock FFP scope, MRAD dials, wind flags, dust/metal effects, and a HUD make it a complete shooting experience.</p>
+          <p>Steel Target Simulator is an interactive steel range with full ballistics and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and realistic target responses. Features dual scopes (rifle + spotting), MRAD/MOA dial adjustments, optional heat mirage effects, wind flags, dust/metal effects, and a HUD.</p>
+        </div>
+
+        <!-- Quick Start -->
+        <div class="help-section">
+          <h3>Quick Start</h3>
+          <div class="param-help">
+            1. Click <strong>Start</strong> to begin<br>
+            2. Click inside the <strong>rifle scope</strong> (bottom-right) to enter aiming mode<br>
+            3. <strong>Move mouse</strong> to aim, <strong>click</strong> to fire<br>
+            4. Use <strong>arrow keys</strong> to adjust elevation/windage dials<br>
+            5. Press <strong>Esc</strong> to exit scope mode<br>
+            6. Use <strong>WASD</strong> to pan the spotting scope (bottom-left) for observation
+          </div>
         </div>
         
+        <!-- Controls -->
         <div class="help-section">
           <h3>Controls</h3>
           <div class="param-help">
-            <strong>Spotting Scope (Bottom-Left):</strong><br>
+            <strong>Desktop - Spotting Scope (Bottom-Left):</strong><br>
             - <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Pan camera (always active, no pointer lock needed)<br>
             - <kbd>E</kbd>/<kbd>Q</kbd> Zoom in/out (4× to 40× magnification)<br>
             - Movement scales with FOV (slower when zoomed in)<br>
-            - Use to observe targets, wind flags, and shot impacts<br>
-            - No reticle (clean view for observation)<br><br>
+            - Simple crosshair for reference<br><br>
 
-            <strong>Rifle Scope (Bottom-Right):</strong><br>
+            <strong>Desktop - Rifle Scope (Right):</strong><br>
             - Click inside the scope circle to enter scope mode (pointer lock activates)<br>
-            - Move mouse to pan/aim the scope (reticle moves with cursor at 1:1 speed)<br>
+            - Move mouse to pan/aim<br>
             - <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> Zoom in/out (4× to 40× magnification)<br>
-            - Click to fire bullet from scope crosshair<br>
-            - <kbd>F</kbd> refocus rifle scope at center crosshair distance (requires Experimental Optical Effects to be enabled)<br>
-            - <kbd>Shift</kbd>+<kbd>F</kbd> refocus spotting scope at center distance (requires Experimental Optical Effects to be enabled)<br>
+            - Click to fire<br>
             - <kbd>Esc</kbd> to exit scope mode (releases pointer lock)<br>
-            - FFP reticle scales with zoom (maintains MRAD subtensions)<br><br>
+            - FFP reticle scales with zoom (maintains angular subtensions)<br><br>
 
-            <strong>Dial Controls:</strong><br>
-            - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation up/down (0.1 MRAD or 0.25 MOA per press; hold <kbd>Shift</kbd> for 1.0 MRAD or 1.0 MOA) - requires scope mode<br>
-            - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage left/right (0.1 MRAD or 0.25 MOA per press; hold <kbd>Shift</kbd> for 1.0 MRAD or 1.0 MOA) - requires scope mode<br>
+            <strong>Desktop - Dial Controls:</strong><br>
+            - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation (0.1 MRAD or 0.25 MOA; hold <kbd>Shift</kbd> for 1.0)<br>
+            - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage (0.1 MRAD or 0.25 MOA; hold <kbd>Shift</kbd> for 1.0)<br>
             - <kbd>R</kbd> reset both dials to zero (only when in rifle scope mode)<br>
-            - On-screen dial buttons (U/D/L/R/⟲) next to HUD - click or hold to fast-dial, works anytime<br>
-            - Dial position shown in HUD (upper-left) in the selected scope type units
-          </div>
-        </div>
+            - On-screen dial buttons (U/D/L/R/⟲) next to HUD work anytime<br><br>
 
-        <div class="help-section">
-          <h3>Mobile/Touch Controls</h3>
-          <div class="param-help">
-            <strong>Both Scopes:</strong><br>
+            <strong>Desktop - Focus (requires Mirage enabled):</strong><br>
+            - <kbd>F</kbd> refocus rifle scope at center crosshair distance<br>
+            - <kbd>Shift</kbd>+<kbd>F</kbd> refocus spotting scope at center distance<br><br>
+
+            <strong>Mobile/Touch:</strong><br>
             - <strong>Single-finger drag:</strong> Pan the scope view<br>
-            - <strong>Pinch:</strong> Zoom in/out (4× to 40× magnification)<br><br>
-
-            <strong>Rifle Scope:</strong><br>
-            - <strong>Tap:</strong> Fire a shot (quick tap &lt; 150ms)<br>
-            - <strong>Long press (≈ 450ms) with minimal movement:</strong> Refocus scope at the point where you press (requires Experimental Optical Effects to be enabled)<br><br>
-
-            <strong>Dial Buttons (on-screen, next to HUD):</strong><br>
-            - <strong>U/D:</strong> Adjust elevation up/down (0.1 MRAD or 0.25 MOA per tap, hold to fast-dial)<br>
-            - <strong>L/R:</strong> Adjust windage left/right (0.1 MRAD or 0.25 MOA per tap, hold to fast-dial)<br>
-            - <strong>⟲:</strong> Reset both dials to zero<br>
-            - Units depend on selected Scope Type (MRAD or MOA)<br><br>
+            - <strong>Pinch:</strong> Zoom in/out (4× to 40× magnification)<br>
+            - <strong>Tap:</strong> Fire a shot (rifle scope, quick tap &lt; 150ms)<br>
+            - <strong>Long press (≈ 450ms):</strong> Refocus at press point (requires Mirage enabled)<br>
+            - <strong>Dial buttons (U/D/L/R/⟲):</strong> Tap or hold for fast-dial<br><br>
 
             <strong>Fullscreen:</strong><br>
-            - Use the Fullscreen button for immersive mobile play<br>
+            - Use the Fullscreen button for immersive play<br>
             - Canvas automatically adapts to your screen's aspect ratio<br>
-            - Only works in landscape orientations<br>
-            - <strong>Note:</strong> Fullscreen may not work on all devices, especially iOS Safari. Desktop and Android work best.
+            - <strong>Note:</strong> May not work on iOS Safari. Desktop and Android work best.
           </div>
         </div>
         
+        <!-- Gameplay -->
         <div class="help-section">
-          <h3>Buttons</h3>
+          <h3>Gameplay</h3>
           <div class="param-help">
-            - <strong>Start:</strong> Initialize the simulator and begin shooting<br>
-            - <strong>Restart:</strong> Restart the simulator with current parameters<br>
-            - <strong>Help:</strong> Show this help dialog<br>
-            - <strong>Fullscreen:</strong> Enter fullscreen mode (also starts the game if not started). Canvas adapts to screen aspect ratio. May not work on iOS Safari.<br>
-            - Settings are automatically saved and restored using cookies on reload
-          </div>
-        </div>
-        
-        <div class="help-section">
-          <h3>Targets & Range</h3>
-          <div class="param-help">
-            <strong>Target Racks:</strong> Multiple target racks positioned from 100 to 1760 yards (1 mile) with various target sizes and configurations. Targets include both rectangular and oval shapes with sizes ranging from ~2" chips up to large ~6‑ft gongs, roughly spanning 0.5–2+ MOA depending on distance and rack configuration.<br><br>
+            <strong>Target Racks:</strong><br>
+            Multiple target racks positioned from 100 to 1760 yards (1 mile) with various target sizes and configurations. Targets include both rectangular and oval shapes with sizes ranging from ~2" chips up to large ~6‑ft gongs, roughly spanning 0.5–2+ MOA depending on distance and rack configuration.<br><br>
             
-            <strong>Chain Mounting:</strong> Each target has two chains attached at the top, connecting to an overhead beam. Chains act as damped springs (10,000 N/m spring constant, 200 N·s/m damping) that dissipate energy to prevent bouncing.<br><br>
-            
-            <strong>Impact Physics:</strong> Bullet impacts transfer momentum to targets. Center hits cause mostly linear motion; edge hits create rotation. Smaller targets respond more dramatically than larger ones. Linear damping (75% velocity per second) and angular damping (10% angular velocity per second) simulate air resistance and friction.
-          </div>
-        </div>
+            <strong>Target Physics:</strong><br>
+            - Each target hangs from two chains (damped springs: 10,000 N/m, 200 N·s/m damping)<br>
+            - Bullet impacts transfer momentum to targets<br>
+            - Center hits cause mostly linear motion; edge hits create rotation<br>
+            - Smaller targets respond more dramatically than larger ones<br><br>
 
-        <div class="help-section">
-          <h3>Prairie Dog Hunting</h3>
-          <div class="param-help">
-            <strong>Prairie Dogs:</strong> Scattered across the range from 100 to 600 yards, prairie dogs pop up from their burrows as hunting targets. Each prairie dog is approximately 16 inches tall and partially visible above its dirt mound when raised.<br><br>
-            
-            <strong>Behavior:</strong> Prairie dogs randomly pop up and down throughout the simulation, spending roughly 30% of their time raised and 70% lowered. Each state lasts between 5-90 seconds before changing.<br><br>
-            
-            <strong>Hit Effects:</strong> When hit, prairie dogs react with a quick upward jump before dropping back into their burrow, accompanied by a red mist effect. Killed prairie dogs respawn after approximately 1 minute.<br><br>
-            
-            <strong>Starting State:</strong> Each prairie dog starts in a random position (up or down) at the beginning of a session.
+            <strong>Prairie Dogs:</strong><br>
+            - Scattered from 100 to 600 yards, approximately 16 inches tall<br>
+            - Randomly pop up and down (roughly 30% up, 70% down)<br>
+            - Each state lasts 5-90s seconds before changing<br>
+            - When hit: quick upward jump + red mist effect, respawn after ~1 minute
           </div>
         </div>
         
+        <!-- Settings -->
         <div class="help-section">
-          <h3>Ballistic Parameters</h3>
+          <h3>Settings</h3>
           <div class="param-help">
-            <strong>Bullet:</strong><br>
-            - <strong>MV:</strong> Muzzle velocity in fps (critical for trajectory and time-of-flight)<br>
-            - <strong>BC:</strong> Ballistic coefficient (aerodynamic efficiency, higher = less drift/drop)<br>
+            <strong>Ballistic Parameters:</strong><br>
+            - <strong>MV:</strong> Muzzle velocity (fps) - critical for trajectory<br>
+            - <strong>BC:</strong> Ballistic coefficient - higher = less drift/drop<br>
             - <strong>Drag Function:</strong> G7 (modern boat-tail) or G1 (flat-base/older)<br>
-            - <strong>Diameter:</strong> Bullet diameter in inches (affects spin calculations)<br>
-            - <strong>Weight:</strong> Bullet weight in grains (for spin moment of inertia)<br>
-            - <strong>Length:</strong> Bullet length in inches (for spin calculations)<br>
-            - <strong>Twist:</strong> Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist, calculates spin rate)<br><br>
+            - <strong>Diameter/Weight/Length:</strong> For spin calculations<br>
+            - <strong>Twist:</strong> Barrel twist rate (inches per turn)<br>
+            - <strong>MV σ:</strong> Muzzle velocity standard deviation (fps)<br>
+            - <strong>Accuracy:</strong> Rifle+shooter precision in MOA<br>
+            - <strong>Zero Distance:</strong> Distance at which rifle is zeroed (yards)<br>
+            - <strong>Scope Height:</strong> Height of scope above bore (inches)<br>
+            - <strong>Wind Preset:</strong> Controls wind patterns affecting trajectory<br><br>
 
-            <strong>Rifle:</strong><br>
-            - <strong>MV σ:</strong> Muzzle velocity standard deviation in fps (lower = more consistent, typical values: 5-15 fps)<br>
-            - <strong>Accuracy:</strong> Rifle+shooter precision in MOA (1 MOA ≈ 1" at 100 yards)<br>
-            - <strong>Zero Distance:</strong> Distance at which the rifle is zeroed in yards (commonly 100 yards; a dedicated 100‑yard rack is included)<br>
-            - <strong>Scope Height:</strong> Height of the scope above the bore in inches<br><br>
+            <strong>Scope Type (MRAD/MOA):</strong><br>
+            - Select in the settings bar to change reticle tick spacing and dial units<br>
+            - MRAD mode: 0.5 MRAD minor ticks, 1.0 MRAD major ticks, 0.1 MRAD clicks<br>
+            - MOA mode: 2.0 MOA minor ticks, 4.0 MOA major ticks, 0.25 MOA clicks<br>
+            - HUD displays dial values in the selected units<br><br>
 
-            <strong>Spin Effects:</strong><br>
-            - Spin drift and crosswind jump are modeled based on bullet spin rate calculated from barrel twist and muzzle velocity<br>
-            - Spin rate is recomputed for each shot based on actual muzzle velocity (accounting for MV variation)<br><br>
+            <strong>Mirage/Optical Effects:</strong><br>
+            - Toggle via the checkbox in the settings bar (off by default)<br>
+            - Simulates realistic heat mirage/shimmer visible through the scope<br>
+            - Mirage moves with the wind—watch it to read wind direction and speed<br>
+            - Higher magnification = stronger mirage (just like a real scope)<br>
+            - Farther distances = stronger mirage (more air to look through)<br>
+            - Very strong wind reduces mirage visibility (turbulence breaks up pattern)<br>
+            - Also includes depth-of-field blur based on focus distance<br>
+            - Increases GPU load; turn off on low-power devices<br><br>
 
-            <strong>Variability:</strong><br>
-            - Each shot has slightly different muzzle velocity (from MV σ) and accuracy errors (from rifle accuracy setting)<br>
-            - These simulate real-world shot-to-shot variability<br><br>
-
-            <strong>Zeroing:</strong><br>
-            - Rifle is zeroed at the configured distance with scope height compensation<br>
-            - Zeroing calculates the initial launch angle needed to hit the target point-of-aim at zero distance<br><br>
-
-            <strong>Wind:</strong><br>
-            - Wind presets (selected in the UI) control atmospheric conditions affecting bullet trajectory throughout the full 3D flight path<br>
-            - Wind flags along the range show wind direction and intensity at multiple distances<br>
-            - Wind affects bullet trajectory, not just dust particles
-          </div>
-        </div>
-        
-        <div class="help-section">
-          <h3>Visual Effects</h3>
-          <div class="param-help">
-            <strong>Impact Marks:</strong> Bullet impacts appear as splatter marks on the target texture, with metal showing through the red paint on the side that was hit.<br><br>
-            
-            <strong>Dust Effects:</strong> Metallic dust particles (silver-gray) fly back when hitting targets. Brown dust clouds appear when missing and hitting the ground. Particles fade out over time.<br><br>
-            
-            <strong>Audio:</strong> Shot sounds play immediately on fire. Impact sounds (ping) play with distance-based delay and volume attenuation (full volume at 100 yards, fading to 10% at max range).<br><br>
-            
-            <strong>Experimental Optical Effects:</strong><br>
-            - Toggle via the \"Experimental Optical Effects\" checkbox in the settings bar (off by default).<br>
-            - Enables physically-inspired depth-of-field blur, scope optics (56mm objective, zoom-dependent DOF), and a wind-driven heat mirage/shimmer in the scopes.<br>
-            - Desktop: Use <kbd>F</kbd>/<kbd>Shift</kbd>+<kbd>F</kbd> to refocus rifle/spotting scopes at the center crosshair distance.<br>
-            - Mobile: Long-press inside a scope (≈ 450ms, minimal movement) to refocus at the point where you press.<br>
-            - Increases GPU load; turn off on low-power or thermally constrained devices.<br><br>
-            
-            <strong>Technical Details:</strong><br>
-            - Uses a thin-lens circle of confusion (CoC) model for physically accurate depth-of-field blur.<br>
-            - Lens parameters: 56mm objective diameter, focal length and f-number derived from scope FOV/zoom.<br>
-            - Blur radius calculated from CoC using: CoC = |(F²/(N·(df-F)))·((d-df)/d)| where F=focal length, N=f-number, df=focus distance, d=object distance.<br>
-            - Implements separable Gaussian blur (horizontal then vertical passes) for performance (O(2n) vs O(n²)).<br>
-            - Depth texture captured from scene render, decoded using THREE.js perspective depth reconstruction.<br>
-            - Default focal distance: 100 yards. Blur strength scales with zoom level (higher zoom = stronger blur).<br>
-            - Heat mirage uses 3D simplex noise on a sphere around the shooter, advected by crosswind at the focus distance with a slow upward drift, and its strength increases with zoom while fading in very strong winds.<br>
-            - Resolution-independent blur and mirage calculations ensure consistent appearance across different screen sizes.
-          </div>
-        </div>
-        
-        <div class="help-section">
-          <h3>HUD & Dial Buttons (Top-Left)</h3>
-          <div class="param-help">
-            <strong>HUD Text:</strong><br>
-            - <strong>Elevation:</strong> Current elevation dial setting (U = up, D = down)<br>
-            - <strong>Windage:</strong> Current windage dial setting (R = right, L = left)<br>
-            - <strong>Impact Status:</strong> Shows "IMPACT" (green) when hitting targets, "MISS" (red) when missing<br>
-            - Units displayed depend on selected Scope Type (MRAD or MOA)<br><br>
-            
-            <strong>Dial Buttons (next to HUD):</strong><br>
-            - U/D elevation, L/R windage, ⟲ reset<br>
-            - Tap for single adjustment (0.1 MRAD or 0.25 MOA), hold for fast-dial<br>
-            - Shift+arrow keys move 1.0 MRAD or 1.0 MOA increments
+            <strong>HUD (Top-Left):</strong><br>
+            - <strong>Elevation:</strong> Current dial setting (U = up, D = down)<br>
+            - <strong>Windage:</strong> Current dial setting (R = right, L = left)<br>
+            - <strong>Impact Status:</strong> "IMPACT" (green) or "MISS" (red)<br>
+            - Units displayed match selected Scope Type
           </div>
         </div>
 
-        <div class="help-section">
-          <h3>Technical Details</h3>
-          <div class="param-help">
-            <strong>Physics Engine:</strong><br>
-            - Custom rigid body physics in C++ (WebAssembly) with quaternion-based orientation for stable rotations<br>
-            - Targets use momentum transfer with linear and angular damping<br><br>
-
-            <strong>Rendering:</strong><br>
-            - 3-pass composition system: background scene renders to texture, scope renders independently with zoom, then composited with reticle overlay<br>
-            - Three.js WebGL with 4× MSAA anti-aliasing<br>
-            - Vertex positions computed in C++ and transferred via typed memory views<br><br>
-
-            <strong>Scope Reticle:</strong><br>
-            - Geometry-based reticle using Three.js meshes<br>
-            - FFP behavior scales with zoom, maintaining angular subtensions<br>
-            - <strong>Scope Type:</strong> Select MRAD or MOA in the settings bar to change reticle tick spacing and dial units<br>
-            - MRAD mode: 0.5 MRAD minor ticks, 1.0 MRAD major ticks<br>
-            - MOA mode: 2.0 MOA minor ticks, 4.0 MOA major ticks<br>
-            - Dial click values and HUD display units match the selected scope type<br><br>
-
-            <strong>Impact Detection:</strong><br>
-            - Spatial binning system (10m bins) for efficient collision detection<br>
-            - Raycasting from trajectory path detects target intersections<br>
-            - Impact points converted to local target coordinates for physics and texture drawing<br>
-            - No collision detection between targets (simplified physics)<br><br>
-
-            <strong>Texture System:</strong><br>
-            - Targets use double-width texture buffer: front face UVs map to left half (0-0.5), back face to right half (0.5-1.0)<br>
-            - Allows impacts to appear on the correct side<br><br>
-
-            <strong>Chain Model:</strong><br>
-            - Chains modeled as damped springs without mass or realistic chain link physics<br>
-            - Cannot go slack or wrap around objects
-          </div>
-        </div>
-        
+        <!-- Tips -->
         <div class="help-section">
           <h3>Tips for Success</h3>
           <div class="param-help">
             - Start with the 100-yard rack to confirm your zero<br>
             - Use wind flags at multiple distances to read wind gradients<br>
-            - Watch target movement after impacts to understand hit location (center vs edge)<br>
-            - Make small dial adjustments (0.1 MRAD or 0.25 MOA increments) for precise corrections<br>
-            - Use <kbd>Shift</kbd>+<kbd>Arrow</kbd> keys for larger adjustments (1.0 MRAD or 1.0 MOA) when needed<br>
-            - Select your preferred Scope Type (MRAD or MOA) in the settings bar - affects reticle spacing and dial units<br>
+            - Watch target movement after impacts to understand hit location<br>
+            - Make small dial adjustments for precise corrections<br>
+            - Use <kbd>Shift</kbd>+<kbd>Arrow</kbd> for larger adjustments (1.0 MRAD/MOA)<br>
             - Higher BC bullets drift less in the wind<br>
             - Lower MV σ = more consistent impacts<br>
-            - Practice at shorter distances before attempting 1760 yards (1 mile)<br>
-            - Use the HUD to track your dial settings and impact status
+            - Practice at shorter distances before attempting 1760 yards (1 mile)
+          </div>
+        </div>
+
+        <!-- Technical Details -->
+        <div class="help-section">
+          <h3>Technical Details</h3>
+          <div class="param-help">
+            <strong>Physics Engine:</strong><br>
+            - Custom rigid body physics in C++ (WebAssembly) with quaternion-based orientation<br>
+            - Targets use momentum transfer with linear and angular damping<br><br>
+
+            <strong>Rendering:</strong><br>
+            - 3-pass composition: background scene → scope with zoom → reticle overlay<br>
+            - Three.js WebGL with 4× MSAA anti-aliasing<br>
+            - Vertex positions computed in C++ and transferred via typed memory views<br><br>
+
+            <strong>Impact Detection:</strong><br>
+            - Spatial binning system (10m bins) for efficient collision detection<br>
+            - Raycasting from trajectory segments detects target intersections<br><br>
+
+            <strong>Mirage Model:</strong><br>
+            - 3D simplex noise sampled on a sphere around the shooter in angular coordinates<br>
+            - Noise advected horizontally by crosswind at focal distance, with upward drift for rising heat<br>
+            - Multi-octave noise (fast + slow) creates fine shimmer and larger wave structures<br>
+            - Causes both image distortion (UV displacement) and brightness shading<br>
+            - Attenuation factors: distance to focal plane, magnification, focal distance, wind speed<br>
+            - Wind sampled at 80%, 90%, and 100% of focal distance and averaged<br><br>
+
+            <strong>Depth-of-Field Model:</strong><br>
+            - Thin-lens circle of confusion (CoC): CoC = |(F²/(N·(df-F)))·((d-df)/d)|<br>
+            - Lens: 56mm objective, focal length and f-number derived from FOV/zoom<br>
+            - Separable Gaussian blur (horizontal + vertical passes) for O(2n) performance<br>
+            - Depth texture from scene render, decoded using THREE.js perspective depth<br>
+            - Default focus: 100 yards; blur scales with zoom level<br>
+            - Resolution-independent calculations for consistent appearance
           </div>
         </div>
       </div>
