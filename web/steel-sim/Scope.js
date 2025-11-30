@@ -547,20 +547,68 @@ export class Scope
 
     const fragmentShader = `
       uniform sampler2D sceneTexture;
+      uniform sampler2D depthTexture;
       uniform float cameraTheta;  // Camera azimuth angle + horizontal advection (radians)
       uniform float cameraPhi;    // Camera elevation angle + vertical advection (radians)
       uniform float mirageAdvectionTime;  // Time advection for noise animation (seconds)
       uniform float cameraFov;    // Camera field of view (radians)
+      uniform float focalDistance;  // Focal distance in meters
+      uniform float cameraNear;     // Camera near plane
+      uniform float cameraFar;      // Camera far plane
 
       varying vec2 vUv;
 
-      const float MIRAGE_ANGLE_SCALE = 1.0 / 0.001;  // Scale factor for angular noise coordinates
-      const float MIRAGE_TIME_SCALE = 1.0 / 10.0;   // Scale factor for time noise coordinate
+      const float MIRAGE_ANGLE_SCALE          = 1.0 / 0.001;  // Scale factor for angular noise coordinates
+      const float MIRAGE_TIME_SCALE           = 1.0 / 10.0;   // Scale factor for time noise coordinate
+      const float MIRAGE_FOV_MAX              = 3.0 * 3.14159265359 / 180.0;  // No mirage at wide FOV (radians)
+      const float MIRAGE_FOV_MIN              = 0.5 * 3.14159265359 / 180.0;  // Full mirage at narrow FOV (radians)
+      const float MIRAGE_FOCAL_MIN            = 50.0;          // Minimum focal distance for mirage ramp (meters)
+      const float MIRAGE_FOCAL_MAX            = 1000.0;        // Distance where mirage reaches full strength (meters)
+      const float MIRAGE_DISTORTION_STRENGTH  = 0.005;          // Base distortion scale in UV space
+      const float MIRAGE_SHADE_STRENGTH       = 0.2;           // ±30% brightness variation at full attenuation
 
       ${simplexNoise}
 
+      float perspectiveDepthToViewZ(const in float fragCoordZ,
+                                    const in float near,
+                                    const in float far) {
+        return (near * far) / ((far - near) * fragCoordZ - far);
+      }
+
+      float depthToDistance(float depth) {
+        float viewZ = perspectiveDepthToViewZ(depth, cameraNear, cameraFar);
+        return -viewZ;
+      }
+
       void main() {
         vec4 sceneColor = texture2D(sceneTexture, vUv);
+        
+        // Decode depth to get distance
+        float depth = texture2D(depthTexture, vUv).r;
+        float distance = depthToDistance(depth);
+        
+        // Attenuate mirage effect for objects closer than focal distance
+        // Full strength at focal distance and beyond, fade to zero closer
+        float distanceAttenuation = 1.0;
+        if (distance < focalDistance) {
+          // Smooth fade from 0 at cameraNear to 1 at focalDistance
+          distanceAttenuation = smoothstep(cameraNear, focalDistance, distance);
+        }
+        
+        // Attenuate based on FOV using magnification (more physical: magnification ∝ 1/FOV)
+        // No mirage at MIRAGE_FOV_MAX, full mirage at MIRAGE_FOV_MIN
+        float invFov      = 1.0 / max(cameraFov, 0.001);          // ~magnification
+        float invFovMin   = 1.0 / MIRAGE_FOV_MIN;
+        float invFovMax   = 1.0 / MIRAGE_FOV_MAX;
+        float magT        = clamp((invFov - invFovMax) / (invFovMin - invFovMax), 0.0, 1.0);
+        // Slightly ease in for a slower ramp at low magnification
+        float fovAttenuation = sqrt(magT);
+
+        // Attenuate based on focal distance: longer path through heated air → stronger mirage
+        // Use a physically-motivated ramp: variance ∝ path length, so amplitude ∝ sqrt(path length)
+        float focalT = clamp((focalDistance - MIRAGE_FOCAL_MIN) /
+                             (MIRAGE_FOCAL_MAX - MIRAGE_FOCAL_MIN), 0.0, 1.0);
+        float focalAttenuation = sqrt(focalT);
         
         // Sample 3D simplex noise at camera angles + time
         // Map UV to angular offset from center using small-angle approximation: θ ≈ (uv - 0.5) * fov
@@ -569,12 +617,27 @@ export class Scope
         float phi = (cameraPhi + uvOffset.y * cameraFov * 0.5) * MIRAGE_ANGLE_SCALE;
         float time = mirageAdvectionTime * MIRAGE_TIME_SCALE;
         
-        vec3 noiseCoord = vec3(theta, phi, time);
-        float noise = snoise(noiseCoord);
+        // Multi-scale simplex noise: combine fast (small-scale) and slow (large-scale) components
+        vec3 noiseCoordFast = vec3(theta, phi, time);
+        vec3 noiseCoordSlow = vec3(theta * 0.25, phi * 0.25, time * 0.25);
+        float noiseFast = snoise(noiseCoordFast);
+        float noiseSlow = snoise(noiseCoordSlow);
+        float noise = noiseFast * 0.5 + noiseSlow * 0.5;
+        float noiseMag = abs(noise);
         
-        // Use noise to modulate brightness (subtle shading)
-        float noiseFactor = noise * 0.3 + 1.0; // Scale noise to ±30% brightness variation
-        gl_FragColor = sceneColor * noiseFactor;
+        // Total attenuation from distance, FOV, and focal distance
+        float totalAttenuation = distanceAttenuation * fovAttenuation * focalAttenuation;
+        
+        // Screen-space distortion: primarily vertical, scaled by attenuation (similar to fclass mirage)
+        vec2 distortion = vec2(0.0, noise) * MIRAGE_DISTORTION_STRENGTH * totalAttenuation;
+        vec2 distortedUV = vUv + distortion;
+        
+        // Sample the scene with distorted UVs
+        vec4 color = texture2D(sceneTexture, distortedUV);
+        
+        // Brightness modulation (shading) based on noise, also attenuated
+        float noiseFactor = noise * MIRAGE_SHADE_STRENGTH * totalAttenuation + 1.0;
+        gl_FragColor = color * noiseFactor;
       }
     `;
 
@@ -583,6 +646,10 @@ export class Scope
       uniforms:
       {
         sceneTexture:
+        {
+          value: null
+        },
+        depthTexture:
         {
           value: null
         },
@@ -601,6 +668,18 @@ export class Scope
         cameraFov:
         {
           value: 1.0
+        },
+        focalDistance:
+        {
+          value: 100.0
+        },
+        cameraNear:
+        {
+          value: 0.1
+        },
+        cameraFar:
+        {
+          value: 1000.0
         }
       },
       vertexShader,
@@ -1495,11 +1574,13 @@ export class Scope
 
     // Compute camera angles (spherical coordinates)
     // theta: azimuth angle (horizontal), phi: elevation angle (vertical)
-    const cameraTheta = Math.atan2(forward.x, forward.z);
+    const cameraTheta = Math.atan2(forward.z, forward.x);
     const cameraPhi = Math.asin(forward.y);
     
-    // Get unit vector perpendicular to view direction, pointing right (left-to-right = positive)
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion).normalize();
+    // Get unit vector perpendicular to view direction, pointing right
+    // Compute as up × forward (right-handed coordinate system)
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).normalize();
+    const right = new THREE.Vector3().crossVectors(up, forward).normalize();
     
     // Signed magnitude of perpendicular wind component: positive for left-to-right
     const perpendicularWind = windVec.dot(right);
@@ -1508,8 +1589,8 @@ export class Scope
     this.mirageAdvectionHorizontal += (perpendicularWind / this.focalDistance) * dt;
     
     // Accumulate vertical advection (heat rise) - constant upward drift
-    const HEAT_RISE_RATE = 0.01; // radians per second (adjust as needed)
-    this.mirageAdvectionVertical += HEAT_RISE_RATE * dt;
+    const HEAT_RISE_SPEED = 1.5; // meters per second (adjust as needed)
+    this.mirageAdvectionVertical -= (HEAT_RISE_SPEED / this.focalDistance) * dt;
     
     // Accumulate time for noise animation
     this.mirageAdvectionTime += dt;
@@ -1517,10 +1598,16 @@ export class Scope
     // Update shader uniforms with camera angles + advection
     const uniforms = this.mirageMesh.material.uniforms;
     uniforms.sceneTexture.value = inputTexture;
+    uniforms.depthTexture.value = this.depthTexture;
     uniforms.cameraTheta.value = cameraTheta + this.mirageAdvectionHorizontal;
     uniforms.cameraPhi.value = cameraPhi + this.mirageAdvectionVertical;
     uniforms.mirageAdvectionTime.value = this.mirageAdvectionTime;
-    uniforms.cameraFov.value = this.camera.fov * Math.PI / 180.0; // Convert degrees to radians
+    const cameraFovRad = this.camera.fov * Math.PI / 180.0; // Convert degrees to radians
+    uniforms.cameraFov.value = cameraFovRad;
+    console.log('FOV:', this.camera.fov, 'degrees (', cameraFovRad, 'radians)');
+    uniforms.focalDistance.value = this.focalDistance; // meters
+    uniforms.cameraNear.value = Config.CAMERA_NEAR_PLANE;
+    uniforms.cameraFar.value = Config.CAMERA_FAR_PLANE;
 
     // Render mirage pass to its own render target
     this.renderer.setRenderTarget(this.mirageRenderTarget);
