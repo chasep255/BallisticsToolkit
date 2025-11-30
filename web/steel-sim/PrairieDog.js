@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /**
@@ -209,12 +208,13 @@ export class PrairieDogFactory
   static baseRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
 
   /**
-   * Load GLB model and initialize factory
+   * Initialize factory with pre-loaded model
    * @param {THREE.Scene} scene - Three.js scene
    * @param {Object} config - Configuration from Config.PRAIRIE_DOG_CONFIG
-   * @returns {Promise<void>} Promise that resolves when model is loaded
+   * @param {Object} preloadedModel - Optional pre-loaded model from ModelManager {geometry, material}
+   * @returns {Promise<void>} Promise that resolves when initialized
    */
-  static async init(scene, config)
+  static async init(scene, config, preloadedModel = null)
   {
     if (PrairieDogFactory.instancedMesh)
     {
@@ -225,14 +225,9 @@ export class PrairieDogFactory
     PrairieDogFactory.scene = scene;
     PrairieDogFactory.config = config;
 
-    // Load GLB model
-    const loader = new GLTFLoader();
-    const gltf = await loader.loadAsync(config.modelPath);
-
-    // Extract geometry and material from loaded model
-    // GLB models can have complex scene graphs, so we need to traverse and find meshes
+    // Extract geometry and material from pre-loaded model scene
     const meshes = [];
-    gltf.scene.traverse((child) =>
+    preloadedModel.scene.traverse((child) =>
     {
       if (child.isMesh)
       {
@@ -253,16 +248,7 @@ export class PrairieDogFactory
     // If multiple meshes, merge geometries
     if (meshes.length > 1)
     {
-      const geometries = meshes.map(m => m.geometry);
-      // Apply transforms if needed
-      geometries.forEach((geom, i) =>
-      {
-        if (meshes[i].matrixWorld && !meshes[i].matrixWorld.isIdentity())
-        {
-          geom.applyMatrix4(meshes[i].matrixWorld);
-        }
-      });
-      // Merge all geometries
+      const geometries = meshes.map(m => m.geometry.clone());
       const mergedGeometry = mergeGeometries(geometries);
       PrairieDogFactory.sharedGeometry = mergedGeometry;
     }

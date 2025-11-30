@@ -107,14 +107,34 @@ export class TextureManager
    */
   async loadAll(renderer)
   {
-    console.log(`${LOG_PREFIX} Loading ${Object.keys(TEXTURE_MANIFEST).length} textures...`);
-
     const entries = Object.entries(TEXTURE_MANIFEST);
     const total = entries.length;
+
+    // Check if all textures are already loaded
+    const alreadyLoaded = entries.every(([id]) => this.textures.has(id));
+    if (alreadyLoaded && total > 0)
+    {
+      // Textures already loaded, just update anisotropy if renderer provided
+      if (renderer)
+      {
+        this.updateAnisotropy(renderer);
+      }
+      return;
+    }
+
+    console.log(`${LOG_PREFIX} Loading ${total} textures...`);
+
     let loaded = 0;
 
     const loadPromises = entries.map(([id, config]) =>
     {
+      // Skip if already loaded
+      if (this.textures.has(id))
+      {
+        loaded++;
+        return Promise.resolve();
+      }
+
       return new Promise((resolve) =>
       {
         this.loader.load(

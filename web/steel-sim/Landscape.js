@@ -4,16 +4,7 @@ import
   Config
 }
 from './config.js';
-import
-{
-  DustCloudFactory
-}
-from './DustCloud.js';
-import
-{
-  ImpactMarkFactory
-}
-from './ImpactMark.js';
+
 import
 {
   PrairieDogFactory
@@ -45,7 +36,8 @@ export class Landscape
         groundLength = Config.LANDSCAPE_CONFIG.groundLength,
         brownGroundWidth = Config.LANDSCAPE_CONFIG.brownGroundWidth,
         brownGroundLength = Config.LANDSCAPE_CONFIG.brownGroundLength,
-        textureManager = null
+        textureManager = null,
+        modelManager = null
     } = options;
 
     this.groundWidth = groundWidth;
@@ -53,6 +45,7 @@ export class Landscape
     this.brownGroundWidth = brownGroundWidth;
     this.brownGroundLength = brownGroundLength;
     this.textureManager = textureManager;
+    this.modelManager = modelManager;
 
     // Environment objects
     this.mountainMesh = null;
@@ -251,14 +244,16 @@ export class Landscape
   /**
    * Create prairie dog hunting targets
    * Scattered randomly across the ground
-   * @returns {Promise<void>} Promise that resolves when prairie dogs are created
    */
-  async createPrairieDogs()
+  createPrairieDogs()
   {
     const config = Config.PRAIRIE_DOG_CONFIG;
 
-    // Initialize factory with model loading
-    await PrairieDogFactory.init(this.scene, config);
+    // Get pre-loaded model from ModelManager (guaranteed to be loaded)
+    const preloadedModel = this.modelManager.getModel('prairie_dog');
+
+    // Initialize factory with pre-loaded model
+    PrairieDogFactory.init(this.scene, config, preloadedModel);
 
     // Create prairie dogs at random positions between 100-600 yards
     for (let i = 0; i < config.count; i++)
@@ -361,7 +356,7 @@ export class Landscape
   }
 
   /**
-   * Create trees along sides and behind targets
+   * Create trees along sides and behind targets using simple geometric shapes with instanced rendering
    */
   createTrees()
   {
@@ -405,37 +400,16 @@ export class Landscape
       });
     }
 
-    // Foliage material - use grass textures if available (leaves/foliage can use grass-like textures)
-    let foliageMaterial;
-
-    // Clone textures for foliage to avoid overwriting ground texture repeat
-    const grassColorGround = this.textureManager.getTexture('grass_color');
-    const grassNormalGround = this.textureManager.getTexture('grass_normal');
-    const grassRoughnessGround = this.textureManager.getTexture('grass_roughness');
-
-    // Clone textures for foliage use (so we don't overwrite ground repeat)
-    const grassColor = grassColorGround.clone();
-    const grassNormal = grassNormalGround.clone();
-    const grassRoughness = grassRoughnessGround.clone();
-
-    // Configure texture repeat for foliage (smaller repeat for detail)
-    grassColor.repeat.set(0.5, 0.5);
-    grassNormal.repeat.set(0.5, 0.5);
-    grassRoughness.repeat.set(0.5, 0.5);
-
-    foliageMaterial = new THREE.MeshStandardMaterial(
+    // Foliage material - simple dark green
+    const foliageMaterial = new THREE.MeshStandardMaterial(
     {
-      map: grassColor,
-      normalMap: grassNormal,
-      roughnessMap: grassRoughness,
       color: 0x2d5016, // Dark green tint
       roughness: 1.0,
       metalness: 0.0,
       side: THREE.DoubleSide
     });
 
-
-    // Base tree geometries (single geometry for trunks and foliage)
+    // Base tree geometries
     const trunkRadius = 0.25;
     const trunkHeight = 3.5;
     const trunkGeometry = new THREE.CylinderGeometry(trunkRadius, trunkRadius * 1.2, trunkHeight, 8);
@@ -482,8 +456,8 @@ export class Landscape
         z = -(this.groundLength + Config.TREE_CONFIG.behindTargetMin + Math.random() * (Config.TREE_CONFIG.behindTargetMax - Config.TREE_CONFIG.behindTargetMin));
       }
 
-      // Get ground height at this position
-      const groundHeight = this.getHeightAt(x, z) || 0;
+      // Brown ground height
+      const groundHeight = -0.1;
 
       // Simple size variation using uniform scale
       const sizeVariant = Math.random(); // 0..1

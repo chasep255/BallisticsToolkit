@@ -88,14 +88,30 @@ export class AudioManager
    */
   async loadAll()
   {
-    console.log(`${LOG_PREFIX} Loading ${Object.keys(AUDIO_MANIFEST).length} audio files...`);
-
     const entries = Object.entries(AUDIO_MANIFEST);
     const total = entries.length;
+
+    // Check if all audio is already loaded
+    const alreadyLoaded = entries.every(([id]) => this.audioBuffers.has(id));
+    if (alreadyLoaded && total > 0)
+    {
+      // Audio already loaded, nothing to do
+      return;
+    }
+
+    console.log(`${LOG_PREFIX} Loading ${total} audio files...`);
+
     let loaded = 0;
 
     const loadPromises = entries.map(async ([id, config]) =>
     {
+      // Skip if already loaded
+      if (this.audioBuffers.has(id))
+      {
+        loaded++;
+        return;
+      }
+
       try
       {
         const response = await fetch(config.path);

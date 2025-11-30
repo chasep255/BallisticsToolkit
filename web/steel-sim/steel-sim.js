@@ -98,6 +98,11 @@ import
 from './TextureManager.js';
 import
 {
+  ModelManager
+}
+from './ModelManager.js';
+import
+{
   BallisticsTable
 }
 from './BallisticsTable.js';
@@ -116,6 +121,55 @@ from './ImpactMark.js';
 // Detect iOS (iPad, iPhone, iPod, or iPadOS on Mac)
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+// ===== SHARED RESOURCE MANAGERS =====
+// Load resources on page load and reuse across restarts
+let sharedTextureManager = null;
+let sharedModelManager = null;
+let sharedAudioManager = null;
+let resourcesReady = false;
+let resourceLoadingPromise = null;
+
+/**
+ * Initialize shared resource managers (load on page load)
+ * @returns {Promise<void>}
+ */
+async function initializeResources()
+{
+  // If already loading, return the existing promise
+  if (resourceLoadingPromise)
+  {
+    return resourceLoadingPromise;
+  }
+
+  // If already loaded, return immediately
+  if (resourcesReady)
+  {
+    return Promise.resolve();
+  }
+
+  resourceLoadingPromise = (async () =>
+  {
+    console.log('[SteelSim] Loading resources...');
+
+    // Create managers
+    sharedTextureManager = new TextureManager();
+    sharedModelManager = new ModelManager();
+    sharedAudioManager = new AudioManager();
+
+    // Load all resources in parallel
+    await Promise.all([
+      sharedTextureManager.loadAll(null), // No renderer yet, anisotropy updated later
+      sharedModelManager.loadAll(),        // Models including prairie dog
+      sharedAudioManager.loadAll()         // Audio files
+    ]);
+
+    resourcesReady = true;
+    console.log('[SteelSim] All resources loaded');
+  })();
+
+  return resourceLoadingPromise;
+}
 
 // ===== STEEL SIMULATOR CLASS =====
 
@@ -218,8 +272,9 @@ class SteelSimulator
     // Audio
     this.audioManager = null;
 
-    // Textures
+    // Textures and models (shared, loaded on page load)
     this.textureManager = null;
+    this.modelManager = null;
 
     // Event handler references for cleanup
     this.boundHandlers = {};
@@ -248,15 +303,17 @@ class SteelSimulator
       this.timeManager = new TimeManager();
       this.timeManager.start();
 
-      // Initialize and load audio
-      this.audioManager = new AudioManager();
-      await this.audioManager.loadAll();
+      // Reuse shared resource managers (or create if first time)
+      if (!sharedTextureManager || !sharedModelManager || !sharedAudioManager)
+      {
+        await initializeResources();
+      }
+      this.textureManager = sharedTextureManager;
+      this.modelManager = sharedModelManager;
+      this.audioManager = sharedAudioManager;
 
       // Start background noise loop (this unlocks audio context for immediate playback)
       await this.audioManager.startLoop('background_noise', 1.0);
-
-      // Initialize texture manager
-      this.textureManager = new TextureManager();
 
       // Setup ballistics (computes rifle zero)
       await this.setupBallistics();
@@ -377,17 +434,11 @@ class SteelSimulator
       this.landscape = null;
     }
 
-    // Dispose modules that own their own resources
-    if (this.textureManager)
-    {
-      this.textureManager.dispose();
-      this.textureManager = null;
-    }
-    if (this.audioManager)
-    {
-      this.audioManager.dispose();
-      this.audioManager = null;
-    }
+    // Clear references to shared managers (but don't dispose them)
+    // They persist across restarts for faster reload
+    this.textureManager = null;
+    this.modelManager = null;
+    this.audioManager = null; // Audio manager is shared, don't dispose
     if (this.hud)
     {
       this.hud.dispose();
@@ -582,11 +633,12 @@ class SteelSimulator
     // Create landscape (uses Config.LANDSCAPE_CONFIG defaults)
     this.landscape = new Landscape(this.scene,
     {
-      textureManager: this.textureManager
+      textureManager: this.textureManager,
+      modelManager: this.modelManager
     });
 
-    // Create prairie dog hunting targets
-    await this.landscape.createPrairieDogs();
+    // Create prairie dog hunting targets (uses pre-loaded model)
+    this.landscape.createPrairieDogs();
 
     // Initialize impact mark factory for bullet holes
     ImpactMarkFactory.init(this.scene);
@@ -1758,6 +1810,27 @@ class SteelSimulator
     const FOCUS_MIN_HOLD_MS = 450; // milliseconds - minimum hold time for focus gesture
     const FOCUS_MAX_MOVE_PX = 5; // pixels - maximum movement allowed for focus
 
+    // Check movement distance first - if moved too far, cancel long-press entirely
+    let distanceFromStart = 0;
+    let touchX = this.touchState.touchStartPos.x;
+    let touchY = this.touchState.touchStartPos.y;
+
+    if (this.touchState.touchMoved && this.touchState.lastTouchPos)
+    {
+      const deltaX = this.touchState.lastTouchPos.x - this.touchState.touchStartPos.x;
+      const deltaY = this.touchState.lastTouchPos.y - this.touchState.touchStartPos.y;
+      distanceFromStart = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      touchX = this.touchState.lastTouchPos.x;
+      touchY = this.touchState.lastTouchPos.y;
+
+      // If moved beyond threshold, cancel long-press (prevent triggering even if they come back)
+      if (distanceFromStart > FOCUS_MAX_MOVE_PX)
+      {
+        this.touchState.focusTriggered = true; // Cancel long-press
+        return;
+      }
+    }
+
     if (elapsed < FOCUS_MIN_HOLD_MS)
     {
       return;
@@ -1779,27 +1852,15 @@ class SteelSimulator
       return;
     }
 
-    // Check movement distance - use current position if available, otherwise start position
-    let distanceFromStart = 0;
-    let touchX = this.touchState.touchStartPos.x;
-    let touchY = this.touchState.touchStartPos.y;
+    // At this point, elapsed time is sufficient and movement is within threshold
+    const norm = this.compositionRenderer.screenToNormalized(touchX, touchY);
+    this.setFocalDistanceFromRaycast(scopeObj, norm.x, norm.y);
+    this.touchState.focusTriggered = true; // Prevent multiple triggers
 
-    // If touch has moved, calculate distance from start
-    if (this.touchState.touchMoved && this.touchState.lastTouchPos)
+    // Vibrate on long-press focus detection
+    if (navigator.vibrate)
     {
-      const deltaX = this.touchState.lastTouchPos.x - this.touchState.touchStartPos.x;
-      const deltaY = this.touchState.lastTouchPos.y - this.touchState.touchStartPos.y;
-      distanceFromStart = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-      // Use current position for more accurate raycast
-      touchX = this.touchState.lastTouchPos.x;
-      touchY = this.touchState.lastTouchPos.y;
-    }
-
-    if (distanceFromStart <= FOCUS_MAX_MOVE_PX)
-    {
-      const norm = this.compositionRenderer.screenToNormalized(touchX, touchY);
-      this.setFocalDistanceFromRaycast(scopeObj, norm.x, norm.y);
-      this.touchState.focusTriggered = true; // Prevent multiple triggers
+      navigator.vibrate(50); // 50ms vibration for tactile feedback
     }
   }
 
@@ -1817,6 +1878,12 @@ class SteelSimulator
     if (this.audioManager)
     {
       this.audioManager.playSound('long_shot');
+    }
+
+    // Vibrate on fire (fast double pulse)
+    if (navigator.vibrate)
+    {
+      navigator.vibrate([10, 20]); // Fast double pulse: 10ms on, 20ms off, 10ms on
     }
 
     const btk = this.btk;
@@ -2420,6 +2487,15 @@ async function startGame()
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('restartBtn').style.display = 'inline-block';
 
+    // Enable fullscreen button now that sim is running
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    if (fullscreenBtn && fullscreenBtn.disabled)
+    {
+      fullscreenBtn.disabled = false;
+      fullscreenBtn.style.opacity = '1';
+      fullscreenBtn.style.cursor = 'pointer';
+    }
+
     // Wind presets already populated during initialization
     // Just reload cookies to restore saved wind preset
     SettingsCookies.loadAll();
@@ -2506,6 +2582,10 @@ function setupUI()
     }
     else
     {
+      // Initially disabled until sim starts
+      fullscreenBtn.disabled = true;
+      fullscreenBtn.style.opacity = '0.5';
+      fullscreenBtn.style.cursor = 'not-allowed';
       fullscreenBtn.addEventListener('click', toggleFullscreen);
 
       // Update button text when fullscreen changes
@@ -2591,7 +2671,6 @@ function unlockOrientation()
 
 /**
  * Toggle fullscreen mode for the canvas container
- * Also starts the game if it hasn't started yet
  */
 async function toggleFullscreen()
 {
@@ -2599,12 +2678,6 @@ async function toggleFullscreen()
 
   if (!document.fullscreenElement)
   {
-    // Start the game if it hasn't started yet
-    if (!steelSimulator)
-    {
-      await startGame();
-    }
-
     // Enter fullscreen
     try
     {
@@ -2656,11 +2729,22 @@ document.addEventListener('DOMContentLoaded', async () =>
 {
   try
   {
+    // Get start button and show loading state
+    const startBtn = document.getElementById('startBtn');
+    if (startBtn)
+    {
+      startBtn.disabled = true;
+      startBtn.textContent = 'Loading...';
+    }
+
     // Load BTK module first
     if (!window.btk)
     {
       window.btk = await BallisticsToolkit();
     }
+
+    // Initialize shared resource managers (load textures and models on page load)
+    await initializeResources();
 
     // Setup UI
     setupUI();
@@ -2699,7 +2783,12 @@ document.addEventListener('DOMContentLoaded', async () =>
       once: true
     });
 
-    // Don't auto-start - wait for Start button
+    // Enable start button now that resources are loaded
+    if (startBtn)
+    {
+      startBtn.disabled = false;
+      startBtn.textContent = 'Start';
+    }
   }
   catch (error)
   {
