@@ -153,7 +153,7 @@
           <strong>Desktop - Scope:</strong> <kbd>Click</kbd> scope to enter • <kbd>Tab</kbd> switch scopes • <kbd>Mouse Wheel</kbd> or <kbd>+</kbd>/<kbd>-</kbd> zoom • <kbd>Click</kbd> to fire • <kbd>Esc</kbd> exit
         </div>
         <div class="quick-keys-section">
-          <strong>Desktop - Dial/Focus:</strong> <kbd>Arrow Keys</kbd> dial • <kbd>F</kbd> or <kbd>Right-click</kbd> focus active scope (when Mirage enabled)
+          <strong>Desktop - Dial/Focus:</strong> <kbd>Arrow Keys</kbd> dial • <kbd>F</kbd> or <kbd>Right-click</kbd> focus active scope (range shown in bottom-right)
         </div>
         <div class="quick-keys-section">
           <strong>Mobile:</strong> Drag to pan • Pinch to zoom • Tap to fire • Long-press inside scope to refocus where you press (when Mirage enabled) • Dial buttons next to HUD (hold to fast-dial)
@@ -218,9 +218,10 @@
             - <kbd>R</kbd> reset both dials to zero (only when in rifle scope mode)<br>
             - On-screen dial buttons (U/D/L/R/⟲) next to HUD work anytime<br><br>
 
-            <strong>Desktop - Focus (requires Mirage enabled):</strong><br>
-            - <kbd>F</kbd> refocus the active scope at center crosshair distance<br>
-            - <kbd>Right-click</kbd> also refocuses the active scope at center<br>
+            <strong>Desktop - Focus/Range Finder:</strong><br>
+            - <kbd>F</kbd> or <kbd>Right-click</kbd> refocus the active scope at center crosshair distance<br>
+            - Sets the focal distance for mirage and depth-of-field blur effects (when optical effects enabled)<br>
+            - Focal distance is always displayed in the bottom-right corner of each scope as a red digital readout (yards)<br>
             - The active scope is indicated by the dull red border<br><br>
 
             <strong>Mobile/Touch:</strong><br>
@@ -297,18 +298,26 @@
             - Farther distances = stronger mirage (more air to look through)<br>
             - Very strong wind reduces mirage visibility (turbulence breaks up pattern)<br>
             - Also includes depth-of-field blur based on focus distance<br>
+            - Focus distance is set using <kbd>F</kbd> or <kbd>Right-click</kbd> (displayed as red digital readout in bottom-right of scope)<br>
             - Increases GPU load; turn off on low-power devices<br><br>
 
             <strong>Hunting:</strong><br>
             - Toggle via the checkbox in the settings bar<br>
             - Enables/disables boars and prairie dogs<br>
             - Must restart game for changes to take effect<br><br>
+            - Increases GPU load; turn off on low-power devices<br><br>
 
             <strong>HUD (Top-Left):</strong><br>
             - <strong>Elevation:</strong> Current dial setting (U = up, D = down)<br>
             - <strong>Windage:</strong> Current dial setting (R = right, L = left)<br>
             - <strong>Impact Status:</strong> "IMPACT" (green) or "MISS" (red)<br>
-            - Units displayed match selected Scope Type
+            - Units displayed match selected Scope Type<br><br>
+            
+            <strong>Range Finder Display (Bottom-Right of Scope):</strong><br>
+            - Shows current focal distance in yards as a red digital readout<br>
+            - Updates when you focus using <kbd>F</kbd> or <kbd>Right-click</kbd><br>
+            - Always visible in both rifle and spotting scopes<br>
+            - The focal distance affects mirage and depth-of-field blur when optical effects are enabled
           </div>
         </div>
 

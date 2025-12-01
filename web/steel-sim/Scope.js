@@ -945,6 +945,9 @@ export class Scope
       this.updateReticleScale();
     }
 
+    // Create focal distance text display (for both rifle and spotting scopes)
+    this.createFocalDistanceText();
+
     // Local lighting for metallic look on housing + reticle
     const ambient = new THREE.AmbientLight(0xffffff, 0.15);
     this.internalScene.add(ambient);
@@ -1653,6 +1656,103 @@ export class Scope
   }
 
   /**
+   * Create focal distance text display in bottom right of reticle
+   */
+  createFocalDistanceText()
+  {
+    // Create canvas for text rendering (larger for digital display)
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    this.focalDistanceCanvas = canvas;
+    
+    const ctx = canvas.getContext('2d');
+    this.focalDistanceCtx = ctx;
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    this.focalDistanceTexture = texture;
+    
+    // Create plane geometry material (more reliable than sprite in orthographic view)
+    const planeMaterial = new THREE.MeshBasicMaterial(
+    {
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      stencilWrite: true,
+      stencilRef: 1,
+      stencilFunc: THREE.EqualStencilFunc,
+      stencilZPass: THREE.KeepStencilOp
+    });
+    
+    // Create plane geometry for text
+    // Size matches canvas aspect ratio (640x160 = 4:1)
+    const planeGeometry = new THREE.PlaneGeometry(0.6, 0.15);
+    const textMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+    // Position in bottom right of reticle (reticle space is -1 to 1, unit circle radius = 1.0)
+    // Position at (0.5, -0.5) to ensure it's well within the circle: sqrt(0.5^2 + 0.5^2) ≈ 0.71 < 1.0
+    textMesh.position.set(0.5, -0.5, 0.05);
+    textMesh.renderOrder = 100; // Render after reticle
+    
+    // Add directly to internalScene to ensure it renders
+    this.internalScene.add(textMesh);
+    this.focalDistanceMesh = textMesh;
+    
+    // Initial update
+    this.updateFocalDistanceText();
+  }
+  
+  /**
+   * Update the focal distance text display
+   */
+  updateFocalDistanceText()
+  {
+    if (!this.focalDistanceCanvas || !this.focalDistanceCtx || !this.focalDistanceTexture)
+    {
+      return;
+    }
+    
+    const ctx = this.focalDistanceCtx;
+    const canvas = this.focalDistanceCanvas;
+    
+    // Clear canvas with transparent background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Convert focal distance from meters to yards
+    const focalYards = btk.Conversions.metersToYards(this.focalDistance);
+    
+    // Format text - just the number, no "yd"
+    const text = `${Math.round(focalYards)}`;
+    
+    // Set text style for 7-segment digital display look
+    // Use monospace font for digital appearance, much larger size
+    ctx.font = 'bold 120px "Courier New", Courier, monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    
+    // Digital red color (#ff0000) with slight glow effect
+    const redColor = '#ff0000';
+    const glowColor = '#ff6666';
+    
+    // Draw glow effect (multiple passes for soft glow)
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = redColor;
+    ctx.fillStyle = glowColor;
+    ctx.fillText(text, canvas.width - 20, canvas.height / 2);
+    
+    // Draw main text in bright red
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = redColor;
+    ctx.fillText(text, canvas.width - 20, canvas.height / 2);
+    
+    // Update texture
+    this.focalDistanceTexture.needsUpdate = true;
+  }
+
+  /**
    * Set the focal distance (in meters)
    * @param {number} meters - Focal distance in meters
    */
@@ -1660,6 +1760,8 @@ export class Scope
   {
     this.focalDistance = meters;
     // The blur shader uniform will be updated automatically in the render loop
+    // Update the text display
+    this.updateFocalDistanceText();
   }
 
   /**
