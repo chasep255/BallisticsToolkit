@@ -1,6 +1,21 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import
+{
+  WindFlagFactory
+}
+from './WindFlag.js';
+import
+{
+  TargetRackFactory
+}
+from './TargetRack.js';
+import
+{
+  Config
+}
+from './config.js';
 
 const LOG_PREFIX = '[Boar]';
 
@@ -32,10 +47,18 @@ export class Boar
     this.impactDetector = impactDetector;
     this.objectId = objectId;
     this.colliderHandle = -1; // Initialized after box calculation
-    this.speed = config.walkingSpeed || 2.0; // m/s
+    
+    // Random speed multiplier between 0.5x and 2.0x
+    this.speedMultiplier = 0.5 + Math.random() * 1.5; // 0.5 to 2.0
+    const baseSpeed = config.walkingSpeed || 0.8; // m/s
+    this.speed = baseSpeed * this.speedMultiplier;
+    
     this.waypointReachThreshold = config.waypointReachThreshold || 0.5; // meters
     this.loopPath = config.loopPath !== undefined ? config.loopPath : true;
     this.turnSpeed = config.turnSpeed || Math.PI; // radians per second (default: 180°/s)
+    
+    // Store timeout reference for cleanup
+    this.respawnTimeout = null;
 
     // Clone the model scene for this boar instance (SkeletonUtils required for skinned meshes)
     this.boarGroup = SkeletonUtils.clone(model.scene);
@@ -126,10 +149,8 @@ export class Boar
           child.updateMatrix();
 
           // Apply mesh's local transform (relative to boarGroup)
-          if (!child.matrix.isIdentity())
-          {
-            geometry.applyMatrix4(child.matrix);
-          }
+          // Always apply matrix - if it's identity, it won't change anything
+          geometry.applyMatrix4(child.matrix);
 
           // Bake boarGroup's uniform scale into the geometry so collider
           // matches the visually scaled model (collider has no scale)
@@ -162,7 +183,11 @@ export class Boar
         });
 
         // Register mesh collider (geometry is in boar local space; we use moveCollider for world transform)
-        this.colliderHandle = this.impactDetector.addMeshFromGeometry(mergedGeometry, null);
+        // Store boar reference in userData so we can find it on impact
+        this.colliderHandle = this.impactDetector.addMeshFromGeometry(mergedGeometry, {
+          type: 'boar',
+          boarObjectId: this.objectId
+        });
 
         // Update collider transform to match current position
         this.updateColliderTransform();
@@ -182,6 +207,8 @@ export class Boar
       ) || model.animations[0];
       
       this.action = this.mixer.clipAction(walkClip);
+      // Set animation playback speed to match walking speed multiplier
+      this.action.setEffectiveTimeScale(this.speedMultiplier);
       this.action.play();
     }
 
@@ -194,11 +221,24 @@ export class Boar
     this.direction = new THREE.Vector3();
     this.facingAngle = 0; // Current facing direction (radians)
     
+    // State tracking
+    this.state = 'alive'; // 'alive', 'dead', 'respawning'
+    
     // Death state
     this.isDead = false;
     this.deathProgress = 0; // 0 to 1, controls roll animation
     this.deathDuration = 0.5; // seconds to complete death roll
     this.deathRotationStart = 0; // Y rotation when death started
+    this.deathRollDirection = 1; // Will be set randomly when die() is called
+    this.fadeOutProgress = 0; // 0 to 1, controls fade-out after death
+    this.fadeOutDuration = 2.0; // seconds to fade out completely (reduced from 10s)
+    
+    // Respawn state
+    this.fadeInProgress = 0; // 0 to 1, controls fade-in after respawn
+    this.fadeInDuration = 1.0; // seconds to fade in completely
+    
+    // Random walk flag
+    this.randomWalk = config.randomWalk !== undefined ? config.randomWalk : true;
   }
 
   /**
@@ -230,14 +270,103 @@ export class Boar
     if (this.isDead) return;
     
     this.isDead = true;
+    this.state = 'dead';
     this.deathProgress = 0;
     this.deathRotationStart = this.boarGroup.rotation.y;
+    this.deathRollDirection = Math.random() > 0.5 ? 1 : -1; // Random left or right roll
     
     // Stop walking animation
     if (this.action)
     {
       this.action.fadeOut(0.2);
     }
+  }
+
+  /**
+   * Respawn the boar at a new random location
+   */
+  respawn()
+  {
+    // Clear any pending respawn timeout
+    if (this.respawnTimeout !== null)
+    {
+      clearTimeout(this.respawnTimeout);
+      this.respawnTimeout = null;
+    }
+    
+    // Generate new random path starting from random location
+    const newPath = BoarFactory.generateRandomPath({ maxLength: 100, maxRetries: 100 });
+    if (!newPath)
+    {
+      console.warn(`${LOG_PREFIX} Failed to generate respawn path, retrying...`);
+      // Retry after a short delay
+      this.respawnTimeout = setTimeout(() => {
+        this.respawnTimeout = null;
+        this.respawn();
+      }, 100);
+      return;
+    }
+    
+    // Generate new random speed multiplier for this respawn
+    this.speedMultiplier = 0.5 + Math.random() * 1.5; // 0.5 to 2.0
+    const baseSpeed = this.config.walkingSpeed || 0.8; // m/s
+    this.speed = baseSpeed * this.speedMultiplier;
+
+    // Reset state
+    this.state = 'respawning';
+    this.isDead = false;
+    this.deathProgress = 0;
+    this.fadeOutProgress = 0;
+    this.fadeInProgress = 0;
+    
+    // Set new path
+    this.path = newPath;
+    this.currentWaypointIndex = 0;
+    
+    // Set position to start of new path
+    const startPos = newPath[0];
+    this.position.set(startPos.x, 0, startPos.z);
+    this.targetWaypoint = newPath[1] || newPath[0];
+    
+    // Reset rotation
+    this.facingAngle = 0;
+    this.boarGroup.rotation.z = 0;
+    this.boarGroup.rotation.y = 0;
+    
+    // Update visual position
+    this.boarGroup.position.set(startPos.x, this.groundYOffset, startPos.z);
+    
+    // Reset opacity to 0 (will fade in)
+    this.boarGroup.traverse((child) =>
+    {
+      if (child.isMesh && child.material)
+      {
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach(mat =>
+        {
+          mat.transparent = true;
+          mat.opacity = 0;
+        });
+      }
+    });
+    
+    // Re-enable collider
+    if (this.impactDetector && this.colliderHandle >= 0)
+    {
+      this.impactDetector.setColliderEnabled(this.colliderHandle, true);
+    }
+    
+    // Restart walking animation with new speed
+    if (this.action)
+    {
+      this.action.reset();
+      // Update animation playback speed to match walking speed multiplier
+      this.action.setEffectiveTimeScale(this.speedMultiplier);
+      this.action.play();
+    }
+    
+    // Update collider transform
+    this.updateColliderTransform();
   }
 
   /**
@@ -252,9 +381,45 @@ export class Boar
       this.mixer.update(dt);
     }
 
+    // Handle respawn fade-in animation
+    if (this.state === 'respawning')
+    {
+      if (this.fadeInProgress < 1)
+      {
+        this.fadeInProgress += dt / this.fadeInDuration;
+        if (this.fadeInProgress > 1) this.fadeInProgress = 1;
+        
+        // Fade in opacity
+        const opacity = this.fadeInProgress;
+        
+        this.boarGroup.traverse((child) =>
+        {
+          if (child.isMesh && child.material)
+          {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(mat =>
+            {
+              mat.transparent = true;
+              mat.opacity = opacity;
+            });
+          }
+        });
+        
+        // Update collider transform during fade-in so boar can be hit while respawning
+        this.updateColliderTransform();
+        
+        // Transition to alive state when fully faded in
+        if (this.fadeInProgress >= 1)
+        {
+          this.state = 'alive';
+        }
+      }
+    }
+    
     // Handle death animation
     if (this.isDead)
     {
+      // Death roll animation
       if (this.deathProgress < 1)
       {
         this.deathProgress += dt / this.deathDuration;
@@ -263,15 +428,43 @@ export class Boar
         // Ease-out for smooth roll
         const t = 1 - Math.pow(1 - this.deathProgress, 2);
         
-        // Roll onto side (rotate around Z axis by 90 degrees)
-        this.boarGroup.rotation.z = t * (Math.PI / 2);
+        // Roll onto side (rotate around Z axis by 90 degrees, random direction)
+        this.boarGroup.rotation.z = t * (Math.PI / 2) * this.deathRollDirection;
         
-        // Slight drop as it falls
-        const dropAmount = t * 0.3;
-        this.boarGroup.position.y = this.groundYOffset - dropAmount;
+        // Slight drop as it falls (but keep it above ground)
+        const dropAmount = t * 0.05; // Small drop for realism
+        this.boarGroup.position.y = Math.max(this.groundYOffset - dropAmount, this.groundYOffset - 0.05);
         
         // Update collider during death animation
         this.updateColliderTransform();
+      }
+      // Fade-out animation (starts after death roll completes)
+      else if (this.fadeOutProgress < 1)
+      {
+        this.fadeOutProgress += dt / this.fadeOutDuration;
+        if (this.fadeOutProgress > 1) this.fadeOutProgress = 1;
+        
+        // Fade out opacity
+        const opacity = 1.0 - this.fadeOutProgress;
+        
+        this.boarGroup.traverse((child) =>
+        {
+          if (child.isMesh && child.material)
+          {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(mat =>
+            {
+              mat.transparent = true;
+              mat.opacity = opacity;
+            });
+          }
+        });
+        
+        // Respawn when fully faded out
+        if (this.fadeOutProgress >= 1)
+        {
+          this.respawn();
+        }
       }
       return; // Don't process movement when dead
     }
@@ -292,7 +485,30 @@ export class Boar
       
       if (this.currentWaypointIndex >= this.path.length)
       {
-        if (this.loopPath)
+        // If random walk is enabled, generate new path from current position
+        if (this.randomWalk)
+        {
+          const newPath = BoarFactory.generateRandomPath({
+            startPos: { x: this.position.x, z: this.position.z },
+            maxLength: 100,
+            maxRetries: 100
+          });
+          
+          if (newPath)
+          {
+            // Use the new path, but skip the first waypoint since we're already there
+            this.path = newPath;
+            this.currentWaypointIndex = 1;
+            this.targetWaypoint = newPath[1] || newPath[0];
+          }
+          else
+          {
+            // If path generation failed, just loop the current path
+            this.currentWaypointIndex = 0;
+            this.targetWaypoint = this.path[0];
+          }
+        }
+        else if (this.loopPath)
         {
           this.currentWaypointIndex = 0;
           this.targetWaypoint = this.path[0];
@@ -376,6 +592,13 @@ export class Boar
    */
   dispose()
   {
+    // Clear any pending respawn timeout to prevent memory leak
+    if (this.respawnTimeout !== null)
+    {
+      clearTimeout(this.respawnTimeout);
+      this.respawnTimeout = null;
+    }
+    
     // Remove mesh collider from impact detector
     if (this.impactDetector && this.colliderHandle >= 0)
     {
@@ -462,14 +685,24 @@ export class BoarFactory
 
   /**
    * Create a new boar instance with a path
-   * @param {Array<{x: number, y?: number, z: number}>} path - Array of waypoint positions in meters
+   * @param {Array<{x: number, y?: number, z: number}>|null} path - Optional array of waypoint positions in meters. If null, generates random path.
    * @returns {Boar} Created boar instance
    */
-  static create(path)
+  static create(path = null)
   {
     if (!BoarFactory.model)
     {
       throw new Error(`${LOG_PREFIX} Factory not initialized. Call init() first.`);
+    }
+
+    // Generate random path if none provided
+    if (!path)
+    {
+      path = BoarFactory.generateRandomPath({ maxLength: 100, maxRetries: 100 });
+      if (!path)
+      {
+        throw new Error(`${LOG_PREFIX} Failed to generate initial random path`);
+      }
     }
 
     const objectId = BoarFactory.nextObjectId++;
@@ -483,6 +716,22 @@ export class BoarFactory
     );
     BoarFactory.boars.push(boar);
     
+    // Start with fade-in animation
+    boar.state = 'respawning';
+    boar.fadeInProgress = 0;
+    boar.boarGroup.traverse((child) =>
+    {
+      if (child.isMesh && child.material)
+      {
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach(mat =>
+        {
+          mat.transparent = true;
+          mat.opacity = 0;
+        });
+      }
+    });
+    
     return boar;
   }
 
@@ -492,6 +741,7 @@ export class BoarFactory
    */
   static updateAll(dt)
   {
+    // Update all boars
     for (const boar of BoarFactory.boars)
     {
       boar.update(dt);
@@ -505,6 +755,220 @@ export class BoarFactory
   static getAll()
   {
     return BoarFactory.boars;
+  }
+
+  /**
+   * Get boar by objectId
+   * @param {number} objectId - Boar object ID
+   * @returns {Boar|null} Boar instance or null if not found
+   */
+  static getByObjectId(objectId)
+  {
+    return BoarFactory.boars.find(boar => boar.objectId === objectId) || null;
+  }
+
+  /**
+   * Generate a random path that avoids obstacles (flag poles and target racks)
+   * @param {Object} options - Configuration options
+   * @param {{x: number, z: number}} options.startPos - Optional starting position. If not provided, generates random within bounds
+   * @param {number} options.maxLength - Maximum ray length in meters (default: 100)
+   * @param {number} options.maxRetries - Maximum retry attempts (default: 100)
+   * @returns {Array<{x: number, z: number}>|null} Path with start and end waypoints, or null if no valid path found
+   */
+  static generateRandomPath(options = {})
+  {
+    const
+    {
+      startPos = null,
+        maxLength = 100,
+        maxRetries = 100
+    } = options;
+
+    // Get landscape bounds
+    const landscapeConfig = Config.LANDSCAPE_CONFIG;
+    const boarConfig = Config.BOAR_CONFIG;
+    const halfWidth = landscapeConfig.groundWidth / 2;
+    const minX = -halfWidth;
+    const maxX = halfWidth;
+    
+    // Use boar spawn range instead of full landscape length
+    // Negative Z = downrange, so minRange becomes more negative (farther)
+    const minZ = -boarConfig.maxRange; // Farthest spawn point (1000 yards)
+    const maxZ = -boarConfig.minRange; // Closest spawn point (100 yards)
+
+    // Padding values (meters)
+    const boarPadding = 1.5; // Padding for boar width
+    const bermPadding = 3.0; // Padding for berms behind targets
+    const polePadding = 1.0; // Padding around flag poles
+
+    // Get obstacles
+    const flags = WindFlagFactory.getAll();
+    const racks = TargetRackFactory.getAll();
+
+    // Helper function to check if ray intersects a circle (pole)
+    const rayIntersectsCircle = (startX, startZ, endX, endZ, centerX, centerZ, radius) =>
+    {
+      // Vector from start to end
+      const dx = endX - startX;
+      const dz = endZ - startZ;
+      const length = Math.sqrt(dx * dx + dz * dz);
+      if (length === 0) return false;
+
+      // Normalized direction
+      const dirX = dx / length;
+      const dirZ = dz / length;
+
+      // Vector from start to circle center
+      const toCenterX = centerX - startX;
+      const toCenterZ = centerZ - startZ;
+
+      // Project toCenter onto direction vector
+      const projection = toCenterX * dirX + toCenterZ * dirZ;
+
+      // Closest point on ray to circle center
+      const closestX = startX + dirX * Math.max(0, Math.min(length, projection));
+      const closestZ = startZ + dirZ * Math.max(0, Math.min(length, projection));
+
+      // Distance from closest point to circle center
+      const distX = closestX - centerX;
+      const distZ = closestZ - centerZ;
+      const dist = Math.sqrt(distX * distX + distZ * distZ);
+
+      return dist < radius;
+    };
+
+    // Helper function to check if ray intersects a rectangle (target rack)
+    const rayIntersectsRect = (startX, startZ, endX, endZ, rectMinX, rectMinZ, rectMaxX, rectMaxZ) =>
+    {
+      // Expand rectangle by padding
+      const paddedMinX = rectMinX - boarPadding - bermPadding;
+      const paddedMinZ = rectMinZ - boarPadding - bermPadding;
+      const paddedMaxX = rectMaxX + boarPadding + bermPadding;
+      const paddedMaxZ = rectMaxZ + boarPadding + bermPadding;
+
+      // Check if ray segment intersects expanded rectangle
+      // Using Liang-Barsky line clipping algorithm
+      let t0 = 0;
+      let t1 = 1;
+      const dx = endX - startX;
+      const dz = endZ - startZ;
+
+      const p = [-dx, dx, -dz, dz];
+      const q = [startX - paddedMinX, paddedMaxX - startX, startZ - paddedMinZ, paddedMaxZ - startZ];
+
+      for (let i = 0; i < 4; i++)
+      {
+        if (Math.abs(p[i]) < 1e-10)
+        {
+          // Ray is parallel to this edge
+          if (q[i] < 0) return false; // Ray is outside rectangle
+        }
+        else
+        {
+          const r = q[i] / p[i];
+          if (p[i] < 0)
+          {
+            if (r > t1) return false;
+            if (r > t0) t0 = r;
+          }
+          else
+          {
+            if (r < t0) return false;
+            if (r < t1) t1 = r;
+          }
+        }
+      }
+
+      // Ray intersects if t0 < t1 and intersection is within segment [0, 1]
+      return t0 < t1 && t1 >= 0 && t0 <= 1;
+    };
+
+    // Helper function to check if point is within bounds
+    const isInBounds = (x, z) =>
+    {
+      return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
+    };
+
+    // Helper function to check if ray is valid (no obstacles, stays in bounds)
+    const isValidRay = (startX, startZ, endX, endZ) =>
+    {
+      // Check bounds
+      if (!isInBounds(startX, startZ) || !isInBounds(endX, endZ))
+      {
+        return false;
+      }
+
+      // Check flag poles
+      for (const flag of flags)
+      {
+        const pos = flag.windFlag.getPosition();
+        const poleRadius = Config.WIND_FLAG_CONFIG.poleThickness / 2 + polePadding;
+        if (rayIntersectsCircle(startX, startZ, endX, endZ, pos.x, pos.z, poleRadius))
+        {
+          return false;
+        }
+      }
+
+      // Check target racks
+      for (const rack of racks)
+      {
+        const rectMinX = Math.min(rack.bottomLeft.x, rack.topRight.x);
+        const rectMaxX = Math.max(rack.bottomLeft.x, rack.topRight.x);
+        const rectMinZ = Math.min(rack.bottomLeft.z, rack.topRight.z);
+        const rectMaxZ = Math.max(rack.bottomLeft.z, rack.topRight.z);
+
+        if (rayIntersectsRect(startX, startZ, endX, endZ, rectMinX, rectMinZ, rectMaxX, rectMaxZ))
+        {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    // Generate random start position if not provided
+    let startX, startZ;
+    if (startPos)
+    {
+      startX = startPos.x;
+      startZ = startPos.z;
+      if (!isInBounds(startX, startZ))
+      {
+        console.warn(`${LOG_PREFIX} Provided start position is out of bounds`);
+        return null;
+      }
+    }
+    else
+    {
+      // Generate random start position within bounds
+      startX = minX + Math.random() * (maxX - minX);
+      startZ = minZ + Math.random() * (maxZ - minZ);
+    }
+
+    // Try to generate valid ray
+    for (let attempt = 0; attempt < maxRetries; attempt++)
+    {
+      // Random angle (0 to 2π)
+      const angle = Math.random() * Math.PI * 2;
+      // Random length (0 to maxLength)
+      const length = Math.random() * maxLength;
+
+      // Calculate end point
+      const endX = startX + Math.cos(angle) * length;
+      const endZ = startZ + Math.sin(angle) * length;
+
+      // Check if ray is valid
+      if (isValidRay(startX, startZ, endX, endZ))
+      {
+        return [
+          { x: startX, z: startZ },
+          { x: endX, z: endZ }
+        ];
+      }
+    }
+
+    console.warn(`${LOG_PREFIX} Failed to generate valid path after ${maxRetries} attempts`);
+    return null;
   }
 
   /**

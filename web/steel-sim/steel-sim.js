@@ -646,23 +646,6 @@ class SteelSimulator
     // Create prairie dog hunting targets (uses pre-loaded model)
     this.landscape.createPrairieDogs();
 
-    // Initialize wild boar factory (uses pre-loaded model)
-    const boarModel = this.modelManager.getModel('wild_boar');
-    if (boarModel)
-    {
-      BoarFactory.init(this.scene, Config.BOAR_CONFIG, boarModel, this.impactDetector);
-      
-      // Create a boar pacing back and forth 10 yards at 200 yards downrange
-      const btk = window.btk;
-      const zPos = btk.Conversions.yardsToMeters(-200);
-      const paceDistance = btk.Conversions.yardsToMeters(5); // 5 yards each side = 10 yards total
-      const testPath = [
-        { x: -paceDistance, z: zPos },
-        { x: paceDistance, z: zPos }
-      ];
-      BoarFactory.create(testPath);
-    }
-
     // Initialize impact mark factory for bullet holes
     ImpactMarkFactory.init(this.scene);
 
@@ -767,6 +750,20 @@ class SteelSimulator
 
     // Create impact detector and register steel targets
     this.setupImpactDetector();
+
+    // Initialize wild boar factory (uses pre-loaded model) - must be after impactDetector is created
+    const boarModel = this.modelManager.getModel('wild_boar');
+    if (boarModel)
+    {
+      BoarFactory.init(this.scene, Config.BOAR_CONFIG, boarModel, this.impactDetector);
+      
+      // Create boars that spawn at random locations and do random walk
+      const boarCount = Config.BOAR_CONFIG.count || 3;
+      for (let i = 0; i < boarCount; i++)
+      {
+        BoarFactory.create(); // No path provided = random spawn and random walk
+      }
+    }
 
     // Setup raycaster for scope-based shooting
     this.raycaster = new THREE.Raycaster();
@@ -2101,6 +2098,51 @@ class SteelSimulator
             {
               type: 'hit'
             });
+          }
+        }
+        // Handle boar hits
+        else if (userData.type === 'boar')
+        {
+          const boar = BoarFactory.getByObjectId(userData.boarObjectId);
+          if (boar && !boar.isDead)
+          {
+            console.log(`[Boar] HIT! objectId=${userData.boarObjectId}, position=(${impactPosition.x.toFixed(2)}, ${impactPosition.y.toFixed(2)}, ${impactPosition.z.toFixed(2)}), velocity=(${impactBullet.getVelocity().x.toFixed(2)}, ${impactBullet.getVelocity().y.toFixed(2)}, ${impactBullet.getVelocity().z.toFixed(2)})`);
+            
+            // Create red dust cloud at impact point
+            const impactPointThree = new THREE.Vector3(
+              impactPosition.x,
+              impactPosition.y,
+              impactPosition.z
+            );
+            
+            DustCloudFactory.create(
+            {
+              position: impactPointThree,
+              scene: this.scene,
+              numParticles: 250,
+              color: { r: 255, g: 0, b: 0 }, // Red color
+              initialRadius: 0.05,
+              growthRate: 0.5,
+              particleDiameter: 0.2
+            });
+
+            // Kill the boar
+            boar.die();
+
+            // Disable this collider so it won't block future shots
+            if (boar.colliderHandle >= 0)
+            {
+              this.impactDetector.setColliderEnabled(boar.colliderHandle, false);
+            }
+
+            // Update HUD with hit status
+            if (this.hud)
+            {
+              this.hud.updateImpactStatus(
+              {
+                type: 'hit'
+              });
+            }
           }
         }
         // Handle prairie dog hits

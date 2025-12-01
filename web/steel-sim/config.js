@@ -148,11 +148,14 @@ export function initConfig()
 
   // ===== WILD BOAR CONFIGURATION =====
   Config.BOAR_CONFIG = {
-    walkingSpeed: 1.0, // Walking speed in m/s
+    count: 5, // Number of active boars to maintain
+    walkingSpeed: 0.8, // Walking speed in m/s
     turnSpeed: Math.PI / 2, // Turn rate in radians per second (90°/s)
     waypointReachThreshold: 0.5, // Distance to consider waypoint reached (meters)
     loopPath: true, // Whether to loop path or stop at end
-    scale: 1.0 // Model scale factor (1.0 = no scaling)
+    scale: 1.0, // Model scale factor (1.0 = no scaling)
+    minRange: btk.Conversions.yardsToMeters(100), // Minimum spawn range (100 yards)
+    maxRange: btk.Conversions.yardsToMeters(500) // Maximum spawn range (1000 yards)
   };
 
   // ===== WIND GENERATOR CONFIGURATION =====
