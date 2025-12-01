@@ -643,8 +643,13 @@ class SteelSimulator
       modelManager: this.modelManager
     });
 
-    // Create prairie dog hunting targets (uses pre-loaded model)
-    this.landscape.createPrairieDogs();
+    // Create prairie dog hunting targets (uses pre-loaded model) - only if hunting enabled
+    const huntingCheckbox = document.getElementById('hunting');
+    this.huntingEnabled = huntingCheckbox ? huntingCheckbox.checked : true;
+    if (this.huntingEnabled)
+    {
+      this.landscape.createPrairieDogs();
+    }
 
     // Initialize impact mark factory for bullet holes
     ImpactMarkFactory.init(this.scene);
@@ -752,40 +757,44 @@ class SteelSimulator
     this.setupImpactDetector();
 
     // Initialize wild boar factory (uses pre-loaded model) - must be after impactDetector is created
-    const boarModel = this.modelManager.getModel('wild_boar');
-    if (boarModel)
+    // Only create boars if hunting is enabled
+    if (this.huntingEnabled)
     {
-      BoarFactory.init(this.scene, Config.BOAR_CONFIG, boarModel, this.impactDetector);
-      
-      // Create boars that spawn at random locations and do random walk
-      const boarCount = Config.BOAR_CONFIG.count || 3;
-      for (let i = 0; i < boarCount; i++)
+      const boarModel = this.modelManager.getModel('wild_boar');
+      if (boarModel)
       {
-        const boar = BoarFactory.create(); // No path provided = random spawn and random walk
-        if (!boar)
+        BoarFactory.init(this.scene, Config.BOAR_CONFIG, boarModel, this.impactDetector);
+        
+        // Create boars that spawn at random locations and do random walk
+        const boarCount = Config.BOAR_CONFIG.count || 3;
+        for (let i = 0; i < boarCount; i++)
         {
-          console.warn(`[SteelSimulator] Failed to create boar ${i + 1}/${boarCount}`);
+          const boar = BoarFactory.create(); // No path provided = random spawn and random walk
+          if (!boar)
+          {
+            console.warn(`[SteelSimulator] Failed to create boar ${i + 1}/${boarCount}`);
+          }
         }
-      }
-      
-      // Create debug boar at 75 yards, offset to the left (static, rotatable) - only in debug mode
-      const urlParams = new URLSearchParams(window.location.search);
-      const debugMode = urlParams.get('debug') === '1';
-      if (debugMode)
-      {
-        const btk = window.btk;
-        const debugZ = -btk.Conversions.yardsToMeters(75); // 75 yards downrange
-        const debugX = -10; // 10 meters to the left
-        const debugPath = [
-          { x: debugX, z: debugZ },
-          { x: debugX, z: debugZ } // Same point so it doesn't move
-        ];
-        this.debugBoar = BoarFactory.create(debugPath);
-        if (this.debugBoar)
+        
+        // Create debug boar at 75 yards, offset to the left (static, rotatable) - only in debug mode
+        const urlParams = new URLSearchParams(window.location.search);
+        const debugMode = urlParams.get('debug') === '1';
+        if (debugMode)
         {
-          this.debugBoar.isDebugBoar = true; // Mark as debug boar
-          this.debugBoar.speed = 0; // Make it static
-          this.debugBoar.randomWalk = false; // Disable random walk
+          const btk = window.btk;
+          const debugZ = -btk.Conversions.yardsToMeters(75); // 75 yards downrange
+          const debugX = -10; // 10 meters to the left
+          const debugPath = [
+            { x: debugX, z: debugZ },
+            { x: debugX, z: debugZ } // Same point so it doesn't move
+          ];
+          this.debugBoar = BoarFactory.create(debugPath);
+          if (this.debugBoar)
+          {
+            this.debugBoar.isDebugBoar = true; // Mark as debug boar
+            this.debugBoar.speed = 0; // Make it static
+            this.debugBoar.randomWalk = false; // Disable random walk
+          }
         }
       }
     }
@@ -2441,8 +2450,13 @@ class SteelSimulator
 
     DustCloudFactory.updateAll(dt);
     WindFlagFactory.updateAll(this.windGenerator, dt);
-    PrairieDogFactory.updateAll(dt);
-    BoarFactory.updateAll(dt);
+    
+    // Update hunting targets only if hunting is enabled
+    if (this.huntingEnabled)
+    {
+      PrairieDogFactory.updateAll(dt);
+      BoarFactory.updateAll(dt);
+    }
 
     // Check for long-press focus gesture
     this.checkLongPressFocus();

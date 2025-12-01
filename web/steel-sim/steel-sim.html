@@ -65,67 +65,71 @@
     <div class="params-bar" style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px;">
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="mv" title="Muzzle velocity in feet per second">MV (fps)</label>
-        <input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second" style="width: 100px; padding: 5px;">
+        <input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
-        <input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics" style="width: 100px; padding: 5px;">
+        <input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">Drag</label>
-        <select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data" style="width: 100px; padding: 5px;">
+        <select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data" style="width: 100px; padding: 5px; align-self: flex-start;">
           <option value="G1">G1</option>
           <option value="G7" selected>G7</option>
         </select>
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="diameter" title="Bullet diameter in inches">Dia (in)</label>
-        <input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches" style="width: 100px; padding: 5px;">
+        <input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="weight" title="Bullet weight in grains">Wt (gr)</label>
-        <input type="number" id="weight" value="140" step="1" min="10" max="1000" title="Bullet weight in grains" style="width: 100px; padding: 5px;">
+        <input type="number" id="weight" value="140" step="1" min="10" max="1000" title="Bullet weight in grains" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="length" title="Bullet length in inches">Len (in)</label>
-        <input type="number" id="length" value="1.4" step="0.01" min="0.1" max="5.0" title="Bullet length in inches" style="width: 100px; padding: 5px;">
+        <input type="number" id="length" value="1.4" step="0.01" min="0.1" max="5.0" title="Bullet length in inches" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="twist" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)">Twist (in/turn)</label>
-        <input type="number" id="twist" value="8.0" step="0.1" min="1" max="20" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)" style="width: 100px; padding: 5px;">
+        <input type="number" id="twist" value="8.0" step="0.1" min="1" max="20" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label>
-        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps" style="width: 100px; padding: 5px;">
+        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label>
-        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)" style="width: 100px; padding: 5px;">
+        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="windPreset" title="Wind preset">Wind</label>
-        <select id="windPreset" title="Wind preset" style="width: 120px; padding: 5px;">
+        <select id="windPreset" title="Wind preset" style="width: 120px; padding: 5px; align-self: flex-start;">
           <option value="Moderate" selected>Moderate</option>
         </select>
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="zeroDistance" title="Zero distance in yards">Zero (yd)</label>
-        <input type="number" id="zeroDistance" value="100" step="10" min="25" max="1000" title="Zero distance in yards" style="width: 100px; padding: 5px;">
+        <input type="number" id="zeroDistance" value="100" step="10" min="25" max="1000" title="Zero distance in yards" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="scopeHeight" title="Scope height above bore in inches">Scope Ht (in)</label>
-        <input type="number" id="scopeHeight" value="2.0" step="0.1" min="0.5" max="10.0" title="Scope height above bore in inches" style="width: 100px; padding: 5px;">
+        <input type="number" id="scopeHeight" value="2.0" step="0.1" min="0.5" max="10.0" title="Scope height above bore in inches" style="width: 100px; padding: 5px; align-self: flex-start;">
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="scopeType" title="Scope type determines reticle and dial units">Scope Type</label>
-        <select id="scopeType" title="Scope type determines reticle and dial units" style="width: 100px; padding: 5px;">
+        <select id="scopeType" title="Scope type determines reticle and dial units" style="width: 100px; padding: 5px; align-self: flex-start;">
           <option value="mrad" selected>MRAD</option>
           <option value="moa">MOA</option>
         </select>
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="opticalEffects" title="Enable heat mirage effect in scopes">Mirage/Optical Effects</label>
-        <input type="checkbox" id="opticalEffects" title="Enable heat mirage and depth-of-field effects in scopes" style="width: auto;">
+        <input type="checkbox" id="opticalEffects" title="Enable heat mirage and depth-of-field effects in scopes" style="width: auto; align-self: flex-start;" checked>
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="hunting" title="Enable boars and prairie dogs">Hunting</label>
+        <input type="checkbox" id="hunting" title="Enable boars and prairie dogs" style="width: auto; align-self: flex-start;" checked>
       </div>
     </div>
 
@@ -246,11 +250,20 @@
             - Center hits cause mostly linear motion; edge hits create rotation<br>
             - Smaller targets respond more dramatically than larger ones<br><br>
 
+            <strong>Hunting Mode:</strong><br>
+            - Enable via the "Hunting" checkbox in settings<br>
+            - Must restart game for changes to take effect<br><br>
+            
             <strong>Prairie Dogs:</strong><br>
-            - Scattered from 100 to 600 yards, approximately 16 inches tall<br>
+            - Scattered from 100 to 1000 yards, approximately 16 inches tall<br>
             - Randomly pop up and down (roughly 30% up, 70% down)<br>
             - Each state lasts 5-90s seconds before changing<br>
-            - When hit: quick upward jump + red mist effect, respawn after ~1 minute
+            - When hit: quick upward jump + red mist effect, respawn after ~1 minute<br><br>
+            
+            <strong>Boars:</strong><br>
+            - Spawn randomly between 150-1200 yards<br>
+            - Walk randomly across the range, avoiding obstacles<br>
+            - When hit: fade out animation and respawn at new random locations<br>
           </div>
         </div>
         
@@ -277,7 +290,7 @@
             - HUD displays dial values in the selected units<br><br>
 
             <strong>Mirage/Optical Effects:</strong><br>
-            - Toggle via the checkbox in the settings bar (off by default)<br>
+            - Toggle via the checkbox in the settings bar<br>
             - Simulates realistic heat mirage/shimmer visible through the scope<br>
             - Mirage moves with the wind—watch it to read wind direction and speed<br>
             - Higher magnification = stronger mirage (just like a real scope)<br>
@@ -285,6 +298,11 @@
             - Very strong wind reduces mirage visibility (turbulence breaks up pattern)<br>
             - Also includes depth-of-field blur based on focus distance<br>
             - Increases GPU load; turn off on low-power devices<br><br>
+
+            <strong>Hunting:</strong><br>
+            - Toggle via the checkbox in the settings bar<br>
+            - Enables/disables boars and prairie dogs<br>
+            - Must restart game for changes to take effect<br><br>
 
             <strong>HUD (Top-Left):</strong><br>
             - <strong>Elevation:</strong> Current dial setting (U = up, D = down)<br>
