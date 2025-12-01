@@ -761,7 +761,32 @@ class SteelSimulator
       const boarCount = Config.BOAR_CONFIG.count || 3;
       for (let i = 0; i < boarCount; i++)
       {
-        BoarFactory.create(); // No path provided = random spawn and random walk
+        const boar = BoarFactory.create(); // No path provided = random spawn and random walk
+        if (!boar)
+        {
+          console.warn(`[SteelSimulator] Failed to create boar ${i + 1}/${boarCount}`);
+        }
+      }
+      
+      // Create debug boar at 75 yards, offset to the left (static, rotatable) - only in debug mode
+      const urlParams = new URLSearchParams(window.location.search);
+      const debugMode = urlParams.get('debug') === '1';
+      if (debugMode)
+      {
+        const btk = window.btk;
+        const debugZ = -btk.Conversions.yardsToMeters(75); // 75 yards downrange
+        const debugX = -10; // 10 meters to the left
+        const debugPath = [
+          { x: debugX, z: debugZ },
+          { x: debugX, z: debugZ } // Same point so it doesn't move
+        ];
+        this.debugBoar = BoarFactory.create(debugPath);
+        if (this.debugBoar)
+        {
+          this.debugBoar.isDebugBoar = true; // Mark as debug boar
+          this.debugBoar.speed = 0; // Make it static
+          this.debugBoar.randomWalk = false; // Disable random walk
+        }
       }
     }
 
@@ -1459,6 +1484,32 @@ class SteelSimulator
       }
       return;
     }
+    
+    // Debug boar rotation with < and > keys (comma and period)
+    if (this.debugBoar && (event.key === ',' || event.key === '.' || event.key === '<' || event.key === '>'))
+    {
+      const rotationSpeed = 0.1; // radians per keypress
+      if (event.key === ',' || event.key === '<')
+      {
+        // Rotate left (counter-clockwise)
+        this.debugBoar.facingAngle -= rotationSpeed;
+      }
+      else if (event.key === '.' || event.key === '>')
+      {
+        // Rotate right (clockwise)
+        this.debugBoar.facingAngle += rotationSpeed;
+      }
+      
+      // Normalize angle
+      while (this.debugBoar.facingAngle > Math.PI) this.debugBoar.facingAngle -= Math.PI * 2;
+      while (this.debugBoar.facingAngle < -Math.PI) this.debugBoar.facingAngle += Math.PI * 2;
+      
+      // Update visual rotation
+      this.debugBoar.boarGroup.rotation.y = this.debugBoar.facingAngle;
+      this.debugBoar.updateColliderTransform();
+      event.preventDefault();
+      return;
+    }
 
     // Rifle scope controls (only when in scope mode)
     if (this.scopeMode)
@@ -2126,13 +2177,17 @@ class SteelSimulator
               particleDiameter: 0.2
             });
 
-            // Kill the boar
-            boar.die();
-
-            // Disable this collider so it won't block future shots
-            if (boar.colliderHandle >= 0)
+            // Only kill non-debug boars
+            if (!boar.isDebugBoar)
             {
-              this.impactDetector.setColliderEnabled(boar.colliderHandle, false);
+              // Kill the boar
+              boar.die();
+
+              // Disable this collider so it won't block future shots
+              if (boar.colliderHandle >= 0)
+              {
+                this.impactDetector.setColliderEnabled(boar.colliderHandle, false);
+              }
             }
 
             // Update HUD with hit status

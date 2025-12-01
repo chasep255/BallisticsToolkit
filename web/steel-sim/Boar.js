@@ -84,6 +84,10 @@ export class Boar
       this.boarGroup.updateMatrixWorld(true);
       box.setFromObject(this.boarGroup);
     }
+    
+    // Store visual bounds for collider creation (before position is set)
+    this.visualSize = box.getSize(new THREE.Vector3());
+    this.visualCenter = box.getCenter(new THREE.Vector3());
 
     // Check for debug wireframe mode via URL param
     const urlParams = new URLSearchParams(window.location.search);
@@ -131,67 +135,49 @@ export class Boar
     // Add to scene
     this.scene.add(this.boarGroup);
 
-    // Register mesh collider for collision detection
+    // Register box collider for collision detection
+    // Using manually tuned box dimensions for best fit
     if (this.impactDetector)
     {
-      // Extract geometry from boar meshes (in local space relative to boarGroup)
-      const geometries = [];
-      const groupScale = this.boarGroup.scale;
-
-      this.boarGroup.traverse((child) =>
+      // Manual box dimensions (in meters, relative to boarGroup origin)
+      // Adjust these values to fit the boar model:
+      const boxWidth = 0.4;   // X - side to side
+      const boxHeight = 0.6;  // Y - ground to top of back
+      const boxDepth = 1.2;   // Z - nose to tail
+      
+      // Box center offset from boarGroup origin (which is at the feet)
+      const centerX = 0.0;      // Left/right offset
+      const centerY = 0.5;   // Height of box center (half of body height from ground)
+      const centerZ = 0.3;      // Forward/backward offset (positive = forward)
+      
+      const size = new THREE.Vector3(boxWidth, boxHeight, boxDepth);
+      const localCenter = new THREE.Vector3(centerX, centerY, centerZ);
+      
+      console.log(`${LOG_PREFIX} Creating manual box collider: size=(${size.x.toFixed(2)}, ${size.y.toFixed(2)}, ${size.z.toFixed(2)}), center=(${localCenter.x.toFixed(2)}, ${localCenter.y.toFixed(2)}, ${localCenter.z.toFixed(2)})`);
+      
+      const boxGeometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+      boxGeometry.translate(localCenter.x, localCenter.y, localCenter.z);
+      
+      // Debug: create wireframe mesh to visualize collider (only in debug mode)
+      if (debugMode)
       {
-        if (child.isMesh && child.geometry)
-        {
-          // Clone geometry so we don't mutate shared buffers
-          const geometry = child.geometry.clone();
+        const debugMaterial = new THREE.MeshBasicMaterial({ wireframe: true, color: 0x00ff00, depthTest: false });
+        this.debugColliderMesh = new THREE.Mesh(boxGeometry.clone(), debugMaterial);
+        this.debugColliderMesh.renderOrder = 999;
+        // Position at boarGroup's position (will be updated in updateColliderTransform)
+        this.debugColliderMesh.position.copy(this.boarGroup.position);
+        this.debugColliderMesh.quaternion.copy(this.boarGroup.quaternion);
+        this.scene.add(this.debugColliderMesh);
+      }
 
-          // Ensure local matrix is up to date
-          child.updateMatrix();
-
-          // Apply mesh's local transform (relative to boarGroup)
-          // Always apply matrix - if it's identity, it won't change anything
-          geometry.applyMatrix4(child.matrix);
-
-          // Bake boarGroup's uniform scale into the geometry so collider
-          // matches the visually scaled model (collider has no scale)
-          if (groupScale.x !== 1 || groupScale.y !== 1 || groupScale.z !== 1)
-          {
-            geometry.scale(groupScale.x, groupScale.y, groupScale.z);
-          }
-
-          geometries.push(geometry);
-        }
+      // Register box collider
+      this.colliderHandle = this.impactDetector.addMeshFromGeometry(boxGeometry,
+      {
+        type: 'boar',
+        boarObjectId: this.objectId
       });
 
-      if (geometries.length === 0)
-      {
-        console.warn(`${LOG_PREFIX} No meshes found for collider`);
-        this.colliderHandle = -1;
-      }
-      else
-      {
-        // Merge all geometries into one
-        const mergedGeometry = geometries.length > 1 ? mergeGeometries(geometries) : geometries[0];
-
-        // Dispose temporary geometries
-        geometries.forEach(geo =>
-        {
-          if (geo !== mergedGeometry)
-          {
-            geo.dispose();
-          }
-        });
-
-        // Register mesh collider (geometry is in boar local space; we use moveCollider for world transform)
-        // Store boar reference in userData so we can find it on impact
-        this.colliderHandle = this.impactDetector.addMeshFromGeometry(mergedGeometry, {
-          type: 'boar',
-          boarObjectId: this.objectId
-        });
-
-        // Update collider transform to match current position
-        this.updateColliderTransform();
-      }
+      this.updateColliderTransform();
     }
 
     // Set up animation mixer if model has animations
@@ -248,18 +234,28 @@ export class Boar
   {
     if (!this.impactDetector || this.colliderHandle < 0) return;
 
-    // Get current position
-    const pos = this.boarGroup.position;
+    // Ensure boarGroup's world matrix is up to date
+    this.boarGroup.updateMatrixWorld(true);
     
-    // Get current quaternion rotation
+    // Get current world position and rotation
+    const pos = this.boarGroup.position;
     const quat = this.boarGroup.quaternion;
     
     // Update mesh collider transform in impact detector
+    // Geometry is in boarGroup local space, so we transform it using boarGroup's
+    // world position and rotation.
     this.impactDetector.moveCollider(
       this.colliderHandle,
       pos.x, pos.y, pos.z,
       quat.x, quat.y, quat.z, quat.w
     );
+    
+    // Update debug wireframe mesh position
+    if (this.debugColliderMesh)
+    {
+      this.debugColliderMesh.position.copy(pos);
+      this.debugColliderMesh.quaternion.copy(quat);
+    }
   }
 
   /**
@@ -469,6 +465,14 @@ export class Boar
       return; // Don't process movement when dead
     }
 
+    // Skip movement for debug boars (they're static)
+    if (this.isDebugBoar)
+    {
+      // Still update collider transform in case it was rotated
+      this.updateColliderTransform();
+      return;
+    }
+
     // Calculate direction to target waypoint
     this.direction.set(
       this.targetWaypoint.x - this.position.x,
@@ -605,6 +609,15 @@ export class Boar
       this.impactDetector.removeCollider(this.colliderHandle);
       this.colliderHandle = -1;
     }
+    
+    // Remove debug collider mesh from scene
+    if (this.debugColliderMesh)
+    {
+      this.scene.remove(this.debugColliderMesh);
+      if (this.debugColliderMesh.geometry) this.debugColliderMesh.geometry.dispose();
+      if (this.debugColliderMesh.material) this.debugColliderMesh.material.dispose();
+      this.debugColliderMesh = null;
+    }
 
     if (this.mixer)
     {
@@ -698,10 +711,11 @@ export class BoarFactory
     // Generate random path if none provided
     if (!path)
     {
-      path = BoarFactory.generateRandomPath({ maxLength: 100, maxRetries: 100 });
+      path = BoarFactory.generateRandomPath({ maxLength: 100, maxRetries: 200 });
       if (!path)
       {
-        throw new Error(`${LOG_PREFIX} Failed to generate initial random path`);
+        console.warn(`${LOG_PREFIX} Failed to generate initial random path, skipping boar creation`);
+        return null;
       }
     }
 
@@ -796,10 +810,10 @@ export class BoarFactory
     const minZ = -boarConfig.maxRange; // Farthest spawn point (1000 yards)
     const maxZ = -boarConfig.minRange; // Closest spawn point (100 yards)
 
-    // Padding values (meters)
-    const boarPadding = 1.5; // Padding for boar width
-    const bermPadding = 3.0; // Padding for berms behind targets
-    const polePadding = 1.0; // Padding around flag poles
+    // Padding values (meters) - keep small to allow paths through tight spaces
+    const boarPadding = 1.0; // Padding for boar width
+    const bermPadding = 2.0; // Padding for berms behind targets
+    const polePadding = 0.5; // Padding around flag poles
 
     // Get obstacles
     const flags = WindFlagFactory.getAll();
@@ -926,32 +940,32 @@ export class BoarFactory
       return true;
     };
 
-    // Generate random start position if not provided
-    let startX, startZ;
-    if (startPos)
-    {
-      startX = startPos.x;
-      startZ = startPos.z;
-      if (!isInBounds(startX, startZ))
-      {
-        console.warn(`${LOG_PREFIX} Provided start position is out of bounds`);
-        return null;
-      }
-    }
-    else
-    {
-      // Generate random start position within bounds
-      startX = minX + Math.random() * (maxX - minX);
-      startZ = minZ + Math.random() * (maxZ - minZ);
-    }
-
-    // Try to generate valid ray
+    // Try to generate valid path
     for (let attempt = 0; attempt < maxRetries; attempt++)
     {
+      // Generate start position (use provided or random)
+      let startX, startZ;
+      if (startPos)
+      {
+        startX = startPos.x;
+        startZ = startPos.z;
+        if (!isInBounds(startX, startZ))
+        {
+          console.warn(`${LOG_PREFIX} Provided start position is out of bounds`);
+          return null;
+        }
+      }
+      else
+      {
+        // Generate random start position within bounds each attempt
+        startX = minX + Math.random() * (maxX - minX);
+        startZ = minZ + Math.random() * (maxZ - minZ);
+      }
+
       // Random angle (0 to 2π)
       const angle = Math.random() * Math.PI * 2;
-      // Random length (0 to maxLength)
-      const length = Math.random() * maxLength;
+      // Random length (10 to maxLength) - minimum 10m to ensure some movement
+      const length = 10 + Math.random() * (maxLength - 10);
 
       // Calculate end point
       const endX = startX + Math.cos(angle) * length;

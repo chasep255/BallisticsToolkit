@@ -154,8 +154,8 @@ export function initConfig()
     waypointReachThreshold: 0.5, // Distance to consider waypoint reached (meters)
     loopPath: true, // Whether to loop path or stop at end
     scale: 1.0, // Model scale factor (1.0 = no scaling)
-    minRange: btk.Conversions.yardsToMeters(100), // Minimum spawn range (100 yards)
-    maxRange: btk.Conversions.yardsToMeters(500) // Maximum spawn range (1000 yards)
+    minRange: btk.Conversions.yardsToMeters(150), // Minimum spawn range (150 yards)
+    maxRange: btk.Conversions.yardsToMeters(1200) // Maximum spawn range (1200 yards)
   };
 
   // ===== WIND GENERATOR CONFIGURATION =====
