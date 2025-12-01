@@ -2,17 +2,16 @@
 
 #include <algorithm>
 #include <cmath>
+#include <emscripten/console.h>
 #include <limits>
 #include <stdexcept>
-#include <emscripten/console.h>
 
 namespace btk::rendering
 {
 
   // ===== Collider =====
 
-  Collider::Collider(const std::vector<float>& vertices, const std::vector<uint32_t>& indices)
-    : indices_(indices), position_(0, 0, 0), rotation_(0, 0, 0, 1)
+  Collider::Collider(const std::vector<float>& vertices, const std::vector<uint32_t>& indices) : indices_(indices), position_(0, 0, 0), rotation_(0, 0, 0, 1)
   {
     if(vertices.size() % 3 != 0)
     {
@@ -44,8 +43,7 @@ namespace btk::rendering
     updateWorldBounds();
   }
 
-  Collider::Collider(btk::rendering::SteelTarget* target, float radius_m)
-    : position_(0, 0, 0), rotation_(0, 0, 0, 1), steel_target_(target)
+  Collider::Collider(btk::rendering::SteelTarget* target, float radius_m) : position_(0, 0, 0), rotation_(0, 0, 0, 1), steel_target_(target)
   {
     // Store radius in min_bounds_m_.x (local bounds not used for steel targets)
     min_bounds_m_.x = radius_m;
@@ -89,16 +87,10 @@ namespace btk::rendering
     else
     {
       // Mesh mode: transform local AABB corners to world space
-      btk::math::Vector3D corners[8] = {
-        btk::math::Vector3D(local_min_.x, local_min_.y, local_min_.z),
-        btk::math::Vector3D(local_max_.x, local_min_.y, local_min_.z),
-        btk::math::Vector3D(local_min_.x, local_max_.y, local_min_.z),
-        btk::math::Vector3D(local_max_.x, local_max_.y, local_min_.z),
-        btk::math::Vector3D(local_min_.x, local_min_.y, local_max_.z),
-        btk::math::Vector3D(local_max_.x, local_min_.y, local_max_.z),
-        btk::math::Vector3D(local_min_.x, local_max_.y, local_max_.z),
-        btk::math::Vector3D(local_max_.x, local_max_.y, local_max_.z)
-      };
+      btk::math::Vector3D corners[8] = {btk::math::Vector3D(local_min_.x, local_min_.y, local_min_.z), btk::math::Vector3D(local_max_.x, local_min_.y, local_min_.z),
+                                        btk::math::Vector3D(local_min_.x, local_max_.y, local_min_.z), btk::math::Vector3D(local_max_.x, local_max_.y, local_min_.z),
+                                        btk::math::Vector3D(local_min_.x, local_min_.y, local_max_.z), btk::math::Vector3D(local_max_.x, local_min_.y, local_max_.z),
+                                        btk::math::Vector3D(local_min_.x, local_max_.y, local_max_.z), btk::math::Vector3D(local_max_.x, local_max_.y, local_max_.z)};
 
       btk::math::Vector3D world_corners[8];
       for(int i = 0; i < 8; ++i)
@@ -120,15 +112,9 @@ namespace btk::rendering
     }
   }
 
-  const btk::math::Vector3D& Collider::minBounds() const
-  {
-    return min_bounds_m_;
-  }
+  const btk::math::Vector3D& Collider::minBounds() const { return min_bounds_m_; }
 
-  const btk::math::Vector3D& Collider::maxBounds() const
-  {
-    return max_bounds_m_;
-  }
+  const btk::math::Vector3D& Collider::maxBounds() const { return max_bounds_m_; }
 
   void Collider::setTransform(const btk::math::Vector3D& position, const btk::math::Quaternion& rotation)
   {
@@ -360,7 +346,6 @@ namespace btk::rendering
     return false;
   }
 
-
   int ImpactDetector::binIndexX(float x_m) const
   {
     int idx = static_cast<int>((x_m - world_min_x_) / bin_size_m_);
@@ -408,7 +393,7 @@ namespace btk::rendering
     // This ensures the collider is inserted into the correct grid bins
     btk::math::Vector3D geom_min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
     btk::math::Vector3D geom_max(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest());
-    
+
     for(size_t i = 0; i < vertices.size(); i += 3)
     {
       float x = vertices[i];
@@ -421,11 +406,11 @@ namespace btk::rendering
       geom_max.y = std::max(geom_max.y, y);
       geom_max.z = std::max(geom_max.z, z);
     }
-    
+
     // Set transform to identity (geometry is already in world space)
     // This ensures world bounds match the geometry bounds
     it->second.setTransform(btk::math::Vector3D(0, 0, 0), btk::math::Quaternion::identity());
-    
+
     Collider* collider_ptr = &it->second;
     const btk::math::Vector3D& min_b = collider_ptr->minBounds();
     const btk::math::Vector3D& max_b = collider_ptr->maxBounds();
@@ -567,8 +552,7 @@ namespace btk::rendering
     int new_min_z = binIndexZ(new_min.z);
     int new_max_z = binIndexZ(new_max.z);
 
-    if(old_min_x == new_min_x && old_max_x == new_max_x &&
-       old_min_z == new_min_z && old_max_z == new_max_z)
+    if(old_min_x == new_min_x && old_max_x == new_max_x && old_min_z == new_min_z && old_max_z == new_max_z)
     {
       return; // Same grid cells, no update needed
     }
@@ -581,7 +565,8 @@ namespace btk::rendering
       for(int bx = old_min_x; bx <= old_max_x; ++bx)
       {
         int gidx = gridIndex(bx, bz);
-        if(gidx < 0) continue;
+        if(gidx < 0)
+          continue;
 
         auto& cell = grid_[gidx];
         cell.erase(std::remove(cell.begin(), cell.end(), collider_ptr), cell.end());
@@ -621,7 +606,8 @@ namespace btk::rendering
       for(int bx = binIndexX(min_b.x); bx <= binIndexX(max_b.x); ++bx)
       {
         int gidx = gridIndex(bx, bz);
-        if(gidx < 0) continue;
+        if(gidx < 0)
+          continue;
 
         auto& cell = grid_[gidx];
         cell.erase(std::remove(cell.begin(), cell.end(), collider_ptr), cell.end());

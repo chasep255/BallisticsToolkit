@@ -54,7 +54,8 @@ export class RenderStats
     // Accumulate stats for this render name
     if (!this.stats.has(name))
     {
-      this.stats.set(name, {
+      this.stats.set(name,
+      {
         calls: 0,
         triangles: 0,
         points: 0,
@@ -94,7 +95,7 @@ export class RenderStats
 
     const frameEndTime = performance.now();
     const frameTime = frameEndTime - this.frameStartTime;
-    
+
     // Track frame time for render stats
     this.frameTimes.push(frameTime);
     this.frameCount++;
@@ -116,12 +117,12 @@ export class RenderStats
       // Actual FPS: frames per wall clock time for this period
       const wallClockTime = (performance.now() - this.periodStartTime) / 1000.0;
       const actualFps = this.frameCount / wallClockTime;
-      
+
       // Theoretical FPS: based on average frame time
       const totalTime = this.frameTimes.reduce((sum, t) => sum + t, 0);
       const avgFrameTime = totalTime / this.frameTimes.length;
       const theoreticalFps = 1000.0 / avgFrameTime;
-      
+
       const minFrameTime = Math.min(...this.frameTimes);
       const maxFrameTime = Math.max(...this.frameTimes);
       const minFps = 1000.0 / maxFrameTime; // Min FPS corresponds to max frame time
@@ -131,7 +132,7 @@ export class RenderStats
     }
 
     console.log('[RenderStats] === Frame Statistics ===');
-    
+
     if (fpsLine)
     {
       console.log(fpsLine);
@@ -149,7 +150,7 @@ export class RenderStats
         console.log(`[RenderStats] ${name}: Draw calls: ${avgCalls.toFixed(1)}, Triangles: ${avgTriangles.toFixed(0)}, Points: ${avgPoints.toFixed(0)}, Lines: ${avgLines.toFixed(0)}, Render count: ${stats.count}`);
       }
     }
-    
+
     console.log('[RenderStats] ========================');
   }
 
@@ -182,4 +183,3 @@ export class RenderStats
     return this.stats;
   }
 }
-

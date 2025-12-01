@@ -260,7 +260,7 @@ export class Landscape
     {
       // Random scatter across width
       const x = (Math.random() - 0.5) * config.scatterWidth;
-      
+
       // Random range between minRange and maxRange (negative Z = downrange)
       const range = config.minRange + Math.random() * (config.maxRange - config.minRange);
       const z = -range; // Negative Z = downrange

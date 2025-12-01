@@ -36,7 +36,7 @@ function fovDegFromFeetAtSpecDistance(widthFeet)
   // Convert scope spec to meters (SI units)
   const widthMeters = btk.Conversions.feetToMeters(widthFeet);
   const specDistanceMeters = btk.Conversions.yardsToMeters(100);
-  
+
   // Calculate FOV angle in radians, then convert to degrees
   const halfAngle = Math.atan((widthMeters / 2) / specDistanceMeters);
   return THREE.MathUtils.radToDeg(2 * halfAngle);
@@ -116,25 +116,25 @@ export class Scope
     // Dial click increments (stored internally in MRAD)
     if (this.scopeType === 'moa')
     {
-      this.MINOR_CLICK_MRAD = btk.Conversions.moaToMrad(0.25);  // 0.25 MOA
-      this.MAJOR_CLICK_MRAD = btk.Conversions.moaToMrad(1.0);   // 1.0 MOA (shift key)
+      this.MINOR_CLICK_MRAD = btk.Conversions.moaToMrad(0.25); // 0.25 MOA
+      this.MAJOR_CLICK_MRAD = btk.Conversions.moaToMrad(1.0); // 1.0 MOA (shift key)
     }
     else
     {
-      this.MINOR_CLICK_MRAD = 0.1;  // 0.1 MRAD
-      this.MAJOR_CLICK_MRAD = 1.0;  // 1.0 MRAD
+      this.MINOR_CLICK_MRAD = 0.1; // 0.1 MRAD
+      this.MAJOR_CLICK_MRAD = 1.0; // 1.0 MRAD
     }
 
     // Reticle tick spacing (stored internally in MRAD)
     if (this.scopeType === 'moa')
     {
-      this.MINOR_TICK_MRAD = btk.Conversions.moaToMrad(2.0);  
+      this.MINOR_TICK_MRAD = btk.Conversions.moaToMrad(2.0);
       this.MAJOR_TICK_MRAD = btk.Conversions.moaToMrad(4.0);
     }
     else
     {
-      this.MINOR_TICK_MRAD = 0.5;  // 0.5 MRAD
-      this.MAJOR_TICK_MRAD = 1.0;  // 1.0 MRAD
+      this.MINOR_TICK_MRAD = 0.5; // 0.5 MRAD
+      this.MAJOR_TICK_MRAD = 1.0; // 1.0 MRAD
     }
 
     this.maxDialMRAD = config.maxDialMRAD || 30.0;
@@ -151,18 +151,18 @@ export class Scope
 
     // Depth texture for blur effects (captured from scene render)
     this.depthTexture = null;
-    
+
     // Focal distance for depth-of-field blur (in meters)
     this.focalDistance = config.focalDistance || btk.Conversions.yardsToMeters(100); // Default ~91.44m (100 yards)
-    
+
     // Physical scope parameters
     // 56mm objective lens (diameter) and virtual sensor width behind the scope
     this.objectiveDiameter = 0.056; // meters (56mm)
-    this.sensorWidth = 0.024;       // meters (24mm effective sensor/eye width)
-    
+    this.sensorWidth = 0.024; // meters (24mm effective sensor/eye width)
+
     // Optical effects (depth-of-field blur) enabled flag
     this.opticalEffectsEnabled = config.opticalEffectsEnabled !== undefined ? config.opticalEffectsEnabled : true;
-    
+
     // Blur render target (blurred scene)
     this.blurRenderTarget = null;
     this.blurScene = null;
@@ -226,10 +226,10 @@ export class Scope
       depthTexture: new THREE.DepthTexture(width, height),
       samples: 4 // MSAA
     });
-    
+
     // Store reference to depth texture
     this.depthTexture = this.sceneRenderTarget.depthTexture;
-    
+
     // Blur render targets for separable Gaussian blur (horizontal then vertical)
     this.blurRenderTargetHorizontal = new THREE.WebGLRenderTarget(width, height,
     {
@@ -252,27 +252,59 @@ export class Scope
       format: THREE.RGBAFormat
     });
   }
-  
+
   createBlurPass()
   {
     // Scene for blur pass (fullscreen quad)
     this.blurScene = new THREE.Scene();
     this.blurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    
+
     // Separable Gaussian blur shader (horizontal pass)
     // This shader calculates blur radius from depth and performs horizontal blur
-    const blurShaderHorizontal = new THREE.ShaderMaterial({
-      uniforms: {
-        sceneTexture:    { value: this.sceneRenderTarget.texture },
-        depthTexture:    { value: this.depthTexture },
-        resolution:      { value: new THREE.Vector2(this.blurRenderTargetHorizontal.width, this.blurRenderTargetHorizontal.height) },
-        focalDistance:   { value: this.focalDistance },
-        cameraNear:      { value: Config.CAMERA_NEAR_PLANE },
-        cameraFar:       { value: Config.CAMERA_FAR_PLANE },
-        maxBlurRadius:   { value: 8.0 },
-        lensFocalLength: { value: 0.3 },
-        lensFNumber:     { value: 4.0 },
-        sensorWidth:     { value: this.sensorWidth }
+    const blurShaderHorizontal = new THREE.ShaderMaterial(
+    {
+      uniforms:
+      {
+        sceneTexture:
+        {
+          value: this.sceneRenderTarget.texture
+        },
+        depthTexture:
+        {
+          value: this.depthTexture
+        },
+        resolution:
+        {
+          value: new THREE.Vector2(this.blurRenderTargetHorizontal.width, this.blurRenderTargetHorizontal.height)
+        },
+        focalDistance:
+        {
+          value: this.focalDistance
+        },
+        cameraNear:
+        {
+          value: Config.CAMERA_NEAR_PLANE
+        },
+        cameraFar:
+        {
+          value: Config.CAMERA_FAR_PLANE
+        },
+        maxBlurRadius:
+        {
+          value: 8.0
+        },
+        lensFocalLength:
+        {
+          value: 0.3
+        },
+        lensFNumber:
+        {
+          value: 4.0
+        },
+        sensorWidth:
+        {
+          value: this.sensorWidth
+        }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -351,20 +383,52 @@ export class Scope
         }
       `
     });
-    
+
     // Vertical blur shader (uses horizontal blur result as input)
-    const blurShaderVertical = new THREE.ShaderMaterial({
-      uniforms: {
-        sceneTexture:    { value: this.blurRenderTargetHorizontal.texture },
-        depthTexture:    { value: this.depthTexture },
-        resolution:      { value: new THREE.Vector2(this.blurRenderTarget.width, this.blurRenderTarget.height) },
-        focalDistance:   { value: this.focalDistance },
-        cameraNear:      { value: Config.CAMERA_NEAR_PLANE },
-        cameraFar:       { value: Config.CAMERA_FAR_PLANE },
-        maxBlurRadius:   { value: 8.0 },
-        lensFocalLength: { value: 0.3 },
-        lensFNumber:     { value: 4.0 },
-        sensorWidth:     { value: this.sensorWidth }
+    const blurShaderVertical = new THREE.ShaderMaterial(
+    {
+      uniforms:
+      {
+        sceneTexture:
+        {
+          value: this.blurRenderTargetHorizontal.texture
+        },
+        depthTexture:
+        {
+          value: this.depthTexture
+        },
+        resolution:
+        {
+          value: new THREE.Vector2(this.blurRenderTarget.width, this.blurRenderTarget.height)
+        },
+        focalDistance:
+        {
+          value: this.focalDistance
+        },
+        cameraNear:
+        {
+          value: Config.CAMERA_NEAR_PLANE
+        },
+        cameraFar:
+        {
+          value: Config.CAMERA_FAR_PLANE
+        },
+        maxBlurRadius:
+        {
+          value: 8.0
+        },
+        lensFocalLength:
+        {
+          value: 0.3
+        },
+        lensFNumber:
+        {
+          value: 4.0
+        },
+        sensorWidth:
+        {
+          value: this.sensorWidth
+        }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -443,7 +507,7 @@ export class Scope
         }
       `
     });
-    
+
     const quad = new THREE.PlaneGeometry(2, 2);
     this.blurMeshHorizontal = new THREE.Mesh(quad, blurShaderHorizontal);
     this.blurMeshVertical = new THREE.Mesh(quad, blurShaderVertical);
@@ -996,7 +1060,8 @@ export class Scope
     const centerY = (y1 + y2) * 0.5;
 
     // Store instance data for instanced mesh creation
-    this.reticleLineInstances.push({
+    this.reticleLineInstances.push(
+    {
       position: new THREE.Vector3(centerX, centerY, 0),
       quaternion: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle),
       scale: new THREE.Vector3(length, thickness, 1)
@@ -1443,7 +1508,7 @@ export class Scope
     {
       console.log(`[Scope] Render target resized: ${outputWidth}x${outputHeight}`);
       this.sceneRenderTarget.setSize(outputWidth, outputHeight);
-      
+
       // Resize depth texture if it exists
       if (this.depthTexture)
       {
@@ -1451,7 +1516,7 @@ export class Scope
         this.depthTexture.image.height = outputHeight;
         this.depthTexture.needsUpdate = true;
       }
-      
+
       // Resize blur render targets
       if (this.blurRenderTargetHorizontal)
       {
@@ -1485,7 +1550,7 @@ export class Scope
     // Step 1: Render 3D scene to internal render target
     this.renderer.setRenderTarget(this.sceneRenderTarget);
     this.renderer.clear();
-    
+
     if (this.renderStats)
     {
       this.renderStats.render(this.renderer, this.scene, this.camera, `Scope.${this.hasReticle ? 'rifle' : 'spotting'}.3DScene`);
@@ -1494,27 +1559,27 @@ export class Scope
     {
       this.renderer.render(this.scene, this.camera);
     }
-    
+
     // Step 1.5: Apply depth-of-field blur (if optical effects enabled)
     // Uses separable Gaussian blur: horizontal pass, then vertical pass
     let scopeTexture = this.applyBlurPass(this.sceneRenderTarget.texture);
-    
+
     // Step 1.6: Apply mirage effect (pass-through for now)
     scopeTexture = this.applyMirage(scopeTexture, dt);
-    
+
     // Step 2: Composite scene (blurred or unblurred) + reticle to output render target
     // Clear with transparent color to preserve alpha channel
     this.renderer.setRenderTarget(this.outputRenderTarget);
     this.renderer.setClearColor(0x000000, 0.0); // Transparent black
     this.renderer.clear();
-    
+
     // Update scope mesh texture
     if (this.scopeMesh)
     {
       this.scopeMesh.material.map = scopeTexture;
       this.scopeMesh.material.needsUpdate = true;
     }
-    
+
     if (this.renderStats)
     {
       this.renderStats.render(this.renderer, this.internalScene, this.internalCamera, `Scope.${this.hasReticle ? 'rifle' : 'spotting'}.InternalScene`);
@@ -1549,14 +1614,14 @@ export class Scope
     const eps = 1e-6;
     const F = sensorWidth / (2.0 * Math.tan(Math.max(fovRad * 0.5, eps))); // meters
     const N = F / this.objectiveDiameter; // f-number from focal length & objective diameter
-    
+
     const lensParams = {
       focalDistance: this.focalDistance,
       lensFocalLength: F,
       lensFNumber: Math.max(N, 1.0),
       sensorWidth: sensorWidth
     };
-    
+
     // Update horizontal blur shader uniforms
     const uniformsH = this.blurMeshHorizontal.material.uniforms;
     uniformsH.focalDistance.value = lensParams.focalDistance;
@@ -1565,12 +1630,12 @@ export class Scope
     uniformsH.lensFocalLength.value = lensParams.lensFocalLength;
     uniformsH.lensFNumber.value = lensParams.lensFNumber;
     uniformsH.sensorWidth.value = lensParams.sensorWidth;
-    
+
     // Render horizontal blur pass
     this.renderer.setRenderTarget(this.blurRenderTargetHorizontal);
     this.renderer.clear();
     this.renderer.render(this.blurMeshHorizontal, this.blurCamera);
-    
+
     // Update vertical blur shader uniforms
     const uniformsV = this.blurMeshVertical.material.uniforms;
     uniformsV.focalDistance.value = lensParams.focalDistance;
@@ -1579,12 +1644,12 @@ export class Scope
     uniformsV.lensFocalLength.value = lensParams.lensFocalLength;
     uniformsV.lensFNumber.value = lensParams.lensFNumber;
     uniformsV.sensorWidth.value = lensParams.sensorWidth;
-    
+
     // Render vertical blur pass (final result)
     this.renderer.setRenderTarget(this.blurRenderTarget);
     this.renderer.clear();
     this.renderer.render(this.blurMeshVertical, this.blurCamera);
-    
+
     return this.blurRenderTarget.texture;
   }
 
@@ -1617,7 +1682,7 @@ export class Scope
     const forward = new THREE.Vector3();
     this.camera.getWorldPosition(camPos);
     this.camera.getWorldDirection(forward);
-    
+
     // Sample wind along the line of sight at 100%, 90% and 80% of the focal distance
     const windAccum = new THREE.Vector3(0, 0, 0);
     const sampleFractions = [1.0, 0.9, 0.8];
@@ -1641,22 +1706,22 @@ export class Scope
     // theta: azimuth angle (horizontal), phi: elevation angle (vertical)
     const cameraTheta = Math.atan2(forward.z, forward.x);
     const cameraPhi = Math.asin(forward.y);
-    
+
     // Get unit vector perpendicular to view direction, pointing right
     // Compute as up × forward (right-handed coordinate system)
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).normalize();
     const right = new THREE.Vector3().crossVectors(up, forward).normalize();
-    
+
     // Signed magnitude of perpendicular wind component: positive for left-to-right
     const perpendicularWind = windVec.dot(right);
-    
+
     // Accumulate horizontal advection: dθ/dt ≈ v_perpendicular / R (small-angle approximation on sphere)
     this.mirageAdvectionHorizontal += (perpendicularWind / this.focalDistance) * dt;
-    
+
     // Accumulate vertical advection (heat rise) - constant upward drift
     const HEAT_RISE_SPEED = 1.5; // meters per second (adjust as needed)
     this.mirageAdvectionVertical -= (HEAT_RISE_SPEED / this.focalDistance) * dt;
-    
+
     // Accumulate time for noise animation
     this.mirageAdvectionTime += dt;
 
@@ -1688,7 +1753,7 @@ export class Scope
     if (this.blurRenderTargetHorizontal) this.blurRenderTargetHorizontal.dispose();
     if (this.blurRenderTarget) this.blurRenderTarget.dispose();
     if (this.mirageRenderTarget) this.mirageRenderTarget.dispose();
-    
+
     // Dispose blur pass resources
     if (this.blurScene)
     {
@@ -1698,7 +1763,7 @@ export class Scope
         if (object.material) object.material.dispose();
       });
     }
-    
+
     // Dispose mirage pass resources
     if (this.mirageScene)
     {
@@ -1708,7 +1773,7 @@ export class Scope
         if (object.material) object.material.dispose();
       });
     }
-    
+
     // Dispose all meshes/materials in internal scene
     this.internalScene.traverse((object) =>
     {

@@ -44,14 +44,14 @@ void main() {
 function truncatedNormalRandom()
 {
   let value;
-  do
-  {
-    let u = 0, v = 0;
-    while(u === 0) u = Math.random(); // Converting [0,1) to (0,1)
-    while(v === 0) v = Math.random();
+  do {
+    let u = 0,
+      v = 0;
+    while (u === 0) u = Math.random(); // Converting [0,1) to (0,1)
+    while (v === 0) v = Math.random();
     value = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
   }
-  while(Math.abs(value) > 2.0); // Reject if outside 2 standard deviations
+  while (Math.abs(value) > 2.0); // Reject if outside 2 standard deviations
   return value;
 }
 
@@ -95,11 +95,11 @@ export class DustCloud
     this.particleDiameter = particleDiameter;
     this.particleScale = Math.max(particleDiameter / 2, 0.01); // Constant particle radius
     this.numParticles = numParticles; // Store for later use
-    
+
     // Scale alpha to account for particle overlap (many particles overlap at center)
     // Use inverse square root to reduce alpha without making it too transparent
     this.alphaScale = 1.0 / Math.sqrt(numParticles);
-    
+
 
     // Generate relative positions using truncated normal distribution (reject outside 2 std dev)
     const relativePositions = new Float32Array(numParticles * 3);
@@ -122,15 +122,32 @@ export class DustCloud
     const avgColor = new THREE.Color(baseR, baseG, baseB);
 
     // Create shader material - GPU calculates positions, no JavaScript loop needed
-    this.material = new THREE.ShaderMaterial({
+    this.material = new THREE.ShaderMaterial(
+    {
       vertexShader: DUST_VERTEX_SHADER,
       fragmentShader: DUST_FRAGMENT_SHADER,
-      uniforms: {
-        centerPosition: { value: this.centerPosition },
-        radiusScale: { value: 1.0 },
-        particleScale: { value: this.particleScale },
-        color: { value: avgColor },
-        alpha: { value: 1.0 }
+      uniforms:
+      {
+        centerPosition:
+        {
+          value: this.centerPosition
+        },
+        radiusScale:
+        {
+          value: 1.0
+        },
+        particleScale:
+        {
+          value: this.particleScale
+        },
+        color:
+        {
+          value: avgColor
+        },
+        alpha:
+        {
+          value: 1.0
+        }
       },
       transparent: true,
       depthWrite: false, // Don't write depth - allows proper alpha blending between overlapping dust clouds
@@ -164,7 +181,7 @@ export class DustCloud
 
     // 1. Grow cloud radius linearly over time
     this.radius += this.growthRate * dt;
-    
+
     // 2. Fade alpha by 1/growth^2 (as cloud expands, color density decreases)
     // As radius grows, area grows as radius^2, so alpha should be 1/(radius/initialRadius)^2
     const growthRatio = this.radius / this.initialRadius;
@@ -201,13 +218,13 @@ export class DustCloud
     if (this.mesh)
     {
       this.scene.remove(this.mesh);
-      
+
       // Clean up geometry
       if (this.mesh.geometry)
       {
         this.mesh.geometry.dispose();
       }
-      
+
       this.mesh = null;
     }
 

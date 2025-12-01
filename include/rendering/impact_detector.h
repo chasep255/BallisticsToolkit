@@ -95,26 +95,26 @@ namespace btk::rendering
 
     private:
     // Mesh data (only used when steel_target_ == nullptr)
-    std::vector<btk::math::Vector3D> vertices_;  ///< Vertices in local space
+    std::vector<btk::math::Vector3D> vertices_; ///< Vertices in local space
     std::vector<uint32_t> indices_;
-    btk::math::Vector3D local_min_;              ///< AABB min in local space
-    btk::math::Vector3D local_max_;              ///< AABB max in local space
+    btk::math::Vector3D local_min_; ///< AABB min in local space
+    btk::math::Vector3D local_max_; ///< AABB max in local space
 
     // Transform (applies to mesh mode)
-    btk::math::Vector3D position_;               ///< World position
-    btk::math::Quaternion rotation_;             ///< World rotation
+    btk::math::Vector3D position_;   ///< World position
+    btk::math::Quaternion rotation_; ///< World rotation
 
     // World bounds (always valid)
-    btk::math::Vector3D min_bounds_m_;           ///< AABB min bounds for grid binning
-    btk::math::Vector3D max_bounds_m_;           ///< AABB max bounds for grid binning
+    btk::math::Vector3D min_bounds_m_; ///< AABB min bounds for grid binning
+    btk::math::Vector3D max_bounds_m_; ///< AABB max bounds for grid binning
 
     // Steel target mode (if not null, this is a steel target)
     // For steel targets, min_bounds_m_.x stores the radius (local bounds not used)
     btk::rendering::SteelTarget* steel_target_ = nullptr;
 
     // State
-    bool enabled_ = true;                        ///< Enabled state (disabled colliders are skipped)
-    int object_id_ = -1;                         ///< Application-defined object ID
+    bool enabled_ = true; ///< Enabled state (disabled colliders are skipped)
+    int object_id_ = -1;  ///< Application-defined object ID
 
     void computeLocalBounds();
     void updateWorldBounds();
@@ -205,7 +205,6 @@ namespace btk::rendering
     int getNextHandle() { return next_handle_++; }
 
     private:
-
     float bin_size_m_;
     float world_min_x_;
     float world_max_x_;

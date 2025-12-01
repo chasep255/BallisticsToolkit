@@ -125,7 +125,7 @@ from './ImpactMark.js';
 // ===== PLATFORM DETECTION =====
 // Detect iOS (iPad, iPhone, iPod, or iPadOS on Mac)
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 // ===== SHARED RESOURCE MANAGERS =====
 // Load resources on page load and reuse across restarts
@@ -165,8 +165,8 @@ async function initializeResources()
     // Load all resources in parallel
     await Promise.all([
       sharedTextureManager.loadAll(null), // No renderer yet, anisotropy updated later
-      sharedModelManager.loadAll(),        // Models including prairie dog
-      sharedAudioManager.loadAll()         // Audio files
+      sharedModelManager.loadAll(), // Models including prairie dog
+      sharedAudioManager.loadAll() // Audio files
     ]);
 
     resourcesReady = true;
@@ -764,7 +764,7 @@ class SteelSimulator
       if (boarModel)
       {
         BoarFactory.init(this.scene, Config.BOAR_CONFIG, boarModel, this.impactDetector);
-        
+
         // Create boars that spawn at random locations and do random walk
         const boarCount = Config.BOAR_CONFIG.count || 3;
         for (let i = 0; i < boarCount; i++)
@@ -775,7 +775,7 @@ class SteelSimulator
             console.warn(`[SteelSimulator] Failed to create boar ${i + 1}/${boarCount}`);
           }
         }
-        
+
         // Create debug boar at 75 yards, offset to the left (static, rotatable) - only in debug mode
         const urlParams = new URLSearchParams(window.location.search);
         const debugMode = urlParams.get('debug') === '1';
@@ -785,8 +785,14 @@ class SteelSimulator
           const debugZ = -btk.Conversions.yardsToMeters(75); // 75 yards downrange
           const debugX = -10; // 10 meters to the left
           const debugPath = [
-            { x: debugX, z: debugZ },
-            { x: debugX, z: debugZ } // Same point so it doesn't move
+            {
+              x: debugX,
+              z: debugZ
+            },
+            {
+              x: debugX,
+              z: debugZ
+            } // Same point so it doesn't move
           ];
           this.debugBoar = BoarFactory.create(debugPath);
           if (this.debugBoar)
@@ -1257,30 +1263,31 @@ class SteelSimulator
     {
       // Use computed scale (calculated to achieve target height)
       const scale = PrairieDogFactory.computedScale;
-      
+
       // Create rotation matrix for 90 degrees around X axis (same as instance rendering)
       const rotationMatrix = new THREE.Matrix4().makeRotationX(Math.PI / 2);
-      
+
       for (const prairieDog of prairieDogs)
       {
         // Clone geometry and apply transforms to match instance rendering
         const geometry = sharedGeometry.clone();
         const basePos = prairieDog.basePosition;
-        
+
         // Apply scale first
         geometry.scale(scale, scale, scale);
-        
+
         // Apply rotation (90 degrees around X axis to stand up)
         geometry.applyMatrix4(rotationMatrix);
-        
+
         // Position geometry at the same raised height used by the instanced mesh.
         // Visual prairie dog position is basePos.y + PrairieDogFactory.raisedOffset,
         // so we use that here to keep the collider in sync.
         geometry.translate(basePos.x, basePos.y + PrairieDogFactory.raisedOffset, basePos.z);
-        
+
         // Register with ImpactDetector
         // Store prairie dog index in userData for impact handling
-        const objectId = this.impactDetector.addMeshFromGeometry(geometry, {
+        const objectId = this.impactDetector.addMeshFromGeometry(geometry,
+        {
           type: 'prairieDog',
           index: prairieDog.instanceIndex
         });
@@ -1493,7 +1500,7 @@ class SteelSimulator
       }
       return;
     }
-    
+
     // Debug boar rotation with < and > keys (comma and period)
     if (this.debugBoar && (event.key === ',' || event.key === '.' || event.key === '<' || event.key === '>'))
     {
@@ -1508,11 +1515,11 @@ class SteelSimulator
         // Rotate right (clockwise)
         this.debugBoar.facingAngle += rotationSpeed;
       }
-      
+
       // Normalize angle
       while (this.debugBoar.facingAngle > Math.PI) this.debugBoar.facingAngle -= Math.PI * 2;
       while (this.debugBoar.facingAngle < -Math.PI) this.debugBoar.facingAngle += Math.PI * 2;
-      
+
       // Update visual rotation
       this.debugBoar.boarGroup.rotation.y = this.debugBoar.facingAngle;
       this.debugBoar.updateColliderTransform();
@@ -1587,7 +1594,7 @@ class SteelSimulator
         this.setFocalDistanceFromRaycast(this.scope);
         return;
       }
-      
+
       // Shift+F: Set focal distance for spotting scope
       if ((event.key === 'f' || event.key === 'F') && event.shiftKey)
       {
@@ -1596,7 +1603,7 @@ class SteelSimulator
         return;
       }
     }
-    
+
     // F key: Set focal distance for rifle scope (works outside scope mode too)
     if ((event.key === 'f' || event.key === 'F') && !event.shiftKey)
     {
@@ -1604,7 +1611,7 @@ class SteelSimulator
       this.setFocalDistanceFromRaycast(this.scope);
       return;
     }
-    
+
     // Shift+F: Set focal distance for spotting scope (works anytime)
     if ((event.key === 'f' || event.key === 'F') && event.shiftKey)
     {
@@ -1625,7 +1632,7 @@ class SteelSimulator
     // Convert normalized composition coordinates to NDC coordinates for the scope camera
     let ndcX = 0;
     let ndcY = 0;
-    
+
     if (normX !== null && normY !== null && scope.layer)
     {
       // Get scope layer position and size in normalized composition space
@@ -1633,13 +1640,13 @@ class SteelSimulator
       // Layer stores width and height as properties (normalized composition units)
       const layerWidth = scope.layer.width || 2.0;
       const layerHeight = scope.layer.height || 2.0;
-      
+
       // Convert from composition coordinates to relative position within scope layer
       // Composition: X spans [-aspect, +aspect], Y spans [-1, +1]
       // Layer: centered at layerPos, with size layerWidth x layerHeight
       const relativeX = (normX - layerPos.x) / (layerWidth / 2);
       const relativeY = (normY - layerPos.y) / (layerHeight / 2);
-      
+
       // Clamp to scope circle (scope radius is 0.98 in normalized layer space)
       const scopeRadius = 0.98;
       const distFromCenter = Math.sqrt(relativeX * relativeX + relativeY * relativeY);
@@ -1656,21 +1663,21 @@ class SteelSimulator
         ndcY = relativeY;
       }
     }
-    
+
     // Raycast from camera through the specified point (or center if not provided)
     this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-    
+
     // Intersect with all objects in the scene (recursive = true to check all children)
     const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-    
+
     if (intersects.length > 0)
     {
       const hit = intersects[0];
       const distanceMeters = hit.distance;
-      
+
       // Update the scope's focal distance
       scope.setFocalDistance(distanceMeters);
-      
+
       const scopeName = scope === this.scope ? 'rifle' : 'spotting';
       const distanceYards = btk.Conversions.metersToYards(distanceMeters);
       console.log(`[SteelSim] ${scopeName} scope focal distance set to ${distanceYards.toFixed(1)} yards (${distanceMeters.toFixed(2)}m) at ${hit.point.x.toFixed(2)}, ${hit.point.y.toFixed(2)}, ${hit.point.z.toFixed(2)}`);
@@ -1744,7 +1751,7 @@ class SteelSimulator
     this.touchState.active = true;
     this.touchState.activeScope = activeScope; // Set immediately for long-press detection
     this.touchState.activeDialAction = null;
-    
+
     // Prevent default iOS long-press context menu when touching a scope
     if (activeScope !== null)
     {
@@ -1821,7 +1828,7 @@ class SteelSimulator
     {
       // Single finger - pan immediately (no distance threshold)
       const touch = touches[0];
-      
+
       // Pan the view
       const deltaX = touch.clientX - this.touchState.lastTouchPos.x;
       const deltaY = touch.clientY - this.touchState.lastTouchPos.y;
@@ -2167,20 +2174,25 @@ class SteelSimulator
           if (boar && !boar.isDead)
           {
             console.log(`[Boar] HIT! objectId=${userData.boarObjectId}, position=(${impactPosition.x.toFixed(2)}, ${impactPosition.y.toFixed(2)}, ${impactPosition.z.toFixed(2)}), velocity=(${impactBullet.getVelocity().x.toFixed(2)}, ${impactBullet.getVelocity().y.toFixed(2)}, ${impactBullet.getVelocity().z.toFixed(2)})`);
-            
+
             // Create red dust cloud at impact point
             const impactPointThree = new THREE.Vector3(
               impactPosition.x,
               impactPosition.y,
               impactPosition.z
             );
-            
+
             DustCloudFactory.create(
             {
               position: impactPointThree,
               scene: this.scene,
               numParticles: 250,
-              color: { r: 255, g: 0, b: 0 }, // Red color
+              color:
+              {
+                r: 255,
+                g: 0,
+                b: 0
+              }, // Red color
               initialRadius: 0.05,
               growthRate: 0.5,
               particleDiameter: 0.2
@@ -2222,13 +2234,18 @@ class SteelSimulator
               impactPosition.y,
               impactPosition.z
             );
-            
+
             DustCloudFactory.create(
             {
               position: impactPointThree,
               scene: this.scene,
               numParticles: 250,
-              color: { r: 255, g: 0, b: 0 }, // Red color
+              color:
+              {
+                r: 255,
+                g: 0,
+                b: 0
+              }, // Red color
               initialRadius: 0.05,
               growthRate: 0.5,
               particleDiameter: 0.2
@@ -2423,7 +2440,7 @@ class SteelSimulator
     if (!this.isRunning) return;
 
     const frameStartTime = performance.now();
-    
+
     // Mark frame start in render stats
     if (this.renderStats)
     {
@@ -2450,7 +2467,7 @@ class SteelSimulator
 
     DustCloudFactory.updateAll(dt);
     WindFlagFactory.updateAll(this.windGenerator, dt);
-    
+
     // Update hunting targets only if hunting is enabled
     if (this.huntingEnabled)
     {

@@ -387,16 +387,16 @@ export class RangeSignFactory
           // Front face is indices 16-19 (4 vertices * 4 faces before it)
           const frontFaceStart = 16;
           const frontFaceEnd = 20;
-          
+
           // Use first sign's region for non-front faces (white background)
           const whiteUOffset = 0;
           const whiteVOffset = 1.0 - vScale; // First row, flipped
-          
+
           for (let j = 0; j < uvAttribute.count; j++)
           {
             const u = uvAttribute.getX(j);
             const v = uvAttribute.getY(j);
-            
+
             if (j >= frontFaceStart && j < frontFaceEnd)
             {
               // Front face: map to this sign's text region in the atlas

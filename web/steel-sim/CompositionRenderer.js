@@ -393,7 +393,7 @@ export class CompositionRenderer
     // Ensure clear color is set before clearing
     this.renderer.setClearColor(0x3a3d41, 1.0);
     this.renderer.clear();
-    
+
     if (this.renderStats)
     {
       this.renderStats.render(this.renderer, this.compositionScene, this.compositionCamera, 'CompositionRenderer.final');

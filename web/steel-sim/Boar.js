@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import
+{
+  mergeGeometries
+}
+from 'three/addons/utils/BufferGeometryUtils.js';
 import
 {
   WindFlagFactory
@@ -47,29 +51,29 @@ export class Boar
     this.impactDetector = impactDetector;
     this.objectId = objectId;
     this.colliderHandle = -1; // Initialized after box calculation
-    
+
     // Random speed multiplier between 0.5x and 2.0x
     this.speedMultiplier = 0.5 + Math.random() * 1.5; // 0.5 to 2.0
     const baseSpeed = config.walkingSpeed || 0.8; // m/s
     this.speed = baseSpeed * this.speedMultiplier;
-    
+
     this.waypointReachThreshold = config.waypointReachThreshold || 0.5; // meters
     this.loopPath = config.loopPath !== undefined ? config.loopPath : true;
     this.turnSpeed = config.turnSpeed || Math.PI; // radians per second (default: 180°/s)
-    
+
     // Store timeout reference for cleanup
     this.respawnTimeout = null;
 
     // Clone the model scene for this boar instance (SkeletonUtils required for skinned meshes)
     this.boarGroup = SkeletonUtils.clone(model.scene);
-    
+
     // Calculate bounding box to determine if scaling is needed
     this.boarGroup.updateMatrixWorld(true);
     const box = new THREE.Box3();
     box.setFromObject(this.boarGroup);
     const size = box.getSize(new THREE.Vector3());
     const maxDimension = Math.max(size.x, size.y, size.z);
-    
+
     // Auto-scale small models to be at least 1.5m in largest dimension
     const targetSize = 1.5;
     let finalScale = config.scale || 1.0;
@@ -77,14 +81,14 @@ export class Boar
     {
       finalScale = targetSize / maxDimension;
     }
-    
+
     if (finalScale !== 1.0)
     {
       this.boarGroup.scale.set(finalScale, finalScale, finalScale);
       this.boarGroup.updateMatrixWorld(true);
       box.setFromObject(this.boarGroup);
     }
-    
+
     // Store visual bounds for collider creation (before position is set)
     this.visualSize = box.getSize(new THREE.Vector3());
     this.visualCenter = box.getCenter(new THREE.Vector3());
@@ -102,7 +106,7 @@ export class Boar
         child.frustumCulled = false;
         child.castShadow = true;
         child.receiveShadow = true;
-        
+
         // Clone material to preserve skinning data
         const materials = Array.isArray(child.material) ? child.material : [child.material];
         const newMaterials = materials.map(mat =>
@@ -110,7 +114,7 @@ export class Boar
           const newMat = mat.clone();
           newMat.side = THREE.DoubleSide;
           newMat.needsUpdate = true;
-          
+
           // Wireframe mode for debug
           if (debugMode)
           {
@@ -118,10 +122,10 @@ export class Boar
             newMat.transparent = true;
             newMat.opacity = 0.7;
           }
-          
+
           return newMat;
         });
-        
+
         child.material = Array.isArray(child.material) ? newMaterials : newMaterials[0];
       }
     });
@@ -131,7 +135,7 @@ export class Boar
     // If waypoint includes explicit Y, use it; otherwise position so bottom is at ground level
     this.groundYOffset = (firstWaypoint.y !== undefined) ? firstWaypoint.y : -box.min.y;
     this.boarGroup.position.set(firstWaypoint.x, this.groundYOffset, firstWaypoint.z);
-    
+
     // Add to scene
     this.scene.add(this.boarGroup);
 
@@ -141,27 +145,32 @@ export class Boar
     {
       // Manual box dimensions (in meters, relative to boarGroup origin)
       // Adjust these values to fit the boar model:
-      const boxWidth = 0.4;   // X - side to side
-      const boxHeight = 0.6;  // Y - ground to top of back
-      const boxDepth = 1.2;   // Z - nose to tail
-      
+      const boxWidth = 0.4; // X - side to side
+      const boxHeight = 0.6; // Y - ground to top of back
+      const boxDepth = 1.2; // Z - nose to tail
+
       // Box center offset from boarGroup origin (which is at the feet)
-      const centerX = 0.0;      // Left/right offset
-      const centerY = 0.5;   // Height of box center (half of body height from ground)
-      const centerZ = 0.3;      // Forward/backward offset (positive = forward)
-      
+      const centerX = 0.0; // Left/right offset
+      const centerY = 0.5; // Height of box center (half of body height from ground)
+      const centerZ = 0.3; // Forward/backward offset (positive = forward)
+
       const size = new THREE.Vector3(boxWidth, boxHeight, boxDepth);
       const localCenter = new THREE.Vector3(centerX, centerY, centerZ);
-      
+
       console.log(`${LOG_PREFIX} Creating manual box collider: size=(${size.x.toFixed(2)}, ${size.y.toFixed(2)}, ${size.z.toFixed(2)}), center=(${localCenter.x.toFixed(2)}, ${localCenter.y.toFixed(2)}, ${localCenter.z.toFixed(2)})`);
-      
+
       const boxGeometry = new THREE.BoxGeometry(size.x, size.y, size.z);
       boxGeometry.translate(localCenter.x, localCenter.y, localCenter.z);
-      
+
       // Debug: create wireframe mesh to visualize collider (only in debug mode)
       if (debugMode)
       {
-        const debugMaterial = new THREE.MeshBasicMaterial({ wireframe: true, color: 0x00ff00, depthTest: false });
+        const debugMaterial = new THREE.MeshBasicMaterial(
+        {
+          wireframe: true,
+          color: 0x00ff00,
+          depthTest: false
+        });
         this.debugColliderMesh = new THREE.Mesh(boxGeometry.clone(), debugMaterial);
         this.debugColliderMesh.renderOrder = 999;
         // Position at boarGroup's position (will be updated in updateColliderTransform)
@@ -186,12 +195,12 @@ export class Boar
     if (model.animations && model.animations.length > 0)
     {
       this.mixer = new THREE.AnimationMixer(this.boarGroup);
-      
+
       // Find a walking animation (prefer one with 'walk' in name)
-      let walkClip = model.animations.find(clip => 
+      let walkClip = model.animations.find(clip =>
         clip.name.toLowerCase().includes('walk')
       ) || model.animations[0];
-      
+
       this.action = this.mixer.clipAction(walkClip);
       // Set animation playback speed to match walking speed multiplier
       this.action.setEffectiveTimeScale(this.speedMultiplier);
@@ -202,14 +211,14 @@ export class Boar
     this.currentWaypointIndex = 0;
     this.targetWaypoint = path[1] || path[0];
     this.position = new THREE.Vector3(firstWaypoint.x, 0, firstWaypoint.z);
-    
+
     // Helper vectors for calculations
     this.direction = new THREE.Vector3();
     this.facingAngle = 0; // Current facing direction (radians)
-    
+
     // State tracking
     this.state = 'alive'; // 'alive', 'dead', 'respawning'
-    
+
     // Death state
     this.isDead = false;
     this.deathProgress = 0; // 0 to 1, controls roll animation
@@ -218,11 +227,11 @@ export class Boar
     this.deathRollDirection = 1; // Will be set randomly when die() is called
     this.fadeOutProgress = 0; // 0 to 1, controls fade-out after death
     this.fadeOutDuration = 2.0; // seconds to fade out completely (reduced from 10s)
-    
+
     // Respawn state
     this.fadeInProgress = 0; // 0 to 1, controls fade-in after respawn
     this.fadeInDuration = 1.0; // seconds to fade in completely
-    
+
     // Random walk flag
     this.randomWalk = config.randomWalk !== undefined ? config.randomWalk : true;
   }
@@ -236,11 +245,11 @@ export class Boar
 
     // Ensure boarGroup's world matrix is up to date
     this.boarGroup.updateMatrixWorld(true);
-    
+
     // Get current world position and rotation
     const pos = this.boarGroup.position;
     const quat = this.boarGroup.quaternion;
-    
+
     // Update mesh collider transform in impact detector
     // Geometry is in boarGroup local space, so we transform it using boarGroup's
     // world position and rotation.
@@ -249,7 +258,7 @@ export class Boar
       pos.x, pos.y, pos.z,
       quat.x, quat.y, quat.z, quat.w
     );
-    
+
     // Update debug wireframe mesh position
     if (this.debugColliderMesh)
     {
@@ -264,13 +273,13 @@ export class Boar
   die()
   {
     if (this.isDead) return;
-    
+
     this.isDead = true;
     this.state = 'dead';
     this.deathProgress = 0;
     this.deathRotationStart = this.boarGroup.rotation.y;
     this.deathRollDirection = Math.random() > 0.5 ? 1 : -1; // Random left or right roll
-    
+
     // Stop walking animation
     if (this.action)
     {
@@ -289,20 +298,25 @@ export class Boar
       clearTimeout(this.respawnTimeout);
       this.respawnTimeout = null;
     }
-    
+
     // Generate new random path starting from random location
-    const newPath = BoarFactory.generateRandomPath({ maxLength: 100, maxRetries: 100 });
+    const newPath = BoarFactory.generateRandomPath(
+    {
+      maxLength: 100,
+      maxRetries: 100
+    });
     if (!newPath)
     {
       console.warn(`${LOG_PREFIX} Failed to generate respawn path, retrying...`);
       // Retry after a short delay
-      this.respawnTimeout = setTimeout(() => {
+      this.respawnTimeout = setTimeout(() =>
+      {
         this.respawnTimeout = null;
         this.respawn();
       }, 100);
       return;
     }
-    
+
     // Generate new random speed multiplier for this respawn
     this.speedMultiplier = 0.5 + Math.random() * 1.5; // 0.5 to 2.0
     const baseSpeed = this.config.walkingSpeed || 0.8; // m/s
@@ -314,24 +328,24 @@ export class Boar
     this.deathProgress = 0;
     this.fadeOutProgress = 0;
     this.fadeInProgress = 0;
-    
+
     // Set new path
     this.path = newPath;
     this.currentWaypointIndex = 0;
-    
+
     // Set position to start of new path
     const startPos = newPath[0];
     this.position.set(startPos.x, 0, startPos.z);
     this.targetWaypoint = newPath[1] || newPath[0];
-    
+
     // Reset rotation
     this.facingAngle = 0;
     this.boarGroup.rotation.z = 0;
     this.boarGroup.rotation.y = 0;
-    
+
     // Update visual position
     this.boarGroup.position.set(startPos.x, this.groundYOffset, startPos.z);
-    
+
     // Reset opacity to 0 (will fade in)
     this.boarGroup.traverse((child) =>
     {
@@ -345,13 +359,13 @@ export class Boar
         });
       }
     });
-    
+
     // Re-enable collider
     if (this.impactDetector && this.colliderHandle >= 0)
     {
       this.impactDetector.setColliderEnabled(this.colliderHandle, true);
     }
-    
+
     // Restart walking animation with new speed
     if (this.action)
     {
@@ -360,7 +374,7 @@ export class Boar
       this.action.setEffectiveTimeScale(this.speedMultiplier);
       this.action.play();
     }
-    
+
     // Update collider transform
     this.updateColliderTransform();
   }
@@ -384,10 +398,10 @@ export class Boar
       {
         this.fadeInProgress += dt / this.fadeInDuration;
         if (this.fadeInProgress > 1) this.fadeInProgress = 1;
-        
+
         // Fade in opacity
         const opacity = this.fadeInProgress;
-        
+
         this.boarGroup.traverse((child) =>
         {
           if (child.isMesh && child.material)
@@ -400,10 +414,10 @@ export class Boar
             });
           }
         });
-        
+
         // Update collider transform during fade-in so boar can be hit while respawning
         this.updateColliderTransform();
-        
+
         // Transition to alive state when fully faded in
         if (this.fadeInProgress >= 1)
         {
@@ -411,7 +425,7 @@ export class Boar
         }
       }
     }
-    
+
     // Handle death animation
     if (this.isDead)
     {
@@ -420,17 +434,17 @@ export class Boar
       {
         this.deathProgress += dt / this.deathDuration;
         if (this.deathProgress > 1) this.deathProgress = 1;
-        
+
         // Ease-out for smooth roll
         const t = 1 - Math.pow(1 - this.deathProgress, 2);
-        
+
         // Roll onto side (rotate around Z axis by 90 degrees, random direction)
         this.boarGroup.rotation.z = t * (Math.PI / 2) * this.deathRollDirection;
-        
+
         // Slight drop as it falls (but keep it above ground)
         const dropAmount = t * 0.05; // Small drop for realism
         this.boarGroup.position.y = Math.max(this.groundYOffset - dropAmount, this.groundYOffset - 0.05);
-        
+
         // Update collider during death animation
         this.updateColliderTransform();
       }
@@ -439,10 +453,10 @@ export class Boar
       {
         this.fadeOutProgress += dt / this.fadeOutDuration;
         if (this.fadeOutProgress > 1) this.fadeOutProgress = 1;
-        
+
         // Fade out opacity
         const opacity = 1.0 - this.fadeOutProgress;
-        
+
         this.boarGroup.traverse((child) =>
         {
           if (child.isMesh && child.material)
@@ -455,7 +469,7 @@ export class Boar
             });
           }
         });
-        
+
         // Respawn when fully faded out
         if (this.fadeOutProgress >= 1)
         {
@@ -486,18 +500,23 @@ export class Boar
     if (distanceToWaypoint <= this.waypointReachThreshold)
     {
       this.currentWaypointIndex++;
-      
+
       if (this.currentWaypointIndex >= this.path.length)
       {
         // If random walk is enabled, generate new path from current position
         if (this.randomWalk)
         {
-          const newPath = BoarFactory.generateRandomPath({
-            startPos: { x: this.position.x, z: this.position.z },
+          const newPath = BoarFactory.generateRandomPath(
+          {
+            startPos:
+            {
+              x: this.position.x,
+              z: this.position.z
+            },
             maxLength: 100,
             maxRetries: 100
           });
-          
+
           if (newPath)
           {
             // Use the new path, but skip the first waypoint since we're already there
@@ -526,7 +545,7 @@ export class Boar
       {
         this.targetWaypoint = this.path[this.currentWaypointIndex];
       }
-      
+
       this.direction.set(
         this.targetWaypoint.x - this.position.x,
         0,
@@ -538,17 +557,17 @@ export class Boar
     if (this.direction.length() > 0)
     {
       this.direction.normalize();
-      
+
       // Calculate target angle
       const targetAngle = Math.atan2(this.direction.x, this.direction.z);
-      
+
       // Gradually turn towards target angle
       let angleDiff = targetAngle - this.facingAngle;
-      
+
       // Normalize angle difference to [-PI, PI]
       while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      
+
       // Limit turn rate
       const maxTurn = this.turnSpeed * dt;
       if (Math.abs(angleDiff) <= maxTurn)
@@ -559,11 +578,11 @@ export class Boar
       {
         this.facingAngle += Math.sign(angleDiff) * maxTurn;
       }
-      
+
       // Normalize facing angle to [-PI, PI]
       while (this.facingAngle > Math.PI) this.facingAngle -= Math.PI * 2;
       while (this.facingAngle < -Math.PI) this.facingAngle += Math.PI * 2;
-      
+
       // Move in facing direction (not target direction)
       const moveDir = new THREE.Vector3(
         Math.sin(this.facingAngle),
@@ -572,12 +591,12 @@ export class Boar
       );
       const moveDistance = this.speed * dt;
       this.position.addScaledVector(moveDir, moveDistance);
-      
+
       // Update boar group position and rotation
       this.boarGroup.position.set(this.position.x, this.groundYOffset, this.position.z);
       this.boarGroup.rotation.y = this.facingAngle;
     }
-    
+
     // Update collider transform to match new position/rotation
     this.updateColliderTransform();
   }
@@ -602,14 +621,14 @@ export class Boar
       clearTimeout(this.respawnTimeout);
       this.respawnTimeout = null;
     }
-    
+
     // Remove mesh collider from impact detector
     if (this.impactDetector && this.colliderHandle >= 0)
     {
       this.impactDetector.removeCollider(this.colliderHandle);
       this.colliderHandle = -1;
     }
-    
+
     // Remove debug collider mesh from scene
     if (this.debugColliderMesh)
     {
@@ -628,7 +647,7 @@ export class Boar
     if (this.boarGroup)
     {
       this.scene.remove(this.boarGroup);
-      
+
       this.boarGroup.traverse((child) =>
       {
         if (child.isMesh)
@@ -711,7 +730,11 @@ export class BoarFactory
     // Generate random path if none provided
     if (!path)
     {
-      path = BoarFactory.generateRandomPath({ maxLength: 100, maxRetries: 200 });
+      path = BoarFactory.generateRandomPath(
+      {
+        maxLength: 100,
+        maxRetries: 200
+      });
       if (!path)
       {
         console.warn(`${LOG_PREFIX} Failed to generate initial random path, skipping boar creation`);
@@ -721,15 +744,15 @@ export class BoarFactory
 
     const objectId = BoarFactory.nextObjectId++;
     const boar = new Boar(
-      BoarFactory.scene, 
-      BoarFactory.model, 
-      path, 
+      BoarFactory.scene,
+      BoarFactory.model,
+      path,
       BoarFactory.config,
       BoarFactory.impactDetector,
       objectId
     );
     BoarFactory.boars.push(boar);
-    
+
     // Start with fade-in animation
     boar.state = 'respawning';
     boar.fadeInProgress = 0;
@@ -745,7 +768,7 @@ export class BoarFactory
         });
       }
     });
-    
+
     return boar;
   }
 
@@ -804,7 +827,7 @@ export class BoarFactory
     const halfWidth = landscapeConfig.groundWidth / 2;
     const minX = -halfWidth;
     const maxX = halfWidth;
-    
+
     // Use boar spawn range instead of full landscape length
     // Negative Z = downrange, so minRange becomes more negative (farther)
     const minZ = -boarConfig.maxRange; // Farthest spawn point (1000 yards)
@@ -975,9 +998,14 @@ export class BoarFactory
       if (isValidRay(startX, startZ, endX, endZ))
       {
         return [
-          { x: startX, z: startZ },
-          { x: endX, z: endZ }
-        ];
+        {
+          x: startX,
+          z: startZ
+        },
+        {
+          x: endX,
+          z: endZ
+        }];
       }
     }
 

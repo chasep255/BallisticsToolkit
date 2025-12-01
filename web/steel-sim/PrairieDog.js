@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import
+{
+  mergeGeometries
+}
+from 'three/addons/utils/BufferGeometryUtils.js';
 
 /**
  * PrairieDog - Individual prairie dog instance for hunting targets
@@ -16,7 +20,7 @@ export class PrairieDog
   {
     this.basePosition = basePosition.clone();
     this.instanceIndex = instanceIndex;
-    
+
     // Random starting state: 50% chance to start raised or lowered
     const startRaised = Math.random() < 0.5;
     this.currentHeight = startRaised ? PrairieDogFactory.raisedOffset : PrairieDogFactory.loweredOffset;
@@ -25,7 +29,7 @@ export class PrairieDog
     this.objectId = -1; // Will be set when registered with ImpactDetector
     this.hitAnimationSpeed = null; // Custom speed for hit animation (null = use default)
     this.isDead = false; // True if prairie dog has been killed
-    
+
     // Random up/down timing (30% raised, 70% lowered)
     this.stateTimer = 0; // Time in current state
     // Set initial timer based on starting state
@@ -37,7 +41,7 @@ export class PrairieDog
     {
       this.nextStateChange = 15 + Math.random() * 60; // Lowered: 15-75 seconds (avg 45s)
     }
-    
+
     // Respawn timing
     this.respawnTimer = 0; // Time since death
     this.respawnDelay = 60; // 1 minute respawn
@@ -83,7 +87,7 @@ export class PrairieDog
   {
     // Mark as dead - no more impact detection
     this.isDead = true;
-    
+
     // Shoot up higher than normal raised position
     const btk = window.btk;
     const shootUpHeight = PrairieDogFactory.raisedOffset + btk.Conversions.inchesToMeters(4); // 4 inches higher
@@ -200,7 +204,7 @@ export class PrairieDogFactory
   static instancePosition = new THREE.Vector3();
   static instanceRotation = new THREE.Quaternion();
   static instanceScale = new THREE.Vector3(1, 1, 1);
-  
+
   /**
    * Base rotation quaternion - rotate 90 degrees around X axis to stand up
    * (model is on its back, needs to be rotated to stand upright)
@@ -257,18 +261,18 @@ export class PrairieDogFactory
     // After rotating 90° around X-axis, the original Z dimension becomes Y (vertical)
     PrairieDogFactory.sharedGeometry.computeBoundingBox();
     const localBox = PrairieDogFactory.sharedGeometry.boundingBox.clone();
-    
+
     // Original model height in Z dimension (before rotation)
     const originalHeight = localBox.max.z - localBox.min.z;
-    
+
     // Calculate scale factor to achieve target height
     // After rotation, Z becomes Y, so we scale to make originalHeight * scale = targetHeight
     const targetHeight = config.targetHeight || btk.Conversions.inchesToMeters(16);
     const scale = originalHeight > 0 ? (targetHeight / originalHeight) : 1.0;
-    
+
     // Store the computed scale for use in rendering
     PrairieDogFactory.computedScale = scale;
-    
+
     const rotation = PrairieDogFactory.baseRotation;
     const transform = new THREE.Matrix4().compose(
       new THREE.Vector3(0, 0, 0),
@@ -280,13 +284,13 @@ export class PrairieDogFactory
     const worldBox = new THREE.Box3().copy(localBox).applyMatrix4(transform);
     PrairieDogFactory.worldBounds = worldBox;
     PrairieDogFactory.modelHeight = worldBox.max.y - worldBox.min.y;
-    
+
     // Calculate prairie dog's horizontal extents (X and Z) for mound sizing
     // After rotation, X stays X, and original Y becomes -Z
     const modelWidthX = worldBox.max.x - worldBox.min.x;
     const modelDepthZ = worldBox.max.z - worldBox.min.z;
     PrairieDogFactory.modelMaxRadius = Math.max(modelWidthX, modelDepthZ) / 2; // Maximum radius needed
-    
+
     // Store offset to center prairie dog in mound (account for bounding box center)
     PrairieDogFactory.modelCenterOffsetX = -(worldBox.min.x + worldBox.max.x) / 2;
     PrairieDogFactory.modelCenterOffsetZ = -(worldBox.min.z + worldBox.max.z) / 2;
@@ -351,7 +355,8 @@ export class PrairieDogFactory
     moundGeometry.computeVertexNormals();
 
     // Create mound material (dirt/brown color)
-    const moundMaterial = new THREE.MeshStandardMaterial({
+    const moundMaterial = new THREE.MeshStandardMaterial(
+    {
       color: 0x8b7355, // Brown dirt color
       roughness: 0.9,
       metalness: 0.0,
@@ -392,7 +397,7 @@ export class PrairieDogFactory
     const prairieDog = new PrairieDog(position.clone(), instanceIndex);
 
     // Start prairie dogs in lowered position (constructor already sets this)
-    
+
     PrairieDogFactory.prairieDogs.push(prairieDog);
 
     // Initialize instance matrices for both prairie dog and mound
@@ -416,10 +421,10 @@ export class PrairieDogFactory
       worldPos.y,
       worldPos.z + PrairieDogFactory.modelCenterOffsetZ
     );
-    
+
     // Use base rotation (90 degrees around X axis to stand up)
     PrairieDogFactory.instanceRotation.copy(PrairieDogFactory.baseRotation);
-    
+
     // Apply computed scale (calculated to achieve target height)
     PrairieDogFactory.instanceScale.set(PrairieDogFactory.computedScale, PrairieDogFactory.computedScale, PrairieDogFactory.computedScale);
 
@@ -447,7 +452,7 @@ export class PrairieDogFactory
     const config = PrairieDogFactory.config;
     const btk = window.btk;
     const moundHeight = config ? (config.moundHeight || btk.Conversions.inchesToMeters(2)) : btk.Conversions.inchesToMeters(2);
-    
+
     // Mound position: at base position, slightly above ground
     // Position mound slightly forward in Z (towards camera) to ensure it occludes the prairie dog
     // TorusGeometry is centered at origin, so we position it at ground level + half height
@@ -456,11 +461,11 @@ export class PrairieDogFactory
       prairieDog.basePosition.y + moundHeight / 2, // Center mound at half its height above ground
       prairieDog.basePosition.z + 0.01 // Slightly forward to ensure depth test wins
     );
-    
+
     // Mound rotation: rotate 90° around X axis to make torus lie flat on ground (XZ plane)
     // TorusGeometry defaults to XY plane, we need XZ plane
     PrairieDogFactory.instanceRotation.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-    
+
     // Mound scale: uniform (geometry already sized correctly)
     PrairieDogFactory.instanceScale.set(1, 1, 1);
 
@@ -501,7 +506,7 @@ export class PrairieDogFactory
           prairieDog.stateTimer = 0;
           prairieDog.nextStateChange = 5 + Math.random() * 30; // Raised: 5-35 seconds
           prairieDog.raise();
-          
+
           // Re-enable the collider
           if (prairieDog.objectId >= 0 && PrairieDogFactory.impactDetector)
           {
@@ -525,7 +530,7 @@ export class PrairieDogFactory
         if (direction > 0 && newHeight >= prairieDog.targetHeight)
         {
           prairieDog.currentHeight = prairieDog.targetHeight;
-          
+
           // If we just finished shooting up from a hit, immediately start lowering quickly
           if (prairieDog.hitAnimationSpeed !== null)
           {
@@ -725,4 +730,3 @@ export class PrairieDogFactory
     PrairieDogFactory.computedScale = 1;
   }
 }
-

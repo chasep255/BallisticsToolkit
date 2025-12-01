@@ -3,16 +3,26 @@
  * Just loads and caches raw GLTF scenes - does NOT process or merge geometry
  */
 
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import
+{
+  GLTFLoader
+}
+from 'three/addons/loaders/GLTFLoader.js';
 
 const LOG_PREFIX = '[ModelManager]';
 
 // Model manifest - all models to load
 const MODEL_MANIFEST = {
   // Prairie dog model
-  prairie_dog: { path: '../models/prairie dog.glb' },
+  prairie_dog:
+  {
+    path: '../models/prairie dog.glb'
+  },
   // Wild boar model (with walking animation)
-  wild_boar: { path: '../models/wild_boar.glb' }
+  wild_boar:
+  {
+    path: '../models/wild_boar.glb'
+  }
 };
 
 /**
@@ -212,4 +222,3 @@ export class ModelManager
     material.dispose();
   }
 }
-

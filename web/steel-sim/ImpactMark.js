@@ -68,7 +68,7 @@ export class ImpactMarkFactory
       const dx = x - centerX;
       const dy = y - centerY;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      
+
       // Add noise to alpha channel for irregular edges (only in outer region)
       if (dist > radius * 0.5 && dist < radius)
       {
