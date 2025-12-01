@@ -166,6 +166,36 @@ export class ImpactDetector
   }
 
   /**
+   * Move a collider to a new position and rotation.
+   * 
+   * @param {number} handle Collider handle
+   * @param {number} x World X position in meters
+   * @param {number} y World Y position in meters
+   * @param {number} z World Z position in meters
+   * @param {number} qx Quaternion X component
+   * @param {number} qy Quaternion Y component
+   * @param {number} qz Quaternion Z component
+   * @param {number} qw Quaternion W component
+   */
+  moveCollider(handle, x, y, z, qx, qy, qz, qw)
+  {
+    const btk = window.btk;
+    const position = new btk.Vector3D(x, y, z);
+    const rotation = new btk.Quaternion(qw, qx, qy, qz);
+    this.detector.moveCollider(handle, position, rotation);
+  }
+
+  /**
+   * Remove a collider by handle.
+   * 
+   * @param {number} handle Collider handle to remove
+   */
+  removeCollider(handle)
+  {
+    this.detector.removeCollider(handle);
+  }
+
+  /**
    * Get statistics about registered colliders.
    */
   getStats()

@@ -52,6 +52,11 @@ import
 from './PrairieDog.js';
 import
 {
+  BoarFactory
+}
+from './Boar.js';
+import
+{
   HUD
 }
 from './HUD.js';
@@ -406,6 +411,7 @@ class SteelSimulator
     BermFactory.deleteAll();
     ImpactMarkFactory.dispose();
     PrairieDogFactory.dispose();
+    BoarFactory.dispose();
 
     // Clean up BTK objects
     if (this.rifleZero)
@@ -640,6 +646,23 @@ class SteelSimulator
     // Create prairie dog hunting targets (uses pre-loaded model)
     this.landscape.createPrairieDogs();
 
+    // Initialize wild boar factory (uses pre-loaded model)
+    const boarModel = this.modelManager.getModel('wild_boar');
+    if (boarModel)
+    {
+      BoarFactory.init(this.scene, Config.BOAR_CONFIG, boarModel, this.impactDetector);
+      
+      // Create a boar pacing back and forth 10 yards at 200 yards downrange
+      const btk = window.btk;
+      const zPos = btk.Conversions.yardsToMeters(-200);
+      const paceDistance = btk.Conversions.yardsToMeters(5); // 5 yards each side = 10 yards total
+      const testPath = [
+        { x: -paceDistance, z: zPos },
+        { x: paceDistance, z: zPos }
+      ];
+      BoarFactory.create(testPath);
+    }
+
     // Initialize impact mark factory for bullet holes
     ImpactMarkFactory.init(this.scene);
 
@@ -753,6 +776,36 @@ class SteelSimulator
 
     // Ensure renderer uses the final CSS size on first layout
     this.onWindowResize();
+
+    // Set all materials to wireframe for debugging if debug=1 is in URL
+    // Do this at the end so it includes all objects (targets, berms, etc.)
+    const urlParams = new URLSearchParams(window.location.search);
+    const debugMode = urlParams.get('debug') === '1';
+    if (debugMode)
+    {
+      console.log('[SteelSim] Debug mode enabled - wireframe rendering active');
+      this.scene.traverse((object) =>
+      {
+        if (object.isMesh)
+        {
+          if (Array.isArray(object.material))
+          {
+            object.material.forEach(mat =>
+            {
+              mat.wireframe = true;
+              mat.transparent = true;
+              mat.opacity = 0.8;
+            });
+          }
+          else if (object.material)
+          {
+            object.material.wireframe = true;
+            object.material.transparent = true;
+            object.material.opacity = 0.8;
+          }
+        }
+      });
+    }
 
     const vertexCount = this.countSceneVertices(this.scene);
     console.log(`[Debug] Total scene vertices: ${vertexCount.toLocaleString()}`);
@@ -2292,6 +2345,7 @@ class SteelSimulator
     DustCloudFactory.updateAll(dt);
     WindFlagFactory.updateAll(this.windGenerator, dt);
     PrairieDogFactory.updateAll(dt);
+    BoarFactory.updateAll(dt);
 
     // Check for long-press focus gesture
     this.checkLongPressFocus();

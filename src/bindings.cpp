@@ -378,12 +378,16 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .field("objectId", &btk::rendering::ImpactResult::object_id);
 
   register_optional<btk::rendering::ImpactResult>();
+  register_vector<btk::rendering::ImpactResult>("VectorImpactResult");
 
   class_<btk::rendering::ImpactDetector>("ImpactDetector")
     .constructor<float, float, float, float, float>()
     .function("addMeshCollider", &btk::rendering::ImpactDetector::addMeshCollider)
     .function("addSteelCollider", &btk::rendering::ImpactDetector::addSteelCollider, allow_raw_pointer<arg<0>>())
+    .function("moveCollider", &btk::rendering::ImpactDetector::moveCollider)
+    .function("removeCollider", &btk::rendering::ImpactDetector::removeCollider)
     .function("findFirstImpact", &btk::rendering::ImpactDetector::findFirstImpact)
     .function("setColliderEnabled", &btk::rendering::ImpactDetector::setColliderEnabled)
-    .function("isColliderEnabled", &btk::rendering::ImpactDetector::isColliderEnabled);
+    .function("isColliderEnabled", &btk::rendering::ImpactDetector::isColliderEnabled)
+    .function("getNextHandle", &btk::rendering::ImpactDetector::getNextHandle);
 }

@@ -9,13 +9,14 @@
 namespace btk::rendering
 {
 
-  // ===== MeshCollider =====
+  // ===== Collider =====
 
-  MeshCollider::MeshCollider(const std::vector<float>& vertices, const std::vector<uint32_t>& indices) : indices_(indices)
+  Collider::Collider(const std::vector<float>& vertices, const std::vector<uint32_t>& indices)
+    : indices_(indices), position_(0, 0, 0), rotation_(0, 0, 0, 1)
   {
     if(vertices.size() % 3 != 0)
     {
-      throw std::invalid_argument("MeshCollider: vertex count must be multiple of 3");
+      throw std::invalid_argument("Collider: vertex count must be multiple of 3");
     }
 
     vertices_.reserve(vertices.size() / 3);
@@ -36,37 +37,107 @@ namespace btk::rendering
 
     if(indices_.size() % 3 != 0)
     {
-      throw std::invalid_argument("MeshCollider: index count must be multiple of 3");
+      throw std::invalid_argument("Collider: index count must be multiple of 3");
     }
 
-    computeBounds();
+    computeLocalBounds();
+    updateWorldBounds();
   }
 
-  void MeshCollider::computeBounds()
+  Collider::Collider(btk::rendering::SteelTarget* target, float radius_m)
+    : position_(0, 0, 0), rotation_(0, 0, 0, 1), steel_target_(target)
+  {
+    // Store radius in min_bounds_m_.x (local bounds not used for steel targets)
+    min_bounds_m_.x = radius_m;
+    updateWorldBounds();
+  }
+
+  void Collider::computeLocalBounds()
   {
     if(vertices_.empty())
     {
-      min_bounds_m_ = btk::math::Vector3D(0, 0, 0);
-      max_bounds_m_ = btk::math::Vector3D(0, 0, 0);
+      local_min_ = btk::math::Vector3D(0, 0, 0);
+      local_max_ = btk::math::Vector3D(0, 0, 0);
       return;
     }
 
-    min_bounds_m_ = vertices_[0];
-    max_bounds_m_ = vertices_[0];
+    local_min_ = vertices_[0];
+    local_max_ = vertices_[0];
 
     for(const auto& v : vertices_)
     {
-      min_bounds_m_.x = std::min(min_bounds_m_.x, v.x);
-      min_bounds_m_.y = std::min(min_bounds_m_.y, v.y);
-      min_bounds_m_.z = std::min(min_bounds_m_.z, v.z);
+      local_min_.x = std::min(local_min_.x, v.x);
+      local_min_.y = std::min(local_min_.y, v.y);
+      local_min_.z = std::min(local_min_.z, v.z);
 
-      max_bounds_m_.x = std::max(max_bounds_m_.x, v.x);
-      max_bounds_m_.y = std::max(max_bounds_m_.y, v.y);
-      max_bounds_m_.z = std::max(max_bounds_m_.z, v.z);
+      local_max_.x = std::max(local_max_.x, v.x);
+      local_max_.y = std::max(local_max_.y, v.y);
+      local_max_.z = std::max(local_max_.z, v.z);
     }
   }
 
-  bool MeshCollider::segmentIntersectsAABB(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, const btk::math::Vector3D& min_bounds, const btk::math::Vector3D& max_bounds) const
+  void Collider::updateWorldBounds()
+  {
+    if(steel_target_)
+    {
+      // Steel target mode: compute bounds from target position + radius
+      float radius = min_bounds_m_.x; // Radius stored here
+      btk::math::Vector3D com = steel_target_->getCenterOfMass();
+      min_bounds_m_ = btk::math::Vector3D(com.x - radius, com.y - radius, com.z - radius);
+      max_bounds_m_ = btk::math::Vector3D(com.x + radius, com.y + radius, com.z + radius);
+    }
+    else
+    {
+      // Mesh mode: transform local AABB corners to world space
+      btk::math::Vector3D corners[8] = {
+        btk::math::Vector3D(local_min_.x, local_min_.y, local_min_.z),
+        btk::math::Vector3D(local_max_.x, local_min_.y, local_min_.z),
+        btk::math::Vector3D(local_min_.x, local_max_.y, local_min_.z),
+        btk::math::Vector3D(local_max_.x, local_max_.y, local_min_.z),
+        btk::math::Vector3D(local_min_.x, local_min_.y, local_max_.z),
+        btk::math::Vector3D(local_max_.x, local_min_.y, local_max_.z),
+        btk::math::Vector3D(local_min_.x, local_max_.y, local_max_.z),
+        btk::math::Vector3D(local_max_.x, local_max_.y, local_max_.z)
+      };
+
+      btk::math::Vector3D world_corners[8];
+      for(int i = 0; i < 8; ++i)
+      {
+        world_corners[i] = rotation_.rotate(corners[i]) + position_;
+      }
+
+      min_bounds_m_ = world_corners[0];
+      max_bounds_m_ = world_corners[0];
+      for(int i = 1; i < 8; ++i)
+      {
+        min_bounds_m_.x = std::min(min_bounds_m_.x, world_corners[i].x);
+        min_bounds_m_.y = std::min(min_bounds_m_.y, world_corners[i].y);
+        min_bounds_m_.z = std::min(min_bounds_m_.z, world_corners[i].z);
+        max_bounds_m_.x = std::max(max_bounds_m_.x, world_corners[i].x);
+        max_bounds_m_.y = std::max(max_bounds_m_.y, world_corners[i].y);
+        max_bounds_m_.z = std::max(max_bounds_m_.z, world_corners[i].z);
+      }
+    }
+  }
+
+  const btk::math::Vector3D& Collider::minBounds() const
+  {
+    return min_bounds_m_;
+  }
+
+  const btk::math::Vector3D& Collider::maxBounds() const
+  {
+    return max_bounds_m_;
+  }
+
+  void Collider::setTransform(const btk::math::Vector3D& position, const btk::math::Quaternion& rotation)
+  {
+    position_ = position;
+    rotation_ = rotation;
+    updateWorldBounds();
+  }
+
+  bool Collider::segmentIntersectsAABB(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, const btk::math::Vector3D& min_bounds, const btk::math::Vector3D& max_bounds) const
   {
     // Slab method: project segment onto each axis and check for overlap
     // Segment: start_m + t * (end_m - start_m) for t in [0, 1]
@@ -116,8 +187,8 @@ namespace btk::rendering
     return t_min <= t_max;
   }
 
-  std::optional<float> MeshCollider::intersectTriangle(const btk::math::Vector3D& ray_origin, const btk::math::Vector3D& ray_dir, const btk::math::Vector3D& v0, const btk::math::Vector3D& v1,
-                                                       const btk::math::Vector3D& v2) const
+  std::optional<float> Collider::intersectTriangle(const btk::math::Vector3D& ray_origin, const btk::math::Vector3D& ray_dir, const btk::math::Vector3D& v0, const btk::math::Vector3D& v1,
+                                                   const btk::math::Vector3D& v2) const
   {
     // Möller–Trumbore intersection algorithm
     constexpr float EPSILON = 1e-6f;
@@ -159,83 +230,94 @@ namespace btk::rendering
     return std::nullopt;
   }
 
-  std::optional<ImpactResult> MeshCollider::intersectSegment(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, float t_start_s, float t_end_s, float /*bullet_radius*/,
-                                                             int object_id) const
+  std::optional<ImpactResult> Collider::intersectSegment(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, float t_start_s, float t_end_s, float bullet_radius) const
   {
     using btk::math::Vector3D;
 
-    // Early rejection: check if segment intersects mesh AABB
+    // Early rejection: check if segment intersects AABB
     if(!segmentIntersectsAABB(start_m, end_m, min_bounds_m_, max_bounds_m_))
     {
       return std::nullopt;
     }
 
-    Vector3D ray_dir = end_m - start_m;
-    float closest_t = std::numeric_limits<float>::max();
-    Vector3D closest_hit_pos;
-    Vector3D closest_normal;
-    bool found_hit = false;
-
-    // Test all triangles
-    for(size_t i = 0; i < indices_.size(); i += 3)
+    if(steel_target_)
     {
-      const Vector3D& v0 = vertices_[indices_[i]];
-      const Vector3D& v1 = vertices_[indices_[i + 1]];
-      const Vector3D& v2 = vertices_[indices_[i + 2]];
-
-      auto t_opt = intersectTriangle(start_m, ray_dir, v0, v1, v2);
-      if(t_opt.has_value() && t_opt.value() < closest_t)
+      // Steel target mode: delegate to target
+      auto hit_opt = steel_target_->intersectSegment(start_m, end_m, bullet_radius);
+      if(!hit_opt.has_value())
       {
-        closest_t = t_opt.value();
-        closest_hit_pos = start_m + ray_dir * closest_t;
-
-        // Compute triangle normal
-        Vector3D edge1 = v1 - v0;
-        Vector3D edge2 = v2 - v0;
-        closest_normal = edge1.cross(edge2).normalized();
-
-        found_hit = true;
+        return std::nullopt;
       }
-    }
 
-    if(!found_hit)
+      const auto& hit = *hit_opt;
+
+      // Estimate time from distance along segment
+      Vector3D dir = end_m - start_m;
+      float segment_length = dir.magnitude();
+      float t_param = (segment_length > 1e-6f) ? (hit.distance_m_ / segment_length) : 0.0f;
+
+      float time_s = t_start_s + (t_end_s - t_start_s) * t_param;
+
+      return ImpactResult(hit.point_world_, hit.normal_world_, time_s, object_id_);
+    }
+    else
     {
-      return std::nullopt;
+      // Mesh mode: transform ray to local space
+      btk::math::Quaternion inv_rotation = rotation_.conjugate();
+      Vector3D local_start = inv_rotation.rotate(start_m - position_);
+      Vector3D local_end = inv_rotation.rotate(end_m - position_);
+      Vector3D local_ray_dir = local_end - local_start;
+
+      float closest_t = std::numeric_limits<float>::max();
+      Vector3D closest_hit_local;
+      Vector3D closest_normal_local;
+      bool found_hit = false;
+
+      // Test all triangles in local space
+      for(size_t i = 0; i < indices_.size(); i += 3)
+      {
+        const Vector3D& v0 = vertices_[indices_[i]];
+        const Vector3D& v1 = vertices_[indices_[i + 1]];
+        const Vector3D& v2 = vertices_[indices_[i + 2]];
+
+        auto t_opt = intersectTriangle(local_start, local_ray_dir, v0, v1, v2);
+        if(t_opt.has_value() && t_opt.value() < closest_t)
+        {
+          closest_t = t_opt.value();
+          closest_hit_local = local_start + local_ray_dir * closest_t;
+
+          // Compute triangle normal in local space
+          Vector3D edge1 = v1 - v0;
+          Vector3D edge2 = v2 - v0;
+          Vector3D normal = edge1.cross(edge2);
+          float normal_len = normal.magnitude();
+          if(normal_len > 1e-6f)
+          {
+            closest_normal_local = normal / normal_len;
+          }
+          else
+          {
+            // Degenerate triangle - use default up vector
+            closest_normal_local = Vector3D(0, 1, 0);
+          }
+
+          found_hit = true;
+        }
+      }
+
+      if(!found_hit)
+      {
+        return std::nullopt;
+      }
+
+      // Transform hit position and normal back to world space
+      Vector3D closest_hit_pos = rotation_.rotate(closest_hit_local) + position_;
+      Vector3D closest_normal = rotation_.rotate(closest_normal_local).normalized();
+
+      float time_s = t_start_s + (t_end_s - t_start_s) * closest_t;
+
+      return ImpactResult(closest_hit_pos, closest_normal, time_s, object_id_);
     }
-
-    float time_s = t_start_s + (t_end_s - t_start_s) * closest_t;
-
-    return ImpactResult(closest_hit_pos, closest_normal, time_s, object_id);
-  }
-
-  // ===== SteelCollider =====
-
-  SteelCollider::SteelCollider(btk::rendering::SteelTarget* target) : target_(target) {}
-
-  std::optional<ImpactResult> SteelCollider::intersectSegment(const btk::math::Vector3D& start_m, const btk::math::Vector3D& end_m, float t_start_s, float t_end_s, float bullet_radius,
-                                                              int object_id) const
-  {
-    if(!target_)
-    {
-      return std::nullopt;
-    }
-
-    auto hit_opt = target_->intersectSegment(start_m, end_m, bullet_radius);
-    if(!hit_opt.has_value())
-    {
-      return std::nullopt;
-    }
-
-    const auto& hit = *hit_opt;
-
-    // Estimate time from distance along segment
-    btk::math::Vector3D dir = end_m - start_m;
-    float segment_length = dir.magnitude();
-    float t_param = (segment_length > 1e-6f) ? (hit.distance_m_ / segment_length) : 0.0f;
-
-    float time_s = t_start_s + (t_end_s - t_start_s) * t_param;
-
-    return ImpactResult(hit.point_world_, hit.normal_world_, time_s, object_id);
   }
 
   // ===== ImpactDetector =====
@@ -261,20 +343,23 @@ namespace btk::rendering
 
   void ImpactDetector::setColliderEnabled(int handle, bool enabled)
   {
-    if(handle >= 0 && handle < static_cast<int>(colliders_.size()))
+    auto it = colliders_.find(handle);
+    if(it != colliders_.end())
     {
-      colliders_[handle]->setEnabled(enabled);
+      it->second.setEnabled(enabled);
     }
   }
 
   bool ImpactDetector::isColliderEnabled(int handle) const
   {
-    if(handle >= 0 && handle < static_cast<int>(colliders_.size()))
+    auto it = colliders_.find(handle);
+    if(it != colliders_.end())
     {
-      return colliders_[handle]->isEnabled();
+      return it->second.isEnabled();
     }
     return false;
   }
+
 
   int ImpactDetector::binIndexX(float x_m) const
   {
@@ -314,22 +399,41 @@ namespace btk::rendering
       indices = emscripten::convertJSArrayToNumberVector<uint32_t>(indices_val);
     }
 
-    auto collider = std::make_unique<MeshCollider>(vertices, indices);
+    int handle = getNextHandle();
+    auto [it, inserted] = colliders_.emplace(handle, Collider(vertices, indices));
+    it->second.setObjectId(object_id);
 
-    const btk::math::Vector3D& min_b = collider->minBounds();
-    const btk::math::Vector3D& max_b = collider->maxBounds();
+    // Geometry is already in world space, so compute bounds directly from vertices
+    // and use identity transform (position=0, rotation=identity)
+    // This ensures the collider is inserted into the correct grid bins
+    btk::math::Vector3D geom_min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    btk::math::Vector3D geom_max(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest());
+    
+    for(size_t i = 0; i < vertices.size(); i += 3)
+    {
+      float x = vertices[i];
+      float y = vertices[i + 1];
+      float z = vertices[i + 2];
+      geom_min.x = std::min(geom_min.x, x);
+      geom_min.y = std::min(geom_min.y, y);
+      geom_min.z = std::min(geom_min.z, z);
+      geom_max.x = std::max(geom_max.x, x);
+      geom_max.y = std::max(geom_max.y, y);
+      geom_max.z = std::max(geom_max.z, z);
+    }
+    
+    // Set transform to identity (geometry is already in world space)
+    // This ensures world bounds match the geometry bounds
+    it->second.setTransform(btk::math::Vector3D(0, 0, 0), btk::math::Quaternion::identity());
+    
+    Collider* collider_ptr = &it->second;
+    const btk::math::Vector3D& min_b = collider_ptr->minBounds();
+    const btk::math::Vector3D& max_b = collider_ptr->maxBounds();
 
     int min_bin_x = binIndexX(min_b.x);
     int max_bin_x = binIndexX(max_b.x);
     int min_bin_z = binIndexZ(min_b.z);
     int max_bin_z = binIndexZ(max_b.z);
-
-    int handle = static_cast<int>(colliders_.size());
-    colliders_.push_back(std::move(collider));
-
-    ObjectRecord rec;
-    rec.collider_handle = handle;
-    rec.object_id = object_id;
 
     // Insert into all overlapping bins
     for(int bz = min_bin_z; bz <= max_bin_z; ++bz)
@@ -339,7 +443,7 @@ namespace btk::rendering
         int gidx = gridIndex(bx, bz);
         if(gidx >= 0)
         {
-          grid_[gidx].push_back(rec);
+          grid_[gidx].push_back(collider_ptr);
         }
       }
     }
@@ -355,21 +459,18 @@ namespace btk::rendering
       return -1;
     }
 
-    auto collider = std::make_unique<SteelCollider>(target);
+    int handle = getNextHandle();
+    auto [it, inserted] = colliders_.emplace(handle, Collider(target, radius_m));
+    it->second.setObjectId(object_id);
 
-    btk::math::Vector3D com = target->getCenterOfMass();
+    Collider* collider_ptr = &it->second;
+    const btk::math::Vector3D& min_b = collider_ptr->minBounds();
+    const btk::math::Vector3D& max_b = collider_ptr->maxBounds();
 
-    int min_bin_x = binIndexX(com.x - radius_m);
-    int max_bin_x = binIndexX(com.x + radius_m);
-    int min_bin_z = binIndexZ(com.z - radius_m);
-    int max_bin_z = binIndexZ(com.z + radius_m);
-
-    int handle = static_cast<int>(colliders_.size());
-    colliders_.push_back(std::move(collider));
-
-    ObjectRecord rec;
-    rec.collider_handle = handle;
-    rec.object_id = object_id;
+    int min_bin_x = binIndexX(min_b.x);
+    int max_bin_x = binIndexX(max_b.x);
+    int min_bin_z = binIndexZ(min_b.z);
+    int max_bin_z = binIndexZ(max_b.z);
 
     for(int bz = min_bin_z; bz <= max_bin_z; ++bz)
     {
@@ -378,7 +479,7 @@ namespace btk::rendering
         int gidx = gridIndex(bx, bz);
         if(gidx >= 0)
         {
-          grid_[gidx].push_back(rec);
+          grid_[gidx].push_back(collider_ptr);
         }
       }
     }
@@ -409,26 +510,126 @@ namespace btk::rendering
         if(gidx < 0)
           continue;
 
-        for(const auto& rec : grid_[gidx])
+        for(Collider* collider_ptr : grid_[gidx])
         {
           // Skip disabled colliders
-          if(!colliders_[rec.collider_handle]->isEnabled())
+          if(!collider_ptr->isEnabled())
           {
             continue;
           }
 
-          auto hit_opt = colliders_[rec.collider_handle]->intersectSegment(start_m, end_m, t_start_s, t_end_s, bullet_radius, rec.object_id);
+          auto hit_opt = collider_ptr->intersectSegment(start_m, end_m, t_start_s, t_end_s, bullet_radius);
 
-          if(hit_opt.has_value() && hit_opt->time_s < earliest_time)
+          if(hit_opt.has_value())
           {
-            earliest_time = hit_opt->time_s;
-            earliest_hit = hit_opt;
+            if(hit_opt->time_s < earliest_time)
+            {
+              earliest_time = hit_opt->time_s;
+              earliest_hit = hit_opt;
+            }
           }
         }
       }
     }
 
     return earliest_hit;
+  }
+
+  void ImpactDetector::moveCollider(int handle, const btk::math::Vector3D& position, const btk::math::Quaternion& rotation)
+  {
+    auto it = colliders_.find(handle);
+    if(it == colliders_.end())
+    {
+      return; // Handle not found
+    }
+
+    auto& collider = it->second;
+
+    // Get old bounds for grid removal
+    const auto old_min = collider.minBounds();
+    const auto old_max = collider.maxBounds();
+
+    // Update collider transform
+    collider.setTransform(position, rotation);
+
+    // Get new bounds
+    const auto& new_min = collider.minBounds();
+    const auto& new_max = collider.maxBounds();
+
+    // Check if grid cells changed
+    int old_min_x = binIndexX(old_min.x);
+    int old_max_x = binIndexX(old_max.x);
+    int old_min_z = binIndexZ(old_min.z);
+    int old_max_z = binIndexZ(old_max.z);
+
+    int new_min_x = binIndexX(new_min.x);
+    int new_max_x = binIndexX(new_max.x);
+    int new_min_z = binIndexZ(new_min.z);
+    int new_max_z = binIndexZ(new_max.z);
+
+    if(old_min_x == new_min_x && old_max_x == new_max_x &&
+       old_min_z == new_min_z && old_max_z == new_max_z)
+    {
+      return; // Same grid cells, no update needed
+    }
+
+    Collider* collider_ptr = &collider;
+
+    // Remove from old cells
+    for(int bz = old_min_z; bz <= old_max_z; ++bz)
+    {
+      for(int bx = old_min_x; bx <= old_max_x; ++bx)
+      {
+        int gidx = gridIndex(bx, bz);
+        if(gidx < 0) continue;
+
+        auto& cell = grid_[gidx];
+        cell.erase(std::remove(cell.begin(), cell.end(), collider_ptr), cell.end());
+      }
+    }
+
+    // Add to new cells
+    for(int bz = new_min_z; bz <= new_max_z; ++bz)
+    {
+      for(int bx = new_min_x; bx <= new_max_x; ++bx)
+      {
+        int gidx = gridIndex(bx, bz);
+        if(gidx >= 0)
+        {
+          grid_[gidx].push_back(collider_ptr);
+        }
+      }
+    }
+  }
+
+  void ImpactDetector::removeCollider(int handle)
+  {
+    auto it = colliders_.find(handle);
+    if(it == colliders_.end())
+    {
+      return; // Handle not found
+    }
+
+    Collider* collider_ptr = &it->second;
+
+    // Remove from all grid cells
+    const auto& min_b = collider_ptr->minBounds();
+    const auto& max_b = collider_ptr->maxBounds();
+
+    for(int bz = binIndexZ(min_b.z); bz <= binIndexZ(max_b.z); ++bz)
+    {
+      for(int bx = binIndexX(min_b.x); bx <= binIndexX(max_b.x); ++bx)
+      {
+        int gidx = gridIndex(bx, bz);
+        if(gidx < 0) continue;
+
+        auto& cell = grid_[gidx];
+        cell.erase(std::remove(cell.begin(), cell.end(), collider_ptr), cell.end());
+      }
+    }
+
+    // Remove from map
+    colliders_.erase(it);
   }
 
   std::optional<ImpactResult> ImpactDetector::findFirstImpact(const btk::ballistics::Trajectory& trajectory, float t0_s, float t1_s) const

@@ -146,6 +146,15 @@ export function initConfig()
     moundHeight: btk.Conversions.inchesToMeters(1) // Mound height above ground (1 inch - shorter)
   };
 
+  // ===== WILD BOAR CONFIGURATION =====
+  Config.BOAR_CONFIG = {
+    walkingSpeed: 1.0, // Walking speed in m/s
+    turnSpeed: Math.PI / 2, // Turn rate in radians per second (90°/s)
+    waypointReachThreshold: 0.5, // Distance to consider waypoint reached (meters)
+    loopPath: true, // Whether to loop path or stop at end
+    scale: 1.0 // Model scale factor (1.0 = no scaling)
+  };
+
   // ===== WIND GENERATOR CONFIGURATION =====
   Config.WIND_CONFIG = {
     boxPadding: btk.Conversions.yardsToMeters(50), // 50 yards

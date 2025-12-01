@@ -10,7 +10,9 @@ const LOG_PREFIX = '[ModelManager]';
 // Model manifest - all models to load
 const MODEL_MANIFEST = {
   // Prairie dog model
-  prairie_dog: { path: '../models/prairie dog.glb' }
+  prairie_dog: { path: '../models/prairie dog.glb' },
+  // Wild boar model (with walking animation)
+  wild_boar: { path: '../models/wild_boar.glb' }
 };
 
 /**
