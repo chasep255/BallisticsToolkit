@@ -232,6 +232,7 @@ class SteelSimulator
     this.scopeMode = false;
     this.rifleZero = null;
     this.activeScope = null; // 'rifle' or 'spotting' - tracks which scope is active for desktop mode
+    this.pendingActiveScope = null; // Temporary storage for scope clicked before pointer lock succeeds
 
     // Spotting scope key states (deprecated - no longer used for WASD)
     this.spottingScopeKeys = {
@@ -1395,27 +1396,31 @@ class SteelSimulator
 
       if (locked)
       {
-        // Fire when clicking in scope mode
-        this.fireFromScope();
+        // Fire when clicking in scope mode (only from rifle scope, never from spotting scope)
+        if (this.activeScope === 'rifle')
+        {
+          this.fireFromScope();
+        }
       }
       else
       {
-        // Check which scope was clicked and set it as active
+        // Check which scope was clicked and request pointer lock
+        // activeScope will be set in onPointerLockChange when lock succeeds
         if (this.scope.isPointInside(norm.x, norm.y))
         {
-          this.activeScope = 'rifle';
+          // Store which scope was clicked so we can set activeScope when lock succeeds
+          this.pendingActiveScope = 'rifle';
           // Enter scope mode when clicking on rifle scope.
-          // Let pointerlockchange handler update scopeMode.
+          // Let pointerlockchange handler update scopeMode and activeScope.
           this.canvas.requestPointerLock();
         }
         else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
         {
-          this.activeScope = 'spotting';
+          // Store which scope was clicked so we can set activeScope when lock succeeds
+          this.pendingActiveScope = 'spotting';
           // Enter scope mode when clicking on spotting scope.
           this.canvas.requestPointerLock();
         }
-        
-        this.updateScopeBorders();
       }
     }
     else if (event.button === 2) // Right click
@@ -1595,10 +1600,18 @@ class SteelSimulator
     this.scopeMode = locked;
     this.canvas.style.cursor = locked ? 'none' : 'default';
     
-    // When entering scope mode, ensure activeScope is set to rifle (pointer lock is rifle scope only)
-    if (locked && !this.activeScope)
+    if (locked)
     {
-      this.activeScope = 'rifle';
+      // When entering scope mode, set activeScope from pendingActiveScope (set by click handler)
+      // If no pending scope, default to rifle
+      this.activeScope = this.pendingActiveScope || 'rifle';
+      this.pendingActiveScope = null; // Clear pending
+    }
+    else
+    {
+      // When exiting scope mode, clear active scope selection
+      this.activeScope = null;
+      this.pendingActiveScope = null; // Also clear pending in case lock failed
     }
     
     this.updateScopeBorders();
@@ -2117,12 +2130,6 @@ class SteelSimulator
 
   fireFromScope()
   {
-    // Only fire from rifle scope (spotting scope is for observation only)
-    if (this.activeScope !== 'rifle')
-    {
-      return;
-    }
-    
     if (!this.rifleZero)
     {
       console.warn('[fireFromScope] Rifle not zeroed yet');

@@ -623,14 +623,14 @@ export class Scope
 
       varying vec2 vUv;
 
-      const float MIRAGE_ANGLE_SCALE          = 1.0 / 0.0025;  // Scale factor for angular noise coordinates
+      const float MIRAGE_ANGLE_SCALE          = 1.0 / 0.001;  // Scale factor for angular noise coordinates
       const float MIRAGE_TIME_SCALE           = 1.0 / 10.0;   // Scale factor for time noise coordinate
       const float MIRAGE_FOV_MAX              = 3.0 * 3.14159265359 / 180.0;  // No mirage at wide FOV (radians)
       const float MIRAGE_FOV_MIN              = 0.5 * 3.14159265359 / 180.0;  // Full mirage at narrow FOV (radians)
       const float MIRAGE_FOCAL_MIN            = 50.0;          // Minimum focal distance for mirage ramp (meters)
       const float MIRAGE_FOCAL_MAX            = 1000.0;        // Distance where mirage reaches full strength (meters)
       const float MIRAGE_DISTORTION_STRENGTH  = 0.005;         // Base distortion scale in UV space
-      const float MIRAGE_SHADE_STRENGTH       = 0.2;           // ±20% brightness variation at full attenuation
+      const float MIRAGE_SHADE_STRENGTH       = 0.25;           // ±25% brightness variation at full attenuation
       const float MIRAGE_WIND_SPEED_MAX       = 6.7;           // ~15 mph, wind speed where mirage fully fades (m/s)
 
       ${simplexNoise}

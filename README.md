@@ -44,8 +44,8 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Target Physics** - Steel targets hang from virtual chains with momentum transfer, damping, and rotation. Center hits drive linear swing; edge hits kick targets into rotation. Impacts leave visible mark splatter and spawn metal dust.
 - **Impact Detection** - Spatial binning system for efficient collision detection. Accurate hit/miss detection with visual feedback (HUD shows impact status).
 - **Wind & Environment** - 3D landscape with wind flags along the range driven by the same curl‑noise wind field used for the f-class sim. Brown ground dust when you miss; silver‑gray metallic dust when you hit steel.
-- **Scope & HUD** - Mouse-based FFP scope with pointer lock: click scope to enter, move mouse to pan, wheel or `+`/`-` to zoom (4×–40×), click to fire, `Esc` to exit. MRAD or MOA scope type selection with matching reticle ticks and dial units. HUD shows current dial settings.
-- **Mirage/Optical Effects** - Optional heat mirage simulation that moves with the wind, letting you read wind speed and direction through the shimmer. Includes depth-of-field blur based on focus distance. Refocus with `F` key (desktop) or long-press (mobile).
+- **Scope & HUD** - Dual scopes (rifle + spotting) with pointer lock: click either scope to enter, `Tab` to switch between scopes, move mouse to pan, wheel or `+`/`-` to zoom (4×–40×), click to fire (rifle scope only), `Esc` to exit. Active scope shows a dull red border. MRAD or MOA scope type selection with matching reticle ticks and dial units. HUD shows current dial settings.
+- **Mirage/Optical Effects** - Optional heat mirage simulation that moves with the wind, letting you read wind speed and direction through the shimmer. Includes depth-of-field blur based on focus distance. Refocus active scope with `F` key or right-click (desktop) or long-press (mobile).
 - **Audio Feedback** - Shot sounds play immediately; impact sounds (ping) play with distance-based delay and volume attenuation.
 
 ## Quick Start
