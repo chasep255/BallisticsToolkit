@@ -630,7 +630,7 @@ export class Scope
       const float MIRAGE_FOCAL_MIN            = 50.0;          // Minimum focal distance for mirage ramp (meters)
       const float MIRAGE_FOCAL_MAX            = 1000.0;        // Distance where mirage reaches full strength (meters)
       const float MIRAGE_DISTORTION_STRENGTH  = 0.005;         // Base distortion scale in UV space
-      const float MIRAGE_SHADE_STRENGTH       = 0.25;           // ±25% brightness variation at full attenuation
+      const float MIRAGE_SHADE_STRENGTH       = 0.4;           // ±40% brightness variation at full attenuation
       const float MIRAGE_WIND_SPEED_MAX       = 6.7;           // ~15 mph, wind speed where mirage fully fades (m/s)
 
       ${simplexNoise}
@@ -707,8 +707,7 @@ export class Scope
         
         // Brightness modulation (shading) based on noise magnitude, sharpened for smoke-like edges
         // Use |noise| and a nonlinear curve so only stronger structures contribute
-        float edge = pow(noiseMag, 1.5); // emphasize stronger features, suppress weak noise
-        float shade = 1.0 - edge * MIRAGE_SHADE_STRENGTH * totalAttenuation;
+        float shade = clamp(1.0 - noiseMag * MIRAGE_SHADE_STRENGTH * totalAttenuation, 0.0, 1.0);
         gl_FragColor = vec4(color.rgb * shade, color.a);
       }
     `;
