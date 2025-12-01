@@ -174,6 +174,35 @@ export class BallisticsTable
   }
 
   /**
+   * Get the bullet drop in mrad for a given range.
+   * Uses linear interpolation between table entries.
+   * @param {number} range_m - Range in meters
+   * @returns {number} Drop in mrad (negative = below line of sight)
+   */
+  getDropForRange(range_m)
+  {
+    if (this.dropTable.length === 0) return 0;
+    if (range_m <= 0) return 0;
+    
+    // Find the two entries to interpolate between
+    let prevEntry = this.dropTable[0];
+    for (let i = 1; i < this.dropTable.length; i++)
+    {
+      const entry = this.dropTable[i];
+      if (entry.range_m >= range_m)
+      {
+        // Interpolate between prevEntry and entry
+        const t = (range_m - prevEntry.range_m) / (entry.range_m - prevEntry.range_m);
+        return prevEntry.drop_mrad + t * (entry.drop_mrad - prevEntry.drop_mrad);
+      }
+      prevEntry = entry;
+    }
+    
+    // Beyond table range, return last entry's drop
+    return prevEntry.drop_mrad;
+  }
+
+  /**
    * Get statistics about the table for debugging
    */
   getStats()

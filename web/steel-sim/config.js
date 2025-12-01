@@ -510,8 +510,8 @@ export function initConfig()
     {
       x: btk.Conversions.yardsToMeters(-5), // -5 yards
       z: btk.Conversions.yardsToMeters(-1000), // -1000 yards
-      rackWidth: btk.Conversions.yardsToMeters(2),
-      rackHeight: btk.Conversions.yardsToMeters(1),
+      rackWidth: btk.Conversions.yardsToMeters(3),
+      rackHeight: btk.Conversions.yardsToMeters(1.0),
       targets: [
       {
         width: btk.Conversions.inchesToMeters(20),

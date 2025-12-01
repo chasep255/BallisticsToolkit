@@ -191,9 +191,9 @@ class SteelSimulator
       params.length_m === undefined || params.twist_mPerTurn === undefined || params.mvSd_mps === undefined ||
       params.rifleAccuracy_rad === undefined || params.bc === undefined || params.dragFunction === undefined ||
       params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined ||
-      params.opticalEffectsEnabled === undefined || params.scopeType === undefined)
+      params.opticalEffectsEnabled === undefined || params.smartScopeEnabled === undefined || params.scopeType === undefined)
     {
-      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled, scopeType). Use getGameParams() to convert from frontend inputs.');
+      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled, smartScopeEnabled, scopeType). Use getGameParams() to convert from frontend inputs.');
     }
 
     // Store all params (all must be in SI units, no defaults)
@@ -210,6 +210,7 @@ class SteelSimulator
     this.zeroDistance_m = params.zeroDistance_m;
     this.scopeHeight_m = params.scopeHeight_m;
     this.opticalEffectsEnabled = params.opticalEffectsEnabled;
+    this.smartScopeEnabled = params.smartScopeEnabled;
     this.scopeType = params.scopeType;
 
     // State
@@ -611,6 +612,10 @@ class SteelSimulator
 
   async setupScene()
   {
+    // Check for debug mode once at the start
+    const urlParams = new URLSearchParams(window.location.search);
+    const debugMode = urlParams.get('debug') === '1';
+    
     // Create scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb);
@@ -733,8 +738,10 @@ class SteelSimulator
       maxZoomX: 40.0,
       lowFovFeet: 25,
       opticalEffectsEnabled: this.opticalEffectsEnabled,
+      smartScopeEnabled: this.smartScopeEnabled,
       windGenerator: this.windGenerator,
       scopeType: this.scopeType,
+      ballisticsTable: this.ballisticsTable, // For drop indicator
       cameraPosition:
       {
         x: 0,
@@ -786,8 +793,6 @@ class SteelSimulator
         }
 
         // Create debug boar at 75 yards, offset to the left (static, rotatable) - only in debug mode
-        const urlParams = new URLSearchParams(window.location.search);
-        const debugMode = urlParams.get('debug') === '1';
         if (debugMode)
         {
           const btk = window.btk;
@@ -814,6 +819,52 @@ class SteelSimulator
       }
     }
 
+    // Create debug cubes at 1000 yards for reticle scale verification (always in debug mode, regardless of hunting)
+    if (debugMode)
+    {
+      const btk = window.btk;
+      const range1000yd = btk.Conversions.yardsToMeters(1000);
+      const cubeZ = -range1000yd; // 1000 yards downrange
+      
+      // 8 MRAD square at 1000 yards
+      // angle = 8 mrad = 8 / 1000 rad, size = angle * distance
+      const cube8MradSize = range1000yd * (8.0 / 1000.0);
+      const cube8MradGeom = new THREE.PlaneGeometry(cube8MradSize, cube8MradSize);
+      const cube4YardMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff00, // Bright green
+        wireframe: false, // Solid for visibility
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+      });
+      const cube8Mrad = new THREE.Mesh(cube8MradGeom, cube4YardMat);
+      cube8Mrad.position.set(0, Config.SHOOTER_HEIGHT, cubeZ); // Dead center, at shooter height
+      cube8Mrad.renderOrder = 1000; // Render on top
+      this.scene.add(cube8Mrad);
+      this.debugCube4Yard = cube8Mrad;
+      
+      // 10 MOA square at 1000 yards
+      // angle = moaToRadians(10), size = angle * distance
+      const angle10MoaRad = btk.Conversions.moaToRadians(10.0);
+      const cube10MoaSize = angle10MoaRad * range1000yd;
+      const cube4MOAGeom = new THREE.PlaneGeometry(cube10MoaSize, cube10MoaSize);
+      const cube4MOAMat = new THREE.MeshBasicMaterial({
+        color: 0xff00ff, // Bright magenta
+        wireframe: false, // Solid for visibility
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+      });
+      const cube4MOA = new THREE.Mesh(cube4MOAGeom, cube4MOAMat);
+      cube4MOA.position.set(0, Config.SHOOTER_HEIGHT, cubeZ); // Dead center, at shooter height
+      cube4MOA.renderOrder = 1000; // Render on top
+      this.scene.add(cube4MOA);
+      this.debugCube4MOA = cube4MOA;
+      
+      console.log(`[Debug] Created 8 mrad square (${cube8MradSize.toFixed(3)}m) at 1000 yards, position (${cube8Mrad.position.x.toFixed(1)}, ${cube8Mrad.position.y.toFixed(1)}, ${cubeZ.toFixed(1)})`);
+      console.log(`[Debug] Created 10 MOA square (${cube10MoaSize.toFixed(3)}m) at 1000 yards, position (${cube4MOA.position.x.toFixed(1)}, ${cube4MOA.position.y.toFixed(1)}, ${cubeZ.toFixed(1)})`);
+    }
+
     // Setup raycaster for scope-based shooting
     this.raycaster = new THREE.Raycaster();
 
@@ -825,8 +876,6 @@ class SteelSimulator
 
     // Set all materials to wireframe for debugging if debug=1 is in URL
     // Do this at the end so it includes all objects (targets, berms, etc.)
-    const urlParams = new URLSearchParams(window.location.search);
-    const debugMode = urlParams.get('debug') === '1';
     if (debugMode)
     {
       console.log('[SteelSim] Debug mode enabled - wireframe rendering active');
@@ -2697,6 +2746,8 @@ function getGameParams()
   const scopeHeightInches = parseFloat(document.getElementById('scopeHeight').value);
   const opticalEffectsCheckbox = document.getElementById('opticalEffects');
   const opticalEffectsEnabled = opticalEffectsCheckbox ? opticalEffectsCheckbox.checked : true;
+  const smartScopeCheckbox = document.getElementById('smartScope');
+  const smartScopeEnabled = smartScopeCheckbox ? smartScopeCheckbox.checked : true;
   const scopeTypeSelect = document.getElementById('scopeType');
   const scopeType = scopeTypeSelect ? scopeTypeSelect.value : 'mrad';
 
@@ -2715,6 +2766,7 @@ function getGameParams()
     zeroDistance_m: btk.Conversions.yardsToMeters(zeroDistanceYards),
     scopeHeight_m: btk.Conversions.inchesToMeters(scopeHeightInches),
     opticalEffectsEnabled: opticalEffectsEnabled,
+    smartScopeEnabled: smartScopeEnabled,
     scopeType: scopeType
   };
 }

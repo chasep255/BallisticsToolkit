@@ -21,14 +21,18 @@ import
 from './RenderStats.js';
 
 // Reticle mapping constant.
-// In the original shader-based implementation, the relationship between
-// FOV (degrees), reticle "units" (the local reticle geometry space) and
-// milliradians was:
-//   mradPerUnit = fovDeg * (1000.0 / 60.0)
-// The 1000/60 factor was tuned so that at ~60° FOV, one reticle unit
-// corresponds to roughly 1 mrad at 1000 yards. We keep the same slope here
-// so this geometry-based reticle matches the old visual behavior.
-const MRAD_PER_UNIT_SLOPE = 1000.0 / 60.0;
+// Derivation:
+//  - For a given vertical FOV (in radians) = theta, the top/bottom of the scope
+//    are at ±theta/2 from the optical axis.
+//  - Our reticle internal space uses y = ±0.5 at the top/bottom of the circle,
+//    so angleRad = y * theta.
+//  - 1 mrad = 0.001 rad, so:
+//        mradPerUnit = theta / 0.001 = 1000 * theta
+//  - Converting FOV from degrees to radians (theta = fovDeg * π/180) gives:
+//        mradPerUnit = fovDeg * (1000 * π / 180)
+// This ensures that 1.0 mrad on the reticle corresponds to a true 1.0 mrad
+// angular change in the camera, so dialing and holding are consistent.
+const MRAD_PER_UNIT_SLOPE = 1000.0 * (Math.PI / 180.0);
 
 // Scope FOV specs are always quoted "width in feet at 100 yards".
 function fovDegFromFeetAtSpecDistance(widthFeet)
@@ -145,6 +149,12 @@ export class Scope
 
     // BTK wind generator (optional)
     this.windGenerator = config.windGenerator || null;
+
+    // Ballistics table for drop indicator (optional, rifle scope only)
+    this.ballisticsTable = config.ballisticsTable || null;
+
+    // Smart scope features (range finder and drop indicator)
+    this.smartScopeEnabled = config.smartScopeEnabled !== undefined ? config.smartScopeEnabled : true;
 
     // Pan speed for keyboard control (used by spotting scope)
     this.panSpeedBase = config.panSpeedBase || 0.1; // radians per second base speed
@@ -904,6 +914,12 @@ export class Scope
 
       // Create instanced mesh after collecting all line data
       this.createInstancedReticle();
+      
+      // Create drop indicator (red circle showing predicted bullet drop) - only if smart scope enabled
+      if (this.smartScopeEnabled)
+      {
+        this.createDropIndicator();
+      }
 
       // Apply initial FFP scaling (and map from [-0.5,0.5] reticle space to [-1,1] HUD space)
       this.updateReticleScale();
@@ -945,8 +961,11 @@ export class Scope
       this.updateReticleScale();
     }
 
-    // Create focal distance text display (for both rifle and spotting scopes)
-    this.createFocalDistanceText();
+    // Create focal distance text display (for both rifle and spotting scopes) - only if smart scope enabled
+    if (this.smartScopeEnabled)
+    {
+      this.createFocalDistanceText();
+    }
 
     // Local lighting for metallic look on housing + reticle
     const ambient = new THREE.AmbientLight(0xffffff, 0.15);
@@ -1258,6 +1277,112 @@ export class Scope
     const baseScale = 2.0;
     const s = baseScale * fovScale;
     this.reticleGroup.scale.set(s, s, 1);
+  }
+
+  /**
+   * Create the drop indicator - a red solid circle with glow on the vertical crosshair
+   * showing where the bullet will drop at the current focal distance.
+   * Only created if ballisticsTable is available.
+   * Uses canvas-based rendering with shadowBlur for glow, matching the range finder text.
+   */
+  createDropIndicator()
+  {
+    if (!this.reticleGroup || !this.ballisticsTable) return;
+    
+    // Create canvas for circle rendering
+    const canvas = document.createElement('canvas');
+    const size = 128; // Canvas size for circle
+    canvas.width = size;
+    canvas.height = size;
+    this.dropIndicatorCanvas = canvas;
+    
+    const ctx = canvas.getContext('2d');
+    this.dropIndicatorCtx = ctx;
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    this.dropIndicatorTexture = texture;
+    
+    // Create plane geometry material
+    const planeMaterial = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      stencilWrite: true,
+      stencilRef: 1,
+      stencilFunc: THREE.EqualStencilFunc,
+      stencilZPass: THREE.KeepStencilOp
+    });
+    this.dropIndicatorMaterial = planeMaterial;
+    
+    // Create plane geometry for circle (0.30 mrad diameter = 0.15 mrad radius)
+    const radiusMrad = 0.15;
+    const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
+    const planeSize = radiusUnits * 2; // Diameter
+    
+    const planeGeom = new THREE.PlaneGeometry(planeSize, planeSize);
+    const planeMesh = new THREE.Mesh(planeGeom, planeMaterial);
+    planeMesh.position.set(0, 0, 0.01); // Slightly in front of reticle
+    
+    this.dropIndicatorMesh = planeMesh;
+    this.reticleGroup.add(planeMesh);
+    
+    // Initial update
+    this.updateDropIndicator();
+  }
+
+  /**
+   * Update the drop indicator position and redraw the circle with glow.
+   * Positions the red circle on the vertical crosshair at the predicted drop.
+   */
+  updateDropIndicator()
+  {
+    if (!this.dropIndicatorMesh || !this.ballisticsTable || !this.dropIndicatorCanvas || !this.dropIndicatorCtx || !this.dropIndicatorTexture) return;
+    
+    const ctx = this.dropIndicatorCtx;
+    const canvas = this.dropIndicatorCanvas;
+    
+    // Clear canvas with transparent background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Get drop in mrad for current focal distance
+    const drop_mrad = this.ballisticsTable.getDropForRange(this.focalDistance);
+    
+    // Convert to reticle units (drop is negative, so indicator goes below crosshair)
+    const dropUnits = this.mradToReticleUnitsAtFov(drop_mrad, this.initialFOV);
+    
+    // Position on vertical crosshair (x=0, y=drop)
+    this.dropIndicatorMesh.position.set(0, dropUnits, 0.01);
+    
+    // Draw circle with glow effect (matching range finder text style)
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = canvas.width / 2 - 4; // Leave small margin
+    
+    // Digital red color (#ff0000) with glow effect
+    const redColor = '#ff0000';
+    const glowColor = '#ff6666';
+    
+    // Draw glow effect using shadowBlur
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = redColor;
+    ctx.fillStyle = glowColor;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw main circle in bright red
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = redColor;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Update texture
+    this.dropIndicatorTexture.needsUpdate = true;
   }
 
   zoomIn(factor = 1.1)
@@ -1762,6 +1887,8 @@ export class Scope
     // The blur shader uniform will be updated automatically in the render loop
     // Update the text display
     this.updateFocalDistanceText();
+    // Update drop indicator position
+    this.updateDropIndicator();
   }
 
   /**

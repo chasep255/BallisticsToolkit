@@ -128,6 +128,10 @@
         <input type="checkbox" id="opticalEffects" title="Enable heat mirage and depth-of-field effects in scopes" style="width: auto; align-self: flex-start;" checked>
       </div>
       <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+        <label for="smartScope" title="Enable range finder and bullet drop indicator">Smart Scope</label>
+        <input type="checkbox" id="smartScope" title="Enable range finder display and bullet drop compensator circle" style="width: auto; align-self: flex-start;" checked>
+      </div>
+      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
         <label for="hunting" title="Enable boars and prairie dogs">Hunting</label>
         <input type="checkbox" id="hunting" title="Enable boars and prairie dogs" style="width: auto; align-self: flex-start;" checked>
       </div>
@@ -221,7 +225,7 @@
             <strong>Desktop - Focus/Range Finder:</strong><br>
             - <kbd>F</kbd> or <kbd>Right-click</kbd> refocus the active scope at center crosshair distance<br>
             - Sets the focal distance for mirage and depth-of-field blur effects (when optical effects enabled)<br>
-            - Focal distance is always displayed in the bottom-right corner of each scope as a red digital readout (yards)<br>
+            - Focal distance is displayed in the bottom-right corner of each scope as a red digital readout (yards) when Smart Scope is enabled<br>
             - The active scope is indicated by the dull red border<br><br>
 
             <strong>Mobile/Touch:</strong><br>
@@ -301,6 +305,17 @@
             - Focus distance is set using <kbd>F</kbd> or <kbd>Right-click</kbd> (displayed as red digital readout in bottom-right of scope)<br>
             - Increases GPU load; turn off on low-power devices<br><br>
 
+            <strong>Smart Scope:</strong><br>
+            - Toggle via the checkbox in the settings bar (enabled by default)<br>
+            - When enabled, displays:<br>
+            &nbsp;&nbsp;• <strong>Range Finder:</strong> Red digital readout in bottom-right showing focal distance in yards<br>
+            &nbsp;&nbsp;• <strong>Drop Indicator:</strong> Red circle on vertical crosshair showing predicted bullet drop<br>
+            - Range finder updates when you focus using <kbd>F</kbd> or <kbd>Right-click</kbd><br>
+            - Drop indicator uses ballistics table to show where bullet will impact at current focal distance<br>
+            - Like a real scope with a dope card, the drop indicator is an estimate, not a guarantee; small errors are expected<br>
+            - Available in both rifle and spotting scopes<br>
+            - Disable to reduce visual clutter if desired<br><br>
+
             <strong>Hunting:</strong><br>
             - Toggle via the checkbox in the settings bar<br>
             - Enables/disables boars and prairie dogs<br>
@@ -313,11 +328,17 @@
             - <strong>Impact Status:</strong> "IMPACT" (green) or "MISS" (red)<br>
             - Units displayed match selected Scope Type<br><br>
             
-            <strong>Range Finder Display (Bottom-Right of Scope):</strong><br>
+            <strong>Range Finder Display (Smart Scope Feature):</strong><br>
             - Shows current focal distance in yards as a red digital readout<br>
             - Updates when you focus using <kbd>F</kbd> or <kbd>Right-click</kbd><br>
-            - Always visible in both rifle and spotting scopes<br>
-            - The focal distance affects mirage and depth-of-field blur when optical effects are enabled
+            - Visible in both rifle and spotting scopes when Smart Scope is enabled<br>
+            - The focal distance affects mirage and depth-of-field blur when optical effects are enabled<br><br>
+            
+            <strong>Drop Indicator (Smart Scope Feature):</strong><br>
+            - Red circle on the vertical crosshair showing predicted bullet drop<br>
+            - Positioned based on ballistics table calculation for current focal distance<br>
+            - Only visible in rifle scope when Smart Scope is enabled<br>
+            - Helps visualize where the bullet will impact at the focused range<br>
           </div>
         </div>
 
