@@ -206,6 +206,14 @@ export class Scope
     // Derived normalized scope radius (computed from layer height)
     this.scopeRadiusNormalized = 0;
 
+    // Derive normalized scope radius (matches maskRadius in HUD)
+    // This is used for composition-space hit testing (isPointInside)
+    const hudMaskRadius = 0.98; // must match maskRadius in createInternalComposition
+    if (this.layer && this.layer.height > 0)
+    {
+      this.scopeRadiusNormalized = (this.layer.height / 2) * hudMaskRadius;
+    }
+
     // Create resources
     this.createInternalRenderTarget(renderWidth, renderHeight);
     this.createCamera();
@@ -213,13 +221,6 @@ export class Scope
     this.createMiragePass();
 
     this.createInternalComposition(renderWidth, renderHeight);
-
-    // Derive normalized scope radius (matches scopeRadius in HUD)
-    const hudScopeRadius = 0.98; // must match scopeRadius in createInternalComposition
-    if (this.layer && this.layer.height > 0)
-    {
-      this.scopeRadiusNormalized = (this.layer.height / 2) * hudScopeRadius;
-    }
   }
 
   // No static helpers here; Scope owns its own geometry/materials.
@@ -833,7 +834,10 @@ export class Scope
     this.internalCamera.position.z = 5;
 
     // Main scope view: circle mapped with scene texture (will be blurred if optical effects enabled)
-    const scopeRadius = 0.98;
+    // Scope circle is slightly larger (0.985) than the stencil mask (0.98) to overlap the housing
+    // and prevent background leaking through due to texture filtering at the edge
+    const scopeRadius = 0.985;
+    const maskRadius = 0.98;
     const scopeGeom = new THREE.CircleGeometry(scopeRadius, 64);
     const scopeTexture = this.sceneRenderTarget.texture; // Start with raw scene texture
     const scopeMat = new THREE.MeshBasicMaterial(
@@ -845,13 +849,14 @@ export class Scope
       toneMapped: false
     });
     const scopeMesh = new THREE.Mesh(scopeGeom, scopeMat);
-    scopeMesh.position.set(0, 0, 0.01);
+    scopeMesh.position.set(0, 0, 0.0);
     this.internalScene.add(scopeMesh);
     this.scopeMesh = scopeMesh; // Store reference for texture updates
 
     // Stencil mask: defines circular aperture for reticle elements (only if reticle enabled)
     // Stencil mask circle for reticle clipping (needed for both rifle and spotting scopes)
-    const maskGeom = new THREE.CircleGeometry(scopeRadius, 64);
+    // Uses maskRadius (0.98) which is slightly smaller than scopeRadius to ensure clean edge
+    const maskGeom = new THREE.CircleGeometry(maskRadius, 64);
     const maskMat = new THREE.MeshBasicMaterial(
     {
       colorWrite: false,
@@ -863,12 +868,13 @@ export class Scope
       stencilZPass: THREE.ReplaceStencilOp
     });
     const maskMesh = new THREE.Mesh(maskGeom, maskMat);
-    maskMesh.position.set(0, 0, 0.015);
+    maskMesh.position.set(0, 0, 0.1);
     this.internalScene.add(maskMesh);
 
     // Thin black housing ring around the glass (simple geometry)
+    // Starts at maskRadius (0.98) to align with the visible edge of the scope
     const housingOuterRadius = 1.0; // controls thickness
-    const housingGeom = new THREE.RingGeometry(scopeRadius, housingOuterRadius, 128);
+    const housingGeom = new THREE.RingGeometry(maskRadius, housingOuterRadius, 128);
     const housingMat = new THREE.MeshStandardMaterial(
     {
       color: 0x000000,
@@ -879,14 +885,14 @@ export class Scope
       toneMapped: false
     });
     const housingMesh = new THREE.Mesh(housingGeom, housingMat);
-    housingMesh.position.set(0, 0, 0.02);
+    housingMesh.position.set(0, 0, 0.2);
     this.internalScene.add(housingMesh);
 
     // Reticle group built in MRAD space, then mapped into HUD units (only if reticle enabled)
     if (this.hasReticle)
     {
       this.reticleGroup = new THREE.Group();
-      this.reticleGroup.position.set(0, 0, 0.02);
+      this.reticleGroup.position.set(0, 0, 0.3);
       this.internalScene.add(this.reticleGroup);
 
       // Shared metallic material for reticle elements
@@ -928,7 +934,7 @@ export class Scope
     {
       // Spotting scope: simple crosshair
       this.reticleGroup = new THREE.Group();
-      this.reticleGroup.position.set(0, 0, 0.02);
+      this.reticleGroup.position.set(0, 0, 0.3);
       this.internalScene.add(this.reticleGroup);
 
       // Shared metallic material for reticle elements
@@ -977,14 +983,66 @@ export class Scope
   }
 
   /**
-   * Convert a MRAD distance into local reticle units at a given FOV.
-   * Matches the previous shader behavior: mradPerUnit = fovDeg * 1000 / 60.
-   * Scope is circular (1:1 aspect), so horizontal FOV = vertical FOV.
+   * Convert MRAD to HUD-space Y coordinate using exact camera angular projection.
+   * This matches the camera's perspective projection exactly, eliminating scaling errors.
+   * 
+   * Formula: angleRad = mrad * 0.001
+   *          y_ndc = tan(angleRad) / tan(fovRad / 2)  (perspective projection)
+   *          y_hud = y_ndc * hudMaskRadius
+   * 
+   * The HUD space is orthographic with bounds [-1, 1] for Y.
+   * The scope circle has radius hudMaskRadius (0.98) in this space.
+   * 
+   * For small angles, tan(θ) ≈ θ, so this simplifies to:
+   *          y_ndc ≈ angleRad / (fovRad / 2)
+   * 
+   * @param {number} mrad - Angle in milliradians
+   * @param {number} fovDeg - Optional FOV in degrees (defaults to current FOV)
+   * @returns {number} Y coordinate in HUD space
+   */
+  mradToHudY(mrad, fovDeg = null)
+  {
+    const angleRad = mrad * 0.001; // mrad → rad
+    const fovRad = fovDeg !== null 
+      ? THREE.MathUtils.degToRad(fovDeg) 
+      : this.getFovRad(); // Use specified FOV or current FOV
+    
+    // Use exact perspective projection: tan(angle) / tan(fov/2)
+    // For small angles, tan(θ) ≈ θ, but we use exact formula for precision
+    const y_ndc = Math.tan(angleRad) / Math.tan(fovRad / 2);
+    
+    // Convert NDC [-1, 1] to HUD space using scope mask radius
+    // HUD space is orthographic with scope circle radius = 0.98
+    const hudMaskRadius = 0.98; // matches maskRadius in createInternalComposition
+    return y_ndc * hudMaskRadius;
+  }
+
+  /**
+   * Convert MRAD to HUD-space X coordinate using exact camera angular projection.
+   * Same as mradToHudY but for horizontal axis.
+   * 
+   * @param {number} mrad - Angle in milliradians
+   * @param {number} fovDeg - Optional FOV in degrees (defaults to current FOV)
+   * @returns {number} X coordinate in HUD space
+   */
+  mradToHudX(mrad, fovDeg = null)
+  {
+    // Scope is circular (1:1 aspect), so horizontal and vertical use same math
+    return this.mradToHudY(mrad, fovDeg);
+  }
+
+  /**
+   * @deprecated Use mradToHudY/X instead for exact angular projection
+   * Kept for backwards compatibility during migration
    */
   mradToReticleUnitsAtFov(mrad, fovDeg)
   {
-    const mradPerUnit = fovDeg * MRAD_PER_UNIT_SLOPE;
-    return mrad / mradPerUnit;
+    // Convert to HUD space using new method, then convert back to old units
+    // This is a temporary bridge function
+    const hudY = this.mradToHudY(mrad);
+    // Old system: reticle units were in [-0.5, 0.5] space, scaled by 2 to HUD [-1, 1]
+    // So: reticleUnit = hudY / (2 * scopeRadiusNormalized)
+    return hudY / (2.0 * this.scopeRadiusNormalized);
   }
 
   /**
@@ -1060,22 +1118,25 @@ export class Scope
   /**
    * Add a line segment defined in MRAD space to the reticle group.
    * Stores instance data for later instanced mesh creation.
+   * Uses exact camera angular projection to convert MRAD directly to HUD coordinates.
    */
   addLineMrad(x1Mrad, y1Mrad, x2Mrad, y2Mrad, thicknessMrad)
   {
     if (!this.reticleGroup || !this.reticleMaterial) return;
 
-    const x1 = this.mradToReticleUnitsAtFov(x1Mrad, this.initialFOV);
-    const y1 = this.mradToReticleUnitsAtFov(y1Mrad, this.initialFOV);
-    const x2 = this.mradToReticleUnitsAtFov(x2Mrad, this.initialFOV);
-    const y2 = this.mradToReticleUnitsAtFov(y2Mrad, this.initialFOV);
+    // Convert MRAD directly to HUD space coordinates using exact camera projection
+    const x1 = this.mradToHudX(x1Mrad);
+    const y1 = this.mradToHudY(y1Mrad);
+    const x2 = this.mradToHudX(x2Mrad);
+    const y2 = this.mradToHudY(y2Mrad);
 
     const dx = x2 - x1;
     const dy = y2 - y1;
     const length = Math.sqrt(dx * dx + dy * dy);
     if (length <= 0.0) return;
 
-    const thickness = this.mradToReticleUnitsAtFov(thicknessMrad, this.initialFOV);
+    // Convert thickness from MRAD to HUD space
+    const thickness = this.mradToHudY(thicknessMrad);
     const angle = Math.atan2(dy, dx);
     const centerX = (x1 + x2) * 0.5;
     const centerY = (y1 + y2) * 0.5;
@@ -1130,16 +1191,17 @@ export class Scope
   {
     if (!this.reticleGroup || !this.reticleMaterial) return;
 
-    const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
-    const thicknessUnits = this.mradToReticleUnitsAtFov(thicknessMrad, this.initialFOV);
-    const innerRadius = Math.max(radiusUnits - thicknessUnits * 0.5, 0.0);
-    const outerRadius = radiusUnits + thicknessUnits * 0.5;
+    // Convert MRAD directly to HUD space coordinates
+    const radiusHud = this.mradToHudY(radiusMrad);
+    const thicknessHud = this.mradToHudY(thicknessMrad);
+    const innerRadius = Math.max(radiusHud - thicknessHud * 0.5, 0.0);
+    const outerRadius = radiusHud + thicknessHud * 0.5;
 
     const ringGeom = new THREE.RingGeometry(innerRadius, outerRadius, segments);
     const ringMesh = new THREE.Mesh(ringGeom, this.reticleMaterial);
 
-    const cx = this.mradToReticleUnitsAtFov(centerXMrad, this.initialFOV);
-    const cy = this.mradToReticleUnitsAtFov(centerYMrad, this.initialFOV);
+    const cx = this.mradToHudX(centerXMrad);
+    const cy = this.mradToHudY(centerYMrad);
     ringMesh.position.set(cx, cy, 0);
 
     this.reticleGroup.add(ringMesh);
@@ -1152,12 +1214,13 @@ export class Scope
   {
     if (!this.reticleGroup || !this.reticleMaterial) return;
 
-    const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
-    const geom = new THREE.CircleGeometry(radiusUnits, segments);
+    // Convert MRAD directly to HUD space coordinates
+    const radiusHud = this.mradToHudY(radiusMrad);
+    const geom = new THREE.CircleGeometry(radiusHud, segments);
     const mesh = new THREE.Mesh(geom, this.reticleMaterial);
 
-    const cx = this.mradToReticleUnitsAtFov(centerXMrad, this.initialFOV);
-    const cy = this.mradToReticleUnitsAtFov(centerYMrad, this.initialFOV);
+    const cx = this.mradToHudX(centerXMrad);
+    const cy = this.mradToHudY(centerYMrad);
     mesh.position.set(cx, cy, 0);
 
     this.reticleGroup.add(mesh);
@@ -1266,17 +1329,37 @@ export class Scope
 
   /**
    * Update the reticle scale for FFP behavior.
-   * Geometry is built at initialFOV; scale changes with currentFOV.
+   * Since reticle geometry is now built directly in HUD space using exact camera projection,
+   * we need to rebuild it when FOV changes to maintain FFP scaling.
+   * 
+   * For FFP scopes, the reticle must scale with zoom. Since we're using exact angular projection,
+   * we rebuild the reticle geometry at the new FOV.
    */
   updateReticleScale()
   {
     if (!this.reticleGroup) return;
 
-    const fovScale = this.initialFOV / this.currentFOV;
-    // Factor 2 maps internal reticle space [-0.5,0.5] to HUD space [-1,1]
-    const baseScale = 2.0;
-    const s = baseScale * fovScale;
-    this.reticleGroup.scale.set(s, s, 1);
+    // With the new exact angular projection, reticle geometry is built directly in HUD space
+    // at the current FOV. For FFP behavior, we need to rebuild the reticle when FOV changes.
+    // However, rebuilding every frame would be expensive, so we use a scale factor that
+    // approximates the FFP behavior while maintaining angular accuracy.
+    
+    // The scale factor accounts for the change in FOV:
+    // At new FOV, the same mrad angle projects to a different HUD position.
+    // Scale = tan(fov_old/2) / tan(fov_new/2)
+    const fovOldRad = THREE.MathUtils.degToRad(this.initialFOV);
+    const fovNewRad = this.getFovRad();
+    
+    // Use exact perspective projection scaling
+    const scale = Math.tan(fovOldRad / 2) / Math.tan(fovNewRad / 2);
+    
+    // For small FOV changes, this is approximately: initialFOV / currentFOV
+    // But we use the exact formula for precision
+    this.reticleGroup.scale.set(scale, scale, 1);
+    
+    // Drop indicator position is calculated at initialFOV, so it scales automatically
+    // with reticleGroup. We only need to update it when focal distance changes,
+    // not when FOV changes (the group scale handles FFP).
   }
 
   /**
@@ -1319,15 +1402,17 @@ export class Scope
     this.dropIndicatorMaterial = planeMaterial;
     
     // Create plane geometry for circle (0.30 mrad diameter = 0.15 mrad radius)
+    // Calculate at initialFOV so it scales correctly with reticleGroup (FFP behavior)
     const radiusMrad = 0.15;
-    const radiusUnits = this.mradToReticleUnitsAtFov(radiusMrad, this.initialFOV);
-    const planeSize = radiusUnits * 2; // Diameter
+    const radiusHud = this.mradToHudY(radiusMrad, this.initialFOV);
+    const planeSize = radiusHud * 2; // Diameter
     
     const planeGeom = new THREE.PlaneGeometry(planeSize, planeSize);
     const planeMesh = new THREE.Mesh(planeGeom, planeMaterial);
     planeMesh.position.set(0, 0, 0.01); // Slightly in front of reticle
     
     this.dropIndicatorMesh = planeMesh;
+    // Add to reticleGroup so it scales consistently with the rest of the reticle (FFP)
     this.reticleGroup.add(planeMesh);
     
     // Initial update
@@ -1337,6 +1422,7 @@ export class Scope
   /**
    * Update the drop indicator position and redraw the circle with glow.
    * Positions the red circle on the vertical crosshair at the predicted drop.
+   * Calculates position at initialFOV so it scales correctly with reticleGroup (FFP).
    */
   updateDropIndicator()
   {
@@ -1351,11 +1437,14 @@ export class Scope
     // Get drop in mrad for current focal distance
     const drop_mrad = this.ballisticsTable.getDropForRange(this.focalDistance);
     
-    // Convert to reticle units (drop is negative, so indicator goes below crosshair)
-    const dropUnits = this.mradToReticleUnitsAtFov(drop_mrad, this.initialFOV);
+    // Convert to HUD space at initialFOV (like reticle lines)
+    // This ensures the drop indicator scales correctly with reticleGroup (FFP behavior)
+    // Drop is positive (bullet drops below line of sight), so indicator goes below crosshair
+    const dropHud = this.mradToHudY(drop_mrad, this.initialFOV);
     
     // Position on vertical crosshair (x=0, y=drop)
-    this.dropIndicatorMesh.position.set(0, dropUnits, 0.01);
+    // Position is in reticleGroup space, so it will be scaled by reticleGroup.scale
+    this.dropIndicatorMesh.position.set(0, dropHud, 0.01);
     
     // Draw circle with glow effect (matching range finder text style)
     const centerX = canvas.width / 2;
