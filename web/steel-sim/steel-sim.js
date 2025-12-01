@@ -231,8 +231,9 @@ class SteelSimulator
     // Scope and shooting
     this.scopeMode = false;
     this.rifleZero = null;
+    this.activeScope = null; // 'rifle' or 'spotting' - tracks which scope is active for desktop mode
 
-    // Spotting scope key states
+    // Spotting scope key states (deprecated - no longer used for WASD)
     this.spottingScopeKeys = {
       w: false,
       a: false,
@@ -361,6 +362,10 @@ class SteelSimulator
     if (this.boundHandlers.onMouseDown)
     {
       this.canvas.removeEventListener('mousedown', this.boundHandlers.onMouseDown);
+    }
+    if (this.boundHandlers.onContextMenu)
+    {
+      this.canvas.removeEventListener('contextmenu', this.boundHandlers.onContextMenu);
     }
     if (this.boundHandlers.onMouseUp)
     {
@@ -744,6 +749,9 @@ class SteelSimulator
     });
     this.camera = this.scope.getCamera(); // For raycasting
 
+    // Initialize scope borders (no active scope initially)
+    this.updateScopeBorders();
+
     // Create target racks (independent of scope setup)
     this.createTargetRacks();
 
@@ -968,6 +976,7 @@ class SteelSimulator
     this.boundHandlers.onMouseMove = (e) => this.onMouseMove(e);
     this.boundHandlers.onMouseDown = (e) => this.onMouseDown(e);
     this.boundHandlers.onMouseUp = (e) => this.onMouseUp(e);
+    this.boundHandlers.onContextMenu = (e) => this.onContextMenu(e);
     this.boundHandlers.onKeyDown = (e) => this.onKeyDown(e);
     this.boundHandlers.onKeyUp = (e) => this.onKeyUp(e);
     this.boundHandlers.onPointerLockChange = () => this.onPointerLockChange();
@@ -980,6 +989,7 @@ class SteelSimulator
     });
     this.canvas.addEventListener('mousemove', this.boundHandlers.onMouseMove);
     this.canvas.addEventListener('mousedown', this.boundHandlers.onMouseDown);
+    this.canvas.addEventListener('contextmenu', this.boundHandlers.onContextMenu);
     window.addEventListener('mouseup', this.boundHandlers.onMouseUp);
     window.addEventListener('keydown', this.boundHandlers.onKeyDown);
     window.addEventListener('keyup', this.boundHandlers.onKeyUp);
@@ -1326,13 +1336,18 @@ class SteelSimulator
 
     event.preventDefault();
 
-    if (event.deltaY < 0)
+    // Zoom the active scope
+    const scopeToZoom = this.activeScope === 'spotting' ? this.spottingScope : this.scope;
+    if (scopeToZoom)
     {
-      this.scope.zoomIn();
-    }
-    else
-    {
-      this.scope.zoomOut();
+      if (event.deltaY < 0)
+      {
+        scopeToZoom.zoomIn();
+      }
+      else
+      {
+        scopeToZoom.zoomOut();
+      }
     }
   }
 
@@ -1340,20 +1355,24 @@ class SteelSimulator
   {
     if (this.scopeMode && document.pointerLockElement === this.canvas)
     {
-      // Pan scope based on relative mouse movement:
+      // Pan active scope based on relative mouse movement:
       // 1) pixels → normalized composition delta
       // 2) normalized delta → yaw/pitch via Scope
       const deltaX = event.movementX || 0;
       const deltaY = event.movementY || 0;
       if (deltaX !== 0 || deltaY !== 0)
       {
-        const normDelta = this.compositionRenderer.movementToNormalized(deltaX, deltaY);
-        const
+        const scopeToControl = this.activeScope === 'spotting' ? this.spottingScope : this.scope;
+        if (scopeToControl)
         {
-          deltaYaw,
-          deltaPitch
-        } = this.scope.normalizedDeltaToAngles(normDelta.x, normDelta.y);
-        this.scope.panBy(deltaYaw, deltaPitch);
+          const normDelta = this.compositionRenderer.movementToNormalized(deltaX, deltaY);
+          const
+          {
+            deltaYaw,
+            deltaPitch
+          } = scopeToControl.normalizedDeltaToAngles(normDelta.x, normDelta.y);
+          scopeToControl.panBy(deltaYaw, deltaPitch);
+        }
       }
     }
   }
@@ -1379,12 +1398,125 @@ class SteelSimulator
         // Fire when clicking in scope mode
         this.fireFromScope();
       }
-      else if (this.scope.isPointInside(norm.x, norm.y))
+      else
       {
-        // Enter scope mode when clicking on scope.
-        // Let pointerlockchange handler update scopeMode.
-        this.canvas.requestPointerLock();
+        // Check which scope was clicked and set it as active
+        if (this.scope.isPointInside(norm.x, norm.y))
+        {
+          this.activeScope = 'rifle';
+          // Enter scope mode when clicking on rifle scope.
+          // Let pointerlockchange handler update scopeMode.
+          this.canvas.requestPointerLock();
+        }
+        else if (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y))
+        {
+          this.activeScope = 'spotting';
+          // Enter scope mode when clicking on spotting scope.
+          this.canvas.requestPointerLock();
+        }
+        
+        this.updateScopeBorders();
       }
+    }
+    else if (event.button === 2) // Right click
+    {
+      // Focus the active scope on right-click (same logic as firing, but focus instead)
+      if (locked && this.activeScope)
+      {
+        const scopeToFocus = this.activeScope === 'spotting' ? this.spottingScope : this.scope;
+        if (scopeToFocus)
+        {
+          this.setFocalDistanceFromRaycast(scopeToFocus);
+        }
+      }
+      event.preventDefault(); // Prevent context menu
+    }
+  }
+
+  onContextMenu(event)
+  {
+    // Prevent context menu when right-clicking on scopes
+    const norm = this.compositionRenderer.screenToNormalized(event.clientX, event.clientY);
+    if ((this.scope && this.scope.isPointInside(norm.x, norm.y)) ||
+        (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y)))
+    {
+      event.preventDefault();
+    }
+  }
+
+  /**
+   * Update scope border styling to show which scope is active (desktop mode)
+   * Adds a dull red border to the active scope layer
+   */
+  updateScopeBorders()
+  {
+    // Only update borders in desktop mode (not mobile)
+    if (!this.scopeLayer || !this.spottingScopeLayer) return;
+    
+    const activeBorderColor = 0x8b0000; // Dull red (dark red)
+    const inactiveBorderColor = 0x000000; // Black (default)
+    const borderWidth = 0.015; // Border width in normalized coordinates
+    
+    // Update rifle scope border
+    const rifleBorderColor = this.activeScope === 'rifle' ? activeBorderColor : inactiveBorderColor;
+    this.updateScopeLayerBorder(this.scopeLayer, rifleBorderColor, borderWidth);
+    
+    // Update spotting scope border
+    const spottingBorderColor = this.activeScope === 'spotting' ? activeBorderColor : inactiveBorderColor;
+    this.updateScopeLayerBorder(this.spottingScopeLayer, spottingBorderColor, borderWidth);
+  }
+
+  /**
+   * Add or update border overlay on a scope layer
+   */
+  updateScopeLayerBorder(layer, borderColor, borderWidth)
+  {
+    if (!layer || !layer._mesh) return;
+    
+    // Remove existing border if present
+    if (layer._borderMesh)
+    {
+      if (layer._mesh.parent)
+      {
+        layer._mesh.parent.remove(layer._borderMesh);
+      }
+      if (layer._borderMesh.geometry) layer._borderMesh.geometry.dispose();
+      if (layer._borderMesh.material) layer._borderMesh.material.dispose();
+      layer._borderMesh = null;
+    }
+    
+    // Only add border if it's the active scope (dull red)
+    if (borderColor === 0x000000) return;
+    
+    // Create border ring geometry
+    const positions = layer._mesh.position;
+    const width = layer.width;
+    const height = layer.height;
+    
+    // Create a ring geometry for the border (using normalized coordinates)
+    const outerRadius = Math.min(width, height) / 2;
+    const innerRadius = Math.max(0.01, outerRadius - borderWidth);
+    const borderGeometry = new THREE.RingGeometry(innerRadius, outerRadius, 64);
+    
+    const borderMaterial = new THREE.MeshBasicMaterial({
+      color: borderColor,
+      transparent: true,
+      opacity: 0.6,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    
+    const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderMesh.position.set(positions.x, positions.y, positions.z + 0.001); // Slightly in front
+    borderMesh.renderOrder = layer._mesh.renderOrder + 1;
+    borderMesh.frustumCulled = false;
+    
+    // Add to composition scene (same parent as the scope layer mesh)
+    if (layer._mesh.parent)
+    {
+      layer._mesh.parent.add(borderMesh);
+      layer._borderMesh = borderMesh;
     }
   }
 
@@ -1462,32 +1594,41 @@ class SteelSimulator
     const locked = document.pointerLockElement === this.canvas;
     this.scopeMode = locked;
     this.canvas.style.cursor = locked ? 'none' : 'default';
+    
+    // When entering scope mode, ensure activeScope is set to rifle (pointer lock is rifle scope only)
+    if (locked && !this.activeScope)
+    {
+      this.activeScope = 'rifle';
+    }
+    
+    this.updateScopeBorders();
   }
 
   onKeyDown(event)
   {
-    // Spotting scope controls (always active, no pointer lock needed)
-    const key = event.key.toLowerCase();
-    if (key === 'w' || key === 'a' || key === 's' || key === 'd' || key === 'e' || key === 'q')
+    // Tab key: Switch between rifle and spotting scope (only when in pointer lock/scope mode)
+    if (event.key === 'Tab')
     {
-      // Don't prevent default if modifier keys are pressed (allow shortcuts)
-      if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey)
+      if (!this.scopeMode || document.pointerLockElement !== this.canvas)
       {
-        return;
+        return; // Only work when in pointer lock mode
       }
-
-      this.spottingScopeKeys[key] = true;
-      event.preventDefault(); // Prevent default for all spotting scope keys
-      return;
-    }
-
-    // Toggle scope display with S key (only if not using spotting scope S key)
-    if (event.key === 's' || event.key === 'S')
-    {
-      if (!this.scopeMode && this.scopeLayer && this.scopeLayer._mesh)
+      
+      event.preventDefault();
+      if (this.activeScope === 'rifle')
       {
-        this.scopeLayer._mesh.visible = !this.scopeLayer._mesh.visible;
+        this.activeScope = 'spotting';
       }
+      else if (this.activeScope === 'spotting')
+      {
+        this.activeScope = 'rifle';
+      }
+      else
+      {
+        // If no scope is active, default to rifle
+        this.activeScope = 'rifle';
+      }
+      this.updateScopeBorders();
       return;
     }
 
@@ -1527,24 +1668,32 @@ class SteelSimulator
       return;
     }
 
-    // Rifle scope controls (only when in scope mode)
+    // Scope controls (only when in scope mode)
     if (this.scopeMode)
     {
-      // Zoom controls: +/- or =/- keys
+      // Zoom controls: +/- or =/- keys (works on active scope)
       if (event.key === '=' || event.key === '+')
       {
         event.preventDefault();
-        this.scope.zoomIn();
+        const scopeToZoom = this.activeScope === 'spotting' ? this.spottingScope : this.scope;
+        if (scopeToZoom)
+        {
+          scopeToZoom.zoomIn();
+        }
         return;
       }
       if (event.key === '-' || event.key === '_')
       {
         event.preventDefault();
-        this.scope.zoomOut();
+        const scopeToZoom = this.activeScope === 'spotting' ? this.spottingScope : this.scope;
+        if (scopeToZoom)
+        {
+          scopeToZoom.zoomOut();
+        }
         return;
       }
 
-      // R key: Reset scope dial to zero
+      // R key: Reset scope dial to zero (rifle scope only - spotting scope has no dials)
       if (event.key === 'r' || event.key === 'R')
       {
         event.preventDefault();
@@ -1587,36 +1736,28 @@ class SteelSimulator
         return;
       }
 
-      // F key: Set focal distance for rifle scope
-      if ((event.key === 'f' || event.key === 'F') && !event.shiftKey)
+      // F key: Set focal distance for active scope
+      if (event.key === 'f' || event.key === 'F')
       {
         event.preventDefault();
-        this.setFocalDistanceFromRaycast(this.scope);
-        return;
-      }
-
-      // Shift+F: Set focal distance for spotting scope
-      if ((event.key === 'f' || event.key === 'F') && event.shiftKey)
-      {
-        event.preventDefault();
-        this.setFocalDistanceFromRaycast(this.spottingScope);
+        const scopeToFocus = this.activeScope === 'spotting' ? this.spottingScope : this.scope;
+        if (scopeToFocus)
+        {
+          this.setFocalDistanceFromRaycast(scopeToFocus);
+        }
         return;
       }
     }
 
-    // F key: Set focal distance for rifle scope (works outside scope mode too)
-    if ((event.key === 'f' || event.key === 'F') && !event.shiftKey)
+    // F key: Set focal distance for active scope (works outside scope mode too)
+    if (event.key === 'f' || event.key === 'F')
     {
       event.preventDefault();
-      this.setFocalDistanceFromRaycast(this.scope);
-      return;
-    }
-
-    // Shift+F: Set focal distance for spotting scope (works anytime)
-    if ((event.key === 'f' || event.key === 'F') && event.shiftKey)
-    {
-      event.preventDefault();
-      this.setFocalDistanceFromRaycast(this.spottingScope);
+      const scopeToFocus = this.activeScope === 'spotting' ? this.spottingScope : this.scope;
+      if (scopeToFocus)
+      {
+        this.setFocalDistanceFromRaycast(scopeToFocus);
+      }
       return;
     }
   }
@@ -1691,16 +1832,7 @@ class SteelSimulator
 
   onKeyUp(event)
   {
-    // Handle spotting scope key releases
-    const key = event.key.toLowerCase();
-    if (key === 'w' || key === 'a' || key === 's' || key === 'd' || key === 'e' || key === 'q')
-    {
-      if (!event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey)
-      {
-        this.spottingScopeKeys[key] = false;
-        event.preventDefault();
-      }
-    }
+    // WASD controls removed - no key releases to handle
   }
 
   // ===== TOUCH HANDLERS (Mobile) =====
@@ -1985,6 +2117,12 @@ class SteelSimulator
 
   fireFromScope()
   {
+    // Only fire from rifle scope (spotting scope is for observation only)
+    if (this.activeScope !== 'rifle')
+    {
+      return;
+    }
+    
     if (!this.rifleZero)
     {
       console.warn('[fireFromScope] Rifle not zeroed yet');
@@ -2478,28 +2616,7 @@ class SteelSimulator
     // Check for long-press focus gesture
     this.checkLongPressFocus();
 
-    // Update spotting scope camera from key states (WASD for panning, E/Q for zoom)
-    if (this.spottingScope)
-    {
-      const panKeys = {
-        w: this.spottingScopeKeys.w,
-        a: this.spottingScopeKeys.a,
-        s: this.spottingScopeKeys.s,
-        d: this.spottingScopeKeys.d
-      };
-      this.spottingScope.updateFromKeys(panKeys, dt);
-
-      // Handle continuous zoom (E/Q) - exponential scaling for smooth zoom
-      const zoomFactor = Math.pow(1.1, dt * 10);
-      if (this.spottingScopeKeys.e)
-      {
-        this.spottingScope.zoomIn(zoomFactor);
-      }
-      if (this.spottingScopeKeys.q)
-      {
-        this.spottingScope.zoomOut(zoomFactor);
-      }
-    }
+    // WASD controls removed - scopes are controlled via mouse/pointer lock
 
     this.spottingScope.render(dt);
     this.scope.render(dt);

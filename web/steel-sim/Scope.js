@@ -623,7 +623,7 @@ export class Scope
 
       varying vec2 vUv;
 
-      const float MIRAGE_ANGLE_SCALE          = 1.0 / 0.001;  // Scale factor for angular noise coordinates
+      const float MIRAGE_ANGLE_SCALE          = 1.0 / 0.0025;  // Scale factor for angular noise coordinates
       const float MIRAGE_TIME_SCALE           = 1.0 / 10.0;   // Scale factor for time noise coordinate
       const float MIRAGE_FOV_MAX              = 3.0 * 3.14159265359 / 180.0;  // No mirage at wide FOV (radians)
       const float MIRAGE_FOV_MIN              = 0.5 * 3.14159265359 / 180.0;  // Full mirage at narrow FOV (radians)
