@@ -73,7 +73,8 @@ from './ImpactDetector.js';
 import
 {
   Config,
-  initConfig
+  initConfig,
+  DEFAULT_PARAMS
 }
 from './config.js';
 import
@@ -2839,6 +2840,9 @@ async function startGame()
       window.btk = await BallisticsToolkit();
     }
 
+    // Explicitly save current UI values to cookies (in case auto-save didn't fire)
+    SettingsCookies.saveAll();
+
     // Clean up previous game if exists
     if (steelSimulator)
     {
@@ -2865,10 +2869,6 @@ async function startGame()
       fullscreenBtn.style.opacity = '1';
       fullscreenBtn.style.cursor = 'pointer';
     }
-
-    // Wind presets already populated during initialization
-    // Just reload cookies to restore saved wind preset
-    SettingsCookies.loadAll();
   }
   catch (error)
   {
@@ -2881,6 +2881,9 @@ async function restartGame()
 {
   try
   {
+    // Explicitly save current UI values to cookies (in case auto-save didn't fire)
+    SettingsCookies.saveAll();
+    
     // Get current parameters
     const params = getGameParams();
 
@@ -2894,10 +2897,6 @@ async function restartGame()
     const canvas = document.getElementById('steelCanvas');
     steelSimulator = new SteelSimulator(canvas, params);
     await steelSimulator.start();
-
-    // Wind presets already populated during initialization
-    // Just reload cookies to restore saved wind preset
-    SettingsCookies.loadAll();
   }
   catch (error)
   {
@@ -2926,6 +2925,19 @@ function setupUI()
   if (helpBtn)
   {
     helpBtn.addEventListener('click', () => helpModal.style.display = 'block');
+  }
+
+  // Reset to defaults button
+  const resetDefaultsBtn = document.getElementById('resetDefaults');
+  if (resetDefaultsBtn)
+  {
+    resetDefaultsBtn.addEventListener('click', (e) =>
+    {
+      e.preventDefault();
+      setDefaultValues();
+      SettingsCookies.saveAll(); // Explicitly save defaults to cookies
+      console.log('[UI] Reset all parameters to defaults and saved to cookies');
+    });
   }
 
   if (helpClose)
@@ -3095,10 +3107,37 @@ async function toggleFullscreen()
 
 // ===== START =====
 
+/**
+ * Set default values for all HTML inputs
+ * Called early, before BTK loads or cookies are loaded
+ * Also used by "Reset to Defaults" button
+ */
+function setDefaultValues()
+{
+  for (const [key, value] of Object.entries(DEFAULT_PARAMS))
+  {
+    const element = document.getElementById(key);
+    if (element)
+    {
+      if (element.type === 'checkbox')
+      {
+        element.checked = value;
+      }
+      else
+      {
+        element.value = value;
+      }
+    }
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () =>
 {
   try
   {
+    // Set default values immediately (before BTK loads)
+    setDefaultValues();
+    
     // Get start button and show loading state
     const startBtn = document.getElementById('startBtn');
     if (startBtn)
@@ -3113,20 +3152,22 @@ document.addEventListener('DOMContentLoaded', async () =>
       window.btk = await BallisticsToolkit();
     }
 
+    // Populate wind preset dropdown now that BTK is loaded
+    populateWindPresetDropdown();
+
+    // Load saved settings from cookies (after wind presets are populated, before resources load)
+    // This will overwrite defaults with saved values
+    SettingsCookies.loadAll();
+    SettingsCookies.attachAutoSave();
+
     // Initialize shared resource managers (load textures and models on page load)
     await initializeResources();
 
     // Setup UI
     setupUI();
 
-    // Populate wind preset dropdown now that BTK is loaded
-    populateWindPresetDropdown();
-
-    // Load saved settings from cookies (after wind presets are populated)
-    SettingsCookies.loadAll();
-
     // Attach auto-save listeners to all settings inputs
-    SettingsCookies.attachAutoSave();
+    
 
     // Try to lock orientation to landscape (may require user gesture on some browsers)
     // Also try on first user interaction since many browsers require a gesture

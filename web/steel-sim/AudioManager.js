@@ -53,6 +53,10 @@ export class AudioManager
     this.scheduledSources = new Set(); // Track scheduled sources for cleanup
     this.loopingSources = new Map(); // Map<soundId, {source, gainNode}>
     this.loadingProgress = 0;
+    
+    // Pre-created gain nodes for instant playback (node pooling)
+    this.gainNodePool = [];
+    this.poolSize = 10; // Pre-create 10 gain nodes
 
     console.log(`${LOG_PREFIX} Initialized`);
   }
@@ -66,6 +70,9 @@ export class AudioManager
     {
       this.audioContext = new(window.AudioContext || window.webkitAudioContext)();
       console.log(`${LOG_PREFIX} Audio context created (sample rate: ${this.audioContext.sampleRate}Hz)`);
+      
+      // Initialize gain node pool for low-latency playback
+      this.initializeGainNodePool();
     }
 
     // Resume context if suspended (browser autoplay policy)
@@ -81,6 +88,65 @@ export class AudioManager
     }
 
     return this.audioContext;
+  }
+  
+  /**
+   * Pre-create gain nodes for instant playback (reduces latency on mobile)
+   */
+  initializeGainNodePool()
+  {
+    if (!this.audioContext) return;
+    
+    this.gainNodePool = [];
+    for (let i = 0; i < this.poolSize; i++)
+    {
+      const gainNode = this.audioContext.createGain();
+      gainNode.connect(this.audioContext.destination);
+      this.gainNodePool.push(gainNode);
+    }
+    
+    console.log(`${LOG_PREFIX} Pre-created ${this.poolSize} gain nodes for low-latency playback`);
+  }
+  
+  /**
+   * Get a gain node from the pool (or create new if pool is empty)
+   */
+  getGainNode()
+  {
+    if (this.gainNodePool.length > 0)
+    {
+      return this.gainNodePool.pop();
+    }
+    
+    // Pool exhausted, create a new one
+    const gainNode = this.audioContext.createGain();
+    gainNode.connect(this.audioContext.destination);
+    return gainNode;
+  }
+  
+  /**
+   * Return a gain node to the pool for reuse
+   */
+  returnGainNode(gainNode)
+  {
+    if (this.gainNodePool.length < this.poolSize)
+    {
+      // Reset gain value and return to pool
+      gainNode.gain.value = 1.0;
+      this.gainNodePool.push(gainNode);
+    }
+    else
+    {
+      // Pool is full, disconnect and let it be garbage collected
+      try
+      {
+        gainNode.disconnect();
+      }
+      catch (e)
+      {
+        // Already disconnected
+      }
+    }
   }
 
   /**
@@ -166,18 +232,10 @@ export class AudioManager
       const source = context.createBufferSource();
       source.buffer = buffer;
 
-      // Apply volume if specified
-      if (options.volume !== undefined)
-      {
-        const gainNode = context.createGain();
-        gainNode.gain.value = options.volume;
-        source.connect(gainNode);
-        gainNode.connect(context.destination);
-      }
-      else
-      {
-        source.connect(context.destination);
-      }
+      // Use pooled gain node for lower latency
+      const gainNode = this.getGainNode();
+      gainNode.gain.value = options.volume !== undefined ? options.volume : 1.0;
+      source.connect(gainNode);
 
       // Track active source
       this.activeSources.add(source);
@@ -190,6 +248,7 @@ export class AudioManager
         try
         {
           source.disconnect();
+          this.returnGainNode(gainNode); // Return gain node to pool
         }
         catch (e)
         {
@@ -198,14 +257,14 @@ export class AudioManager
       };
 
       // Ensure context is running before playback (should be running after background loop starts)
-      // Resume synchronously if suspended - this should be rare after user interaction
+      // Resume asynchronously if suspended - this should be rare after user interaction
       if (context.state === 'suspended')
       {
-        context.resume();
+        context.resume().catch(e => console.warn(`${LOG_PREFIX} Failed to resume context:`, e));
       }
 
-      // Start immediately - if context was suspended, resume() will queue the start
-      source.start(0);
+      // Start immediately at current time for minimal latency
+      source.start(context.currentTime);
       return source;
     }
     catch (error)
@@ -238,18 +297,10 @@ export class AudioManager
       const source = context.createBufferSource();
       source.buffer = buffer;
 
-      // Apply volume if specified
-      if (options.volume !== undefined)
-      {
-        const gainNode = context.createGain();
-        gainNode.gain.value = options.volume;
-        source.connect(gainNode);
-        gainNode.connect(context.destination);
-      }
-      else
-      {
-        source.connect(context.destination);
-      }
+      // Use pooled gain node for lower latency
+      const gainNode = this.getGainNode();
+      gainNode.gain.value = options.volume !== undefined ? options.volume : 1.0;
+      source.connect(gainNode);
 
       // Track scheduled source
       this.scheduledSources.add(source);
@@ -263,6 +314,7 @@ export class AudioManager
         try
         {
           source.disconnect();
+          this.returnGainNode(gainNode); // Return gain node to pool
         }
         catch (e)
         {

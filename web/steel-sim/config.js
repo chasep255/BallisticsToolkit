@@ -9,6 +9,28 @@
 // Export config object that will be populated after BTK loads
 export const Config = {};
 
+// Default parameter values for UI inputs
+export const DEFAULT_PARAMS = {
+  mv: '2750',
+  bc: '0.311',
+  dragFunction: 'G7',
+  diameter: '0.264',
+  weight: '140',
+  length: '1.4',
+  twist: '8.0',
+  mvSd: '7.0',
+  rifleAccuracy: '0.25',
+  windPreset: 'Moderate',
+  zeroDistance: '100',
+  scopeHeight: '2.0',
+  scopeType: 'mrad',
+  opticalEffects: true,
+  rangeFinder: true,
+  bdc: true,
+  hogs: true,
+  prairieDogs: true
+};
+
 /**
  * Initialize config with SI unit values after BTK loads
  * Uses window.btk.Conversions for unit conversion
