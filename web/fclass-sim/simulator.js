@@ -512,13 +512,6 @@ class FClassSimulator
     // Pending relay end notification (waiting for target to be ready)
     this.pendingRelayEndNotification = false;
 
-    // FPS tracking
-    this.fpsFrameCount = 0;
-    this.fpsStartTime = null;
-    this.fpsLastLogTime = null;
-    this.fpsLogInterval = 10.0; // Log every 10 seconds
-    this.fpsTotalFrameTime = 0; // Sum of all frame times for theoretical FPS
-
     // Render statistics tracking
     this.renderStats = new RenderStats();
   }
@@ -978,7 +971,14 @@ class FClassSimulator
     // 3) Composite everything to screen
     this.renderer.setRenderTarget(null);
     this.renderer.clear();
-    this.renderer.render(this.compositionScene, this.compositionCamera);
+    if (this.renderStats)
+    {
+      this.renderStats.render(this.renderer, this.compositionScene, this.compositionCamera, 'Composition');
+    }
+    else
+    {
+      this.renderer.render(this.compositionScene, this.compositionCamera);
+    }
 
     // Mark frame complete and log stats periodically
     if (this.renderStats)
@@ -991,38 +991,6 @@ class FClassSimulator
         this.renderStats.logStats();
         this.renderStats.reset();
       }
-    }
-
-    // Track FPS
-    const frameEndTime = performance.now();
-    const frameTime = frameEndTime - frameStartTime;
-    this.fpsTotalFrameTime += frameTime;
-    this.fpsFrameCount++;
-
-    // Initialize timing on first frame
-    if (this.fpsStartTime === null)
-    {
-      this.fpsStartTime = frameStartTime;
-      this.fpsLastLogTime = frameStartTime;
-    }
-
-    // Log FPS every 10 seconds
-    const timeSinceLastLog = (frameEndTime - this.fpsLastLogTime) / 1000.0;
-    if (timeSinceLastLog >= this.fpsLogInterval)
-    {
-      // Calculate actual FPS (frames rendered over wall clock time)
-      const actualFps = this.fpsFrameCount / timeSinceLastLog;
-
-      // Calculate theoretical FPS (if we rendered as fast as possible)
-      const avgFrameTime = this.fpsTotalFrameTime / this.fpsFrameCount;
-      const theoreticalFps = 1000.0 / avgFrameTime;
-
-      console.log(`FPS: Actual=${actualFps.toFixed(1)} (limited by requestAnimationFrame), Theoretical=${theoreticalFps.toFixed(1)} (if unlimited)`);
-
-      // Reset counters
-      this.fpsFrameCount = 0;
-      this.fpsLastLogTime = frameEndTime;
-      this.fpsTotalFrameTime = 0;
     }
   }
 
