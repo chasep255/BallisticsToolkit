@@ -48,6 +48,12 @@ function fovDegFromFeetAtSpecDistance(widthFeet)
 
 export class Scope
 {
+  // Scope geometry constants (in NDC space, orthographic camera bounds [-1, 1])
+  static SCOPE_MASK_RADIUS = 0.98;        // Stencil mask radius (visible scope circle edge)
+  static SCOPE_OVERLAP = 0.005;           // Overlap between scope circle and mask (prevents gap)
+  static SCOPE_CIRCLE_RADIUS = 0.985;     // Scope texture circle radius (SCOPE_MASK_RADIUS + SCOPE_OVERLAP)
+  static HOUSING_OUTER_RADIUS = 1.0;      // Housing ring outer radius
+
   constructor(config)
   {
     this.scene = config.scene;
@@ -208,10 +214,9 @@ export class Scope
 
     // Derive normalized scope radius (matches maskRadius in HUD)
     // This is used for composition-space hit testing (isPointInside)
-    const hudMaskRadius = 0.98; // must match maskRadius in createInternalComposition
     if (this.layer && this.layer.height > 0)
     {
-      this.scopeRadiusNormalized = (this.layer.height / 2) * hudMaskRadius;
+      this.scopeRadiusNormalized = (this.layer.height / 2) * Scope.SCOPE_MASK_RADIUS;
     }
 
     // Create resources
@@ -834,10 +839,10 @@ export class Scope
     this.internalCamera.position.z = 5;
 
     // Main scope view: circle mapped with scene texture (will be blurred if optical effects enabled)
-    // Scope circle is slightly larger (0.985) than the stencil mask (0.98) to overlap the housing
+    // Scope circle is slightly larger than the stencil mask to overlap the housing
     // and prevent background leaking through due to texture filtering at the edge
-    const scopeRadius = 0.985;
-    const maskRadius = 0.98;
+    const scopeRadius = Scope.SCOPE_CIRCLE_RADIUS;
+    const maskRadius = Scope.SCOPE_MASK_RADIUS;
     const scopeGeom = new THREE.CircleGeometry(scopeRadius, 64);
     const scopeTexture = this.sceneRenderTarget.texture; // Start with raw scene texture
     const scopeMat = new THREE.MeshBasicMaterial(
@@ -872,9 +877,8 @@ export class Scope
     this.internalScene.add(maskMesh);
 
     // Thin black housing ring around the glass (simple geometry)
-    // Starts at maskRadius (0.98) to align with the visible edge of the scope
-    const housingOuterRadius = 1.0; // controls thickness
-    const housingGeom = new THREE.RingGeometry(maskRadius, housingOuterRadius, 128);
+    // Starts at maskRadius to align with the visible edge of the scope
+    const housingGeom = new THREE.RingGeometry(maskRadius, Scope.HOUSING_OUTER_RADIUS, 128);
     const housingMat = new THREE.MeshStandardMaterial(
     {
       color: 0x000000,
@@ -988,10 +992,10 @@ export class Scope
    * 
    * Formula: angleRad = mrad * 0.001
    *          y_ndc = tan(angleRad) / tan(fovRad / 2)  (perspective projection)
-   *          y_hud = y_ndc * hudMaskRadius
+   *          y_hud = y_ndc * SCOPE_MASK_RADIUS
    * 
    * The HUD space is orthographic with bounds [-1, 1] for Y.
-   * The scope circle has radius hudMaskRadius (0.98) in this space.
+   * The scope circle has radius SCOPE_MASK_RADIUS in this space.
    * 
    * For small angles, tan(θ) ≈ θ, so this simplifies to:
    *          y_ndc ≈ angleRad / (fovRad / 2)
@@ -1012,9 +1016,8 @@ export class Scope
     const y_ndc = Math.tan(angleRad) / Math.tan(fovRad / 2);
     
     // Convert NDC [-1, 1] to HUD space using scope mask radius
-    // HUD space is orthographic with scope circle radius = 0.98
-    const hudMaskRadius = 0.98; // matches maskRadius in createInternalComposition
-    return y_ndc * hudMaskRadius;
+    // HUD space is orthographic with scope circle radius = SCOPE_MASK_RADIUS
+    return y_ndc * Scope.SCOPE_MASK_RADIUS;
   }
 
   /**
