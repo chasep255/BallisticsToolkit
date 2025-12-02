@@ -1,5 +1,11 @@
 /* Steel Target Simulator Styles */
 
+/* Left-justify checkboxes only */
+.params-bar .param-item input[type="checkbox"] {
+  width: auto;
+  justify-self: start;
+}
+
 .stats-container {
   display: flex;
   justify-content: center;

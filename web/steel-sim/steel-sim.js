@@ -191,9 +191,9 @@ class SteelSimulator
       params.length_m === undefined || params.twist_mPerTurn === undefined || params.mvSd_mps === undefined ||
       params.rifleAccuracy_rad === undefined || params.bc === undefined || params.dragFunction === undefined ||
       params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined ||
-      params.opticalEffectsEnabled === undefined || params.smartScopeEnabled === undefined || params.scopeType === undefined)
+      params.opticalEffectsEnabled === undefined || params.rangeFinderEnabled === undefined || params.bdcEnabled === undefined || params.scopeType === undefined)
     {
-      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled, smartScopeEnabled, scopeType). Use getGameParams() to convert from frontend inputs.');
+      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled, rangeFinderEnabled, bdcEnabled, scopeType). Use getGameParams() to convert from frontend inputs.');
     }
 
     // Store all params (all must be in SI units, no defaults)
@@ -210,7 +210,8 @@ class SteelSimulator
     this.zeroDistance_m = params.zeroDistance_m;
     this.scopeHeight_m = params.scopeHeight_m;
     this.opticalEffectsEnabled = params.opticalEffectsEnabled;
-    this.smartScopeEnabled = params.smartScopeEnabled;
+    this.rangeFinderEnabled = params.rangeFinderEnabled;
+    this.bdcEnabled = params.bdcEnabled;
     this.scopeType = params.scopeType;
 
     // State
@@ -654,10 +655,10 @@ class SteelSimulator
       modelManager: this.modelManager
     });
 
-    // Create prairie dog hunting targets (uses pre-loaded model) - only if hunting enabled
-    const huntingCheckbox = document.getElementById('hunting');
-    this.huntingEnabled = huntingCheckbox ? huntingCheckbox.checked : true;
-    if (this.huntingEnabled)
+    // Create prairie dog hunting targets (uses pre-loaded model) - only if enabled
+    const prairieDogsCheckbox = document.getElementById('prairieDogs');
+    this.prairieDogsEnabled = prairieDogsCheckbox ? prairieDogsCheckbox.checked : true;
+    if (this.prairieDogsEnabled)
     {
       this.landscape.createPrairieDogs();
     }
@@ -697,6 +698,8 @@ class SteelSimulator
       hasReticle: false, // Spotting scope has no reticle
       hasDials: false, // Spotting scope has no dials
       opticalEffectsEnabled: this.opticalEffectsEnabled,
+      rangeFinderEnabled: this.rangeFinderEnabled,
+      bdcEnabled: this.bdcEnabled,
       windGenerator: this.windGenerator,
       scopeType: this.scopeType,
       cameraPosition:
@@ -738,7 +741,8 @@ class SteelSimulator
       maxZoomX: 40.0,
       lowFovFeet: 25,
       opticalEffectsEnabled: this.opticalEffectsEnabled,
-      smartScopeEnabled: this.smartScopeEnabled,
+      rangeFinderEnabled: this.rangeFinderEnabled,
+      bdcEnabled: this.bdcEnabled,
       windGenerator: this.windGenerator,
       scopeType: this.scopeType,
       ballisticsTable: this.ballisticsTable, // For drop indicator
@@ -773,8 +777,10 @@ class SteelSimulator
     this.setupImpactDetector();
 
     // Initialize wild boar factory (uses pre-loaded model) - must be after impactDetector is created
-    // Only create boars if hunting is enabled
-    if (this.huntingEnabled)
+    // Only create boars if enabled
+    const hogsCheckbox = document.getElementById('hogs');
+    this.hogsEnabled = hogsCheckbox ? hogsCheckbox.checked : true;
+    if (this.hogsEnabled)
     {
       const boarModel = this.modelManager.getModel('wild_boar');
       if (boarModel)
@@ -2662,10 +2668,13 @@ class SteelSimulator
     DustCloudFactory.updateAll(dt);
     WindFlagFactory.updateAll(this.windGenerator, dt);
 
-    // Update hunting targets only if hunting is enabled
-    if (this.huntingEnabled)
+    // Update hunting targets only if enabled
+    if (this.prairieDogsEnabled)
     {
       PrairieDogFactory.updateAll(dt);
+    }
+    if (this.hogsEnabled)
+    {
       BoarFactory.updateAll(dt);
     }
 
@@ -2746,8 +2755,10 @@ function getGameParams()
   const scopeHeightInches = parseFloat(document.getElementById('scopeHeight').value);
   const opticalEffectsCheckbox = document.getElementById('opticalEffects');
   const opticalEffectsEnabled = opticalEffectsCheckbox ? opticalEffectsCheckbox.checked : true;
-  const smartScopeCheckbox = document.getElementById('smartScope');
-  const smartScopeEnabled = smartScopeCheckbox ? smartScopeCheckbox.checked : true;
+  const rangeFinderCheckbox = document.getElementById('rangeFinder');
+  const rangeFinderEnabled = rangeFinderCheckbox ? rangeFinderCheckbox.checked : true;
+  const bdcCheckbox = document.getElementById('bdc');
+  const bdcEnabled = bdcCheckbox ? bdcCheckbox.checked : true;
   const scopeTypeSelect = document.getElementById('scopeType');
   const scopeType = scopeTypeSelect ? scopeTypeSelect.value : 'mrad';
 
@@ -2766,7 +2777,8 @@ function getGameParams()
     zeroDistance_m: btk.Conversions.yardsToMeters(zeroDistanceYards),
     scopeHeight_m: btk.Conversions.inchesToMeters(scopeHeightInches),
     opticalEffectsEnabled: opticalEffectsEnabled,
-    smartScopeEnabled: smartScopeEnabled,
+    rangeFinderEnabled: rangeFinderEnabled,
+    bdcEnabled: bdcEnabled,
     scopeType: scopeType
   };
 }

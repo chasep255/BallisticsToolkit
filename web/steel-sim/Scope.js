@@ -159,8 +159,9 @@ export class Scope
     // Ballistics table for drop indicator (optional, rifle scope only)
     this.ballisticsTable = config.ballisticsTable || null;
 
-    // Smart scope features (range finder and drop indicator)
-    this.smartScopeEnabled = config.smartScopeEnabled !== undefined ? config.smartScopeEnabled : true;
+    // Separate smart scope features
+    this.rangeFinderEnabled = config.rangeFinderEnabled !== undefined ? config.rangeFinderEnabled : true;
+    this.bdcEnabled = config.bdcEnabled !== undefined ? config.bdcEnabled : true;
 
     // Pan speed for keyboard control (used by spotting scope)
     this.panSpeedBase = config.panSpeedBase || 0.1; // radians per second base speed
@@ -925,8 +926,8 @@ export class Scope
       // Create instanced mesh after collecting all line data
       this.createInstancedReticle();
       
-      // Create drop indicator (red circle showing predicted bullet drop) - only if smart scope enabled
-      if (this.smartScopeEnabled)
+      // Create drop indicator (red circle showing predicted bullet drop) - only if BDC enabled
+      if (this.bdcEnabled)
       {
         this.createDropIndicator();
       }
@@ -971,8 +972,8 @@ export class Scope
       this.updateReticleScale();
     }
 
-    // Create focal distance text display (for both rifle and spotting scopes) - only if smart scope enabled
-    if (this.smartScopeEnabled)
+    // Create focal distance text display (for both rifle and spotting scopes) - only if range finder enabled
+    if (this.rangeFinderEnabled)
     {
       this.createFocalDistanceText();
     }

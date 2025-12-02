@@ -11,13 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # Compiler options
-add_compile_options(-Wall -Wextra -Wpedantic -Werror)
-
-# Optimization flags for Release builds
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -O3")
-endif()
+add_compile_options(-Wall -Wextra -Wpedantic -Werror -O3 -ffast-math)
 
 # WebAssembly linker flags for embind
 set(CMAKE_EXECUTABLE_SUFFIX ".js")

@@ -62,78 +62,86 @@
     <h1>🔩 Steel Target Simulator</h1>
 
     <!-- Bullet Parameters -->
-    <div class="params-bar" style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px;">
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+    <div class="params-bar">
+      <div class="param-item">
         <label for="mv" title="Muzzle velocity in feet per second">MV (fps)</label>
-        <input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
-        <input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">Drag</label>
-        <select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">
           <option value="G1">G1</option>
           <option value="G7" selected>G7</option>
         </select>
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="diameter" title="Bullet diameter in inches">Dia (in)</label>
-        <input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="weight" title="Bullet weight in grains">Wt (gr)</label>
-        <input type="number" id="weight" value="140" step="1" min="10" max="1000" title="Bullet weight in grains" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="weight" value="140" step="1" min="10" max="1000" title="Bullet weight in grains">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="length" title="Bullet length in inches">Len (in)</label>
-        <input type="number" id="length" value="1.4" step="0.01" min="0.1" max="5.0" title="Bullet length in inches" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="length" value="1.4" step="0.01" min="0.1" max="5.0" title="Bullet length in inches">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="twist" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)">Twist (in/turn)</label>
-        <input type="number" id="twist" value="8.0" step="0.1" min="1" max="20" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="twist" value="8.0" step="0.1" min="1" max="20" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label>
-        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label>
-        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="windPreset" title="Wind preset">Wind</label>
-        <select id="windPreset" title="Wind preset" style="width: 120px; padding: 5px; align-self: flex-start;">
+        <select id="windPreset" title="Wind preset">
           <option value="Moderate" selected>Moderate</option>
         </select>
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="zeroDistance" title="Zero distance in yards">Zero (yd)</label>
-        <input type="number" id="zeroDistance" value="100" step="10" min="25" max="1000" title="Zero distance in yards" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="zeroDistance" value="100" step="10" min="25" max="1000" title="Zero distance in yards">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="scopeHeight" title="Scope height above bore in inches">Scope Ht (in)</label>
-        <input type="number" id="scopeHeight" value="2.0" step="0.1" min="0.5" max="10.0" title="Scope height above bore in inches" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <input type="number" id="scopeHeight" value="2.0" step="0.1" min="0.5" max="10.0" title="Scope height above bore in inches">
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
+      <div class="param-item">
         <label for="scopeType" title="Scope type determines reticle and dial units">Scope Type</label>
-        <select id="scopeType" title="Scope type determines reticle and dial units" style="width: 100px; padding: 5px; align-self: flex-start;">
+        <select id="scopeType" title="Scope type determines reticle and dial units">
           <option value="mrad" selected>MRAD</option>
           <option value="moa">MOA</option>
         </select>
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
-        <label for="opticalEffects" title="Enable heat mirage effect in scopes">Mirage/Optical Effects</label>
-        <input type="checkbox" id="opticalEffects" title="Enable heat mirage and depth-of-field effects in scopes" style="width: auto; align-self: flex-start;" checked>
+      <div class="param-item">
+        <label for="opticalEffects" title="Enable heat mirage and depth-of-field effects in scopes">Mirage/Optical Effects</label>
+        <input type="checkbox" id="opticalEffects" checked>
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
-        <label for="smartScope" title="Enable range finder and bullet drop indicator">Smart Scope</label>
-        <input type="checkbox" id="smartScope" title="Enable range finder display and bullet drop compensator circle" style="width: auto; align-self: flex-start;" checked>
+      <div class="param-item">
+        <label for="rangeFinder" title="Display focal distance in yards on both spotting and rifle scopes">Range Finder</label>
+        <input type="checkbox" id="rangeFinder" checked>
       </div>
-      <div class="param-item" style="display: flex; flex-direction: column; gap: 5px;">
-        <label for="hunting" title="Enable boars and prairie dogs">Hunting</label>
-        <input type="checkbox" id="hunting" title="Enable boars and prairie dogs" style="width: auto; align-self: flex-start;" checked>
+      <div class="param-item">
+        <label for="bdc" title="Show predicted bullet impact point as red circle on rifle scope">Bullet Drop Compensator</label>
+        <input type="checkbox" id="bdc" checked>
+      </div>
+      <div class="param-item">
+        <label for="hogs" title="Enable wild boars on the range">Hogs</label>
+        <input type="checkbox" id="hogs" checked>
+      </div>
+      <div class="param-item">
+        <label for="prairieDogs" title="Enable prairie dogs on the range">Prairie Dogs</label>
+        <input type="checkbox" id="prairieDogs" checked>
       </div>
     </div>
 
@@ -302,19 +310,23 @@
             - Farther distances = stronger mirage (more air to look through)<br>
             - Very strong wind reduces mirage visibility (turbulence breaks up pattern)<br>
             - Also includes depth-of-field blur based on focus distance<br>
-            - Focus distance is set using <kbd>F</kbd> or <kbd>Right-click</kbd> (displayed as red digital readout in bottom-right of scope)<br>
+            - Focus distance is set using <kbd>F</kbd> or <kbd>Right-click</kbd> (displayed when Range Finder is enabled)<br>
             - Increases GPU load; turn off on low-power devices<br><br>
 
-            <strong>Smart Scope:</strong><br>
+            <strong>Range Finder:</strong><br>
             - Toggle via the checkbox in the settings bar (enabled by default)<br>
-            - When enabled, displays:<br>
-            &nbsp;&nbsp;• <strong>Range Finder:</strong> Red digital readout in bottom-right showing focal distance in yards<br>
-            &nbsp;&nbsp;• <strong>Drop Indicator:</strong> Red circle on vertical crosshair showing predicted bullet drop<br>
-            - Range finder updates when you focus using <kbd>F</kbd> or <kbd>Right-click</kbd><br>
-            - Drop indicator uses ballistics table to show where bullet will impact at current focal distance<br>
-            - Like a real scope with a dope card, the drop indicator is an estimate, not a guarantee; small errors are expected<br>
-            - Available in both rifle and spotting scopes<br>
+            - Displays red digital readout in bottom-right of both scopes showing focal distance in yards<br>
+            - Updates when you focus using <kbd>F</kbd> or <kbd>Right-click</kbd><br>
+            - Helps judge distance to targets and understand mirage/depth-of-field effects<br>
             - Disable to reduce visual clutter if desired<br><br>
+
+            <strong>BDC (Bullet Drop Compensator):</strong><br>
+            - Toggle via the checkbox in the settings bar (enabled by default)<br>
+            - Shows red circle on vertical crosshair indicating predicted bullet impact point<br>
+            - Only visible in rifle scope (not spotting scope)<br>
+            - Uses ballistics table to calculate drop at current focal distance<br>
+            - Like a real scope with a dope card, the BDC is an estimate; small errors are expected<br>
+            - Disable for a more traditional shooting experience<br><br>
 
             <strong>Hunting:</strong><br>
             - Toggle via the checkbox in the settings bar<br>
@@ -327,18 +339,6 @@
             - <strong>Windage:</strong> Current dial setting (R = right, L = left)<br>
             - <strong>Impact Status:</strong> "IMPACT" (green) or "MISS" (red)<br>
             - Units displayed match selected Scope Type<br><br>
-            
-            <strong>Range Finder Display (Smart Scope Feature):</strong><br>
-            - Shows current focal distance in yards as a red digital readout<br>
-            - Updates when you focus using <kbd>F</kbd> or <kbd>Right-click</kbd><br>
-            - Visible in both rifle and spotting scopes when Smart Scope is enabled<br>
-            - The focal distance affects mirage and depth-of-field blur when optical effects are enabled<br><br>
-            
-            <strong>Drop Indicator (Smart Scope Feature):</strong><br>
-            - Red circle on the vertical crosshair showing predicted bullet drop<br>
-            - Positioned based on ballistics table calculation for current focal distance<br>
-            - Only visible in rifle scope when Smart Scope is enabled<br>
-            - Helps visualize where the bullet will impact at the focused range<br>
           </div>
         </div>
 
