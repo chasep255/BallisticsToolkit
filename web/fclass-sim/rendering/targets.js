@@ -49,8 +49,13 @@ export class TargetRenderer
     this.targetFrames = [];
     this.targetAnimationStates = [];
     this.userTarget = null;
+    this.userTargetIndex = -1;
     this.lastShotMarker = null;
     this.btkTarget = null; // Will be created when createTargets is called
+
+    // Instanced rendering
+    this.targetInstancedMesh = null;
+    this.numberBoxes = []; // Individual meshes since each has unique texture
 
     // Match-style animation state machine
     this.animationState = 'IDLE'; // IDLE, LOWERING, IN_PITS, RAISING
@@ -75,19 +80,23 @@ export class TargetRenderer
 
   dispose()
   {
-    // Remove all target meshes from scene
-    for (const targetFrame of this.targetFrames)
+    // Remove instanced mesh
+    if (this.targetInstancedMesh)
     {
-      this.scene.remove(targetFrame.mesh);
-      targetFrame.mesh.material.dispose();
-
-      if (targetFrame.numberBox)
-      {
-        this.scene.remove(targetFrame.numberBox);
-        targetFrame.numberBox.material.map.dispose();
-        targetFrame.numberBox.material.dispose();
-      }
+      this.scene.remove(this.targetInstancedMesh);
+      this.targetInstancedMesh.geometry.dispose();
+      this.targetInstancedMesh.material.dispose();
+      this.targetInstancedMesh = null;
     }
+
+    // Remove number boxes
+    for (const numberBox of this.numberBoxes)
+    {
+      this.scene.remove(numberBox);
+      numberBox.material.map.dispose();
+      numberBox.material.dispose();
+    }
+    this.numberBoxes = [];
 
     // Remove pits
     if (this.pits)
@@ -343,28 +352,36 @@ export class TargetRenderer
     // Create shared target geometry
     this.targetGeometry = new THREE.BoxGeometry(targetSize, targetSize, 0.1);
 
+    // Create instanced mesh for all target faces (they all share the same texture)
+    const targetMaterial = new THREE.MeshStandardMaterial(
+    {
+      map: this.targetTexture,
+      metalness: 0.3,
+      roughness: 0.4,
+      envMapIntensity: 0.8
+    });
+
+    this.targetInstancedMesh = new THREE.InstancedMesh(this.targetGeometry, targetMaterial, maxTargets);
+    this.targetInstancedMesh.castShadow = this.shadowsEnabled;
+    this.targetInstancedMesh.receiveShadow = this.shadowsEnabled;
+    this.scene.add(this.targetInstancedMesh);
+
+    // Set up target instances and create individual number boxes
+    const matrix = new THREE.Matrix4();
     for (let i = 0; i < maxTargets; i++)
     {
       const xPos = startX + i * totalTargetWidth;
       const targetNumber = i + 1;
 
-      // Create target
-      const targetMaterial = new THREE.MeshStandardMaterial(
-      {
-        map: this.targetTexture,
-        metalness: 0.3,
-        roughness: 0.4,
-        envMapIntensity: 0.8
-      });
-      const target = new THREE.Mesh(this.targetGeometry, targetMaterial);
-      target.castShadow = this.shadowsEnabled;
-      target.receiveShadow = this.shadowsEnabled;
-      target.position.set(xPos, this.targetCenterHeight, -this.rangeDistance);
-      target.matrixAutoUpdate = false;
-      this.scene.add(target);
-      target.updateMatrix();
+      // Set target instance matrix
+      matrix.compose(
+        new THREE.Vector3(xPos, this.targetCenterHeight, -this.rangeDistance),
+        new THREE.Quaternion(),
+        new THREE.Vector3(1, 1, 1)
+      );
+      this.targetInstancedMesh.setMatrixAt(i, matrix);
 
-      // Create number box
+      // Create number box (individual mesh since each has unique texture)
       const numberTexture = this.createNumberTexture(targetNumber);
       const numberMaterial = new THREE.MeshStandardMaterial(
       {
@@ -376,13 +393,15 @@ export class TargetRenderer
       numberBox.receiveShadow = this.shadowsEnabled;
       numberBox.position.set(xPos, this.targetCenterHeight + targetSize + 0.2, -this.rangeDistance);
       numberBox.matrixAutoUpdate = false;
-      this.scene.add(numberBox);
       numberBox.updateMatrix();
+      this.scene.add(numberBox);
+      this.numberBoxes.push(numberBox);
 
-      // Store target frame
+      // Store target frame data (no individual mesh, just instance data)
       this.targetFrames.push(
       {
-        mesh: target,
+        instanceId: i,
+        xPos: xPos,
         baseHeight: this.targetCenterHeight,
         targetNumber: targetNumber,
         numberBox: numberBox,
@@ -400,12 +419,14 @@ export class TargetRenderer
       });
     }
 
+    this.targetInstancedMesh.instanceMatrix.needsUpdate = true;
+
     // Set center target as user target
     let centerTargetIndex = 0;
     let minDistance = Infinity;
     for (let i = 0; i < this.targetFrames.length; i++)
     {
-      const xPos = Math.abs(this.targetFrames[i].mesh.position.x);
+      const xPos = Math.abs(this.targetFrames[i].xPos);
       if (xPos < minDistance)
       {
         minDistance = xPos;
@@ -413,6 +434,7 @@ export class TargetRenderer
       }
     }
     this.userTarget = this.targetFrames[centerTargetIndex];
+    this.userTargetIndex = centerTargetIndex;
 
     // Initialize scoring disc resources
     this.initializeScoringDiscResources();
@@ -427,7 +449,11 @@ export class TargetRenderer
     }
 
     const target = this.targetFrames[targetNumber - 1];
-    const position = target.mesh.position;
+    const matrix = new THREE.Matrix4();
+    this.targetInstancedMesh.getMatrixAt(target.instanceId, matrix);
+    const position = new THREE.Vector3();
+    position.setFromMatrixPosition(matrix);
+
     return {
       x: position.x,
       y: position.y,
@@ -443,7 +469,11 @@ export class TargetRenderer
       return null;
     }
 
-    const position = this.userTarget.mesh.position;
+    const matrix = new THREE.Matrix4();
+    this.targetInstancedMesh.getMatrixAt(this.userTarget.instanceId, matrix);
+    const position = new THREE.Vector3();
+    position.setFromMatrixPosition(matrix);
+
     return {
       x: position.x,
       y: position.y,
@@ -548,6 +578,11 @@ export class TargetRenderer
    */
   updateAnimations(deltaTime, relayClockRunning = true)
   {
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3(1, 1, 1);
+
     // Handle user target animation state machine
     if (this.userTarget)
     {
@@ -676,9 +711,10 @@ export class TargetRenderer
           break;
       }
 
-      // Update user target position
-      targetFrame.mesh.position.y = targetFrame.baseHeight + targetFrame.currentHeight;
-      targetFrame.mesh.updateMatrix();
+      // Update user target instance matrix
+      position.set(targetFrame.xPos, targetFrame.baseHeight + targetFrame.currentHeight, -this.rangeDistance);
+      matrix.compose(position, quaternion, scale);
+      this.targetInstancedMesh.setMatrixAt(targetFrame.instanceId, matrix);
 
       // Update number box position
       if (targetFrame.numberBox)
@@ -690,8 +726,8 @@ export class TargetRenderer
       // Update scoring disc positions to follow target
       for (const disc of this.scoringDiscs)
       {
-        disc.position.x = targetFrame.mesh.position.x + disc.userData.relativeX;
-        disc.position.y = targetFrame.mesh.position.y + disc.userData.relativeY;
+        disc.position.x = position.x + disc.userData.relativeX;
+        disc.position.y = position.y + disc.userData.relativeY;
       }
 
       // Update spotter position to follow target
@@ -707,7 +743,7 @@ export class TargetRenderer
         const animationState = this.targetAnimationStates[i];
 
         // Skip user's target - handled above
-        if (targetFrame === this.userTarget)
+        if (i === this.userTargetIndex)
         {
           continue;
         }
@@ -767,9 +803,10 @@ export class TargetRenderer
           targetFrame.animating = true;
         }
 
-        // Update target position
-        targetFrame.mesh.position.y = targetFrame.baseHeight + targetFrame.currentHeight;
-        targetFrame.mesh.updateMatrix();
+        // Update target instance matrix
+        position.set(targetFrame.xPos, targetFrame.baseHeight + targetFrame.currentHeight, -this.rangeDistance);
+        matrix.compose(position, quaternion, scale);
+        this.targetInstancedMesh.setMatrixAt(targetFrame.instanceId, matrix);
 
         // Update number box position
         if (targetFrame.numberBox)
@@ -779,6 +816,9 @@ export class TargetRenderer
         }
       }
     }
+
+    // Mark instance matrix as needing update
+    this.targetInstancedMesh.instanceMatrix.needsUpdate = true;
   }
 
   // ===== SHOT MARKERS =====
@@ -978,16 +1018,18 @@ export class TargetRenderer
     const discRadiusYards = (6.0 / 36.0) / 2.0; // 6 inch disc radius in yards
     const edgePos = frameHalfSize - gapYards - discRadiusYards; // Position discs with 1" gap from edge
 
-    // Use actual target position (not base height) so discs are positioned correctly
-    const targetX = this.userTarget.mesh.position.x;
-    const targetY = this.userTarget.mesh.position.y;
-    const targetZ = this.userTarget.mesh.position.z;
+    // Get user target center from instance
+    const targetCenter = this.getUserTargetCenter();
+    if (!targetCenter) return;
+
+    const targetX = targetCenter.x;
+    const targetY = targetCenter.y;
+    const targetZ = targetCenter.z;
 
     // Z position in front of target but behind shot marker (marker is at +0.1)
     const discZ = targetZ + 0.1;
 
     // Define disc positions for each score (relative to target center)
-    // Positions are inset from frame edges to keep discs on the frame
     const positions = {
       'X': [
       {

@@ -60,6 +60,8 @@ export class FlagRenderer
     };
 
     this.flagMeshes = [];
+    this.poleInstancedMesh = null;
+    this.polePositions = []; // Store pole positions for instanced mesh
 
     // Shared resources (created once, reused for all flags)
     this.sharedMaterials = null;
@@ -68,10 +70,18 @@ export class FlagRenderer
 
   dispose()
   {
-    // Remove all flag meshes from scene
+    // Remove instanced pole mesh
+    if (this.poleInstancedMesh)
+    {
+      this.scene.remove(this.poleInstancedMesh);
+      this.poleInstancedMesh.geometry.dispose();
+      this.poleInstancedMesh.material.dispose();
+      this.poleInstancedMesh = null;
+    }
+
+    // Remove all flag cloth meshes from scene
     for (const flag of this.flagMeshes)
     {
-      this.scene.remove(flag.pole);
       this.scene.remove(flag.flagMesh);
       flag.flagGeometry.dispose();
     }
@@ -307,12 +317,12 @@ export class FlagRenderer
 
   createFlagAtPosition(xPosition, zPosition)
   {
-    // Create pole (reuse shared geometry and material)
-    const pole = new THREE.Mesh(this.poleGeometry, this.sharedMaterials.pole);
-    pole.castShadow = this.shadowsEnabled;
-    pole.receiveShadow = this.shadowsEnabled;
-    pole.position.set(xPosition, this.cfg.poleHeight / 2, zPosition);
-    this.scene.add(pole);
+    // Store pole position for later instancing
+    this.polePositions.push({
+      x: xPosition,
+      y: this.cfg.poleHeight / 2,
+      z: zPosition
+    });
 
     // Create flag (unique geometry per flag for animation, share material)
     const flagGeometry = this.createFlagGeometry();
@@ -327,7 +337,6 @@ export class FlagRenderer
     // Store flag data
     this.flagMeshes.push(
     {
-      pole: pole,
       flagGeometry: flagGeometry,
       flagMesh: flagMesh,
       position:
@@ -341,6 +350,40 @@ export class FlagRenderer
       currentDirection: 0,
       flapPhase: Math.random() * this.cfg.flagPhaseDriftRange
     });
+  }
+
+  /**
+   * Create instanced mesh for all poles after all flags have been added
+   * Call this after all addFlag() calls are complete
+   */
+  finalizePoles()
+  {
+    if (this.polePositions.length === 0) return;
+
+    // Create instanced mesh for all poles
+    this.poleInstancedMesh = new THREE.InstancedMesh(
+      this.poleGeometry,
+      this.sharedMaterials.pole,
+      this.polePositions.length
+    );
+    this.poleInstancedMesh.castShadow = this.shadowsEnabled;
+    this.poleInstancedMesh.receiveShadow = this.shadowsEnabled;
+
+    // Set instance matrices for all poles
+    const matrix = new THREE.Matrix4();
+    for (let i = 0; i < this.polePositions.length; i++)
+    {
+      const pos = this.polePositions[i];
+      matrix.compose(
+        new THREE.Vector3(pos.x, pos.y, pos.z),
+        new THREE.Quaternion(),
+        new THREE.Vector3(1, 1, 1)
+      );
+      this.poleInstancedMesh.setMatrixAt(i, matrix);
+    }
+
+    this.poleInstancedMesh.instanceMatrix.needsUpdate = true;
+    this.scene.add(this.poleInstancedMesh);
   }
 
   updateFlags(windGenerator)

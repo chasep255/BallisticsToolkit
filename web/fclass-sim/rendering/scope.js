@@ -56,6 +56,9 @@ export class Scope
     this.zeroOffsetYaw = 0; // Horizontal dial (L/R)
     this.zeroOffsetPitch = 0; // Vertical dial (U/D)
 
+    // Render statistics tracking (optional)
+    this.renderStats = config.renderStats || null;
+
     // Calculate scope size and position in virtual coordinates
     // Scope size is based on available virtual space minus margins
     const availableWidth = VC.WIDTH - (VC.MARGIN_SMALL * 2);
@@ -828,7 +831,15 @@ export class Scope
     // Step 1: Render scene to intermediate mirage target
     this.renderer.setRenderTarget(this.mirageTarget);
     this.renderer.clear();
-    this.renderer.render(this.scene, this.camera);
+    if (this.renderStats)
+    {
+      const scopeName = this.reticle ? 'rifle' : 'spotting';
+      this.renderStats.render(this.renderer, this.scene, this.camera, `Scope.${scopeName}`);
+    }
+    else
+    {
+      this.renderer.render(this.scene, this.camera);
+    }
 
     // Step 2: Apply mirage effect from mirageTarget to final renderTarget
     if (windGenerator)

@@ -77,6 +77,11 @@ import
   Scorecard
 }
 from './ui/scorecard.js';
+import
+{
+  RenderStats
+}
+from './core/RenderStats.js';
 
 const LOG_PREFIX_GAME = '[Game]';
 
@@ -513,6 +518,9 @@ class FClassSimulator
     this.fpsLastLogTime = null;
     this.fpsLogInterval = 10.0; // Log every 10 seconds
     this.fpsTotalFrameTime = 0; // Sum of all frame times for theoretical FPS
+
+    // Render statistics tracking
+    this.renderStats = new RenderStats();
   }
 
   // ===== SCENE SETUP =====
@@ -690,6 +698,9 @@ class FClassSimulator
     // Add flags at target distance
     this.flags.addFlag(leftBorder, -this.distance); // Left side
     this.flags.addFlag(rightBorder, -this.distance); // Right side
+
+    // Finalize poles (create instanced mesh)
+    this.flags.finalizePoles();
   }
 
   // ===== SCENE SETUP =====
@@ -866,6 +877,12 @@ class FClassSimulator
   {
     const frameStartTime = performance.now();
 
+    // Mark frame start for render stats
+    if (this.renderStats)
+    {
+      this.renderStats.frameStart();
+    }
+
     // Update time at the start of each frame
     ResourceManager.time.update();
 
@@ -936,7 +953,14 @@ class FClassSimulator
     // 1) Render main scene to texture
     this.renderer.setRenderTarget(this.mainSceneRenderTarget);
     this.renderer.clear();
-    this.renderer.render(this.scene, this.camera);
+    if (this.renderStats)
+    {
+      this.renderStats.render(this.renderer, this.scene, this.camera, 'MainScene');
+    }
+    else
+    {
+      this.renderer.render(this.scene, this.camera);
+    }
 
     // 2) Render all scopes to their textures with mirage effect
     if (this.spottingScope) this.spottingScope.render(this.windGenerator);
@@ -955,6 +979,19 @@ class FClassSimulator
     this.renderer.setRenderTarget(null);
     this.renderer.clear();
     this.renderer.render(this.compositionScene, this.compositionCamera);
+
+    // Mark frame complete and log stats periodically
+    if (this.renderStats)
+    {
+      this.renderStats.frameComplete();
+
+      // Log render statistics every 300 frames
+      if (this.renderStats.getFrameCount() >= 300)
+      {
+        this.renderStats.logStats();
+        this.renderStats.reset();
+      }
+    }
 
     // Track FPS
     const frameEndTime = performance.now();
@@ -1174,7 +1211,8 @@ class FClassSimulator
         z: -this.distance
       },
       reticle: false,
-      msaaSamples: this.graphicsConfig.msaaSamples
+      msaaSamples: this.graphicsConfig.msaaSamples,
+      renderStats: this.renderStats
     });
 
     // Rifle scope - narrower FOV for precision aiming
@@ -1206,7 +1244,8 @@ class FClassSimulator
       reticle: true,
       focalPlane: this.focalPlane, // SFP: reticle stays fixed size, FFP: reticle scales with zoom
       maxDialMOA: FClassSimulator.RIFLE_SCOPE_MAX_DIAL_MOA, // Maximum dial adjustment
-      msaaSamples: this.graphicsConfig.msaaSamples
+      msaaSamples: this.graphicsConfig.msaaSamples,
+      renderStats: this.renderStats
     });
 
     // ===== INPUT =====
@@ -1428,7 +1467,7 @@ class FClassSimulator
 
     // Update rifle scope to look at user's target (always at base height, not animated position)
     const userTarget = this.targets.userTarget;
-    this.rifleScope.lookAt(userTarget.mesh.position.x, userTarget.baseHeight, userTarget.mesh.position.z);
+    this.rifleScope.lookAt(userTarget.xPos, userTarget.baseHeight, -this.distance);
   }
 
 
