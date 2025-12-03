@@ -48,7 +48,20 @@ function calculateTrajectory()
   const maxRange = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('maxRange').value));
   const step = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('step').value));
   const windSpeed = btk.Conversions.mphToMps(parseFloat(document.getElementById('windSpeed').value));
-  const windDirection = btk.Conversions.oclockToRadians(parseFloat(document.getElementById('windDirection').value));
+
+  // Wind direction (o'clock convention): where the wind is COMING FROM,
+  // with the target at 12 o'clock:
+  //  - 12 o'clock = from target (headwind)
+  //  -  6 o'clock = from behind shooter (tailwind)
+  //  -  3 o'clock = from right (full-value crosswind)
+  //  -  9 o'clock = from left (full-value crosswind)
+  //
+  // oclockToRadians returns the origin direction angle φ in radians,
+  // measured clockwise from 12 o'clock. We convert this to the direction
+  // the wind is BLOWING TOWARD (θ) in BTK coordinates by negating it:
+  //   θ = -φ
+  const windOriginAngle = btk.Conversions.oclockToRadians(parseFloat(document.getElementById('windDirection').value));
+  const windDirection = -windOriginAngle;
 
   // Calculate spin rate from twist rate (or 0 if spin effects disabled)
   const enableSpinEffects = document.getElementById('enableSpinEffects').checked;
@@ -88,12 +101,15 @@ function calculateTrajectory()
   );
   targetPos.delete(); // Dispose Vector3D to prevent memory leak
 
-  // Wind vector in new coordinate system: X=crossrange, Y=up, Z=-downrange
-  // windDirection is o'clock format: 12=tailwind, 3=from right, 6=headwind, 9=from left
-  // Note: oclockToRadians maps 12 o'clock→π, 6 o'clock→0, 3 o'clock→π/2, 9 o'clock→3π/2
-  const windX = windSpeed * Math.sin(windDirection); // Crossrange component (positive = from right, negative = from left)
+  // Wind vector in BTK coordinate system: X=crossrange (right), Y=up, Z=-downrange.
+  // With the convention above and θ = -φ:
+  //  - 12 o'clock (from target)  → headwind (+Z, against bullet flight)
+  //  -  6 o'clock (from behind) → tailwind (−Z, with bullet flight)
+  //  -  3 o'clock (from right)  → wind blowing left (−X), full-value crosswind
+  //  -  9 o'clock (from left)   → wind blowing right (+X), full-value crosswind
+  const windX = windSpeed * Math.sin(windDirection); // Crossrange component (+X = wind blowing to the right)
   const windY = 0.0; // No vertical component
-  const windZ = windSpeed * Math.cos(windDirection); // Downrange component (12 o'clock: cos(π)=-1, so negative = tailwind)
+  const windZ = windSpeed * Math.cos(windDirection); // Downrange component (+Z = headwind from target, −Z = tailwind from behind)
 
   const windVector = new btk.Vector3D(windX, windY, windZ);
   simulator.setWind(windVector);

@@ -116,9 +116,9 @@
                 <input type="number" id="windSpeed" value="0" step="1" title="Wind speed in miles per hour">
         </div>
             <div class="param-item">
-                <label for="windDirection" title="Wind direction using 12-hour clock (3 = from right, 9 = from left, 12 = from rear, 6 = from front)">Wind Dir</label>
-                <input type="number" id="windDirection" value="3" step="1" min="1" max="12" title="Wind direction using 12-hour clock (3 = from right, 9 = from left, 12 = from rear, 6 = from front)">
-                </div>
+                <label for="windDirection" title="Wind direction using 12-hour clock, where the wind is COMING FROM (target at 12). 3 = from right, 9 = from left, 12 = from target (headwind), 6 = from behind (tailwind).">Wind Dir</label>
+                <input type="number" id="windDirection" value="3" step="1" min="1" max="12" title="Wind direction using 12-hour clock, where the wind is COMING FROM (target at 12). 3 = from right, 9 = from left, 12 = from target (headwind), 6 = from behind (tailwind).">
+            </div>
             <div class="param-item">
                 <label for="maxRange" title="Maximum range for trajectory calculation in yards">Max Range (yd)</label>
                 <input type="number" id="maxRange" value="1000" step="100" title="Maximum range for trajectory calculation in yards">
@@ -221,7 +221,7 @@
                     <h3>Wind Conditions</h3>
                     <div class="param-help">
                         <strong>Wind Speed:</strong> Wind velocity in mph. Always positive value.<br><br>
-                        <strong>Wind Direction:</strong> Wind direction using 12-hour clock (1-12). 12 = tailwind, 3 = from right, 6 = headwind, 9 = from left.
+                        <strong>Wind Direction (o'clock):</strong> Wind direction using a 12-hour clock, describing where the wind is COMING FROM with the target at 12 o'clock. 12 = from target (headwind), 6 = from behind (tailwind), 3 = from right (full-value crosswind), 9 = from left (full-value crosswind). Intermediate positions (e.g., 1 or 11 o'clock) give fractional-value crosswinds.
                     </div>
                 </div>
                 
@@ -269,7 +269,7 @@
                         <strong>Drag (G1/G7):</strong> Uses standard empirical drag tables (G1/G7). Air density corrections are applied from temperature, humidity, and altitude to adjust deceleration along the velocity vector.<br><br>
                         <strong>Spin Effects:</strong> Spin drift and crosswind jump are modeled with simplified, empirically tuned aerodynamics. Lateral and vertical accelerations are computed from local wind, bullet spin, and angle-of-attack dynamics. Right-hand twist yields rightward spin drift; sign flips for left-hand twist.<br><br>
                         <strong>Moment of Inertia:</strong> Estimated from bullet weight, length, and diameter. Affects how the spinning bullet responds to wind.<br><br>
-                        <strong>Limitations:</strong> Spin aerodynamics are simplified and tuned to typical match bullets rather than derived from full CFD or 6DOF data. Expect qualitative accuracy for spin drift and crosswind jump trends, not a perfect substitute for live-fire dope.
+                        <strong>Limitations:</strong> Spin aerodynamics are simplified and tuned to typical match bullets rather than derived from full CFD or 6DOF data. Expect qualitative accuracy for spin drift and crosswind jump trends, not a perfect substitute for live-fire dope or more advanced calculators.
                     </div>
                 </div>
             </div>

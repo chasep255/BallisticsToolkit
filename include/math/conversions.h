@@ -103,12 +103,22 @@ namespace btk::math
     static constexpr float gradiansToRadians(float gradians) { return gradians * M_PI_F / 200.0f; }
     static constexpr float turnsToRadians(float turns) { return turns * 2.0f * M_PI_F; }
 
-    // Clock position to radians (wind direction)
-    // 12 o'clock = 0°, 3 o'clock = 90°, 6 o'clock = 180°, 9 o'clock = 270°
+    // Clock position to radians (wind direction, o'clock convention)
+    // Target is at 12 o'clock. Value describes where the wind is COMING FROM.
+    // Mapping (clock → angle, measured clockwise from 12 o'clock):
+    //  - 12 o'clock =   0° (from target, headwind)
+    //  -  3 o'clock =  90° (from right, full-value crosswind)
+    //  -  6 o'clock = 180° (from behind, tailwind)
+    //  -  9 o'clock = 270° (from left, full-value crosswind)
+    //
+    // Intermediate values (e.g., 1.5) are supported and give fractional-value winds.
     static constexpr float oclockToRadians(float oclock)
     {
-      float degrees = ((18.0f - oclock) * 30.0f);
-      if(degrees >= 360.0f)
+      // Normalize to [0, 360) degrees with 12 o'clock = 0°
+      float degrees = (oclock - 12.0f) * 30.0f;
+      while(degrees < 0.0f)
+        degrees += 360.0f;
+      while(degrees >= 360.0f)
         degrees -= 360.0f;
       return degrees * M_PI_F / 180.0f;
     }
@@ -120,7 +130,34 @@ namespace btk::math
     static constexpr float radiansToMils(float radians) { return radians * 3200.0f / M_PI_F; }
     static constexpr float radiansToGradians(float radians) { return radians * 200.0f / M_PI_F; }
     static constexpr float radiansToTurns(float radians) { return radians / (2.0f * M_PI_F); }
-    static constexpr float radiansToOclock(float radians) { return (radians * 180.0f / M_PI_F) / 30.0f; }
+
+    // Inverse of oclockToRadians. Converts an angle (radians) in the o'clock
+    // wind convention back to a clock value:
+    //  - 12 o'clock = 0 rad
+    //  -  3 o'clock = π/2 rad
+    //  -  6 o'clock = π rad
+    //  -  9 o'clock = 3π/2 rad
+    //
+    // Returns a continuous clock value in [1, 13), where:
+    //  - 12 o'clock is exactly 12.0
+    //  - Values between 12 and 1 o'clock are represented as 12.x
+    //    (e.g., 12:30 ≈ 12.5).
+    static constexpr float radiansToOclock(float radians)
+    {
+      // Normalize angle to [0, 2π)
+      float angle = radians;
+      while(angle < 0.0f)
+        angle += 2.0f * M_PI_F;
+      while(angle >= 2.0f * M_PI_F)
+        angle -= 2.0f * M_PI_F;
+
+      float degrees = angle * 180.0f / M_PI_F; // [0, 360)
+      float raw = degrees / 30.0f;             // [0, 12)
+
+      // raw in [0, 1) corresponds to 12..just-before-1
+      // raw in [1, 12) corresponds directly to 1..just-before-12
+      return (raw < 1.0f) ? (12.0f + raw) : raw;
+    }
 
     // Direct conversions between angular units
     static constexpr float mradToMoa(float mrad) { return mrad * 3.43775f; } // 1 mrad = 3.43775 MOA
