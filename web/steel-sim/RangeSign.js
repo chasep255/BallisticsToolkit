@@ -363,6 +363,42 @@ export class RangeSignFactory
         sign.postMesh.updateMatrixWorld();
         clonedPostGeom.applyMatrix4(sign.postMesh.matrixWorld);
         postGeometries.push(clonedPostGeom);
+
+        // Register EACH post individually for collision detection (tight AABBs)
+        if (impactDetector)
+        {
+          const impactGeometry = clonedPostGeom.clone();
+          impactDetector.addMeshFromGeometry(
+            impactGeometry,
+            {
+              name: 'SignPost',
+              soundName: null,
+              onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+              {
+                const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+                DustCloudFactory.create(
+                {
+                  position: pos,
+                  scene: scene,
+                  numParticles: Config.WOOD_DUST_CONFIG.numParticles,
+                  color: Config.WOOD_DUST_CONFIG.color,
+                  initialRadius: Config.WOOD_DUST_CONFIG.initialRadius,
+                  growthRate: Config.WOOD_DUST_CONFIG.growthRate,
+                  particleDiameter: Config.WOOD_DUST_CONFIG.particleDiameter
+                });
+                ImpactMarkFactory.create(
+                {
+                  position: pos,
+                  normal: normal,
+                  mesh: this.mergedPostMesh,
+                  color: 0xd4c4a8,
+                  size: 0.2
+                });
+              }
+            }
+          );
+        }
+
         if (!postMaterial)
         {
           postMaterial = sign.postMesh.material;
@@ -412,6 +448,44 @@ export class RangeSignFactory
         }
 
         signBoardGeometries.push(clonedBoardGeom);
+
+        // Register EACH sign board individually for collision detection (tight AABBs)
+        // Note: Use a copy without the UV remapping for collision (simpler geometry)
+        if (impactDetector)
+        {
+          const impactGeometry = sign.signBoardMesh.geometry.clone();
+          impactGeometry.applyMatrix4(sign.signBoardMesh.matrixWorld);
+          impactDetector.addMeshFromGeometry(
+            impactGeometry,
+            {
+              name: 'SignBoard',
+              soundName: null,
+              onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+              {
+                const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+                DustCloudFactory.create(
+                {
+                  position: pos,
+                  scene: scene,
+                  numParticles: Config.SIGN_BOARD_DUST_CONFIG.numParticles,
+                  color: Config.SIGN_BOARD_DUST_CONFIG.color,
+                  initialRadius: Config.SIGN_BOARD_DUST_CONFIG.initialRadius,
+                  growthRate: Config.SIGN_BOARD_DUST_CONFIG.growthRate,
+                  particleDiameter: Config.SIGN_BOARD_DUST_CONFIG.particleDiameter
+                });
+                ImpactMarkFactory.create(
+                {
+                  position: pos,
+                  normal: normal,
+                  mesh: this.mergedSignBoardMesh,
+                  color: 0x404040,
+                  size: 0.2
+                });
+              }
+            }
+          );
+        }
+
         if (!signBoardMaterial)
         {
           signBoardMaterial = sign.signBoardMesh.material;
@@ -445,79 +519,8 @@ export class RangeSignFactory
       scene.add(this.mergedSignBoardMesh);
     }
 
-    // Register merged meshes for impact detection
-    if (impactDetector)
-    {
-      if (this.mergedPostMesh)
-      {
-        const impactGeometry = this.mergedPostMesh.geometry.clone();
-        impactDetector.addMeshFromGeometry(
-          impactGeometry,
-          {
-            name: 'SignPost',
-            soundName: null,
-            mesh: this.mergedPostMesh,
-            onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
-            {
-              const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
-              DustCloudFactory.create(
-              {
-                position: pos,
-                scene: scene,
-                numParticles: Config.WOOD_DUST_CONFIG.numParticles,
-                color: Config.WOOD_DUST_CONFIG.color,
-                initialRadius: Config.WOOD_DUST_CONFIG.initialRadius,
-                growthRate: Config.WOOD_DUST_CONFIG.growthRate,
-                particleDiameter: Config.WOOD_DUST_CONFIG.particleDiameter
-              });
-              ImpactMarkFactory.create(
-              {
-                position: pos,
-                normal: normal,
-                mesh: targetMesh,
-                color: 0xd4c4a8,
-                size: 0.2
-              });
-            }
-          }
-        );
-      }
-
-      if (this.mergedSignBoardMesh)
-      {
-        const impactGeometry = this.mergedSignBoardMesh.geometry.clone();
-        impactDetector.addMeshFromGeometry(
-          impactGeometry,
-          {
-            name: 'SignBoard',
-            soundName: null,
-            mesh: this.mergedSignBoardMesh,
-            onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
-            {
-              const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
-              DustCloudFactory.create(
-              {
-                position: pos,
-                scene: scene,
-                numParticles: Config.SIGN_BOARD_DUST_CONFIG.numParticles,
-                color: Config.SIGN_BOARD_DUST_CONFIG.color,
-                initialRadius: Config.SIGN_BOARD_DUST_CONFIG.initialRadius,
-                growthRate: Config.SIGN_BOARD_DUST_CONFIG.growthRate,
-                particleDiameter: Config.SIGN_BOARD_DUST_CONFIG.particleDiameter
-              });
-              ImpactMarkFactory.create(
-              {
-                position: pos,
-                normal: normal,
-                mesh: targetMesh,
-                color: 0x404040,
-                size: 0.2
-              });
-            }
-          }
-        );
-      }
-    }
+    // NOTE: Collision detection registered per-sign above (tight AABBs)
+    // Merged meshes are for RENDERING only (single draw call)
 
     // Dispose original geometries
     for (const sign of this.signs)

@@ -237,6 +237,45 @@ export class BermFactory
       clonedGeometry.applyMatrix4(berm.mesh.matrixWorld);
       geometriesToMerge.push(clonedGeometry);
 
+      // Register EACH berm individually for collision detection (tight AABBs)
+      if (impactDetector)
+      {
+        const impactGeometry = clonedGeometry.clone();
+        impactDetector.addMeshFromGeometry(
+          impactGeometry,
+          {
+            name: 'Berm',
+            soundName: null, // Berms are silent
+            onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+            {
+              const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+
+              // Sand dust for berm impacts
+              DustCloudFactory.create(
+              {
+                position: pos,
+                scene: scene,
+                numParticles: Config.BERM_DUST_CONFIG.numParticles,
+                color: Config.BERM_DUST_CONFIG.color,
+                initialRadius: Config.BERM_DUST_CONFIG.initialRadius,
+                growthRate: Config.BERM_DUST_CONFIG.growthRate,
+                particleDiameter: Config.BERM_DUST_CONFIG.particleDiameter
+              });
+
+              // Impact mark - stretched based on impact angle
+              ImpactMarkFactory.create(
+              {
+                position: pos,
+                normal: normal,
+                mesh: this.mergedMesh, // Use merged mesh for decal projection
+                color: 0x8b7a65, // Sandy tan
+                size: 1.0
+              });
+            }
+          }
+        );
+      }
+
       // Use first berm's material (they should all be similar)
       if (!sharedMaterial)
       {
@@ -249,7 +288,7 @@ export class BermFactory
 
     if (geometriesToMerge.length === 0) return;
 
-    // Merge all geometries
+    // Merge all geometries for RENDERING only (single draw call)
     const mergedGeometry = mergeGeometries(geometriesToMerge);
 
     // Create merged mesh
@@ -257,47 +296,6 @@ export class BermFactory
     this.mergedMesh.castShadow = true;
     this.mergedMesh.receiveShadow = true;
     scene.add(this.mergedMesh);
-
-    // Register merged geometry for impact detection
-    if (impactDetector)
-    {
-      // Clone geometry for impact detection (it needs its own copy)
-      const impactGeometry = mergedGeometry.clone();
-      impactDetector.addMeshFromGeometry(
-        impactGeometry,
-        {
-          name: 'Berm',
-          soundName: null, // Berms are silent
-          mesh: this.mergedMesh, // Use merged mesh for decal projection
-          onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
-          {
-            const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
-
-            // Sand dust for berm impacts
-            DustCloudFactory.create(
-            {
-              position: pos,
-              scene: scene,
-              numParticles: Config.BERM_DUST_CONFIG.numParticles,
-              color: Config.BERM_DUST_CONFIG.color,
-              initialRadius: Config.BERM_DUST_CONFIG.initialRadius,
-              growthRate: Config.BERM_DUST_CONFIG.growthRate,
-              particleDiameter: Config.BERM_DUST_CONFIG.particleDiameter
-            });
-
-            // Impact mark - stretched based on impact angle
-            ImpactMarkFactory.create(
-            {
-              position: pos,
-              normal: normal,
-              mesh: targetMesh,
-              color: 0x8b7a65, // Sandy tan
-              size: 1.0
-            });
-          }
-        }
-      );
-    }
 
     // Dispose original geometries (they've been cloned and merged)
     for (const berm of this.berms)

@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <emscripten/console.h>
 #include <limits>
 #include <stdexcept>
 
