@@ -1438,13 +1438,23 @@ export class Scope
     // Clear canvas with transparent background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Get drop in mrad for current focal distance
-    const drop_mrad = this.ballisticsTable.getDropForRange(this.focalDistance);
+    // Get dialed elevation angle (not holdover) in mrad
+    const dialedElevation_mrad = this.hasDials ? this.elevationClicks * this.MINOR_CLICK_MRAD : 0;
+    
+    // Get drop in mrad for current focal distance at zero elevation
+    // The drop table gives drop relative to line of sight at zero elevation
+    const dropAtZero_mrad = this.ballisticsTable.getDropForRange(this.focalDistance);
+    
+    // When elevation is dialed, the reticle is pointing at a different angle.
+    // The drop table assumes zero elevation, so we need to account for the dial offset.
+    // If dialed up (positive elevation), the reticle moved up, so drop relative to reticle increases.
+    // Formula: drop_relative_to_reticle = drop_at_zero - dialed_elevation
+    const dropRelativeToReticle_mrad = dropAtZero_mrad + dialedElevation_mrad;
     
     // Convert to HUD space at initialFOV (like reticle lines)
     // This ensures the drop indicator scales correctly with reticleGroup (FFP behavior)
-    // Drop is positive (bullet drops below line of sight), so indicator goes below crosshair
-    const dropHud = this.mradToHudY(drop_mrad, this.initialFOV);
+    // Drop is negative (bullet drops below line of sight), so indicator goes below crosshair
+    const dropHud = this.mradToHudY(dropRelativeToReticle_mrad, this.initialFOV);
     
     // Position on vertical crosshair (x=0, y=drop)
     // Position is in reticleGroup space, so it will be scaled by reticleGroup.scale
@@ -1564,6 +1574,11 @@ export class Scope
       {
         this.audioManager.playSound('scope_click');
       }
+      // Update drop indicator to account for dial change
+      if (this.bdcEnabled)
+      {
+        this.updateDropIndicator();
+      }
     }
   }
 
@@ -1585,6 +1600,11 @@ export class Scope
       if (oldClicks !== newClicks && this.audioManager)
       {
         this.audioManager.playSound('scope_click');
+      }
+      // Update drop indicator to account for dial change
+      if (this.bdcEnabled)
+      {
+        this.updateDropIndicator();
       }
     }
   }
@@ -1670,6 +1690,11 @@ export class Scope
     if ((hadElevation || hadWindage) && this.audioManager)
     {
       this.audioManager.playSound('scope_click');
+    }
+    // Update drop indicator to account for dial reset
+    if (this.bdcEnabled)
+    {
+      this.updateDropIndicator();
     }
   }
 
