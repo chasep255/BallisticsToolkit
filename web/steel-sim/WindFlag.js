@@ -657,10 +657,21 @@ export class WindFlagFactory
 
     // Set bounding sphere for a SINGLE flag at max extension
     // Three.js will use this + instance matrix for per-instance frustum culling
-    const maxExtension = this.config.flagLength + this.config.flagFlapAmplitude;
+    // Must account for length, width, and wave amplitude in 3D space
+    const halfMaxWidth = Math.max(this.config.flagBaseWidth, this.config.flagTipWidth) * 0.5;
+    const maxWave = this.config.flagFlapAmplitude;
+    
+    // True bounding sphere radius = diagonal of 3D box (length, width, amplitude)
+    const radius = Math.sqrt(
+      this.config.flagLength * this.config.flagLength +
+      halfMaxWidth * halfMaxWidth +
+      maxWave * maxWave
+    );
+    
+    // Add 10% safety margin for high-wind deformation
     geometry.boundingSphere = new THREE.Sphere(
       new THREE.Vector3(0, 0, 0),  // Centered at flag attachment point
-      maxExtension  // Radius covers max flag extension in any direction
+      radius * 1.1  // Radius covers max flag extension in any direction
     );
     
     // Create instanced mesh
