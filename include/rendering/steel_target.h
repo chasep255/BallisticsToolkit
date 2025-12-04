@@ -194,6 +194,17 @@ namespace btk::rendering
     const btk::math::Quaternion& getOrientation() const { return orientation_; }
 
     /**
+     * @brief Get target dimensions
+     * @return Vector3D with width, height, thickness
+     */
+    btk::math::Vector3D getDimensions() const { return btk::math::Vector3D(width_, height_, thickness_); }
+
+    /**
+     * @brief Check if target is oval shape
+     */
+    bool isOval() const { return is_oval_; }
+
+    /**
      * @brief Check if target is currently moving
      */
     bool isMoving() const { return is_moving_; }
@@ -205,51 +216,6 @@ namespace btk::rendering
      * @return Point in world coordinate system
      */
     btk::math::Vector3D localToWorld(const btk::math::Vector3D& local_point) const;
-
-    /**
-     * @brief Update the vertex buffer with current position and orientation
-     */
-    void updateDisplay();
-
-    /**
-     * @brief Get vertex buffer as a JS-typed array view for zero-copy access
-     *
-     * Returns vertices as [x,y,z, x,y,z, ...] in Three.js coordinates.
-     * Each 9 consecutive floats form one triangle (3 vertices * 3 components).
-     * Buffer is updated by calling updateDisplay() before this.
-     */
-#ifdef __EMSCRIPTEN__
-    emscripten::val getVertices() const;
-#else
-    // Non-WASM builds can access the raw buffer directly
-    const std::vector<float>& getVertices() const { return vertices_buffer_; }
-#endif
-
-    /**
-     * @brief Get UV buffer as a JS-typed array view for zero-copy access
-     *
-     * Returns UVs as [u,v, u,v, ...] for texture mapping.
-     * Each 6 consecutive floats form one triangle (3 vertices * 2 components).
-     * Buffer is updated by calling updateDisplay() before this.
-     */
-#ifdef __EMSCRIPTEN__
-    emscripten::val getUVs() const;
-#else
-    const std::vector<float>& getUVs() const { return uvs_buffer_; }
-#endif
-
-    /**
-     * @brief Get normal buffer as a JS-typed array view for zero-copy access
-     *
-     * Returns normals as [nx,ny,nz, nx,ny,nz, ...] for lighting.
-     * Each 9 consecutive floats form one triangle (3 vertices * 3 components).
-     * Buffer is updated by calling updateDisplay() before this.
-     */
-#ifdef __EMSCRIPTEN__
-    emscripten::val getNormals() const;
-#else
-    const std::vector<float>& getNormals() const { return normals_buffer_; }
-#endif
 
     /**
      * @brief Get texture buffer as memory view for zero-copy access
@@ -369,10 +335,6 @@ namespace btk::rendering
     std::vector<Impact> impacts_;
 
     // Display buffer
-    std::vector<float> vertices_buffer_; // Flat array: x,y,z,x,y,z,... in Three.js coordinates
-    std::vector<float> uvs_buffer_;      // Flat array: u,v,u,v,... for texture mapping
-    std::vector<float> normals_buffer_;  // Flat array: nx,ny,nz,nx,ny,nz,... for lighting
-    int segments_per_circle_;            // Number of segments for circular shapes
 
     // Texture buffer (RGBA format) - single texture with front on left half, back on right half
     std::vector<uint8_t> texture_buffer_; // Combined texture: r,g,b,a,r,g,b,a,...

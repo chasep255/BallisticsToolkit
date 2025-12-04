@@ -14,8 +14,8 @@ namespace btk::rendering
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(0.0f, 0.0f, -1.0f),
       orientation_(btk::math::Quaternion()),
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true),
-      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32),
-      texture_width_(texture_size), texture_height_(texture_size)
+      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f),
+      texture_width_(texture_size * 2), texture_height_(texture_size)  // 2x width for front/back halves
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
@@ -26,15 +26,14 @@ namespace btk::rendering
     metal_color_[2] = 140;
 
     calculateMassAndInertia();
-    updateDisplay();     // Initialize vertex buffer
     initializeTexture(); // Initialize texture buffer
   }
 
   SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal, int texture_size)
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(position), normal_(normal.normalized()), orientation_(btk::math::Quaternion()),
       velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true),
-      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32),
-      texture_width_(texture_size), texture_height_(texture_size)
+      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f),
+      texture_width_(texture_size * 2), texture_height_(texture_size)  // 2x width for front/back halves
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
@@ -64,7 +63,6 @@ namespace btk::rendering
     // else: already aligned, identity quaternion is correct
 
     calculateMassAndInertia();
-    updateDisplay();
     initializeTexture();
   }
 
@@ -521,385 +519,7 @@ namespace btk::rendering
     drawImpactOnTexture(local_pos_clamped, bullet.getDiameter(), is_front_face);
   }
 
-  void SteelTarget::updateDisplay()
-  {
-    vertices_buffer_.clear();
-    normals_buffer_.clear();
-
-    // Generate UVs once if not already computed (they're static based on geometry)
-    if(uvs_buffer_.empty())
-    {
-      float halfThickness = thickness_ / 2.0f;
-
-      if(is_oval_)
-      {
-        float rx = width_ / 2.0f;
-        float ry = height_ / 2.0f;
-
-        for(int i = 0; i < segments_per_circle_; ++i)
-        {
-          float angle1 = (2.0f * M_PI_F * i) / segments_per_circle_;
-          float angle2 = (2.0f * M_PI_F * (i + 1)) / segments_per_circle_;
-
-          float cos1 = std::cos(angle1), sin1 = std::sin(angle1);
-          float cos2 = std::cos(angle2), sin2 = std::sin(angle2);
-
-          btk::math::Vector3D centerFront_local(0.0f, 0.0f, -halfThickness);
-          btk::math::Vector3D v1Front_local(rx * cos1, ry * sin1, -halfThickness);
-          btk::math::Vector3D v2Front_local(rx * cos2, ry * sin2, -halfThickness);
-          btk::math::Vector3D centerBack_local(0.0f, 0.0f, halfThickness);
-          btk::math::Vector3D v1Back_local(rx * cos1, ry * sin1, halfThickness);
-          btk::math::Vector3D v2Back_local(rx * cos2, ry * sin2, halfThickness);
-
-          auto pushUVFront = [&](const btk::math::Vector3D& local)
-          {
-            float u = 0.5f + local.x / width_;
-            float v = 0.5f + local.y / height_;
-            u = u * 0.5f;
-            uvs_buffer_.push_back(u);
-            uvs_buffer_.push_back(v);
-          };
-
-          auto pushUVBack = [&](const btk::math::Vector3D& local)
-          {
-            float u = 0.5f + local.x / width_;
-            float v = 0.5f + local.y / height_;
-            u = u * 0.5f + 0.5f;
-            uvs_buffer_.push_back(u);
-            uvs_buffer_.push_back(v);
-          };
-
-          auto pushBlankUV = [&]()
-          {
-            uvs_buffer_.push_back(-1.0f);
-            uvs_buffer_.push_back(-1.0f);
-          };
-
-          // Front face (3 vertices)
-          pushUVFront(centerFront_local);
-          pushUVFront(v1Front_local);
-          pushUVFront(v2Front_local);
-
-          // Back face (3 vertices)
-          pushUVBack(centerBack_local);
-          pushUVBack(v2Back_local);
-          pushUVBack(v1Back_local);
-
-          // Edge face (6 vertices)
-          pushBlankUV();
-          pushBlankUV();
-          pushBlankUV();
-          pushBlankUV();
-          pushBlankUV();
-          pushBlankUV();
-        }
-      }
-      else
-      {
-        float hw = width_ / 2.0f;
-        float hh = height_ / 2.0f;
-
-        btk::math::Vector3D v0_local(-hw, -hh, -halfThickness);
-        btk::math::Vector3D v1_local(+hw, -hh, -halfThickness);
-        btk::math::Vector3D v2_local(+hw, +hh, -halfThickness);
-        btk::math::Vector3D v3_local(-hw, +hh, -halfThickness);
-        btk::math::Vector3D v4_local(-hw, -hh, +halfThickness);
-        btk::math::Vector3D v5_local(+hw, -hh, +halfThickness);
-        btk::math::Vector3D v6_local(+hw, +hh, +halfThickness);
-        btk::math::Vector3D v7_local(-hw, +hh, +halfThickness);
-
-        auto pushUVFront = [&](const btk::math::Vector3D& local)
-        {
-          float u = 0.5f + local.x / width_;
-          float v = 0.5f + local.y / height_;
-          u = u * 0.5f;
-          uvs_buffer_.push_back(u);
-          uvs_buffer_.push_back(v);
-        };
-
-        auto pushUVBack = [&](const btk::math::Vector3D& local)
-        {
-          float u = 0.5f + local.x / width_;
-          float v = 0.5f + local.y / height_;
-          u = u * 0.5f + 0.5f;
-          uvs_buffer_.push_back(u);
-          uvs_buffer_.push_back(v);
-        };
-
-        auto pushBlankUV = [&]()
-        {
-          uvs_buffer_.push_back(-1.0f);
-          uvs_buffer_.push_back(-1.0f);
-        };
-
-        // Front face (6 vertices)
-        pushUVFront(v0_local);
-        pushUVFront(v1_local);
-        pushUVFront(v2_local);
-        pushUVFront(v0_local);
-        pushUVFront(v2_local);
-        pushUVFront(v3_local);
-
-        // Back face (6 vertices)
-        pushUVBack(v4_local);
-        pushUVBack(v6_local);
-        pushUVBack(v5_local);
-        pushUVBack(v4_local);
-        pushUVBack(v7_local);
-        pushUVBack(v6_local);
-
-        // Edge faces (24 vertices = 4 edges * 6 vertices each)
-        for(int i = 0; i < 24; ++i)
-        {
-          pushBlankUV();
-        }
-      }
-    }
-
-    float halfThickness = thickness_ / 2.0f;
-
-    // Use full orientation quaternion to rotate from local (-Z-normal) frame to world
-    btk::math::Quaternion rotation_quat = orientation_;
-
-    if(is_oval_)
-    {
-      // Oval with thickness: front face, back face, and edge
-      // Shape is in XY plane with normal in -Z direction (before rotation)
-      float rx = width_ / 2.0f;
-      float ry = height_ / 2.0f;
-
-      // Generate front and back faces
-      for(int i = 0; i < segments_per_circle_; ++i)
-      {
-        float angle1 = (2.0f * M_PI_F * i) / segments_per_circle_;
-        float angle2 = (2.0f * M_PI_F * (i + 1)) / segments_per_circle_;
-
-        float cos1 = std::cos(angle1), sin1 = std::sin(angle1);
-        float cos2 = std::cos(angle2), sin2 = std::sin(angle2);
-
-        // Generate vertices in local space (relative to position_, normal in -Z)
-        btk::math::Vector3D centerFront_local(0.0f, 0.0f, -halfThickness);
-        btk::math::Vector3D v1Front_local(rx * cos1, ry * sin1, -halfThickness);
-        btk::math::Vector3D v2Front_local(rx * cos2, ry * sin2, -halfThickness);
-
-        btk::math::Vector3D centerBack_local(0.0f, 0.0f, halfThickness);
-        btk::math::Vector3D v1Back_local(rx * cos1, ry * sin1, halfThickness);
-        btk::math::Vector3D v2Back_local(rx * cos2, ry * sin2, halfThickness);
-
-        // Rotate vertices by current orientation (in BTK space)
-        btk::math::Vector3D centerFront = position_ + rotation_quat.rotate(centerFront_local);
-        btk::math::Vector3D v1Front = position_ + rotation_quat.rotate(v1Front_local);
-        btk::math::Vector3D v2Front = position_ + rotation_quat.rotate(v2Front_local);
-        btk::math::Vector3D centerBack = position_ + rotation_quat.rotate(centerBack_local);
-        btk::math::Vector3D v1Back = position_ + rotation_quat.rotate(v1Back_local);
-        btk::math::Vector3D v2Back = position_ + rotation_quat.rotate(v2Back_local);
-
-        // Helper lambda to push world-space vertices (meters) directly.
-        // BTK now matches Three.js: X=crossrange, Y=up, Z=-downrange (meters),
-        // and the Three.js scene is also in meters.
-        auto pushVertex = [&](const btk::math::Vector3D& v)
-        {
-          vertices_buffer_.push_back(v.x);
-          vertices_buffer_.push_back(v.y);
-          vertices_buffer_.push_back(v.z);
-        };
-
-        // Front face - maps to left half of texture
-        pushVertex(centerFront);
-        pushVertex(v1Front);
-        pushVertex(v2Front);
-
-        // Back face - maps to right half of texture
-        pushVertex(centerBack);
-        pushVertex(v2Back);
-        pushVertex(v1Back);
-
-        // Edge face (quad connecting front and back) - 2 triangles - no texture
-        pushVertex(v1Front);
-        pushVertex(v1Back);
-        pushVertex(v2Front);
-
-        pushVertex(v2Front);
-        pushVertex(v1Back);
-        pushVertex(v2Back);
-      }
-    }
-    else
-    {
-      // Rectangle with thickness: front face, back face, and 4 edge faces
-      // In new coordinate system: X=crossrange (width), Y=up (height), Z=-downrange (normal direction)
-      // Local space with normal pointing uprange (-Z): plate is vertical in XY plane
-      float hw = width_ / 2.0f;
-      float hh = height_ / 2.0f;
-
-      // Generate corners in local space (X=crossrange, Y=up, Z=thickness/normal)
-      // Front face (facing uprange, Z=-halfThickness)
-      btk::math::Vector3D v0_local(-hw, -hh, -halfThickness);
-      btk::math::Vector3D v1_local(+hw, -hh, -halfThickness);
-      btk::math::Vector3D v2_local(+hw, +hh, -halfThickness);
-      btk::math::Vector3D v3_local(-hw, +hh, -halfThickness);
-      // Back face (facing downrange, Z=+halfThickness)
-      btk::math::Vector3D v4_local(-hw, -hh, +halfThickness);
-      btk::math::Vector3D v5_local(+hw, -hh, +halfThickness);
-      btk::math::Vector3D v6_local(+hw, +hh, +halfThickness);
-      btk::math::Vector3D v7_local(-hw, +hh, +halfThickness);
-
-      // Rotate to world space using full orientation (in BTK space)
-      btk::math::Vector3D v0 = position_ + rotation_quat.rotate(v0_local);
-      btk::math::Vector3D v1 = position_ + rotation_quat.rotate(v1_local);
-      btk::math::Vector3D v2 = position_ + rotation_quat.rotate(v2_local);
-      btk::math::Vector3D v3 = position_ + rotation_quat.rotate(v3_local);
-      btk::math::Vector3D v4 = position_ + rotation_quat.rotate(v4_local);
-      btk::math::Vector3D v5 = position_ + rotation_quat.rotate(v5_local);
-      btk::math::Vector3D v6 = position_ + rotation_quat.rotate(v6_local);
-      btk::math::Vector3D v7 = position_ + rotation_quat.rotate(v7_local);
-
-      // Helper lambda to push world-space vertices (meters) directly.
-      // BTK now matches Three.js: X=crossrange, Y=up, Z=-downrange (meters),
-      // and the Three.js scene is also in meters.
-      auto pushVertex = [&](const btk::math::Vector3D& v)
-      {
-        vertices_buffer_.push_back(v.x);
-        vertices_buffer_.push_back(v.y);
-        vertices_buffer_.push_back(v.z);
-      };
-
-      // Front face (Z = -halfThickness) - maps to left half of texture
-      pushVertex(v0);
-      pushVertex(v1);
-      pushVertex(v2);
-      pushVertex(v0);
-      pushVertex(v2);
-      pushVertex(v3);
-
-      // Back face (Z = +halfThickness) - maps to right half of texture
-      pushVertex(v4);
-      pushVertex(v6);
-      pushVertex(v5);
-      pushVertex(v4);
-      pushVertex(v7);
-      pushVertex(v6);
-
-      // Edge faces (4 sides) - no texture
-      // Bottom edge
-      pushVertex(v0);
-      pushVertex(v1);
-      pushVertex(v5);
-      pushVertex(v0);
-      pushVertex(v5);
-      pushVertex(v4);
-      // Top edge
-      pushVertex(v2);
-      pushVertex(v6);
-      pushVertex(v3);
-      pushVertex(v3);
-      pushVertex(v6);
-      pushVertex(v7);
-      // Left edge
-      pushVertex(v0);
-      pushVertex(v4);
-      pushVertex(v7);
-      pushVertex(v0);
-      pushVertex(v7);
-      pushVertex(v3);
-      // Right edge
-      pushVertex(v1);
-      pushVertex(v5);
-      pushVertex(v6);
-      pushVertex(v1);
-      pushVertex(v6);
-      pushVertex(v2);
-    }
-
-    // Compute vertex normals
-    // Since we use non-indexed geometry, we compute face normals for each triangle
-    // and assign them to all three vertices of that triangle (flat shading)
-    normals_buffer_.resize(vertices_buffer_.size(), 0.0f);
-
-    // Process each triangle (9 floats = 3 vertices * 3 components)
-    for(size_t i = 0; i < vertices_buffer_.size(); i += 9)
-    {
-      // Get vertex positions for this triangle
-      const float* v0 = &vertices_buffer_[i];
-      const float* v1 = &vertices_buffer_[i + 3];
-      const float* v2 = &vertices_buffer_[i + 6];
-
-      // Compute edge vectors
-      const float edge1x = v1[0] - v0[0];
-      const float edge1y = v1[1] - v0[1];
-      const float edge1z = v1[2] - v0[2];
-
-      const float edge2x = v2[0] - v0[0];
-      const float edge2y = v2[1] - v0[1];
-      const float edge2z = v2[2] - v0[2];
-
-      // Compute face normal (cross product)
-      float nx = edge1y * edge2z - edge1z * edge2y;
-      float ny = edge1z * edge2x - edge1x * edge2z;
-      float nz = edge1x * edge2y - edge1y * edge2x;
-
-      // Normalize face normal
-      const float len = std::sqrt(nx * nx + ny * ny + nz * nz);
-      if(len > 1e-6f)
-      {
-        nx /= len;
-        ny /= len;
-        nz /= len;
-      }
-      else
-      {
-        // Fallback to default normal if degenerate
-        nx = 0.0f;
-        ny = 1.0f;
-        nz = 0.0f;
-      }
-
-      // Assign face normal to all three vertices of this triangle
-      normals_buffer_[i] = nx;
-      normals_buffer_[i + 1] = ny;
-      normals_buffer_[i + 2] = nz;
-
-      normals_buffer_[i + 3] = nx;
-      normals_buffer_[i + 4] = ny;
-      normals_buffer_[i + 5] = nz;
-
-      normals_buffer_[i + 6] = nx;
-      normals_buffer_[i + 7] = ny;
-      normals_buffer_[i + 8] = nz;
-    }
-  }
-
 #ifdef __EMSCRIPTEN__
-  emscripten::val SteelTarget::getVertices() const
-  {
-    using namespace emscripten;
-    if(vertices_buffer_.empty())
-    {
-      return val::global("Float32Array").new_(0);
-    }
-    return val(typed_memory_view(vertices_buffer_.size(), vertices_buffer_.data()));
-  }
-
-  emscripten::val SteelTarget::getUVs() const
-  {
-    using namespace emscripten;
-    if(uvs_buffer_.empty())
-    {
-      return val::global("Float32Array").new_(0);
-    }
-    return val(typed_memory_view(uvs_buffer_.size(), uvs_buffer_.data()));
-  }
-
-  emscripten::val SteelTarget::getNormals() const
-  {
-    using namespace emscripten;
-    if(normals_buffer_.empty())
-    {
-      return val::global("Float32Array").new_(0);
-    }
-    return val(typed_memory_view(normals_buffer_.size(), normals_buffer_.data()));
-  }
-
   emscripten::val SteelTarget::getTexture() const
   {
     using namespace emscripten;
@@ -944,25 +564,24 @@ namespace btk::rendering
     float u = 0.5f + local_position.x / width_;
     float v = 0.5f + local_position.y / height_;
 
-    // Offset U coordinate based on which face: front = left half (0-0.5), back = right half (0.5-1.0)
-    // Since texture_width_ is 2x the target aspect, we need to map to the correct half
-    float u_offset = is_front_face ? 0.0f : 0.5f;
-    u = u * 0.5f + u_offset; // Scale U to half width and offset to correct half
-
     // Skip if outside texture bounds
     if(u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f)
     {
       return;
     }
 
-    // Calculate half-width to confine drawing to correct side
+    // Texture is split: left half = front face (u=0-0.5), right half = back face (u=0.5-1.0)
+    // Scale u to half width and offset to correct half
     int half_texture_width = texture_width_ / 2;
+    int u_offset = is_front_face ? 0 : half_texture_width;
+
+    // Convert UV to pixel coordinates within the correct half
+    int center_x = u_offset + static_cast<int>(u * half_texture_width);
+    int center_y = static_cast<int>(v * texture_height_);
+
+    // Bounds for this face's half of the texture
     int u_min = is_front_face ? 0 : half_texture_width;
     int u_max = is_front_face ? half_texture_width : texture_width_;
-
-    // Convert UV to pixel coordinates
-    int center_x = static_cast<int>(u * texture_width_);
-    int center_y = static_cast<int>(v * texture_height_);
 
     // Draw splatter as a circle revealing metal underneath
     // Splatter radius based on bullet diameter (scaled to texture space)
@@ -970,8 +589,7 @@ namespace btk::rendering
 
     // Calculate radius in pixels for X and Y separately to account for aspect ratio
     // Half texture width maps to target width, full texture height maps to target height
-    float half_tex_width = texture_width_ / 2.0f;
-    int splatter_radius_px_x = static_cast<int>((splatter_radius_m / width_) * half_tex_width);
+    int splatter_radius_px_x = static_cast<int>((splatter_radius_m / width_) * half_texture_width);
     int splatter_radius_px_y = static_cast<int>((splatter_radius_m / height_) * texture_height_);
     splatter_radius_px_x = std::max(3, splatter_radius_px_x);
     splatter_radius_px_y = std::max(3, splatter_radius_px_y);

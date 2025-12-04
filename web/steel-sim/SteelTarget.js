@@ -5,8 +5,9 @@ import
 }
 from './config.js';
 
-// Atlas configuration
-const ATLAS_TILE_SIZE = 512; // Each target gets 512x512 in the atlas
+// Atlas configuration - texture is 2x width for front/back halves
+const ATLAS_TILE_WIDTH = 1024;  // 2x for front/back
+const ATLAS_TILE_HEIGHT = 512;
 
 /**
  * Wrapper class for C++ SteelTarget physics object.
@@ -78,7 +79,7 @@ export class SteelTarget
     // Create BTK steel target (physics + rendering data)
     const initialPos = new btk.Vector3D(position.x, position.y, position.z);
     const defaultNormal = new btk.Vector3D(0, 0, -1);
-    this.steelTarget = new btk.SteelTarget(width, height, thickness, isOval, initialPos, defaultNormal, ATLAS_TILE_SIZE);
+    this.steelTarget = new btk.SteelTarget(width, height, thickness, isOval, initialPos, defaultNormal, ATLAS_TILE_HEIGHT);
     initialPos.delete();
     defaultNormal.delete();
 
@@ -134,12 +135,12 @@ export class SteelTarget
   }
 
   /**
-   * Update mesh in merged geometry (called by factory for moving targets)
+   * Update instance attributes (called by factory for moving targets)
    */
   updateMesh()
   {
     if (!this.steelTarget || this.targetIndex === null) return;
-    SteelTargetFactory.copyTargetToMerged(this);
+    SteelTargetFactory.updateInstanceAttributes(this);
   }
 
   /**
@@ -274,17 +275,16 @@ export class SteelTargetFactory
   static allTargets = new Set();
   static movingTargets = new Set();
 
-  // Merged geometry state
-  static mergedMesh = null;
-  static mergedGeometry = null;
+  // Instanced mesh state
+  static rectInstancedMesh = null;
+  static ovalInstancedMesh = null;
+  static edgeInstancedMesh = null;
   static atlasTexture = null;
   static atlasData = null;
-  static targetIndexBuffer = null;
 
-  // Buffer arrays
-  static vertexBuffer = null;
-  static uvBuffer = null;
-  static normalBuffer = null;
+  // Instance data tracking
+  static instanceData = new Map(); // target -> {instanceId, isOval}
+  static nextInstanceId = 0;
 
   // Chain instancing
   static chainMesh = null;
@@ -308,7 +308,7 @@ export class SteelTargetFactory
   }
 
   /**
-   * Initialize merged mesh after all targets are created.
+   * Initialize instanced meshes after all targets are created.
    * Call this once after all targets exist.
    * @param {THREE.Scene} scene
    */
@@ -322,30 +322,31 @@ export class SteelTargetFactory
 
     console.log(`SteelTargetFactory.initializeMergedMesh: ${numTargets} targets`);
 
-    // First pass: update display and count total vertices
-    let totalVertices = 0;
-    const targetVertexCounts = [];
+    // Separate targets by shape
+    const rectTargets = [];
+    const ovalTargets = [];
 
     for (const target of targets)
     {
-      target.steelTarget.updateDisplay();
-      const vertices = target.steelTarget.getVertices();
-      const vertexCount = vertices.length / 3;
-      targetVertexCounts.push(vertexCount);
-      totalVertices += vertexCount;
+      const isOval = target.steelTarget.isOval();
+      if (isOval)
+      {
+        ovalTargets.push(target);
+      }
+      else
+      {
+        rectTargets.push(target);
+      }
     }
 
-    console.log(`  Total vertices: ${totalVertices}`);
-
-    // Create texture array (one layer per target, 256x256 each)
-    // Data layout: [layer0, layer1, layer2...] where each layer is 256x256x4 bytes
-    const pixelsPerLayer = ATLAS_TILE_SIZE * ATLAS_TILE_SIZE * 4;
+    // Create texture array (one layer per target)
+    const pixelsPerLayer = ATLAS_TILE_WIDTH * ATLAS_TILE_HEIGHT * 4;
     this.atlasData = new Uint8Array(pixelsPerLayer * numTargets);
 
     this.atlasTexture = new THREE.DataArrayTexture(
       this.atlasData,
-      ATLAS_TILE_SIZE,
-      ATLAS_TILE_SIZE,
+      ATLAS_TILE_WIDTH,
+      ATLAS_TILE_HEIGHT,
       numTargets
     );
     this.atlasTexture.format = THREE.RGBAFormat;
@@ -353,114 +354,260 @@ export class SteelTargetFactory
     this.atlasTexture.minFilter = THREE.LinearFilter;
     this.atlasTexture.magFilter = THREE.LinearFilter;
     this.atlasTexture.flipY = false;
+    this.atlasTexture.colorSpace = THREE.LinearSRGBColorSpace;
 
-    // Allocate merged buffers
-    this.vertexBuffer = new Float32Array(totalVertices * 3);
-    this.uvBuffer = new Float32Array(totalVertices * 2);
-    this.normalBuffer = new Float32Array(totalVertices * 3);
-    this.targetIndexBuffer = new Float32Array(totalVertices); // Layer index per vertex
-
-    // Second pass: assign indices and copy data
-    let vertexOffset = 0;
-
-    for (let i = 0; i < targets.length; i++)
+    // Copy textures to array
+    let targetIndex = 0;
+    for (const target of targets)
     {
-      const target = targets[i];
-      const vertexCount = targetVertexCounts[i];
+      target.targetIndex = targetIndex;
+      target.atlasOffset = targetIndex;
 
-      // Assign indices to target
-      target.targetIndex = i;
-      target.vertexOffset = vertexOffset;
-      target.vertexCount = vertexCount;
-      target.atlasOffset = i; // Layer index in texture array
-
-      // Copy vertex and normal data
-      const srcVertices = target.steelTarget.getVertices();
-      const srcNormals = target.steelTarget.getNormals();
-
-      this.vertexBuffer.set(srcVertices, vertexOffset * 3);
-      this.normalBuffer.set(srcNormals, vertexOffset * 3);
-
-      // Copy UVs directly (no remapping needed for texture array)
-      const srcUVs = target.steelTarget.getUVs();
-      this.uvBuffer.set(srcUVs, vertexOffset * 2);
-
-      // Set target index (layer) for all vertices of this target
-      for (let j = 0; j < vertexCount; j++)
-      {
-        this.targetIndexBuffer[vertexOffset + j] = i;
-      }
-
-      // Copy texture to array layer (C++ texture matches atlas size)
       const srcData = target.steelTarget.getTexture();
-      const pixelsPerLayer = ATLAS_TILE_SIZE * ATLAS_TILE_SIZE * 4;
-      const layerOffset = i * pixelsPerLayer;
+      const layerOffset = targetIndex * pixelsPerLayer;
       this.atlasData.set(srcData, layerOffset);
-
-      vertexOffset += vertexCount;
+      targetIndex++;
     }
 
-    // Create merged geometry
-    this.mergedGeometry = new THREE.BufferGeometry();
-    this.mergedGeometry.setAttribute('position', new THREE.BufferAttribute(this.vertexBuffer, 3));
-    this.mergedGeometry.setAttribute('uv', new THREE.BufferAttribute(this.uvBuffer, 2));
-    this.mergedGeometry.setAttribute('normal', new THREE.BufferAttribute(this.normalBuffer, 3));
-    this.mergedGeometry.setAttribute('targetIndex', new THREE.BufferAttribute(this.targetIndexBuffer, 1));
+    // Create base geometries
+    const unitQuadGeometry = this.createUnitQuadGeometry();
+    const unitCircleGeometry = this.createUnitCircleGeometry();
 
-    // Mark as dynamic for updates
-    this.mergedGeometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
-    this.mergedGeometry.attributes.normal.setUsage(THREE.DynamicDrawUsage);
+    // Create materials with custom shaders for texture array
+    const rectMaterial = this.createInstancedMaterial();
+    const ovalMaterial = this.createInstancedMaterial();
 
-    // Create material with texture array (requires custom shader)
+    // Create instanced meshes using standard Three.js setMatrixAt approach
+    if (rectTargets.length > 0)
+    {
+      this.rectInstancedMesh = new THREE.InstancedMesh(unitQuadGeometry, rectMaterial, rectTargets.length);
+      this.rectInstancedMesh.castShadow = true;
+      this.rectInstancedMesh.receiveShadow = true;
+      this.setupInstanceMatrices(this.rectInstancedMesh, rectTargets);
+      scene.add(this.rectInstancedMesh);
+      console.log(`  Created rect instanced mesh: ${rectTargets.length} instances`);
+    }
+
+    if (ovalTargets.length > 0)
+    {
+      this.ovalInstancedMesh = new THREE.InstancedMesh(unitCircleGeometry, ovalMaterial, ovalTargets.length);
+      this.ovalInstancedMesh.castShadow = true;
+      this.ovalInstancedMesh.receiveShadow = true;
+      this.setupInstanceMatrices(this.ovalInstancedMesh, ovalTargets);
+      scene.add(this.ovalInstancedMesh);
+      console.log(`  Created oval instanced mesh: ${ovalTargets.length} instances`);
+    }
+
+    this.atlasTexture.needsUpdate = true;
+
+    console.log(`  Texture array: ${ATLAS_TILE_WIDTH}x${ATLAS_TILE_HEIGHT} x ${numTargets} layers`);
+    console.log(`  Rect instances: ${rectTargets.length}, Oval instances: ${ovalTargets.length}`);
+  }
+
+  /**
+   * Create unit box geometry (1x1x1, centered at origin) with custom UVs
+   * Front and back faces get proper texture UVs, edge faces get -1 UVs (for shader to color gray)
+   */
+  static createUnitQuadGeometry()
+  {
+    const geometry = new THREE.BufferGeometry();
+
+    // Half dimensions
+    const hw = 0.5, hh = 0.5, hd = 0.5;
+
+    // Vertices: front face (z=-0.5), back face (z=+0.5), and 4 edge faces
+    const positions = new Float32Array([
+      // Front face (facing -Z) - 2 triangles
+      -hw, -hh, -hd,  hw, -hh, -hd,  hw,  hh, -hd,
+      -hw, -hh, -hd,  hw,  hh, -hd, -hw,  hh, -hd,
+      // Back face (facing +Z) - 2 triangles
+      hw, -hh,  hd, -hw, -hh,  hd, -hw,  hh,  hd,
+      hw, -hh,  hd, -hw,  hh,  hd,  hw,  hh,  hd,
+      // Bottom edge (facing -Y)
+      -hw, -hh, -hd, -hw, -hh,  hd,  hw, -hh,  hd,
+      -hw, -hh, -hd,  hw, -hh,  hd,  hw, -hh, -hd,
+      // Top edge (facing +Y)
+      -hw,  hh,  hd, -hw,  hh, -hd,  hw,  hh, -hd,
+      -hw,  hh,  hd,  hw,  hh, -hd,  hw,  hh,  hd,
+      // Left edge (facing -X)
+      -hw, -hh,  hd, -hw, -hh, -hd, -hw,  hh, -hd,
+      -hw, -hh,  hd, -hw,  hh, -hd, -hw,  hh,  hd,
+      // Right edge (facing +X)
+      hw, -hh, -hd,  hw, -hh,  hd,  hw,  hh,  hd,
+      hw, -hh, -hd,  hw,  hh,  hd,  hw,  hh, -hd,
+    ]);
+
+    // UVs: texture is 2x width - left half (u=0-0.5) for front, right half (u=0.5-1) for back
+    // Edges get -1 UVs (shader will color gray)
+    const uvs = new Float32Array([
+      // Front face - uses left half of texture (u=0 to 0.5)
+      // Vertices: (-hw,-hh,-hd), (hw,-hh,-hd), (hw,hh,-hd), (-hw,-hh,-hd), (hw,hh,-hd), (-hw,hh,-hd)
+      0, 0,    0.5, 0,    0.5, 1,
+      0, 0,    0.5, 1,    0, 1,
+      // Back face - uses right half of texture (u=0.5 to 1.0)
+      // Vertices: (hw,-hh,hd), (-hw,-hh,hd), (-hw,hh,hd), (hw,-hh,hd), (-hw,hh,hd), (hw,hh,hd)
+      // When viewed from +Z: (hw,-hh) is RIGHT, (-hw,-hh) is LEFT
+      // Map so right side gets u=1, left side gets u=0.5
+      1, 0,    0.5, 0,    0.5, 1,
+      1, 0,    0.5, 1,    1, 1,
+      // Edge faces - negative UVs to signal "no texture"
+      -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1,
+      -1, -1, -1, -1, -1, -1,
+    ]);
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geometry.computeVertexNormals();
+
+    return geometry;
+  }
+
+  /**
+   * Create unit cylinder geometry with custom UVs for oval targets
+   * Front and back circular faces get texture, edge ring gets -1 UVs
+   */
+  static createUnitCircleGeometry()
+  {
+    const segments = 32;
+    const geometry = new THREE.BufferGeometry();
+
+    const positions = [];
+    const uvs = [];
+
+    const rx = 0.5, ry = 0.5, hd = 0.5; // Half dimensions
+
+    // Front face (z = -hd) - triangle fan from center
+    // Uses left half of texture (u=0 to 0.5)
+    for (let i = 0; i < segments; i++)
+    {
+      const angle1 = (2 * Math.PI * i) / segments;
+      const angle2 = (2 * Math.PI * (i + 1)) / segments;
+
+      const cos1 = Math.cos(angle1), sin1 = Math.sin(angle1);
+      const cos2 = Math.cos(angle2), sin2 = Math.sin(angle2);
+
+      // Triangle: center, v1, v2
+      positions.push(0, 0, -hd);
+      positions.push(rx * cos1, ry * sin1, -hd);
+      positions.push(rx * cos2, ry * sin2, -hd);
+
+      // UVs: map to left half (u=0 to 0.5)
+      uvs.push(0.25, 0.5);  // center at u=0.25
+      uvs.push(0.25 + cos1 * 0.25, 0.5 + sin1 * 0.5);
+      uvs.push(0.25 + cos2 * 0.25, 0.5 + sin2 * 0.5);
+    }
+
+    // Back face (z = +hd) - triangle fan from center (reversed winding)
+    // Uses right half of texture (u=0.5 to 1.0)
+    for (let i = 0; i < segments; i++)
+    {
+      const angle1 = (2 * Math.PI * i) / segments;
+      const angle2 = (2 * Math.PI * (i + 1)) / segments;
+
+      const cos1 = Math.cos(angle1), sin1 = Math.sin(angle1);
+      const cos2 = Math.cos(angle2), sin2 = Math.sin(angle2);
+
+      // Triangle: center, v2, v1 (reversed for correct facing)
+      positions.push(0, 0, hd);
+      positions.push(rx * cos2, ry * sin2, hd);
+      positions.push(rx * cos1, ry * sin1, hd);
+
+      // UVs: map to right half (u=0.5 to 1.0), flipped horizontally
+      uvs.push(0.75, 0.5);  // center at u=0.75
+      uvs.push(0.75 - cos2 * 0.25, 0.5 + sin2 * 0.5);
+      uvs.push(0.75 - cos1 * 0.25, 0.5 + sin1 * 0.5);
+    }
+
+    // Edge faces (connecting front and back) - quads as 2 triangles each
+    for (let i = 0; i < segments; i++)
+    {
+      const angle1 = (2 * Math.PI * i) / segments;
+      const angle2 = (2 * Math.PI * (i + 1)) / segments;
+
+      const cos1 = Math.cos(angle1), sin1 = Math.sin(angle1);
+      const cos2 = Math.cos(angle2), sin2 = Math.sin(angle2);
+
+      const x1 = rx * cos1, y1 = ry * sin1;
+      const x2 = rx * cos2, y2 = ry * sin2;
+
+      // Two triangles for the edge quad
+      positions.push(x1, y1, -hd);
+      positions.push(x1, y1, hd);
+      positions.push(x2, y2, -hd);
+
+      positions.push(x2, y2, -hd);
+      positions.push(x1, y1, hd);
+      positions.push(x2, y2, hd);
+
+      // Edge UVs: -1 to signal "no texture"
+      uvs.push(-1, -1, -1, -1, -1, -1);
+      uvs.push(-1, -1, -1, -1, -1, -1);
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geometry.computeVertexNormals();
+
+    return geometry;
+  }
+
+  /**
+   * Create material with texture array for instanced rendering
+   */
+  static createInstancedMaterial()
+  {
     const material = new THREE.MeshStandardMaterial({
       side: THREE.DoubleSide,
-      roughness: 0.5,
+      roughness: 0.7,
       metalness: 0.1,
       polygonOffset: true,
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
     });
 
-    // Patch shader to use texture array
     material.onBeforeCompile = (shader) => {
-      // Add targetIndex attribute and varying
+      // Add per-instance target index attribute and varying
       shader.vertexShader = `
-        attribute float targetIndex;
+        attribute float instanceTargetIndex;
         varying float vTargetIndex;
         varying vec2 vUv;
       ` + shader.vertexShader;
 
-      // Pass targetIndex and ensure vUv is set
+      // Pass target index to fragment shader
       shader.vertexShader = shader.vertexShader.replace(
         '#include <uv_vertex>',
         `
         #include <uv_vertex>
-        vTargetIndex = targetIndex;
+        vTargetIndex = instanceTargetIndex;
         vUv = uv;
         `
       );
 
-      // Add uniform for texture array
+      // Add texture array uniform
       shader.uniforms.mapArray = { value: this.atlasTexture };
-      shader.uniforms.map = { value: null }; // Disable regular map
 
-      // Replace fragment shader to use sampler2DArray
       shader.fragmentShader = `
         uniform sampler2DArray mapArray;
         varying float vTargetIndex;
         varying vec2 vUv;
       ` + shader.fragmentShader;
 
-      // Replace map sampling with texture array sampling
+      // Sample texture array (or use gray for edge faces with negative UVs)
       shader.fragmentShader = shader.fragmentShader.replace(
         'vec4 diffuseColor = vec4( diffuse, opacity );',
         `
         vec4 diffuseColor;
         if (vUv.x < 0.0) {
           // Edge face - metal gray
-          diffuseColor = vec4(vec3(0.55), opacity);
+          diffuseColor = vec4(0.55, 0.55, 0.55, opacity);
         } else {
-          // Sample texture array: texture(mapArray, vec3(uv, layerIndex))
+          // Front/back face - sample texture array
           vec4 texColor = texture(mapArray, vec3(vUv, vTargetIndex));
           diffuseColor = texColor;
         }
@@ -470,20 +617,58 @@ export class SteelTargetFactory
       // Remove default map sampling
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <map_fragment>',
-        '// map_fragment replaced by texture array sampling above'
+        '// map_fragment replaced by texture array sampling'
       );
     };
 
-    // Create merged mesh
-    this.mergedMesh = new THREE.Mesh(this.mergedGeometry, material);
-    this.mergedMesh.castShadow = true;
-    this.mergedMesh.receiveShadow = true;
-    scene.add(this.mergedMesh);
+    return material;
+  }
 
-    this.atlasTexture.needsUpdate = true;
+  // Reusable objects for matrix computation
+  static _matrix = new THREE.Matrix4();
+  static _position = new THREE.Vector3();
+  static _quaternion = new THREE.Quaternion();
+  static _scale = new THREE.Vector3();
 
-    console.log(`  Texture array: ${ATLAS_TILE_SIZE}x${ATLAS_TILE_SIZE} x ${numTargets} layers`);
-    console.log(`  Merged mesh created`);
+  /**
+   * Setup instance matrices and target index attributes using standard Three.js approach
+   */
+  static setupInstanceMatrices(instancedMesh, targets)
+  {
+    const count = targets.length;
+    const targetIndexArray = new Float32Array(count);
+
+    for (let i = 0; i < count; i++)
+    {
+      const target = targets[i];
+      const pos = target.steelTarget.getCenterOfMass();
+      const orient = target.steelTarget.getOrientation();
+      const dims = target.steelTarget.getDimensions();
+
+      // Set position
+      this._position.set(pos.x, pos.y, pos.z);
+
+      // Set orientation (from C++ quaternion)
+      this._quaternion.set(orient.x, orient.y, orient.z, orient.w);
+      this._quaternion.normalize();
+
+      // Set scale (width, height, thickness)
+      this._scale.set(dims.x, dims.y, dims.z);
+
+      // Compose matrix and set
+      this._matrix.compose(this._position, this._quaternion, this._scale);
+      instancedMesh.setMatrixAt(i, this._matrix);
+
+      // Store target index for texture array
+      targetIndexArray[i] = target.targetIndex;
+
+      // Store instance info for updates
+      this.instanceData.set(target, { instanceId: i, isOval: target.steelTarget.isOval() });
+    }
+
+    // Add target index as instanced attribute
+    instancedMesh.geometry.setAttribute('instanceTargetIndex', new THREE.InstancedBufferAttribute(targetIndexArray, 1));
+    instancedMesh.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -525,33 +710,31 @@ export class SteelTargetFactory
   }
 
   /**
-   * Copy a target's vertices/normals to the merged buffer
+   * Update instance matrix for a target (called when target moves)
    * @param {SteelTarget} target
    */
-  static copyTargetToMerged(target)
+  static updateInstanceAttributes(target)
   {
-    if (!this.mergedGeometry || target.vertexOffset === null) return;
+    const instanceInfo = this.instanceData.get(target);
+    if (!instanceInfo) return;
 
-    // Update C++ display buffer
-    target.steelTarget.updateDisplay();
+    const { instanceId, isOval } = instanceInfo;
+    const instancedMesh = isOval ? this.ovalInstancedMesh : this.rectInstancedMesh;
+    if (!instancedMesh) return;
 
-    // Copy vertices
-    const srcVertices = target.steelTarget.getVertices();
-    this.vertexBuffer.set(srcVertices, target.vertexOffset * 3);
+    const pos = target.steelTarget.getCenterOfMass();
+    const orient = target.steelTarget.getOrientation();
+    const dims = target.steelTarget.getDimensions();
 
-    // Copy normals
-    const srcNormals = target.steelTarget.getNormals();
-    this.normalBuffer.set(srcNormals, target.vertexOffset * 3);
+    // Update matrix
+    this._position.set(pos.x, pos.y, pos.z);
+    this._quaternion.set(orient.x, orient.y, orient.z, orient.w);
+    this._quaternion.normalize();
+    this._scale.set(dims.x, dims.y, dims.z);
 
-    // Mark range as needing update
-    const posAttr = this.mergedGeometry.attributes.position;
-    posAttr.needsUpdate = true;
-    // Note: updateRange can be used for partial updates if needed
-    // posAttr.updateRange.offset = target.vertexOffset * 3;
-    // posAttr.updateRange.count = target.vertexCount * 3;
-
-    const normAttr = this.mergedGeometry.attributes.normal;
-    normAttr.needsUpdate = true;
+    this._matrix.compose(this._position, this._quaternion, this._scale);
+    instancedMesh.setMatrixAt(instanceId, this._matrix);
+    instancedMesh.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -564,7 +747,7 @@ export class SteelTargetFactory
 
     const srcData = target.steelTarget.getTexture();
     const layerIndex = target.atlasOffset;
-    const pixelsPerLayer = ATLAS_TILE_SIZE * ATLAS_TILE_SIZE * 4;
+    const pixelsPerLayer = ATLAS_TILE_WIDTH * ATLAS_TILE_HEIGHT * 4;
     const layerOffset = layerIndex * pixelsPerLayer;
     
     this.atlasData.set(srcData, layerOffset);
@@ -619,12 +802,28 @@ export class SteelTargetFactory
     this.allTargets.clear();
     this.movingTargets.clear();
 
-    if (this.mergedMesh && this.scene)
+    if (this.rectInstancedMesh && this.scene)
     {
-      this.scene.remove(this.mergedMesh);
-      this.mergedMesh.geometry.dispose();
-      this.mergedMesh.material.dispose();
-      this.mergedMesh = null;
+      this.scene.remove(this.rectInstancedMesh);
+      this.rectInstancedMesh.geometry.dispose();
+      this.rectInstancedMesh.material.dispose();
+      this.rectInstancedMesh = null;
+    }
+
+    if (this.ovalInstancedMesh && this.scene)
+    {
+      this.scene.remove(this.ovalInstancedMesh);
+      this.ovalInstancedMesh.geometry.dispose();
+      this.ovalInstancedMesh.material.dispose();
+      this.ovalInstancedMesh = null;
+    }
+
+    if (this.edgeInstancedMesh && this.scene)
+    {
+      this.scene.remove(this.edgeInstancedMesh);
+      this.edgeInstancedMesh.geometry.dispose();
+      this.edgeInstancedMesh.material.dispose();
+      this.edgeInstancedMesh = null;
     }
 
     if (this.atlasTexture)
@@ -641,12 +840,9 @@ export class SteelTargetFactory
       this.chainMesh = null;
     }
 
-    this.mergedGeometry = null;
     this.atlasData = null;
-    this.vertexBuffer = null;
-    this.uvBuffer = null;
-    this.normalBuffer = null;
-    this.targetIndexBuffer = null;
+    this.instanceData.clear();
+    this.nextInstanceId = 0;
     this.chainScene = null;
     this.scene = null;
     this.nextChainInstanceIndex = 0;
