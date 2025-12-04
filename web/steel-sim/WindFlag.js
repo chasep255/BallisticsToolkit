@@ -800,7 +800,7 @@ export class WindFlagFactory
       shader.uniforms.uFlapAmplitude = { value: cfg.flagFlapAmplitude };
       shader.uniforms.uWaveLength = { value: cfg.flagWaveLength };
 
-      // Vertex shader: add attributes and uniforms
+      // Vertex shader: add attributes, uniforms, and helper function
       shader.vertexShader = shader.vertexShader.replace(
         '#include <common>',
         `
@@ -816,6 +816,45 @@ export class WindFlagFactory
         uniform float uAngleResponseK;
         uniform float uFlapAmplitude;
         uniform float uWaveLength;
+        
+        // Helper function to compute deformed position at given local coordinates
+        vec3 computeDeformedPosition(float localX, float localY, float localZ, float t) {
+          // Extract wind parameters
+          float windX = instanceWindVector.x;
+          float windZ = -instanceWindVector.z;
+          float windSpeed = sqrt(windX * windX + windZ * windZ);
+          float windSpeedMph = windSpeed * 2.237;
+          
+          float windDir = windSpeed > 0.001 ? atan(windZ, windX) : 0.0;
+          
+          float angleSpan = uMaxAngle - uMinAngle;
+          float angleDeg = uMinAngle + angleSpan * (1.0 - exp(-uAngleResponseK * windSpeedMph * windSpeedMph));
+          float angleRad = angleDeg * 0.01745329;
+          
+          float cosDir = cos(windDir);
+          float sinDir = sin(windDir);
+          float cosPitch = cos(angleRad);
+          float sinPitch = sin(angleRad);
+          
+          // Quadratic bending: more curvature toward tip
+          float xNorm = localX / uFlagLength;
+          float bend = xNorm * xNorm;  // Quadratic curvature
+          
+          // Wave/flapping animation
+          float waveArg = instanceWavePhase + t * uWaveLength * 6.28318;
+          float waveOffset = sin(waveArg) * uFlapAmplitude * t;
+          
+          // Apply quadratic pitch
+          float pitchedX = bend * uFlagLength * sinPitch;
+          float pitchedY = bend * uFlagLength * -cosPitch;
+          
+          // Rotate into wind direction and add wave
+          float rotatedX = pitchedX * cosDir + waveOffset * sinDir;
+          float rotatedY = pitchedY + localY;
+          float rotatedZ = -pitchedX * sinDir + waveOffset * cosDir + localZ;
+          
+          return vec3(rotatedX, rotatedY, rotatedZ);
+        }
         `
       );
 
@@ -825,79 +864,44 @@ export class WindFlagFactory
         `
         #include <begin_vertex>
         
-        // Per-instance wind
-        float windX = instanceWindVector.x;
-        float windZ = -instanceWindVector.z;
-        float windSpeed = sqrt(windX * windX + windZ * windZ);
-        float windSpeedMph = windSpeed * 2.237;
-        
-        float windDir = windSpeed > 0.001 ? atan(windZ, windX) : 0.0;
-        
-        float angleSpan = uMaxAngle - uMinAngle;
-        float angleDeg = uMinAngle + angleSpan * (1.0 - exp(-uAngleResponseK * windSpeedMph * windSpeedMph));
-        float angleRad = angleDeg * 0.01745329;
-        
         float localX = position.x;
         float localY = position.y;
         float localZ = position.z;
         float t = segmentT;
         
-        float cosDir = cos(windDir);
-        float sinDir = sin(windDir);
-        float cosPitch = cos(angleRad);
-        float sinPitch = sin(angleRad);
-        
-        // Per-instance wave phase
-        float waveArg = instanceWavePhase + t * uWaveLength * 6.28318;
-        float waveOffset = sin(waveArg) * uFlapAmplitude * t;
-        
-        float pitchedX = localX * sinPitch;
-        float pitchedY = -localX * cosPitch;
-        
-        float rotatedX = pitchedX * cosDir + waveOffset * sinDir;
-        float rotatedY = pitchedY + localY;
-        float rotatedZ = -pitchedX * sinDir + waveOffset * cosDir + localZ;
-        
         // Local deformed position - instance matrix handles world position
-        transformed = vec3(rotatedX, rotatedY, rotatedZ);
+        transformed = computeDeformedPosition(localX, localY, localZ, t);
         `
       );
 
-      // Normal calculation with per-instance wind
+      // Normal calculation: compute tangent and bitangent from deformed geometry
       shader.vertexShader = shader.vertexShader.replace(
         '#include <beginnormal_vertex>',
         `
-        float nWindX = instanceWindVector.x;
-        float nWindZ = -instanceWindVector.z;
-        float nWindSpeed = sqrt(nWindX * nWindX + nWindZ * nWindZ);
-        float nWindSpeedMph = nWindSpeed * 2.237;
-        float nWindDir = nWindSpeed > 0.001 ? atan(nWindZ, nWindX) : 0.0;
+        // Use same variables declared in begin_vertex
+        float nLocalX = position.x;
+        float nLocalY = position.y;
+        float nLocalZ = position.z;
+        float nT = segmentT;
         
-        float nAngleSpan = uMaxAngle - uMinAngle;
-        float nAngleDeg = uMinAngle + nAngleSpan * (1.0 - exp(-uAngleResponseK * nWindSpeedMph * nWindSpeedMph));
-        float nAngleRad = nAngleDeg * 0.01745329;
+        // Compute deformed position at current point
+        vec3 p = computeDeformedPosition(nLocalX, nLocalY, nLocalZ, nT);
         
-        float nCosDir = cos(nWindDir);
-        float nSinDir = sin(nWindDir);
-        float nCosPitch = cos(nAngleRad);
-        float nSinPitch = sin(nAngleRad);
+        // Compute tangent along flag length - step in physical space (localX)
+        // This keeps tangent calculation resolution-independent
+        float dx = uFlagLength * 0.001;
+        float tNext = clamp(nT + 0.001, 0.0, 1.0);
+        vec3 pt = computeDeformedPosition(nLocalX + dx, nLocalY, nLocalZ, tNext);
+        vec3 tangent = normalize(pt - p);
         
-        float nWaveArg = instanceWavePhase + segmentT * uWaveLength * 6.28318;
-        float dWave = cos(nWaveArg) * uFlapAmplitude * uWaveLength * 6.28318 * segmentT
-                    + sin(nWaveArg) * uFlapAmplitude;
+        // Compute bitangent along flag width - step in physical space (localY)
+        float dy = 0.001;
+        vec3 py = computeDeformedPosition(nLocalX, nLocalY + dy, nLocalZ, nT);
+        vec3 bitangent = normalize(py - p);
         
-        vec3 localTangent;
-        localTangent.x = nSinPitch * nCosDir + dWave * nSinDir;
-        localTangent.y = -nCosPitch;
-        localTangent.z = -nSinPitch * nSinDir + dWave * nCosDir;
-        localTangent = normalize(localTangent);
-        
-        vec3 localBitangent = vec3(0.0, 1.0, 0.0);
-        vec3 objectNormal = normalize(cross(localTangent, localBitangent));
-        
-        if (position.z < 0.0) {
-          objectNormal = -objectNormal;
-        }
+        // Normal = tangent × bitangent
+        // Let Three.js handle front/back facing via gl_FrontFacing in fragment shader
+        vec3 objectNormal = normalize(cross(tangent, bitangent));
         `
       );
     };
