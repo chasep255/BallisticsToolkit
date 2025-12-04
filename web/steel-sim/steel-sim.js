@@ -1232,27 +1232,15 @@ class SteelSimulator
   {
     if (!this.landscape) return;
 
-    // Create flags from configuration
-    for (const flagConfig of Config.WIND_FLAGS)
-    {
-      const groundHeight = this.landscape.getHeightAt(flagConfig.x, flagConfig.z) || 0;
+    // Collect flag positions from configuration
+    const positions = Config.WIND_FLAGS.map(flagConfig => ({
+      x: flagConfig.x,
+      y: this.landscape.getHeightAt(flagConfig.x, flagConfig.z) || 0,
+      z: flagConfig.z
+    }));
 
-      WindFlagFactory.create(
-      {
-        position:
-        {
-          x: flagConfig.x,
-          y: groundHeight,
-          z: flagConfig.z
-        },
-        scene: this.scene,
-        config: flagConfig.config ||
-        {}
-      });
-    }
-
-    // Initialize instanced pole mesh after all flags are created
-    WindFlagFactory.initializePoleInstancing(this.scene);
+    // Create all instanced flags at once
+    WindFlagFactory.createFlagsAtPositions(this.scene, positions);
   }
 
   setupImpactDetector()
@@ -1321,11 +1309,7 @@ class SteelSimulator
     }
 
     // Register wind flag poles
-    const flags = WindFlagFactory.getAll();
-    for (const flag of flags)
-    {
-      flag.registerWithImpactDetector(this.impactDetector);
-    }
+    WindFlagFactory.registerWithImpactDetector(this.impactDetector);
 
     // Register prairie dog hunting targets
     const prairieDogs = PrairieDogFactory.getAll();
@@ -1379,6 +1363,7 @@ class SteelSimulator
     }
 
     const signs = RangeSignFactory.getAll();
+    const flags = WindFlagFactory.getAll();
     console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets, ${racks.length} racks, ${signs.length} signs, ${flags.length} flags, ${prairieDogs.length} prairie dogs`);
     console.log('[SteelSim] ImpactDetector stats:', this.impactDetector.getStats());
   }

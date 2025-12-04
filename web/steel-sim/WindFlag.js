@@ -520,134 +520,432 @@ export class WindFlag
 }
 
 /**
- * Factory class for managing multiple wind flags
+ * Factory class for managing instanced wind flags
+ * Uses a single InstancedMesh for all flags with per-instance attributes
  */
 export class WindFlagFactory
 {
-  static flags = [];
-  static poleMesh = null;
-  static polePositions = [];
+  static flagData = [];     // Per-flag data: { position, wavePhase }
+  static poleMesh = null;   // InstancedMesh for poles
+  static flagMesh = null;   // InstancedMesh for flags
   static scene = null;
+  static config = null;
+
+  // Instance attribute buffers
+  static instancePositions = null;
+  static instanceWindVectors = null;
+  static instanceWavePhases = null;
 
   /**
-   * Create a single wind flag
-   * @param {Object} options - Same as WindFlag constructor
-   * @returns {WindFlag}
+   * Create all flags at specified positions
+   * @param {THREE.Scene} scene - Three.js scene
+   * @param {Array} positions - Array of {x, y, z} positions
+   * @param {Object} config - Optional flag configuration
    */
-  static create(options)
+  static createFlagsAtPositions(scene, positions, config = {})
   {
-    const flag = new WindFlag(options);
-    this.flags.push(flag);
-    return flag;
+    console.log(`[WindFlagFactory] createFlagsAtPositions called with ${positions.length} positions`);
+    
+    // Clear existing
+    this.deleteAll();
+    this.scene = scene;
+
+    const numFlags = positions.length;
+    if (numFlags === 0) {
+      console.warn('[WindFlagFactory] No positions provided');
+      return;
+    }
+
+    // Store flag configuration
+    this.config = {
+      flagBaseWidth: config.flagBaseWidth ?? Config.WIND_FLAG_CONFIG.flagBaseWidth,
+      flagTipWidth: config.flagTipWidth ?? Config.WIND_FLAG_CONFIG.flagTipWidth,
+      flagLength: config.flagLength ?? Config.WIND_FLAG_CONFIG.flagLength,
+      flagThickness: config.flagThickness ?? Config.WIND_FLAG_CONFIG.flagThickness,
+      flagSegments: config.flagSegments ?? Config.WIND_FLAG_CONFIG.flagSegments,
+      flagMinAngle: config.flagMinAngle ?? Config.WIND_FLAG_CONFIG.flagMinAngle,
+      flagMaxAngle: config.flagMaxAngle ?? Config.WIND_FLAG_CONFIG.flagMaxAngle,
+      flagAngleResponseK: config.flagAngleResponseK ?? Config.WIND_FLAG_CONFIG.flagAngleResponseK,
+      flagFlapFrequencyBase: config.flagFlapFrequencyBase ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyBase,
+      flagFlapFrequencyScale: config.flagFlapFrequencyScale ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyScale,
+      flagFlapAmplitude: config.flagFlapAmplitude ?? Config.WIND_FLAG_CONFIG.flagFlapAmplitude,
+      flagWaveLength: config.flagWaveLength ?? Config.WIND_FLAG_CONFIG.flagWaveLength,
+      poleHeight: Config.WIND_FLAG_CONFIG.poleHeight,
+      poleThickness: Config.WIND_FLAG_CONFIG.poleThickness
+    };
+
+    // Initialize flag data
+    this.flagData = positions.map(pos => ({
+      position: new THREE.Vector3(
+        pos.x,
+        pos.y + this.config.poleHeight - this.config.flagBaseWidth / 2,
+        pos.z
+      ),
+      polePosition: new THREE.Vector3(
+        pos.x,
+        pos.y + this.config.poleHeight / 2,
+        pos.z
+      ),
+      wavePhase: Math.random() * Math.PI * 2 // Random initial phase
+    }));
+
+    // Create instanced poles
+    this.createInstancedPoles(scene, numFlags);
+
+    // Create instanced flags
+    this.createInstancedFlags(scene, numFlags);
   }
 
   /**
-   * Initialize instanced pole mesh (call after all flags are created)
-   * @param {THREE.Scene} scene - Three.js scene
+   * Create instanced pole mesh
    */
-  static initializePoleInstancing(scene)
+  static createInstancedPoles(scene, numFlags)
   {
-    if (this.flags.length === 0) return;
-
-    this.scene = scene;
-
-    // Create shared pole geometry and material
-    const poleThickness = Config.WIND_FLAG_CONFIG.poleThickness;
-    const poleHeight = Config.WIND_FLAG_CONFIG.poleHeight;
-    const poleRadius = poleThickness / 2;
-    const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, poleHeight, 16);
-    const poleMaterial = new THREE.MeshStandardMaterial(
-    {
+    const poleRadius = this.config.poleThickness / 2;
+    const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, this.config.poleHeight, 16);
+    const poleMaterial = new THREE.MeshStandardMaterial({
       color: 0x606060,
       metalness: 0.4,
       roughness: 0.6
     });
 
-    // Create instanced mesh for all poles
-    this.poleMesh = new THREE.InstancedMesh(poleGeometry, poleMaterial, this.flags.length);
+    this.poleMesh = new THREE.InstancedMesh(poleGeometry, poleMaterial, numFlags);
     this.poleMesh.castShadow = true;
     this.poleMesh.receiveShadow = true;
-    scene.add(this.poleMesh);
 
-    // Set instance matrices for all poles
-    const instanceMatrix = new THREE.Matrix4();
-    for (let i = 0; i < this.flags.length; i++)
+    const matrix = new THREE.Matrix4();
+    for (let i = 0; i < numFlags; i++)
     {
-      const flag = this.flags[i];
-      const polePosition = flag.pole.position;
-      instanceMatrix.makeTranslation(polePosition.x, polePosition.y, polePosition.z);
-      this.poleMesh.setMatrixAt(i, instanceMatrix);
-      this.polePositions.push(polePosition.clone());
-
-      // Remove individual pole from scene
-      scene.remove(flag.pole);
+      const pos = this.flagData[i].polePosition;
+      matrix.makeTranslation(pos.x, pos.y, pos.z);
+      this.poleMesh.setMatrixAt(i, matrix);
     }
-
     this.poleMesh.instanceMatrix.needsUpdate = true;
+
+    scene.add(this.poleMesh);
   }
 
   /**
-   * Create all flags along the range
-   * @param {THREE.Scene} scene - Three.js scene
-   * @param {Landscape} landscape - Landscape instance for height queries
-   * @param {Object} options - Optional configuration
+   * Create instanced flag mesh with per-instance attributes
    */
-  static createFlags(scene, landscape, options = {})
+  static createInstancedFlags(scene, numFlags)
   {
-    const
+    // Create shared flag geometry
+    const geometry = this.createFlagGeometry();
+
+    // Create per-instance attribute buffers (wind and phase only - position via matrix)
+    this.instanceWindVectors = new Float32Array(numFlags * 3);
+    this.instanceWavePhases = new Float32Array(numFlags);
+
+    // Initialize default wind (small value so flags hang down)
+    for (let i = 0; i < numFlags; i++)
     {
-      maxRange = Config.LANDSCAPE_CONFIG.groundLength,
-        interval = Config.WIND_FLAG_CONFIG.interval,
-        sideOffset = Config.LANDSCAPE_CONFIG.groundWidth / 2,
-        config = {}
-    } = options;
-
-    // Clear existing flags
-    this.deleteAll();
-
-    // Create flags every interval
-    for (let distance = interval; distance <= maxRange; distance += interval)
-    {
-      const z = -distance;
-
-      // Left side flag
-      const leftX = -sideOffset;
-      const leftY = landscape.getHeightAt(leftX, z) || 0;
-      const leftFlag = new WindFlag(
-      {
-        position: { x: leftX, y: leftY, z },
-        scene,
-        config
-      });
-      this.flags.push(leftFlag);
-
-      // Right side flag
-      const rightX = sideOffset;
-      const rightY = landscape.getHeightAt(rightX, z) || 0;
-      const rightFlag = new WindFlag(
-      {
-        position: { x: rightX, y: rightY, z },
-        scene,
-        config
-      });
-      this.flags.push(rightFlag);
+      // Default small wind so flags aren't invisible (zero wind = zero angle)
+      this.instanceWindVectors[i * 3] = 0.1;
+      this.instanceWindVectors[i * 3 + 1] = 0;
+      this.instanceWindVectors[i * 3 + 2] = 0;
+      
+      this.instanceWavePhases[i] = this.flagData[i].wavePhase;
     }
 
-    // Initialize pole instancing after all flags are created
-    this.initializePoleInstancing(scene);
+    // Add instance attributes to geometry (no instancePosition - use matrix instead)
+    geometry.setAttribute('instanceWindVector', new THREE.InstancedBufferAttribute(this.instanceWindVectors, 3));
+    geometry.setAttribute('instanceWavePhase', new THREE.InstancedBufferAttribute(this.instanceWavePhases, 1));
+
+    // Create material with instanced shader
+    const material = this.createInstancedMaterial();
+
+    // Set bounding sphere for a SINGLE flag at max extension
+    // Three.js will use this + instance matrix for per-instance frustum culling
+    const maxExtension = this.config.flagLength + this.config.flagFlapAmplitude;
+    geometry.boundingSphere = new THREE.Sphere(
+      new THREE.Vector3(0, 0, 0),  // Centered at flag attachment point
+      maxExtension  // Radius covers max flag extension in any direction
+    );
+    
+    // Create instanced mesh
+    this.flagMesh = new THREE.InstancedMesh(geometry, material, numFlags);
+    this.flagMesh.castShadow = true;
+    this.flagMesh.receiveShadow = true;
+
+    // Set instance matrices to position each flag
+    const matrix = new THREE.Matrix4();
+    for (let i = 0; i < numFlags; i++)
+    {
+      const pos = this.flagData[i].position;
+      matrix.makeTranslation(pos.x, pos.y, pos.z);
+      this.flagMesh.setMatrixAt(i, matrix);
+    }
+    this.flagMesh.instanceMatrix.needsUpdate = true;
+
+    scene.add(this.flagMesh);
+    
+    console.log(`[WindFlagFactory] Created ${numFlags} instanced flags`);
   }
 
   /**
-   * Update all flags
+   * Create static flag geometry with segmentT attribute
+   */
+  static createFlagGeometry()
+  {
+    const segments = this.config.flagSegments;
+    const halfThickness = this.config.flagThickness / 2;
+
+    const positions = [];
+    const uvs = [];
+    const segmentTs = [];
+    const indices = [];
+
+    for (let i = 0; i < segments; i++)
+    {
+      const t = i / (segments - 1);
+      const halfWidth = this.config.flagBaseWidth / 2 + (this.config.flagTipWidth / 2 - this.config.flagBaseWidth / 2) * t;
+      const x = this.config.flagLength * t;
+
+      // Front face vertices
+      positions.push(x, halfWidth, halfThickness);
+      uvs.push(t, 0.0);
+      segmentTs.push(t);
+
+      positions.push(x, -halfWidth, halfThickness);
+      uvs.push(t, 1.0);
+      segmentTs.push(t);
+
+      // Back face vertices
+      positions.push(x, halfWidth, -halfThickness);
+      uvs.push(t, 0.0);
+      segmentTs.push(t);
+
+      positions.push(x, -halfWidth, -halfThickness);
+      uvs.push(t, 1.0);
+      segmentTs.push(t);
+    }
+
+    // Front and back face indices
+    for (let i = 0; i < segments - 1; i++)
+    {
+      const idx = i * 4;
+      indices.push(idx, idx + 1, idx + 4);
+      indices.push(idx + 1, idx + 5, idx + 4);
+      indices.push(idx + 2, idx + 6, idx + 3);
+      indices.push(idx + 3, idx + 6, idx + 7);
+    }
+
+    // Side faces
+    for (let i = 0; i < segments - 1; i++)
+    {
+      const idx = i * 4;
+      indices.push(idx, idx + 4, idx + 2);
+      indices.push(idx + 2, idx + 4, idx + 6);
+      indices.push(idx + 1, idx + 3, idx + 5);
+      indices.push(idx + 3, idx + 7, idx + 5);
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setAttribute('segmentT', new THREE.Float32BufferAttribute(segmentTs, 1));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+
+    console.log(`[WindFlagFactory] Created flag geometry: ${positions.length / 3} vertices, ${indices.length / 3} triangles`);
+    
+    return geometry;
+  }
+
+  /**
+   * Create flag texture
+   */
+  static createFlagTexture()
+  {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(0, 0, 256, 128);
+    ctx.fillStyle = '#ffff00';
+    ctx.fillRect(0, 128, 256, 128);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  /**
+   * Create instanced material with per-instance wind and phase
+   */
+  static createInstancedMaterial()
+  {
+    const texture = this.createFlagTexture();
+
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      color: 0xffffff,
+      roughness: 0.8,
+      metalness: 0.0,
+      side: THREE.DoubleSide
+    });
+
+    const cfg = this.config;
+
+    material.onBeforeCompile = (shader) =>
+    {
+      // Add uniforms (shared across all instances)
+      shader.uniforms.uFlagLength = { value: cfg.flagLength };
+      shader.uniforms.uMinAngle = { value: cfg.flagMinAngle };
+      shader.uniforms.uMaxAngle = { value: cfg.flagMaxAngle };
+      shader.uniforms.uAngleResponseK = { value: cfg.flagAngleResponseK };
+      shader.uniforms.uFlapAmplitude = { value: cfg.flagFlapAmplitude };
+      shader.uniforms.uWaveLength = { value: cfg.flagWaveLength };
+
+      // Vertex shader: add attributes and uniforms
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `
+        #include <common>
+        
+        attribute float segmentT;
+        attribute vec3 instanceWindVector;
+        attribute float instanceWavePhase;
+        
+        uniform float uFlagLength;
+        uniform float uMinAngle;
+        uniform float uMaxAngle;
+        uniform float uAngleResponseK;
+        uniform float uFlapAmplitude;
+        uniform float uWaveLength;
+        `
+      );
+
+      // Vertex shader: deform based on per-instance wind and phase
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+        #include <begin_vertex>
+        
+        // Per-instance wind
+        float windX = instanceWindVector.x;
+        float windZ = -instanceWindVector.z;
+        float windSpeed = sqrt(windX * windX + windZ * windZ);
+        float windSpeedMph = windSpeed * 2.237;
+        
+        float windDir = windSpeed > 0.001 ? atan(windZ, windX) : 0.0;
+        
+        float angleSpan = uMaxAngle - uMinAngle;
+        float angleDeg = uMinAngle + angleSpan * (1.0 - exp(-uAngleResponseK * windSpeedMph * windSpeedMph));
+        float angleRad = angleDeg * 0.01745329;
+        
+        float localX = position.x;
+        float localY = position.y;
+        float localZ = position.z;
+        float t = segmentT;
+        
+        float cosDir = cos(windDir);
+        float sinDir = sin(windDir);
+        float cosPitch = cos(angleRad);
+        float sinPitch = sin(angleRad);
+        
+        // Per-instance wave phase
+        float waveArg = instanceWavePhase + t * uWaveLength * 6.28318;
+        float waveOffset = sin(waveArg) * uFlapAmplitude * t;
+        
+        float pitchedX = localX * sinPitch;
+        float pitchedY = -localX * cosPitch;
+        
+        float rotatedX = pitchedX * cosDir + waveOffset * sinDir;
+        float rotatedY = pitchedY + localY;
+        float rotatedZ = -pitchedX * sinDir + waveOffset * cosDir + localZ;
+        
+        // Local deformed position - instance matrix handles world position
+        transformed = vec3(rotatedX, rotatedY, rotatedZ);
+        `
+      );
+
+      // Normal calculation with per-instance wind
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <beginnormal_vertex>',
+        `
+        float nWindX = instanceWindVector.x;
+        float nWindZ = -instanceWindVector.z;
+        float nWindSpeed = sqrt(nWindX * nWindX + nWindZ * nWindZ);
+        float nWindSpeedMph = nWindSpeed * 2.237;
+        float nWindDir = nWindSpeed > 0.001 ? atan(nWindZ, nWindX) : 0.0;
+        
+        float nAngleSpan = uMaxAngle - uMinAngle;
+        float nAngleDeg = uMinAngle + nAngleSpan * (1.0 - exp(-uAngleResponseK * nWindSpeedMph * nWindSpeedMph));
+        float nAngleRad = nAngleDeg * 0.01745329;
+        
+        float nCosDir = cos(nWindDir);
+        float nSinDir = sin(nWindDir);
+        float nCosPitch = cos(nAngleRad);
+        float nSinPitch = sin(nAngleRad);
+        
+        float nWaveArg = instanceWavePhase + segmentT * uWaveLength * 6.28318;
+        float dWave = cos(nWaveArg) * uFlapAmplitude * uWaveLength * 6.28318 * segmentT
+                    + sin(nWaveArg) * uFlapAmplitude;
+        
+        vec3 localTangent;
+        localTangent.x = nSinPitch * nCosDir + dWave * nSinDir;
+        localTangent.y = -nCosPitch;
+        localTangent.z = -nSinPitch * nSinDir + dWave * nCosDir;
+        localTangent = normalize(localTangent);
+        
+        vec3 localBitangent = vec3(0.0, 1.0, 0.0);
+        vec3 objectNormal = normalize(cross(localTangent, localBitangent));
+        
+        if (position.z < 0.0) {
+          objectNormal = -objectNormal;
+        }
+        `
+      );
+    };
+
+    return material;
+  }
+
+  /**
+   * Update all flags - samples wind and updates instance attributes
    * @param {Object} windGenerator - BTK WindGenerator instance
    * @param {number} deltaTime - Time step in seconds
    */
   static updateAll(windGenerator, deltaTime)
   {
-    for (const flag of this.flags)
+    if (!this.flagMesh || !windGenerator) return;
+
+    const numFlags = this.flagData.length;
+    const cfg = this.config;
+
+    for (let i = 0; i < numFlags; i++)
     {
-      flag.update(windGenerator, deltaTime);
+      const data = this.flagData[i];
+
+      // Sample wind at flag position
+      const wind = windGenerator.sample(data.position.x, data.position.y, data.position.z);
+
+      // Update wind vector attribute
+      this.instanceWindVectors[i * 3] = wind.x;
+      this.instanceWindVectors[i * 3 + 1] = wind.y;
+      this.instanceWindVectors[i * 3 + 2] = wind.z;
+
+      // Calculate frequency and update phase
+      const windX = wind.x;
+      const windZ = -wind.z;
+      const windSpeed = Math.sqrt(windX * windX + windZ * windZ);
+      const windSpeedMph = windSpeed * 2.237;
+      const flapFreq = cfg.flagFlapFrequencyBase + windSpeedMph * cfg.flagFlapFrequencyScale;
+
+      data.wavePhase += flapFreq * deltaTime * 2 * Math.PI;
+      data.wavePhase = data.wavePhase % (2 * Math.PI);
+      this.instanceWavePhases[i] = data.wavePhase;
+
+      wind.delete();
     }
+
+    // Update GPU buffers
+    this.flagMesh.geometry.attributes.instanceWindVector.needsUpdate = true;
+    this.flagMesh.geometry.attributes.instanceWavePhase.needsUpdate = true;
   }
 
   /**
@@ -655,12 +953,6 @@ export class WindFlagFactory
    */
   static deleteAll()
   {
-    for (const flag of this.flags)
-    {
-      flag.dispose();
-    }
-    this.flags = [];
-
     if (this.poleMesh && this.scene)
     {
       this.scene.remove(this.poleMesh);
@@ -668,16 +960,124 @@ export class WindFlagFactory
       this.poleMesh.material.dispose();
       this.poleMesh = null;
     }
-    this.polePositions = [];
+
+    if (this.flagMesh && this.scene)
+    {
+      this.scene.remove(this.flagMesh);
+      this.flagMesh.geometry.dispose();
+      this.flagMesh.material.map?.dispose();
+      this.flagMesh.material.dispose();
+      this.flagMesh = null;
+    }
+
+    this.flagData = [];
+    this.instancePositions = null;
+    this.instanceWindVectors = null;
+    this.instanceWavePhases = null;
     this.scene = null;
+    this.config = null;
   }
 
   /**
-   * Get all flags
-   * @returns {WindFlag[]}
+   * Get all flag data (for compatibility)
+   * @returns {Array}
    */
   static getAll()
   {
-    return this.flags;
+    return this.flagData.map(d => ({ position: d.position }));
+  }
+
+  /**
+   * Create flags along a range (legacy method)
+   * @param {THREE.Scene} scene - Three.js scene
+   * @param {Landscape} landscape - Landscape instance for height queries
+   * @param {Object} options - Optional configuration
+   */
+  static createFlags(scene, landscape, options = {})
+  {
+    const {
+      maxRange = Config.LANDSCAPE_CONFIG.groundLength,
+      interval = Config.WIND_FLAG_CONFIG.interval,
+      sideOffset = Config.LANDSCAPE_CONFIG.groundWidth / 2,
+      config = {}
+    } = options;
+
+    const positions = [];
+    for (let distance = interval; distance <= maxRange; distance += interval)
+    {
+      const z = -distance;
+      positions.push({ x: -sideOffset, y: landscape.getHeightAt(-sideOffset, z) || 0, z });
+      positions.push({ x: sideOffset, y: landscape.getHeightAt(sideOffset, z) || 0, z });
+    }
+
+    this.createFlagsAtPositions(scene, positions, config);
+  }
+
+  /**
+   * Register all pole cylinders with the impact detector
+   * @param {ImpactDetector} impactDetector - The impact detector to register with
+   */
+  static registerWithImpactDetector(impactDetector)
+  {
+    if (!impactDetector || !this.config) return;
+    
+    if (!this.poleMesh) {
+      console.warn('[WindFlagFactory] poleMesh not available for impact registration');
+    }
+
+    const poleRadius = this.config.poleThickness / 2;
+    const poleHeight = this.config.poleHeight;
+
+    // Create pole geometry for collision
+    const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, poleHeight, 16);
+
+    for (let i = 0; i < this.flagData.length; i++)
+    {
+      const data = this.flagData[i];
+
+      // Clone and position the geometry
+      const geometry = poleGeometry.clone();
+      const matrix = new THREE.Matrix4().makeTranslation(
+        data.polePosition.x,
+        data.polePosition.y,
+        data.polePosition.z
+      );
+      geometry.applyMatrix4(matrix);
+
+      impactDetector.addMeshFromGeometry(geometry, {
+        name: `FlagPole_${i}`,
+        soundName: 'ricochet',
+        mesh: this.poleMesh, // Pass the instanced mesh for impact marks
+        onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
+        {
+          const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
+
+          DustCloudFactory.create({
+            position: pos,
+            scene: scene,
+            numParticles: Config.METAL_FRAME_DUST_CONFIG.numParticles,
+            color: Config.METAL_FRAME_DUST_CONFIG.color,
+            initialRadius: Config.METAL_FRAME_DUST_CONFIG.initialRadius,
+            growthRate: Config.METAL_FRAME_DUST_CONFIG.growthRate,
+            particleDiameter: Config.METAL_FRAME_DUST_CONFIG.particleDiameter
+          });
+
+          // Note: DecalGeometry doesn't work with InstancedMesh, and
+          // impact marks on thin poles wouldn't be visible anyway.
+          // Dust cloud provides sufficient visual feedback.
+        }
+      });
+    }
+
+    poleGeometry.dispose();
+  }
+
+  /**
+   * Legacy create method - not supported with instancing
+   */
+  static create(options)
+  {
+    console.warn('WindFlagFactory.create() is deprecated. Use createFlagsAtPositions() instead.');
+    return null;
   }
 }
