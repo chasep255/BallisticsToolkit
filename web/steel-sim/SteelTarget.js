@@ -6,7 +6,7 @@ import
 from './config.js';
 
 // Atlas configuration
-const ATLAS_TILE_SIZE = 256; // Each target gets 256x256 in the atlas
+const ATLAS_TILE_SIZE = 512; // Each target gets 512x512 in the atlas
 
 /**
  * Wrapper class for C++ SteelTarget physics object.
@@ -279,8 +279,7 @@ export class SteelTargetFactory
   static mergedGeometry = null;
   static atlasTexture = null;
   static atlasData = null;
-  static atlasWidth = 0;
-  static atlasHeight = 0;
+  static targetIndexBuffer = null;
 
   // Buffer arrays
   static vertexBuffer = null;
@@ -338,17 +337,19 @@ export class SteelTargetFactory
 
     console.log(`  Total vertices: ${totalVertices}`);
 
-    // Create texture atlas (one tile per target, stacked vertically)
-    this.atlasWidth = ATLAS_TILE_SIZE;
-    this.atlasHeight = ATLAS_TILE_SIZE * numTargets;
-    this.atlasData = new Uint8Array(this.atlasWidth * this.atlasHeight * 4);
+    // Create texture array (one layer per target, 256x256 each)
+    // Data layout: [layer0, layer1, layer2...] where each layer is 256x256x4 bytes
+    const pixelsPerLayer = ATLAS_TILE_SIZE * ATLAS_TILE_SIZE * 4;
+    this.atlasData = new Uint8Array(pixelsPerLayer * numTargets);
 
-    this.atlasTexture = new THREE.DataTexture(
+    this.atlasTexture = new THREE.DataArrayTexture(
       this.atlasData,
-      this.atlasWidth,
-      this.atlasHeight,
-      THREE.RGBAFormat
+      ATLAS_TILE_SIZE,
+      ATLAS_TILE_SIZE,
+      numTargets
     );
+    this.atlasTexture.format = THREE.RGBAFormat;
+    this.atlasTexture.type = THREE.UnsignedByteType;
     this.atlasTexture.minFilter = THREE.LinearFilter;
     this.atlasTexture.magFilter = THREE.LinearFilter;
     this.atlasTexture.flipY = false;
@@ -357,10 +358,10 @@ export class SteelTargetFactory
     this.vertexBuffer = new Float32Array(totalVertices * 3);
     this.uvBuffer = new Float32Array(totalVertices * 2);
     this.normalBuffer = new Float32Array(totalVertices * 3);
+    this.targetIndexBuffer = new Float32Array(totalVertices); // Layer index per vertex
 
     // Second pass: assign indices and copy data
     let vertexOffset = 0;
-    let atlasOffset = 0;
 
     for (let i = 0; i < targets.length; i++)
     {
@@ -371,7 +372,7 @@ export class SteelTargetFactory
       target.targetIndex = i;
       target.vertexOffset = vertexOffset;
       target.vertexCount = vertexCount;
-      target.atlasOffset = atlasOffset;
+      target.atlasOffset = i; // Layer index in texture array
 
       // Copy vertex and normal data
       const srcVertices = target.steelTarget.getVertices();
@@ -380,25 +381,23 @@ export class SteelTargetFactory
       this.vertexBuffer.set(srcVertices, vertexOffset * 3);
       this.normalBuffer.set(srcNormals, vertexOffset * 3);
 
-      // Copy and transform UVs to atlas space
+      // Copy UVs directly (no remapping needed for texture array)
       const srcUVs = target.steelTarget.getUVs();
-      const vScale = ATLAS_TILE_SIZE / this.atlasHeight;
-      const vOffset = (atlasOffset * ATLAS_TILE_SIZE) / this.atlasHeight;
+      this.uvBuffer.set(srcUVs, vertexOffset * 2);
 
+      // Set target index (layer) for all vertices of this target
       for (let j = 0; j < vertexCount; j++)
       {
-        const srcIdx = j * 2;
-        const dstIdx = (vertexOffset + j) * 2;
-        // U stays the same (0-1), V is transformed to atlas tile
-        this.uvBuffer[dstIdx] = srcUVs[srcIdx];           // u
-        this.uvBuffer[dstIdx + 1] = srcUVs[srcIdx + 1] * vScale + vOffset;  // v
+        this.targetIndexBuffer[vertexOffset + j] = i;
       }
 
-      // Copy texture to atlas
-      this.copyTextureToAtlasInternal(target, atlasOffset);
+      // Copy texture to array layer (C++ texture matches atlas size)
+      const srcData = target.steelTarget.getTexture();
+      const pixelsPerLayer = ATLAS_TILE_SIZE * ATLAS_TILE_SIZE * 4;
+      const layerOffset = i * pixelsPerLayer;
+      this.atlasData.set(srcData, layerOffset);
 
       vertexOffset += vertexCount;
-      atlasOffset++;
     }
 
     // Create merged geometry
@@ -406,14 +405,14 @@ export class SteelTargetFactory
     this.mergedGeometry.setAttribute('position', new THREE.BufferAttribute(this.vertexBuffer, 3));
     this.mergedGeometry.setAttribute('uv', new THREE.BufferAttribute(this.uvBuffer, 2));
     this.mergedGeometry.setAttribute('normal', new THREE.BufferAttribute(this.normalBuffer, 3));
+    this.mergedGeometry.setAttribute('targetIndex', new THREE.BufferAttribute(this.targetIndexBuffer, 1));
 
     // Mark as dynamic for updates
     this.mergedGeometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
     this.mergedGeometry.attributes.normal.setUsage(THREE.DynamicDrawUsage);
 
-    // Create material with atlas
+    // Create material with texture array (requires custom shader)
     const material = new THREE.MeshStandardMaterial({
-      map: this.atlasTexture,
       side: THREE.DoubleSide,
       roughness: 0.5,
       metalness: 0.1,
@@ -421,6 +420,59 @@ export class SteelTargetFactory
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
     });
+
+    // Patch shader to use texture array
+    material.onBeforeCompile = (shader) => {
+      // Add targetIndex attribute and varying
+      shader.vertexShader = `
+        attribute float targetIndex;
+        varying float vTargetIndex;
+        varying vec2 vUv;
+      ` + shader.vertexShader;
+
+      // Pass targetIndex and ensure vUv is set
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <uv_vertex>',
+        `
+        #include <uv_vertex>
+        vTargetIndex = targetIndex;
+        vUv = uv;
+        `
+      );
+
+      // Add uniform for texture array
+      shader.uniforms.mapArray = { value: this.atlasTexture };
+      shader.uniforms.map = { value: null }; // Disable regular map
+
+      // Replace fragment shader to use sampler2DArray
+      shader.fragmentShader = `
+        uniform sampler2DArray mapArray;
+        varying float vTargetIndex;
+        varying vec2 vUv;
+      ` + shader.fragmentShader;
+
+      // Replace map sampling with texture array sampling
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'vec4 diffuseColor = vec4( diffuse, opacity );',
+        `
+        vec4 diffuseColor;
+        if (vUv.x < 0.0) {
+          // Edge face - metal gray
+          diffuseColor = vec4(vec3(0.55), opacity);
+        } else {
+          // Sample texture array: texture(mapArray, vec3(uv, layerIndex))
+          vec4 texColor = texture(mapArray, vec3(vUv, vTargetIndex));
+          diffuseColor = texColor;
+        }
+        `
+      );
+
+      // Remove default map sampling
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        '// map_fragment replaced by texture array sampling above'
+      );
+    };
 
     // Create merged mesh
     this.mergedMesh = new THREE.Mesh(this.mergedGeometry, material);
@@ -430,7 +482,7 @@ export class SteelTargetFactory
 
     this.atlasTexture.needsUpdate = true;
 
-    console.log(`  Atlas size: ${this.atlasWidth}x${this.atlasHeight}`);
+    console.log(`  Texture array: ${ATLAS_TILE_SIZE}x${ATLAS_TILE_SIZE} x ${numTargets} layers`);
     console.log(`  Merged mesh created`);
   }
 
@@ -503,27 +555,20 @@ export class SteelTargetFactory
   }
 
   /**
-   * Copy a target's texture to the atlas
+   * Copy a target's texture to the texture array
    * @param {SteelTarget} target
    */
   static copyTextureToAtlas(target)
   {
-    if (!this.atlasData || target.atlasOffset === null) return;
-    this.copyTextureToAtlasInternal(target, target.atlasOffset);
-    this.atlasTexture.needsUpdate = true;
-  }
+    if (!this.atlasTexture || target.atlasOffset === null) return;
 
-  /**
-   * Internal: copy texture data to atlas at given offset
-   * @param {SteelTarget} target
-   * @param {number} tileIndex - Y tile index in atlas
-   * @private
-   */
-  static copyTextureToAtlasInternal(target, tileIndex)
-  {
     const srcData = target.steelTarget.getTexture();
-    const dstOffset = tileIndex * ATLAS_TILE_SIZE * this.atlasWidth * 4;
-    this.atlasData.set(srcData, dstOffset);
+    const layerIndex = target.atlasOffset;
+    const pixelsPerLayer = ATLAS_TILE_SIZE * ATLAS_TILE_SIZE * 4;
+    const layerOffset = layerIndex * pixelsPerLayer;
+    
+    this.atlasData.set(srcData, layerOffset);
+    this.atlasTexture.needsUpdate = true;
   }
 
   /**
@@ -601,11 +646,10 @@ export class SteelTargetFactory
     this.vertexBuffer = null;
     this.uvBuffer = null;
     this.normalBuffer = null;
+    this.targetIndexBuffer = null;
     this.chainScene = null;
     this.scene = null;
     this.nextChainInstanceIndex = 0;
-    this.atlasWidth = 0;
-    this.atlasHeight = 0;
   }
 
   /**

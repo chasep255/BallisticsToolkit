@@ -694,7 +694,7 @@ class SteelSimulator
       layer: this.spottingScopeLayer,
       renderStats: this.renderStats, // Pass render stats collector
       minZoomX: 4.0,
-      maxZoomX: 40.0,
+      maxZoomX: 80.0,
       lowFovFeet: 25,
       hasReticle: false, // Spotting scope has no reticle
       hasDials: false, // Spotting scope has no dials
