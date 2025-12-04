@@ -89,14 +89,14 @@ export class TargetRack
   }
 
   /**
-   * Add a target to the rack with automatic positioning
+   * Add a target configuration to the rack.
+   * Does NOT create the target - call buildTargets() after all addTarget() calls.
    * @param {Object} options - Target configuration
    * @param {number} options.width - Width in meters (required)
    * @param {number} options.height - Height in meters (required)
-   * @param {number} options.thickness - Thickness in meters (default from config, already converted)
-   * @param {boolean} options.isOval - True for oval shape, false for rectangle (default false)
-   * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (defaults to rack's outwardOffset)
-   * @returns {SteelTarget} The created target instance
+   * @param {number} options.thickness - Thickness in meters (default from config)
+   * @param {boolean} options.isOval - True for oval shape (default false)
+   * @param {number} options.outwardOffset - Outward offset for chain anchors (defaults to rack's)
    */
   addTarget(options)
   {
@@ -106,50 +106,33 @@ export class TargetRack
       height,
       thickness = 0.5,
       isOval = false,
-      outwardOffset = this.outwardOffset // Default to rack's outwardOffset
+      outwardOffset = this.outwardOffset
     } = options;
 
     if (width === undefined || width === null) throw new Error('Width is required');
     if (height === undefined || height === null) throw new Error('Height is required');
 
-    // Store target configuration for later positioning
-    this.targets.push(
-    {
+    // Just store the configuration - target created in buildTargets()
+    this.targets.push({
       width,
       height,
       thickness,
       isOval,
-      outwardOffset, // Store per-target outwardOffset
-      steelTarget: null // Will be created in repositionTargets
+      outwardOffset,
+      steelTarget: null
     });
-
-    // Reposition all targets and update beam/posts
-    this.repositionTargets();
-
-    return this.targets[this.targets.length - 1].steelTarget;
   }
 
   /**
-   * Reposition all targets to be evenly spaced across the full rack width
-   * Deletes and recreates all targets to ensure correct positioning
-   * @private
+   * Build all targets from stored configurations.
+   * Call once after all addTarget() calls, before SteelTargetFactory.finalize().
    */
-  repositionTargets()
+  buildTargets()
   {
     const totalTargets = this.targets.length;
     if (totalTargets === 0) return;
 
-    // Delete all existing steel targets (use factory to properly remove from array)
-    for (const targetConfig of this.targets)
-    {
-      if (targetConfig.steelTarget)
-      {
-        SteelTargetFactory.delete(targetConfig.steelTarget);
-        targetConfig.steelTarget = null;
-      }
-    }
-
-    // Position each target evenly spaced across the full width (in yards)
+    // Create each target at its calculated position
     for (let i = 0; i < totalTargets; i++)
     {
       const targetConfig = this.targets[i];
@@ -158,15 +141,8 @@ export class TargetRack
       const fraction = (i + 0.5) / totalTargets;
       const targetX = this.bottomLeft.x + fraction * (this.topRight.x - this.bottomLeft.x);
 
-      // Create target at correct position using factory
-      targetConfig.steelTarget = SteelTargetFactory.create(
-      {
-        position:
-        {
-          x: targetX,
-          y: this.center.y,
-          z: this.center.z
-        },
+      targetConfig.steelTarget = SteelTargetFactory.create({
+        position: { x: targetX, y: this.center.y, z: this.center.z },
         width: targetConfig.width,
         height: targetConfig.height,
         thickness: targetConfig.thickness,
@@ -177,9 +153,10 @@ export class TargetRack
       });
     }
 
-    // Update beam and posts to span all targets
+    // Create beam and posts
     this.updateBeamAndPosts();
   }
+
 
   /**
    * Update beam and support posts to span all targets

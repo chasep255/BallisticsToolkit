@@ -258,7 +258,6 @@ export class SteelTarget
 
     if (anchors.size() === 0)
     {
-      anchors.delete();
       return;
     }
 
@@ -316,8 +315,6 @@ export class SteelTarget
 
       SteelTargetFactory.chainMesh.instanceMatrix.needsUpdate = true;
     }
-
-    anchors.delete();
   }
 
   /**

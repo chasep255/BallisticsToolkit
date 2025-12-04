@@ -11,6 +11,7 @@ CompileFlags:
     - -isystem/home/chase/emsdk/upstream/emscripten/cache/sysroot/include
     # Emscripten preprocessor define
     - -DEMSCRIPTEN
+    - -D__EMSCRIPTEN__
   Remove:
     # Remove Emscripten-specific flags that clangd doesn't understand
     - -fwasm-exceptions

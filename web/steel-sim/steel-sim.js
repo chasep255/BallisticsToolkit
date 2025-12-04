@@ -765,7 +765,7 @@ class SteelSimulator
     // Initialize scope borders (no active scope initially)
     this.updateScopeBorders();
 
-    // Create target racks (independent of scope setup)
+    // Create target racks (each rack builds its targets immediately)
     this.createTargetRacks();
 
     // Initialize instanced post mesh for all racks
@@ -1162,6 +1162,7 @@ class SteelSimulator
     });
 
     targets.forEach(target => rack.addTarget(target));
+    rack.buildTargets();
     return rack;
   }
 
