@@ -5,29 +5,29 @@ import
 }
 from './config.js';
 
+// Atlas configuration
+const ATLAS_TILE_SIZE = 256; // Each target gets 256x256 in the atlas
+
 /**
- * Wrapper class for C++ SteelTarget that manages Three.js rendering resources
- * and optimizes updates by skipping targets that have stopped moving.
- * 
- * Creates and owns all its resources (C++ physics object, Three.js mesh, chain lines).
+ * Wrapper class for C++ SteelTarget physics object.
+ * No longer creates individual meshes - uses merged geometry from factory.
  * 
  * Requires window.btk to be initialized (loaded by main application).
  */
 export class SteelTarget
 {
-
   /**
    * Create a new steel target
    * @param {Object} options - Configuration options
    * @param {Object} options.position - Position in meters (SI units) {x, y, z} (required)
    * @param {number} options.width - Width in meters (required)
    * @param {number} options.height - Height in meters (required)
-   * @param {number} options.thickness - Thickness in meters (default from config, already converted)
+   * @param {number} options.thickness - Thickness in meters (default from config)
    * @param {boolean} options.isOval - True for oval shape, false for rectangle (default false)
-   * @param {number} options.beamHeight - Height of overhead beam in meters (default from Config.TARGET_CONFIG.defaultBeamHeight)
-   * @param {number} options.attachmentAngle - Angle in radians for oval attachment point (default Math.PI / 4 = 45°)
-   * @param {number} options.outwardOffset - Outward offset for chain anchors in meters (default 0)
-   * @param {THREE.Scene} options.scene - Three.js scene to add mesh/chain lines to (required)
+   * @param {number} options.beamHeight - Height of overhead beam in meters
+   * @param {number} options.attachmentAngle - Angle in radians for oval attachment point
+   * @param {number} options.outwardOffset - Outward offset for chain anchors in meters
+   * @param {THREE.Scene} options.scene - Three.js scene (required)
    */
   constructor(options)
   {
@@ -38,9 +38,9 @@ export class SteelTarget
       height,
       thickness,
       isOval = false,
-      beamHeight = Config.TARGET_CONFIG.defaultBeamHeight, // meters from config
-      attachmentAngle = Math.PI / 4, // 45 degrees
-      outwardOffset = 0, // Default 0 meters
+      beamHeight = Config.TARGET_CONFIG.defaultBeamHeight,
+      attachmentAngle = Math.PI / 4,
+      outwardOffset = 0,
       scene
     } = options;
 
@@ -49,48 +49,46 @@ export class SteelTarget
     if (width === undefined || width === null) throw new Error('Width is required');
     if (height === undefined || height === null) throw new Error('Height is required');
 
-    // Use BTK from window (must be initialized by main application)
     const btk = window.btk;
 
     this.scene = scene;
-    this.outwardOffset = outwardOffset; // Store for use in addChainAnchor
+    this.outwardOffset = outwardOffset;
+    this.isOval = isOval;
 
-    // Calculate attachment points based on shape
-    // In new coordinate system: X=crossrange (width), Y=up (height), Z=thickness (normal direction)
+    // Target index in merged geometry (assigned by factory)
+    this.targetIndex = null;
+    this.vertexOffset = null;   // Offset in merged vertex buffer
+    this.vertexCount = null;    // Number of vertices for this target
+    this.atlasOffset = null;    // Offset in atlas (y position)
+
+    // Calculate attachment points
     let attachmentX, attachmentY;
     if (isOval)
     {
-      // For circles, attach at specified angle from vertical on the circle edge
       const radius = width / 2;
       attachmentX = radius * Math.sin(attachmentAngle);
       attachmentY = radius * Math.cos(attachmentAngle);
     }
     else
     {
-      // For rectangles, attach at top corners
-      attachmentX = width / 3; // 1/3 width from center (left/right)
-      attachmentY = height / 2; // Top of target
+      attachmentX = width / 3;
+      attachmentY = height / 2;
     }
 
-    // Create BTK steel target
-    // Position and dimensions are in meters (SI units)
+    // Create BTK steel target (physics + rendering data)
     const initialPos = new btk.Vector3D(position.x, position.y, position.z);
-    const defaultNormal = new btk.Vector3D(0, 0, -1); // Facing uprange (towards shooter)
-    this.steelTarget = new btk.SteelTarget(width, height, thickness, isOval, initialPos, defaultNormal);
+    const defaultNormal = new btk.Vector3D(0, 0, -1);
+    this.steelTarget = new btk.SteelTarget(width, height, thickness, isOval, initialPos, defaultNormal, ATLAS_TILE_SIZE);
     initialPos.delete();
     defaultNormal.delete();
 
-    // Add chain anchors - attach at top corners on front face
-    // X = ± crossrange (left/right), Y = up (top), Z = -thickness/2 (front face)
+    // Add chain anchors
     const leftLocalAttach = new btk.Vector3D(-attachmentX, attachmentY, -thickness / 2);
     const rightLocalAttach = new btk.Vector3D(+attachmentX, attachmentY, -thickness / 2);
 
-    // Transform local attachments to world space
     const leftWorldAttach = this.steelTarget.localToWorld(leftLocalAttach);
     const rightWorldAttach = this.steelTarget.localToWorld(rightLocalAttach);
 
-    // Place fixed anchors above and slightly outward from attachment points
-    // X=crossrange, Y=up (beam height), Z=-downrange
     const leftWorldFixed = new btk.Vector3D(
       leftWorldAttach.x + this.outwardOffset,
       beamHeight,
@@ -105,7 +103,6 @@ export class SteelTarget
     this.steelTarget.addChainAnchor(leftLocalAttach, leftWorldFixed);
     this.steelTarget.addChainAnchor(rightLocalAttach, rightWorldFixed);
 
-    // Cleanup temporary vectors
     leftWorldAttach.delete();
     rightWorldAttach.delete();
     leftLocalAttach.delete();
@@ -113,100 +110,13 @@ export class SteelTarget
     leftWorldFixed.delete();
     rightWorldFixed.delete();
 
-    // Create Three.js mesh
-    this.mesh = this.createMesh();
-
-    // Chain lines will be created as instances by SteelTargetFactory
-    this.chainLines = null; // Will be set by factory
-    this.chainInstanceIndices = [null, null]; // [leftIndex, rightIndex] - tracked by factory
-
-    // Initialize chain line positions (target may be stationary after settling)
-    // Note: updateChainLines() will be called after factory sets up instancing
-  }
-
-
-  /**
-   * Create Three.js mesh from C++ steel target
-   * @private
-   */
-  createMesh()
-  {
-    // Ensure display buffer is up to date
-    this.steelTarget.updateDisplay();
-
-    // Get buffers from C++ (already in Three.js coordinates)
-    const vertexView = this.steelTarget.getVertices();
-    const uvView = this.steelTarget.getUVs();
-    const normalView = this.steelTarget.getNormals();
-
-    const positions = new Float32Array(vertexView.length);
-    positions.set(vertexView);
-    const uvs = new Float32Array(uvView.length);
-    uvs.set(uvView);
-    const normals = new Float32Array(normalView.length);
-    normals.set(normalView);
-
-    // Create geometry
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-    geometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
-    geometry.attributes.normal.setUsage(THREE.DynamicDrawUsage);
-
-    // Get texture from C++ (already initialized with paint color)
-    const textureData = this.steelTarget.getTexture();
-    const texWidth = this.steelTarget.getTextureWidth();
-    const texHeight = this.steelTarget.getTextureHeight();
-
-    // Create Three.js DataTexture from C++ buffer
-    const imageData = new Uint8ClampedArray(textureData);
-    const texture = new THREE.DataTexture(imageData, texWidth, texHeight, THREE.RGBAFormat);
-    texture.needsUpdate = true;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-
-    // Create material with texture.
-    // Render both sides so the back of the plate is visible when it swings,
-    // but apply a small polygon offset so the plate as a whole wins the depth
-    // test against the background terrain (reduces flicker/see-through).
-    const material = new THREE.MeshStandardMaterial(
-    {
-      map: texture,
-      side: THREE.DoubleSide,
-      depthTest: true,
-      depthWrite: true,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1,
-      roughness: 0.5,
-      metalness: 0.1
-    });
-
-    // Create mesh
-    const targetMesh = new THREE.Mesh(geometry, material);
-    targetMesh.castShadow = true;
-    targetMesh.receiveShadow = true;
-    targetMesh.userData.texture = texture; // Store texture reference
-    // Vertices from C++ are already in world space, so leave mesh at origin
-    this.scene.add(targetMesh);
-
-
-    return targetMesh;
+    // Chain instance indices (assigned by factory)
+    this.chainInstanceIndices = [null, null];
   }
 
   /**
-   * Store base length for scaling (unit length = 1.0 meter)
-   * @private
-   */
-  getChainBaseLength()
-  {
-    return 1.0;
-  }
-
-  /**
-   * Check if target is moving (delegates to C++)
-   * @returns {boolean} True if target is moving
+   * Check if target is moving
+   * @returns {boolean}
    */
   isMoving()
   {
@@ -224,47 +134,35 @@ export class SteelTarget
   }
 
   /**
-   * Update mesh vertices from C++ physics state
+   * Update mesh in merged geometry (called by factory for moving targets)
    */
   updateMesh()
   {
-    if (!this.mesh || !this.steelTarget) return;
-
-    // Update display buffer before reading vertices
-    this.steelTarget.updateDisplay();
-
-    // Get vertex buffer as memory view (already in Three.js coordinates)
-    const vertexView = this.steelTarget.getVertices();
-    const positions = this.mesh.geometry.attributes.position.array;
-    positions.set(vertexView);
-    this.mesh.geometry.attributes.position.needsUpdate = true;
-
-    // Update normals from C++
-    const normalView = this.steelTarget.getNormals();
-    const normals = this.mesh.geometry.attributes.normal.array;
-    normals.set(normalView);
-    this.mesh.geometry.attributes.normal.needsUpdate = true;
+    if (!this.steelTarget || this.targetIndex === null) return;
+    SteelTargetFactory.copyTargetToMerged(this);
   }
 
   /**
-   * Update chain cylinder positions and orientations from C++ physics state
+   * Update texture in atlas
+   */
+  updateTexture()
+  {
+    if (!this.steelTarget || this.targetIndex === null) return;
+    SteelTargetFactory.copyTextureToAtlas(this);
+  }
+
+  /**
+   * Update chain positions
    */
   updateChainLines()
   {
     if (!this.steelTarget) return;
 
-    // Get actual anchor data from C++ physics engine (already updated by simulation)
     const anchors = this.steelTarget.getAnchors();
+    if (anchors.size() === 0) return;
 
-    if (anchors.size() === 0)
-    {
-      return;
-    }
-
-    // Update instance matrices for instanced chains
     if (SteelTargetFactory.chainMesh && this.chainInstanceIndices[0] !== null)
     {
-      const chainBaseLength = this.getChainBaseLength();
       const instanceMatrix = new THREE.Matrix4();
       const up = new THREE.Vector3(0, 1, 0);
       const chainDirection = new THREE.Vector3();
@@ -275,11 +173,8 @@ export class SteelTarget
         if (instanceIndex === null) continue;
 
         const anchor = anchors.get(i);
-
-        // Transform local attachment to world space
         const attachWorld = this.steelTarget.localToWorld(anchor.localAttachment);
 
-        // Convert BTK positions (meters) to Three.js (meters)
         const fixed = new THREE.Vector3(
           anchor.worldFixed.x,
           anchor.worldFixed.y,
@@ -291,25 +186,21 @@ export class SteelTarget
           attachWorld.z
         );
 
-        // Calculate chain length and direction
         chainDirection.subVectors(attach, fixed);
         const chainLength = chainDirection.length();
         chainDirection.normalize();
 
-        // Position cylinder at midpoint
         const midpoint = new THREE.Vector3();
         midpoint.addVectors(fixed, attach);
         midpoint.multiplyScalar(0.5);
 
-        // Create transform matrix: position at midpoint, rotate to chain direction, scale by length
         const quaternion = new THREE.Quaternion();
         quaternion.setFromUnitVectors(up, chainDirection);
-        const scale = new THREE.Vector3(1, chainLength / chainBaseLength, 1);
+        const scale = new THREE.Vector3(1, chainLength, 1);
 
         instanceMatrix.compose(midpoint, quaternion, scale);
         SteelTargetFactory.chainMesh.setMatrixAt(instanceIndex, instanceMatrix);
 
-        // Cleanup WASM objects
         attachWorld.delete();
       }
 
@@ -318,30 +209,21 @@ export class SteelTarget
   }
 
   /**
-   * Update texture from C++ texture buffer
+   * Apply bullet hit
+   * @param {btk.Bullet} bullet
    */
-  updateTexture()
+  hit(bullet)
   {
-    if (!this.steelTarget || !this.mesh) return;
-
-    // Get texture from mesh
-    const texture = this.mesh.userData.texture;
-    if (!texture) return;
-
-    // Get updated texture data from C++ (already updated incrementally with impacts)
-    const textureData = this.steelTarget.getTexture();
-    if (!textureData || textureData.length === 0) return;
-
-    // Copy data from WASM memory to texture
-    const imageData = new Uint8ClampedArray(textureData);
-    texture.image.data.set(imageData);
-    texture.needsUpdate = true;
+    if (!this.steelTarget) return;
+    this.steelTarget.hit(bullet);
+    this.updateTexture();
+    SteelTargetFactory._moveToMoving(this);
   }
 
   /**
-   * Check if trajectory intersects with this target
-   * @param {btk.Trajectory} trajectory - Trajectory to test for intersection
-   * @returns {btk.TrajectoryPoint|null} Hit point or null if no intersection
+   * Check trajectory intersection
+   * @param {btk.Trajectory} trajectory
+   * @returns {btk.TrajectoryPoint|null}
    */
   intersectTrajectory(trajectory)
   {
@@ -351,130 +233,239 @@ export class SteelTarget
   }
 
   /**
-   * Apply a bullet hit to this target
-   * @param {btk.Bullet} bullet - Bullet instance to apply hit with
-   */
-  hit(bullet)
-  {
-    if (!this.steelTarget) return;
-    this.steelTarget.hit(bullet);
-    this.updateTexture();
-
-    // If target was settled, move it back to moving set
-    SteelTargetFactory._moveToMoving(this);
-  }
-
-  /**
-   * Enable or disable verbose debug logging in the underlying C++ target.
-   * When enabled, physics state and chain forces are logged to the browser console
-   * on each physics substep for this specific target.
+   * Enable/disable debug logging
    * @param {boolean} enabled
    */
   setDebug(enabled)
   {
-    if (!this.steelTarget || typeof this.steelTarget.setDebug !== 'function') return;
-    this.steelTarget.setDebug(!!enabled);
+    if (this.steelTarget && typeof this.steelTarget.setDebug === 'function')
+    {
+      this.steelTarget.setDebug(!!enabled);
+    }
   }
 
   /**
-   * Clean up all resources (C++ object, Three.js objects)
+   * Clean up resources
    */
   dispose()
   {
-    // Clean up physics object
     if (this.steelTarget)
     {
       this.steelTarget.delete();
       this.steelTarget = null;
     }
 
-    // Clean up mesh
-    if (this.mesh)
-    {
-      this.scene.remove(this.mesh);
-      // Dispose texture if stored
-      if (this.mesh.userData.texture)
-      {
-        this.mesh.userData.texture.dispose();
-      }
-      if (this.mesh.geometry) this.mesh.geometry.dispose();
-      if (this.mesh.material) this.mesh.material.dispose();
-      this.mesh = null;
-    }
-
-    // Chain lines are managed by factory - no cleanup needed here
-    this.chainLines = null;
+    this.targetIndex = null;
+    this.vertexOffset = null;
+    this.vertexCount = null;
+    this.atlasOffset = null;
     this.chainInstanceIndices = [null, null];
   }
 }
 
 /**
- * Factory class for managing collections of steel targets
+ * Factory class for steel targets with merged geometry rendering.
+ * All targets share one BufferGeometry and one texture atlas.
+ * Result: 1 draw call for all targets.
  */
 export class SteelTargetFactory
 {
-  /**
-   * Static collection of all targets (for getAll, getCount, etc.)
-   * @type {Set<SteelTarget>}
-   */
+  // Target collections
   static allTargets = new Set();
-
-  /**
-   * Static collection of moving targets (actively simulating)
-   * @type {Set<SteelTarget>}
-   */
   static movingTargets = new Set();
 
-  /**
-   * Instanced mesh for all chains (shared across all targets)
-   * @type {THREE.InstancedMesh|null}
-   */
+  // Merged geometry state
+  static mergedMesh = null;
+  static mergedGeometry = null;
+  static atlasTexture = null;
+  static atlasData = null;
+  static atlasWidth = 0;
+  static atlasHeight = 0;
+
+  // Buffer arrays
+  static vertexBuffer = null;
+  static uvBuffer = null;
+  static normalBuffer = null;
+
+  // Chain instancing
   static chainMesh = null;
   static chainScene = null;
   static nextChainInstanceIndex = 0;
 
+  // Scene reference
+  static scene = null;
+
   /**
-   * Initialize instanced chain mesh (call once after all targets are created)
-   * @param {THREE.Scene} scene - Three.js scene
+   * Create a new steel target (adds to pending, no mesh yet)
+   * @param {Object} options
+   * @returns {SteelTarget}
+   */
+  static create(options)
+  {
+    const target = new SteelTarget(options);
+    this.allTargets.add(target);
+    this.movingTargets.add(target);
+    return target;
+  }
+
+  /**
+   * Initialize merged mesh after all targets are created.
+   * Call this once after all targets exist.
+   * @param {THREE.Scene} scene
+   */
+  static initializeMergedMesh(scene)
+  {
+    this.scene = scene;
+    const targets = [...this.allTargets];
+    const numTargets = targets.length;
+
+    if (numTargets === 0) return;
+
+    console.log(`SteelTargetFactory.initializeMergedMesh: ${numTargets} targets`);
+
+    // First pass: update display and count total vertices
+    let totalVertices = 0;
+    const targetVertexCounts = [];
+
+    for (const target of targets)
+    {
+      target.steelTarget.updateDisplay();
+      const vertices = target.steelTarget.getVertices();
+      const vertexCount = vertices.length / 3;
+      targetVertexCounts.push(vertexCount);
+      totalVertices += vertexCount;
+    }
+
+    console.log(`  Total vertices: ${totalVertices}`);
+
+    // Create texture atlas (one tile per target, stacked vertically)
+    this.atlasWidth = ATLAS_TILE_SIZE;
+    this.atlasHeight = ATLAS_TILE_SIZE * numTargets;
+    this.atlasData = new Uint8Array(this.atlasWidth * this.atlasHeight * 4);
+
+    this.atlasTexture = new THREE.DataTexture(
+      this.atlasData,
+      this.atlasWidth,
+      this.atlasHeight,
+      THREE.RGBAFormat
+    );
+    this.atlasTexture.minFilter = THREE.LinearFilter;
+    this.atlasTexture.magFilter = THREE.LinearFilter;
+    this.atlasTexture.flipY = false;
+
+    // Allocate merged buffers
+    this.vertexBuffer = new Float32Array(totalVertices * 3);
+    this.uvBuffer = new Float32Array(totalVertices * 2);
+    this.normalBuffer = new Float32Array(totalVertices * 3);
+
+    // Second pass: assign indices and copy data
+    let vertexOffset = 0;
+    let atlasOffset = 0;
+
+    for (let i = 0; i < targets.length; i++)
+    {
+      const target = targets[i];
+      const vertexCount = targetVertexCounts[i];
+
+      // Assign indices to target
+      target.targetIndex = i;
+      target.vertexOffset = vertexOffset;
+      target.vertexCount = vertexCount;
+      target.atlasOffset = atlasOffset;
+
+      // Copy vertex and normal data
+      const srcVertices = target.steelTarget.getVertices();
+      const srcNormals = target.steelTarget.getNormals();
+
+      this.vertexBuffer.set(srcVertices, vertexOffset * 3);
+      this.normalBuffer.set(srcNormals, vertexOffset * 3);
+
+      // Copy and transform UVs to atlas space
+      const srcUVs = target.steelTarget.getUVs();
+      const vScale = ATLAS_TILE_SIZE / this.atlasHeight;
+      const vOffset = (atlasOffset * ATLAS_TILE_SIZE) / this.atlasHeight;
+
+      for (let j = 0; j < vertexCount; j++)
+      {
+        const srcIdx = j * 2;
+        const dstIdx = (vertexOffset + j) * 2;
+        // U stays the same (0-1), V is transformed to atlas tile
+        this.uvBuffer[dstIdx] = srcUVs[srcIdx];           // u
+        this.uvBuffer[dstIdx + 1] = srcUVs[srcIdx + 1] * vScale + vOffset;  // v
+      }
+
+      // Copy texture to atlas
+      this.copyTextureToAtlasInternal(target, atlasOffset);
+
+      vertexOffset += vertexCount;
+      atlasOffset++;
+    }
+
+    // Create merged geometry
+    this.mergedGeometry = new THREE.BufferGeometry();
+    this.mergedGeometry.setAttribute('position', new THREE.BufferAttribute(this.vertexBuffer, 3));
+    this.mergedGeometry.setAttribute('uv', new THREE.BufferAttribute(this.uvBuffer, 2));
+    this.mergedGeometry.setAttribute('normal', new THREE.BufferAttribute(this.normalBuffer, 3));
+
+    // Mark as dynamic for updates
+    this.mergedGeometry.attributes.position.setUsage(THREE.DynamicDrawUsage);
+    this.mergedGeometry.attributes.normal.setUsage(THREE.DynamicDrawUsage);
+
+    // Create material with atlas
+    const material = new THREE.MeshStandardMaterial({
+      map: this.atlasTexture,
+      side: THREE.DoubleSide,
+      roughness: 0.5,
+      metalness: 0.1,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
+
+    // Create merged mesh
+    this.mergedMesh = new THREE.Mesh(this.mergedGeometry, material);
+    this.mergedMesh.castShadow = true;
+    this.mergedMesh.receiveShadow = true;
+    scene.add(this.mergedMesh);
+
+    this.atlasTexture.needsUpdate = true;
+
+    console.log(`  Atlas size: ${this.atlasWidth}x${this.atlasHeight}`);
+    console.log(`  Merged mesh created`);
+  }
+
+  /**
+   * Initialize chain instancing
+   * @param {THREE.Scene} scene
    */
   static initializeChainInstancing(scene)
   {
-    // Count total chains (2 per target)
     const totalChains = this.allTargets.size * 2;
     if (totalChains === 0) return;
 
     this.chainScene = scene;
 
-    // Chain radius from config (already in meters)
     const chainRadius = Config.TARGET_CONFIG.chainRadius;
-    const chainBaseLength = 1.0; // Unit length
-
-    // Create unit-length cylinder geometry (height = 1.0)
-    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, chainBaseLength, 8);
+    const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, 1.0, 8);
     chainGeometry.computeVertexNormals();
 
-    // Shared material for all chains
-    const chainMaterial = new THREE.MeshStandardMaterial(
-    {
+    const chainMaterial = new THREE.MeshStandardMaterial({
       color: 0x666666,
       roughness: 0.5,
       metalness: 0.6
     });
 
-    // Create instanced mesh for all chains
     this.chainMesh = new THREE.InstancedMesh(chainGeometry, chainMaterial, totalChains);
     this.chainMesh.castShadow = true;
     this.chainMesh.receiveShadow = true;
     scene.add(this.chainMesh);
 
-    // Assign instance indices to each target's chains
     let instanceIndex = 0;
     for (const target of this.allTargets)
     {
       target.chainInstanceIndices = [instanceIndex++, instanceIndex++];
     }
 
-    // Initialize chain positions
     for (const target of this.allTargets)
     {
       target.updateChainLines();
@@ -482,84 +473,121 @@ export class SteelTargetFactory
   }
 
   /**
-   * Create a new steel target and add it to both collections
-   * @param {Object} options - Configuration options for SteelTarget
-   * @returns {SteelTarget} The created target instance
+   * Copy a target's vertices/normals to the merged buffer
+   * @param {SteelTarget} target
    */
-  static create(options)
+  static copyTargetToMerged(target)
   {
-    const target = new SteelTarget(options);
-    SteelTargetFactory.allTargets.add(target);
-    SteelTargetFactory.movingTargets.add(target);
+    if (!this.mergedGeometry || target.vertexOffset === null) return;
 
-    // If instanced chain mesh exists, add instances for this target's chains
-    if (this.chainMesh)
-    {
-      // Need to recreate the instanced mesh with more capacity
-      // For now, just assign indices - we'll handle expansion if needed
-      const instanceIndex = this.nextChainInstanceIndex;
-      target.chainInstanceIndices = [instanceIndex, instanceIndex + 1];
-      this.nextChainInstanceIndex += 2;
+    // Update C++ display buffer
+    target.steelTarget.updateDisplay();
 
-      // Initialize chain positions
-      target.updateChainLines();
-    }
+    // Copy vertices
+    const srcVertices = target.steelTarget.getVertices();
+    this.vertexBuffer.set(srcVertices, target.vertexOffset * 3);
 
-    return target;
+    // Copy normals
+    const srcNormals = target.steelTarget.getNormals();
+    this.normalBuffer.set(srcNormals, target.vertexOffset * 3);
+
+    // Mark range as needing update
+    const posAttr = this.mergedGeometry.attributes.position;
+    posAttr.needsUpdate = true;
+    // Note: updateRange can be used for partial updates if needed
+    // posAttr.updateRange.offset = target.vertexOffset * 3;
+    // posAttr.updateRange.count = target.vertexCount * 3;
+
+    const normAttr = this.mergedGeometry.attributes.normal;
+    normAttr.needsUpdate = true;
   }
 
   /**
-   * Move a target from settled to moving (called when target is hit)
-   * @param {SteelTarget} target - The target instance to move
+   * Copy a target's texture to the atlas
+   * @param {SteelTarget} target
+   */
+  static copyTextureToAtlas(target)
+  {
+    if (!this.atlasData || target.atlasOffset === null) return;
+    this.copyTextureToAtlasInternal(target, target.atlasOffset);
+    this.atlasTexture.needsUpdate = true;
+  }
+
+  /**
+   * Internal: copy texture data to atlas at given offset
+   * @param {SteelTarget} target
+   * @param {number} tileIndex - Y tile index in atlas
+   * @private
+   */
+  static copyTextureToAtlasInternal(target, tileIndex)
+  {
+    const srcData = target.steelTarget.getTexture();
+    const dstOffset = tileIndex * ATLAS_TILE_SIZE * this.atlasWidth * 4;
+    this.atlasData.set(srcData, dstOffset);
+  }
+
+  /**
+   * Move target to moving set
+   * @param {SteelTarget} target
    * @private
    */
   static _moveToMoving(target)
   {
-    // Just add to moving - idempotent if already there
-    SteelTargetFactory.movingTargets.add(target);
+    this.movingTargets.add(target);
   }
 
   /**
-   * Move a target from moving to settled (called when target settles)
-   * @param {SteelTarget} target - The target instance to move
+   * Move target to settled set
+   * @param {SteelTarget} target
    * @private
    */
   static _moveToSettled(target)
   {
-    // Just remove from moving - stays in allTargets
-    SteelTargetFactory.movingTargets.delete(target);
+    this.movingTargets.delete(target);
   }
 
   /**
-   * Delete a specific target by reference
-   * @param {SteelTarget} target - The target instance to delete
-   * @returns {boolean} True if target was found and deleted, false otherwise
+   * Delete a target
+   * @param {SteelTarget} target
+   * @returns {boolean}
    */
   static delete(target)
   {
-    if (SteelTargetFactory.allTargets.delete(target))
+    if (this.allTargets.delete(target))
     {
-      SteelTargetFactory.movingTargets.delete(target);
+      this.movingTargets.delete(target);
       target.dispose();
       return true;
     }
-
     return false;
   }
 
   /**
-   * Delete all targets
+   * Delete all targets and cleanup
    */
   static deleteAll()
   {
-    for (const target of SteelTargetFactory.allTargets)
+    for (const target of this.allTargets)
     {
       target.dispose();
     }
-    SteelTargetFactory.allTargets.clear();
-    SteelTargetFactory.movingTargets.clear();
+    this.allTargets.clear();
+    this.movingTargets.clear();
 
-    // Dispose instanced chain mesh
+    if (this.mergedMesh && this.scene)
+    {
+      this.scene.remove(this.mergedMesh);
+      this.mergedMesh.geometry.dispose();
+      this.mergedMesh.material.dispose();
+      this.mergedMesh = null;
+    }
+
+    if (this.atlasTexture)
+    {
+      this.atlasTexture.dispose();
+      this.atlasTexture = null;
+    }
+
     if (this.chainMesh && this.chainScene)
     {
       this.chainScene.remove(this.chainMesh);
@@ -567,37 +595,44 @@ export class SteelTargetFactory
       this.chainMesh.material.dispose();
       this.chainMesh = null;
     }
+
+    this.mergedGeometry = null;
+    this.atlasData = null;
+    this.vertexBuffer = null;
+    this.uvBuffer = null;
+    this.normalBuffer = null;
     this.chainScene = null;
+    this.scene = null;
     this.nextChainInstanceIndex = 0;
+    this.atlasWidth = 0;
+    this.atlasHeight = 0;
   }
 
   /**
-   * Step physics for all moving targets
-   * @param {number} dt - Time step in seconds
+   * Step physics for moving targets
+   * @param {number} dt
    */
   static stepPhysics(dt)
   {
-    // Convert to array to avoid modification during iteration
-    const targetsToProcess = [...SteelTargetFactory.movingTargets];
+    const targetsToProcess = [...this.movingTargets];
 
     for (const target of targetsToProcess)
     {
       target.stepPhysics(dt);
 
-      // Check if target has settled and move it to settled set
       if (!target.isMoving())
       {
-        SteelTargetFactory._moveToSettled(target);
+        this._moveToSettled(target);
       }
     }
   }
 
   /**
-   * Update display/rendering for all moving targets
+   * Update display for moving targets
    */
   static updateDisplay()
   {
-    for (const target of SteelTargetFactory.movingTargets)
+    for (const target of this.movingTargets)
     {
       target.updateMesh();
       target.updateChainLines();
@@ -606,28 +641,28 @@ export class SteelTargetFactory
 
   /**
    * Get all targets
-   * @returns {SteelTarget[]} Array of all active targets
+   * @returns {SteelTarget[]}
    */
   static getAll()
   {
-    return [...SteelTargetFactory.allTargets];
+    return [...this.allTargets];
   }
 
   /**
    * Get target count
-   * @returns {number} Number of active targets
+   * @returns {number}
    */
   static getCount()
   {
-    return SteelTargetFactory.allTargets.size;
+    return this.allTargets.size;
   }
 
   /**
    * Get moving target count
-   * @returns {number} Number of moving targets
+   * @returns {number}
    */
   static getMovingCount()
   {
-    return SteelTargetFactory.movingTargets.size;
+    return this.movingTargets.size;
   }
 }

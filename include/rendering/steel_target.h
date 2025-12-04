@@ -81,8 +81,9 @@ namespace btk::rendering
      * @param height Target height (bounding box)
      * @param thickness Target thickness
      * @param is_oval True for oval shape, false for rectangle
+     * @param texture_size Texture dimensions (default 256x256)
      */
-    SteelTarget(float width, float height, float thickness, bool is_oval = false);
+    SteelTarget(float width, float height, float thickness, bool is_oval = false, int texture_size = 256);
 
     /**
      * @brief Initialize steel target with position and orientation
@@ -93,8 +94,9 @@ namespace btk::rendering
      * @param is_oval True for oval shape, false for rectangle
      * @param position Initial position (center of mass)
      * @param normal Surface normal direction (target faces this direction)
+     * @param texture_size Texture dimensions (default 256x256)
      */
-    SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal);
+    SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal, int texture_size = 256);
 
     /**
      * @brief Add a chain anchor constraint
@@ -276,10 +278,8 @@ namespace btk::rendering
      * Creates the initial texture filled with paint color.
      * Call this once during setup or when resetting the target.
      *
-     * @param texture_width Texture width in pixels (default 512)
-     * @param texture_height Texture height in pixels (default 512)
      */
-    void initializeTexture(int texture_width = 512, int texture_height = 512);
+    void initializeTexture();
 
     /**
      * @brief Set paint and metal colors
@@ -304,7 +304,7 @@ namespace btk::rendering
     void clearImpacts()
     {
       impacts_.clear();
-      initializeTexture(texture_width_, texture_height_);
+      initializeTexture();
     }
 
     /**

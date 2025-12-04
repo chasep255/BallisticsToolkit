@@ -10,11 +10,12 @@
 
 namespace btk::rendering
 {
-  SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval)
+  SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, int texture_size)
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(0.0f, 0.0f, -1.0f),
-      orientation_(btk::math::Quaternion()),                                                 // Identity orientation (no rotation)
-      velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
-      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
+      orientation_(btk::math::Quaternion()),
+      velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true),
+      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32),
+      texture_width_(texture_size), texture_height_(texture_size)
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
@@ -29,10 +30,11 @@ namespace btk::rendering
     initializeTexture(); // Initialize texture buffer
   }
 
-  SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal)
+  SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal, int texture_size)
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(position), normal_(normal.normalized()), orientation_(btk::math::Quaternion()),
-      velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), // Assume moving initially
-      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32), texture_width_(512), texture_height_(512)
+      velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true),
+      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f), segments_per_circle_(32),
+      texture_width_(texture_size), texture_height_(texture_size)
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
@@ -919,27 +921,9 @@ namespace btk::rendering
     metal_color_[2] = metal_b;
   }
 
-  void SteelTarget::initializeTexture(int texture_width, int texture_height)
+  void SteelTarget::initializeTexture()
   {
-    // Calculate texture size based on target aspect ratio
-    // Keep a reasonable resolution while matching aspect ratio
-    float aspect_ratio = width_ / height_;
-
-    if(aspect_ratio > 1.0f)
-    {
-      // Width is larger
-      texture_width_ = texture_width;
-      texture_height_ = static_cast<int>(texture_width / aspect_ratio);
-    }
-    else
-    {
-      // Height is larger or square
-      texture_height_ = texture_height;
-      texture_width_ = static_cast<int>(texture_height * aspect_ratio);
-    }
-
-    // Allocate RGBA buffer - texture is 2x width (front on left half, back on right half)
-    texture_width_ = texture_width_ * 2; // Double the width to fit both faces side-by-side
+    // texture_width_ and texture_height_ set by constructor
     size_t pixel_count = texture_width_ * texture_height_;
     texture_buffer_.resize(pixel_count * 4);
 
@@ -982,17 +966,20 @@ namespace btk::rendering
 
     // Draw splatter as a circle revealing metal underneath
     // Splatter radius based on bullet diameter (scaled to texture space)
-    float splatter_radius_m = bullet_diameter * 3.0f; // 2x bullet diameter
-    // Use average of texture dimensions for circular splatter
-    float avg_texture_size = (texture_width_ + texture_height_) / 2.0f;
-    float avg_target_size = (width_ + height_) / 2.0f;
-    int splatter_radius_px = static_cast<int>((splatter_radius_m / avg_target_size) * avg_texture_size);
-    splatter_radius_px = std::max(3, splatter_radius_px); // Minimum 3 pixels
+    float splatter_radius_m = bullet_diameter * 3.0f; // 3x bullet diameter
 
-    // Draw main circular splatter
-    for(int dy = -splatter_radius_px; dy <= splatter_radius_px; ++dy)
+    // Calculate radius in pixels for X and Y separately to account for aspect ratio
+    // Half texture width maps to target width, full texture height maps to target height
+    float half_tex_width = texture_width_ / 2.0f;
+    int splatter_radius_px_x = static_cast<int>((splatter_radius_m / width_) * half_tex_width);
+    int splatter_radius_px_y = static_cast<int>((splatter_radius_m / height_) * texture_height_);
+    splatter_radius_px_x = std::max(3, splatter_radius_px_x);
+    splatter_radius_px_y = std::max(3, splatter_radius_px_y);
+
+    // Draw ellipse that appears circular on the target
+    for(int dy = -splatter_radius_px_y; dy <= splatter_radius_px_y; ++dy)
     {
-      for(int dx = -splatter_radius_px; dx <= splatter_radius_px; ++dx)
+      for(int dx = -splatter_radius_px_x; dx <= splatter_radius_px_x; ++dx)
       {
         int px = center_x + dx;
         int py = center_y + dy;
@@ -1001,14 +988,15 @@ namespace btk::rendering
         if(px < u_min || px >= u_max || py < 0 || py >= texture_height_)
           continue;
 
-        // Calculate distance from center
-        float dist = std::sqrt(static_cast<float>(dx * dx + dy * dy));
+        // Calculate normalized distance (ellipse equation: (dx/rx)^2 + (dy/ry)^2 <= 1)
+        float nx = static_cast<float>(dx) / splatter_radius_px_x;
+        float ny = static_cast<float>(dy) / splatter_radius_px_y;
+        float dist = std::sqrt(nx * nx + ny * ny);
 
-        if(dist <= splatter_radius_px)
+        if(dist <= 1.0f)
         {
           // Blend from metal (center) to paint (edge)
-          float blend = dist / splatter_radius_px; // 0 at center, 1 at edge
-          blend = blend * blend;                   // Quadratic falloff for softer edge
+          float blend = dist * dist; // Quadratic falloff for softer edge (dist is already 0-1)
 
           size_t pixel_idx = (py * texture_width_ + px) * 4;
 
@@ -1031,27 +1019,29 @@ namespace btk::rendering
       float angle_variation = btk::math::Random::uniform(-0.3f, 0.3f);
       float angle = base_angle + angle_variation;
 
-      float spike_dir_x = std::cos(angle);
-      float spike_dir_y = std::sin(angle);
+      // Direction in normalized space, then scale by aspect ratio for pixel space
+      float dir_nx = std::cos(angle);
+      float dir_ny = std::sin(angle);
 
-      // Random spike length and width
+      // Random spike length (in normalized units, like splatter radius)
       float length_randomness = btk::math::Random::uniform(0.8f, 1.2f);
-      float spike_length = splatter_radius_px * 3.0f * length_randomness;
+      float spike_length_norm = 3.0f * length_randomness; // 3x splatter radius
       float spike_width = 2.5f * btk::math::Random::uniform(0.8f, 1.2f);
 
       // Draw spike as a thin triangle
-      for(float t = 0.0f; t < spike_length; t += 0.5f)
+      for(float t = 0.0f; t < spike_length_norm; t += 0.05f)
       {
-        float width_at_t = spike_width * (1.0f - t / spike_length); // Taper to point
+        float width_at_t = spike_width * (1.0f - t / spike_length_norm); // Taper to point
 
-        int spike_x = center_x + static_cast<int>(spike_dir_x * t);
-        int spike_y = center_y + static_cast<int>(spike_dir_y * t);
+        // Convert normalized position to pixel position
+        int spike_x = center_x + static_cast<int>(dir_nx * t * splatter_radius_px_x);
+        int spike_y = center_y + static_cast<int>(dir_ny * t * splatter_radius_px_y);
 
         // Draw width of spike at this point
         for(int w = -static_cast<int>(width_at_t); w <= static_cast<int>(width_at_t); ++w)
         {
-          int px = spike_x + static_cast<int>(spike_dir_y * w);
-          int py = spike_y - static_cast<int>(spike_dir_x * w);
+          int px = spike_x + static_cast<int>(dir_ny * w);
+          int py = spike_y - static_cast<int>(dir_nx * w);
 
           // Check bounds - confine to correct half of texture
           if(px >= u_min && px < u_max && py >= 0 && py < texture_height_)
@@ -1059,7 +1049,7 @@ namespace btk::rendering
             size_t pixel_idx = (py * texture_width_ + px) * 4;
 
             // Fade spike from metal to paint along its length
-            float fade = t / spike_length;
+            float fade = t / spike_length_norm;
             fade = fade * fade; // Quadratic falloff
 
             texture_buffer_[pixel_idx + 0] = static_cast<uint8_t>(metal_color_[0] * (1.0f - fade) + paint_color_[0] * fade);

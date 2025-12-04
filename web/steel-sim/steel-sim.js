@@ -771,6 +771,9 @@ class SteelSimulator
     // Initialize instanced post mesh for all racks
     TargetRackFactory.initializePostInstancing(this.scene);
 
+    // Initialize merged geometry for all steel targets (1 draw call)
+    SteelTargetFactory.initializeMergedMesh(this.scene);
+
     // Initialize instanced chain mesh for all targets
     SteelTargetFactory.initializeChainInstancing(this.scene);
 

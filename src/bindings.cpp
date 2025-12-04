@@ -329,8 +329,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Steel Target class
   class_<btk::rendering::SteelTarget>("SteelTarget")
-    .constructor<float, float, float, bool>()
-    .constructor<float, float, float, bool, const btk::math::Vector3D&, const btk::math::Vector3D&>()
+    .constructor<float, float, float, bool, int>()
+    .constructor<float, float, float, bool, const btk::math::Vector3D&, const btk::math::Vector3D&, int>()
     .function("addChainAnchor", &btk::rendering::SteelTarget::addChainAnchor)
     .function("hit", &btk::rendering::SteelTarget::hit)
     .function("intersectSegment", &btk::rendering::SteelTarget::intersectSegment)
