@@ -16,10 +16,9 @@ import
 from './ImpactMark.js';
 
 /**
- * Wrapper class for C++ WindFlag that manages Three.js rendering resources
- * Creates pole geometry and flag texture, uses C++ WindFlag for flag geometry
- * 
- * Requires window.btk to be initialized (loaded by main application).
+ * GPU-based wind flag with shader-driven animation.
+ * Uses static geometry with custom vertex shader for wind deformation.
+ * No per-frame C++ calls - just uniform updates.
  */
 export class WindFlag
 {
@@ -42,104 +41,81 @@ export class WindFlag
     if (!scene) throw new Error('Scene is required');
     if (!position) throw new Error('Position is required');
 
-    const btk = window.btk;
     this.scene = scene;
 
-    // Use config defaults, allow overrides
-    const flagConfig = {
-      flagBaseWidth: config.flagBaseWidth ?? Config.WIND_FLAG_CONFIG.flagBaseWidth,
-      flagTipWidth: config.flagTipWidth ?? Config.WIND_FLAG_CONFIG.flagTipWidth,
-      flagLength: config.flagLength ?? Config.WIND_FLAG_CONFIG.flagLength,
-      flagThickness: config.flagThickness ?? Config.WIND_FLAG_CONFIG.flagThickness,
-      flagSegments: config.flagSegments ?? Config.WIND_FLAG_CONFIG.flagSegments,
-      flagMinAngle: config.flagMinAngle ?? Config.WIND_FLAG_CONFIG.flagMinAngle,
-      flagMaxAngle: config.flagMaxAngle ?? Config.WIND_FLAG_CONFIG.flagMaxAngle,
-      flagAngleResponseK: config.flagAngleResponseK ?? Config.WIND_FLAG_CONFIG.flagAngleResponseK,
-      flagAngleInterpolationSpeed: config.flagAngleInterpolationSpeed ?? Config.WIND_FLAG_CONFIG.flagAngleInterpolationSpeed,
-      flagDirectionInterpolationSpeed: config.flagDirectionInterpolationSpeed ?? Config.WIND_FLAG_CONFIG.flagDirectionInterpolationSpeed,
-      flagFlapFrequencyBase: config.flagFlapFrequencyBase ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyBase,
-      flagFlapFrequencyScale: config.flagFlapFrequencyScale ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyScale,
-      flagFlapAmplitude: config.flagFlapAmplitude ?? Config.WIND_FLAG_CONFIG.flagFlapAmplitude,
-      flagWaveLength: config.flagWaveLength ?? Config.WIND_FLAG_CONFIG.flagWaveLength
-    };
+    // Flag configuration
+    this.flagBaseWidth = config.flagBaseWidth ?? Config.WIND_FLAG_CONFIG.flagBaseWidth;
+    this.flagTipWidth = config.flagTipWidth ?? Config.WIND_FLAG_CONFIG.flagTipWidth;
+    this.flagLength = config.flagLength ?? Config.WIND_FLAG_CONFIG.flagLength;
+    this.flagThickness = config.flagThickness ?? Config.WIND_FLAG_CONFIG.flagThickness;
+    this.flagSegments = config.flagSegments ?? Config.WIND_FLAG_CONFIG.flagSegments;
 
-    // Create C++ WindFlag instance with configurable parameters
-    this.windFlag = new btk.WindFlag(
-      flagConfig.flagBaseWidth,
-      flagConfig.flagTipWidth,
-      flagConfig.flagLength,
-      flagConfig.flagThickness,
-      flagConfig.flagSegments,
-      flagConfig.flagMinAngle,
-      flagConfig.flagMaxAngle,
-      flagConfig.flagAngleResponseK,
-      flagConfig.flagAngleInterpolationSpeed,
-      flagConfig.flagDirectionInterpolationSpeed,
-      flagConfig.flagFlapFrequencyBase,
-      flagConfig.flagFlapFrequencyScale,
-      flagConfig.flagFlapAmplitude,
-      flagConfig.flagWaveLength
-    );
+    // Physics parameters (now used in shader)
+    this.flagMinAngle = config.flagMinAngle ?? Config.WIND_FLAG_CONFIG.flagMinAngle;
+    this.flagMaxAngle = config.flagMaxAngle ?? Config.WIND_FLAG_CONFIG.flagMaxAngle;
+    this.flagAngleResponseK = config.flagAngleResponseK ?? Config.WIND_FLAG_CONFIG.flagAngleResponseK;
+    this.flagFlapFrequencyBase = config.flagFlapFrequencyBase ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyBase;
+    this.flagFlapFrequencyScale = config.flagFlapFrequencyScale ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyScale;
+    this.flagFlapAmplitude = config.flagFlapAmplitude ?? Config.WIND_FLAG_CONFIG.flagFlapAmplitude;
+    this.flagWaveLength = config.flagWaveLength ?? Config.WIND_FLAG_CONFIG.flagWaveLength;
 
-    // Store pole height for flag positioning (meters - Three.js scene is in meters)
-    this.poleHeight = Config.WIND_FLAG_CONFIG.poleHeight; // meters
-    this.flagBaseWidth = flagConfig.flagBaseWidth; // meters from C++
+    // Store pole height for flag positioning (meters)
+    this.poleHeight = Config.WIND_FLAG_CONFIG.poleHeight;
 
     // Flag attaches at pole top minus half flag base width
-    // Position is in meters (Three.js scene is in meters)
-    const flagY = position.y + this.poleHeight - this.flagBaseWidth / 2;
-    this.windFlag.setPosition(
+    this.position = new THREE.Vector3(
       position.x,
-      flagY,
+      position.y + this.poleHeight - this.flagBaseWidth / 2,
       position.z
     );
 
+    // Track wave phase incrementally to avoid large time * freq issues
+    this.wavePhase = 0;
+
     // Create pole
-    this.pole = this.createPole();
+    this.pole = this.createPole(position);
 
     // Create flag texture
     this.flagTexture = this.createFlagTexture();
 
-    // Create flag mesh (this will call updateDisplay() internally)
-    this.flagMesh = this.createFlagMesh();
+    // Create shader material
+    this.flagMaterial = this.createFlagMaterial();
 
-    // Ensure mesh was created successfully
-    if (!this.flagMesh)
-    {
-      throw new Error('Failed to create flag mesh - vertices buffer is empty. Check that flagSegments > 0.');
-    }
+    // Create static flag geometry
+    this.flagGeometry = this.createStaticFlagGeometry();
+
+    // Create flag mesh - positioned at flag attachment point
+    this.flagMesh = new THREE.Mesh(this.flagGeometry, this.flagMaterial);
+    this.flagMesh.position.copy(this.position);
+    this.flagMesh.castShadow = true;
+    this.flagMesh.receiveShadow = true;
 
     // Add to scene
     scene.add(this.pole);
-    if (this.flagMesh)
-    {
-      scene.add(this.flagMesh);
-    }
+    scene.add(this.flagMesh);
   }
 
   /**
    * Create pole mesh
    * @private
    */
-  createPole()
+  createPole(basePosition)
   {
     const poleThickness = Config.WIND_FLAG_CONFIG.poleThickness;
-    const baseY = this.windFlag.getPosition().y - this.poleHeight + this.flagBaseWidth / 2;
-
     const poleRadius = poleThickness / 2;
     const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, this.poleHeight, 16);
     const poleMaterial = new THREE.MeshStandardMaterial(
     {
-      color: 0x606060, // Darker metal gray (original)
+      color: 0x606060,
       metalness: 0.4,
       roughness: 0.6
     });
 
     const pole = new THREE.Mesh(poleGeometry, poleMaterial);
     pole.position.set(
-      this.windFlag.getPosition().x,
-      baseY + this.poleHeight / 2,
-      this.windFlag.getPosition().z
+      basePosition.x,
+      basePosition.y + this.poleHeight / 2,
+      basePosition.z
     );
     pole.castShadow = true;
     pole.receiveShadow = true;
@@ -172,53 +148,96 @@ export class WindFlag
   }
 
   /**
-   * Create flag mesh from C++ geometry
+   * Create static flag geometry with segmentT attribute
+   * Geometry is in local space - shader transforms to world position
    * @private
    */
-  createFlagMesh()
+  createStaticFlagGeometry()
   {
-    // Update display to generate initial geometry
-    this.windFlag.updateDisplay();
+    const segments = this.flagSegments;
+    const halfThickness = this.flagThickness / 2;
 
-    // Get vertices, UVs, indices, and normals from C++
-    const vertexView = this.windFlag.getVertices();
-    const uvView = this.windFlag.getUVs();
-    const indexView = this.windFlag.getIndices();
-    const normalView = this.windFlag.getNormals();
+    const positions = [];
+    const uvs = [];
+    const segmentTs = [];
+    const indices = [];
 
-    if (!vertexView || vertexView.length === 0)
+    // Generate vertices for each segment
+    // Local space: X along flag length, Y is top/bottom, Z is front/back
+    for (let i = 0; i < segments; i++)
     {
-      console.error('getVertices returned empty or invalid view');
-      return null;
+      const t = i / (segments - 1);
+      const halfWidth = this.flagBaseWidth / 2 + (this.flagTipWidth / 2 - this.flagBaseWidth / 2) * t;
+      const x = this.flagLength * t;
+
+      // Front face vertices (z = +halfThickness)
+      // Top front
+      positions.push(x, halfWidth, halfThickness);
+      uvs.push(t, 0.0);
+      segmentTs.push(t);
+
+      // Bottom front
+      positions.push(x, -halfWidth, halfThickness);
+      uvs.push(t, 1.0);
+      segmentTs.push(t);
+
+      // Back face vertices (z = -halfThickness)
+      // Top back
+      positions.push(x, halfWidth, -halfThickness);
+      uvs.push(t, 0.0);
+      segmentTs.push(t);
+
+      // Bottom back
+      positions.push(x, -halfWidth, -halfThickness);
+      uvs.push(t, 1.0);
+      segmentTs.push(t);
     }
 
-    // Create Float32Arrays from memory views
-    const positions = new Float32Array(vertexView.length);
-    positions.set(vertexView);
-
-    const uvs = new Float32Array(uvView.length);
-    uvs.set(uvView);
-
-    const normals = new Float32Array(normalView.length);
-    normals.set(normalView);
-
-    const indices = new Uint32Array(indexView.length);
-    indices.set(indexView);
-
-    // Create geometry
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-
-    // Mark position and normal as stream (updated every frame, rendered once)
-    geometry.attributes.position.setUsage(THREE.StreamDrawUsage);
-    geometry.attributes.normal.setUsage(THREE.StreamDrawUsage);
-
-    // Create material with flag texture
-    const material = new THREE.MeshStandardMaterial(
+    // Generate indices for front and back faces
+    for (let i = 0; i < segments - 1; i++)
     {
+      const idx = i * 4;
+
+      // Front face triangles
+      indices.push(idx, idx + 1, idx + 4);
+      indices.push(idx + 1, idx + 5, idx + 4);
+
+      // Back face triangles (reverse winding)
+      indices.push(idx + 2, idx + 6, idx + 3);
+      indices.push(idx + 3, idx + 6, idx + 7);
+    }
+
+    // Side faces (top and bottom edges)
+    for (let i = 0; i < segments - 1; i++)
+    {
+      const idx = i * 4;
+
+      // Top edge
+      indices.push(idx, idx + 4, idx + 2);
+      indices.push(idx + 2, idx + 4, idx + 6);
+
+      // Bottom edge
+      indices.push(idx + 1, idx + 3, idx + 5);
+      indices.push(idx + 3, idx + 7, idx + 5);
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setAttribute('segmentT', new THREE.Float32BufferAttribute(segmentTs, 1));
+    geometry.setIndex(indices);
+
+    return geometry;
+  }
+
+  /**
+   * Create shader material with wind deformation
+   * Uses MeshStandardMaterial with onBeforeCompile for PBR lighting
+   * @private
+   */
+  createFlagMaterial()
+  {
+    const material = new THREE.MeshStandardMaterial({
       map: this.flagTexture,
       color: 0xffffff,
       roughness: 0.8,
@@ -226,44 +245,195 @@ export class WindFlag
       side: THREE.DoubleSide
     });
 
-    const mesh = new THREE.Mesh(geometry, material);
-    // Vertices from C++ are already in world space, so mesh is at origin
-    // Position is already included in vertex coordinates
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    // Store uniforms for updating
+    this.uniforms = {
+      uWindVector: { value: new THREE.Vector3(0, 0, 0) },
+      uWavePhase: { value: 0 },  // Accumulated phase, not time
+      uFlagLength: { value: this.flagLength },
+      uMinAngle: { value: this.flagMinAngle },
+      uMaxAngle: { value: this.flagMaxAngle },
+      uAngleResponseK: { value: this.flagAngleResponseK },
+      uFlapAmplitude: { value: this.flagFlapAmplitude },
+      uWaveLength: { value: this.flagWaveLength }
+    };
 
-    return mesh;
+    material.onBeforeCompile = (shader) =>
+    {
+      // Add uniforms
+      shader.uniforms.uWindVector = this.uniforms.uWindVector;
+      shader.uniforms.uWavePhase = this.uniforms.uWavePhase;
+      shader.uniforms.uFlagLength = this.uniforms.uFlagLength;
+      shader.uniforms.uMinAngle = this.uniforms.uMinAngle;
+      shader.uniforms.uMaxAngle = this.uniforms.uMaxAngle;
+      shader.uniforms.uAngleResponseK = this.uniforms.uAngleResponseK;
+      shader.uniforms.uFlapAmplitude = this.uniforms.uFlapAmplitude;
+      shader.uniforms.uWaveLength = this.uniforms.uWaveLength;
+
+      // Vertex shader: add attribute and uniforms
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `
+        #include <common>
+        
+        attribute float segmentT;
+        
+        uniform vec3 uWindVector;
+        uniform float uWavePhase;  // Pre-accumulated phase (0 to 2π)
+        uniform float uFlagLength;
+        uniform float uMinAngle;
+        uniform float uMaxAngle;
+        uniform float uAngleResponseK;
+        uniform float uFlapAmplitude;
+        uniform float uWaveLength;
+        `
+      );
+
+      // Vertex shader: deform in local space, let Three.js handle world transform
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+        #include <begin_vertex>
+        
+        // Extract horizontal wind components
+        float windX = uWindVector.x;  // Crossrange
+        float windZ = -uWindVector.z; // Downrange (BTK convention)
+        float windSpeed = sqrt(windX * windX + windZ * windZ);
+        float windSpeedMph = windSpeed * 2.237; // m/s to mph
+        
+        // Wind direction (atan2 of horizontal components)
+        float windDir = windSpeed > 0.001 ? atan(windZ, windX) : 0.0;
+        
+        // Nonlinear angle response: angle = min + span * (1 - exp(-k * v^2))
+        float angleSpan = uMaxAngle - uMinAngle;
+        float angleDeg = uMinAngle + angleSpan * (1.0 - exp(-uAngleResponseK * windSpeedMph * windSpeedMph));
+        float angleRad = angleDeg * 0.01745329; // deg to rad
+        
+        // Local space: X = along flag, Y = width, Z = thickness
+        float localX = position.x; // 0 to flagLength
+        float localY = position.y; // -halfWidth to +halfWidth  
+        float localZ = position.z; // -halfThickness to +halfThickness
+        float t = segmentT;
+        
+        // Direction vectors for rotating flag into wind direction
+        float cosDir = cos(windDir);
+        float sinDir = sin(windDir);
+        float cosPitch = cos(angleRad);
+        float sinPitch = sin(angleRad);
+        
+        // Wave/flapping animation - phase is pre-accumulated in JS to avoid time*freq jumps
+        float waveArg = uWavePhase + t * uWaveLength * 6.28318;
+        float waveOffset = sin(waveArg) * uFlapAmplitude * t;
+        
+        // Deform in LOCAL space:
+        // 1. Start with base position along flag
+        // 2. Apply pitch (tilt down based on wind)
+        // 3. Rotate into wind direction
+        // 4. Add wave perpendicular to wind direction
+        
+        // Position after pitch rotation (rotate around horizontal axis perpendicular to wind)
+        // Pitch rotates the flag down from vertical
+        float pitchedX = localX * sinPitch;  // Horizontal extension
+        float pitchedY = -localX * cosPitch; // Vertical droop
+        
+        // Rotate into wind direction (around Y axis)
+        float rotatedX = pitchedX * cosDir + waveOffset * sinDir;
+        float rotatedY = pitchedY + localY; // Add width offset
+        float rotatedZ = -pitchedX * sinDir + waveOffset * cosDir + localZ;
+        
+        // Final local position
+        transformed = vec3(rotatedX, rotatedY, rotatedZ);
+        `
+      );
+
+      // Also override normal calculation to account for wave deformation
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <beginnormal_vertex>',
+        `
+        // Compute deformed normal in local space
+        
+        // Recompute wind parameters (same as above)
+        float nWindX = uWindVector.x;
+        float nWindZ = -uWindVector.z;
+        float nWindSpeed = sqrt(nWindX * nWindX + nWindZ * nWindZ);
+        float nWindSpeedMph = nWindSpeed * 2.237;
+        float nWindDir = nWindSpeed > 0.001 ? atan(nWindZ, nWindX) : 0.0;
+        
+        float nAngleSpan = uMaxAngle - uMinAngle;
+        float nAngleDeg = uMinAngle + nAngleSpan * (1.0 - exp(-uAngleResponseK * nWindSpeedMph * nWindSpeedMph));
+        float nAngleRad = nAngleDeg * 0.01745329;
+        
+        float nCosDir = cos(nWindDir);
+        float nSinDir = sin(nWindDir);
+        float nCosPitch = cos(nAngleRad);
+        float nSinPitch = sin(nAngleRad);
+        
+        // Use pre-accumulated phase from JS
+        float nWaveArg = uWavePhase + segmentT * uWaveLength * 6.28318;
+        
+        // Derivative of wave offset with respect to t (along flag)
+        float dWave = cos(nWaveArg) * uFlapAmplitude * uWaveLength * 6.28318 * segmentT
+                    + sin(nWaveArg) * uFlapAmplitude;
+        
+        // Tangent along flag (derivative of position with respect to t)
+        vec3 localTangent;
+        localTangent.x = nSinPitch * nCosDir + dWave * nSinDir;
+        localTangent.y = -nCosPitch;
+        localTangent.z = -nSinPitch * nSinDir + dWave * nCosDir;
+        localTangent = normalize(localTangent);
+        
+        // Bitangent is the width direction (Y axis in local space)
+        vec3 localBitangent = vec3(0.0, 1.0, 0.0);
+        
+        // Normal = tangent × bitangent
+        vec3 objectNormal = normalize(cross(localTangent, localBitangent));
+        
+        // Flip for back face (negative Z in local space)
+        if (position.z < 0.0) {
+          objectNormal = -objectNormal;
+        }
+        `
+      );
+
+      // Fragment shader: use Three.js's normal pipeline (no custom injection needed)
+      // The vertex shader sets objectNormal which flows through normalMatrix automatically
+    };
+
+    return material;
   }
 
   /**
-   * Update flag physics and geometry based on wind
-   * @param {Object} windGenerator - BTK WindGenerator instance (required)
+   * Update flag based on wind
+   * @param {Object} windGenerator - BTK WindGenerator instance
    * @param {number} deltaTime - Time step in seconds
    */
   update(windGenerator, deltaTime)
   {
-    if (!this.windFlag || !this.flagMesh || !windGenerator) return;
+    if (!windGenerator) return;
 
-    const pos = this.windFlag.getPosition();
+    // Sample wind at flag position
+    const wind = windGenerator.sample(this.position.x, this.position.y, this.position.z);
 
-    // Sample wind in BTK coordinates (m/s) - pos is already a Vector3D
-    const windBtk = windGenerator.sample(pos.x, pos.y, pos.z);
+    // Calculate horizontal wind speed for frequency
+    const windX = wind.x;
+    const windZ = -wind.z;
+    const windSpeed = Math.sqrt(windX * windX + windZ * windZ);
+    const windSpeedMph = windSpeed * 2.237; // m/s to mph
 
-    // Update C++ flag physics
-    this.windFlag.update(deltaTime, windBtk);
-    windBtk.delete();
+    // Calculate flap frequency based on wind speed
+    const flapFreq = this.flagFlapFrequencyBase + windSpeedMph * this.flagFlapFrequencyScale;
 
-    // Update display geometry (includes normals computation in C++)
-    this.windFlag.updateDisplay();
+    // Accumulate phase incrementally (avoids time*freq jumps when freq changes)
+    this.wavePhase += flapFreq * deltaTime * 2 * Math.PI;
 
-    // Update Three.js geometry from C++ buffers
-    const positions = this.flagMesh.geometry.attributes.position.array;
-    positions.set(this.windFlag.getVertices());
-    this.flagMesh.geometry.attributes.position.needsUpdate = true;
+    // Wrap to 0-2π to avoid floating point issues
+    this.wavePhase = this.wavePhase % (2 * Math.PI);
 
-    const normals = this.flagMesh.geometry.attributes.normal.array;
-    normals.set(this.windFlag.getNormals());
-    this.flagMesh.geometry.attributes.normal.needsUpdate = true;
+    // Update uniforms
+    this.uniforms.uWindVector.value.set(wind.x, wind.y, wind.z);
+    this.uniforms.uWavePhase.value = this.wavePhase;
+
+    // Clean up C++ object
+    wind.delete();
   }
 
   /**
@@ -292,8 +462,8 @@ export class WindFlag
       transformedGeometry,
       {
         name: 'FlagPole',
-        soundName: 'ricochet', // Metal ricochet sound
-        mesh: this.pole, // Store mesh reference for decal projection
+        soundName: 'ricochet',
+        mesh: this.pole,
         onImpact: (impactPosition, normal, velocity, scene, windGenerator, targetMesh) =>
         {
           const pos = new THREE.Vector3(impactPosition.x, impactPosition.y, impactPosition.z);
@@ -310,14 +480,14 @@ export class WindFlag
             particleDiameter: Config.METAL_FRAME_DUST_CONFIG.particleDiameter
           });
 
-          // Small dark impact mark (1cm)
+          // Small dark impact mark
           ImpactMarkFactory.create(
           {
             position: pos,
             normal: normal,
             mesh: targetMesh,
-            color: 0x2a2a2a, // Dark grey
-            size: 0.2 // 1cm
+            color: 0x2a2a2a,
+            size: 0.2
           });
         }
       }
@@ -339,17 +509,12 @@ export class WindFlag
     if (this.flagMesh)
     {
       this.scene.remove(this.flagMesh);
-      this.flagMesh.geometry.dispose();
-      this.flagMesh.material.dispose();
+      this.flagGeometry.dispose();
+      this.flagMaterial.dispose();
       if (this.flagTexture)
       {
         this.flagTexture.dispose();
       }
-    }
-
-    if (this.windFlag)
-    {
-      this.windFlag.delete();
     }
   }
 }
@@ -360,9 +525,9 @@ export class WindFlag
 export class WindFlagFactory
 {
   static flags = [];
-  static poleMesh = null; // InstancedMesh for all poles
-  static polePositions = []; // Track pole positions for instance matrices
-  static scene = null; // Scene reference for cleanup
+  static poleMesh = null;
+  static polePositions = [];
+  static scene = null;
 
   /**
    * Create a single wind flag
@@ -384,7 +549,6 @@ export class WindFlagFactory
   {
     if (this.flags.length === 0) return;
 
-    // Store scene reference for cleanup
     this.scene = scene;
 
     // Create shared pole geometry and material
@@ -394,7 +558,7 @@ export class WindFlagFactory
     const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, poleHeight, 16);
     const poleMaterial = new THREE.MeshStandardMaterial(
     {
-      color: 0x606060, // Darker metal gray
+      color: 0x606060,
       metalness: 0.4,
       roughness: 0.6
     });
@@ -423,18 +587,13 @@ export class WindFlagFactory
   }
 
   /**
-   * Create all flags along the range (legacy method for fclass-sim compatibility)
+   * Create all flags along the range
    * @param {THREE.Scene} scene - Three.js scene
    * @param {Landscape} landscape - Landscape instance for height queries
-   * @param {Object} options - Optional configuration (all in meters, SI units)
-   * @param {number} options.maxRange - Maximum range in meters
-   * @param {number} options.interval - Flag interval in meters
-   * @param {number} options.sideOffset - Distance from center to flag positions in meters
-   * @param {Object} options.config - Flag configuration overrides
+   * @param {Object} options - Optional configuration
    */
   static createFlags(scene, landscape, options = {})
   {
-    const btk = window.btk;
     const
     {
       maxRange = Config.LANDSCAPE_CONFIG.groundLength,
@@ -446,39 +605,28 @@ export class WindFlagFactory
     // Clear existing flags
     this.deleteAll();
 
-    // All values are in meters - Three.js scene is in meters
-    // Create flags every interval from interval to maxRange
+    // Create flags every interval
     for (let distance = interval; distance <= maxRange; distance += interval)
     {
-      const z = -distance; // Negative Z = downrange (meters)
+      const z = -distance;
 
       // Left side flag
-      const leftX = -sideOffset; // meters
+      const leftX = -sideOffset;
       const leftY = landscape.getHeightAt(leftX, z) || 0;
       const leftFlag = new WindFlag(
       {
-        position:
-        {
-          x: leftX,
-          y: leftY,
-          z
-        },
+        position: { x: leftX, y: leftY, z },
         scene,
         config
       });
       this.flags.push(leftFlag);
 
       // Right side flag
-      const rightX = sideOffset; // meters
+      const rightX = sideOffset;
       const rightY = landscape.getHeightAt(rightX, z) || 0;
       const rightFlag = new WindFlag(
       {
-        position:
-        {
-          x: rightX,
-          y: rightY,
-          z
-        },
+        position: { x: rightX, y: rightY, z },
         scene,
         config
       });
@@ -491,7 +639,7 @@ export class WindFlagFactory
 
   /**
    * Update all flags
-   * @param {Object} windGenerator - BTK WindGenerator instance (optional)
+   * @param {Object} windGenerator - BTK WindGenerator instance
    * @param {number} deltaTime - Time step in seconds
    */
   static updateAll(windGenerator, deltaTime)
@@ -513,7 +661,6 @@ export class WindFlagFactory
     }
     this.flags = [];
 
-    // Dispose instanced pole mesh
     if (this.poleMesh && this.scene)
     {
       this.scene.remove(this.poleMesh);

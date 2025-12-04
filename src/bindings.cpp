@@ -16,7 +16,7 @@
 #include "physics/wind_generator.h"
 #include "rendering/impact_detector.h"
 #include "rendering/steel_target.h"
-#include "rendering/wind_flag.h"
+// wind_flag.h removed - flag animation moved to GPU shader
 
 using namespace emscripten;
 using namespace btk::ballistics;
@@ -356,17 +356,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("setColors", &btk::rendering::SteelTarget::setColors)
     .function("localToWorld", &btk::rendering::SteelTarget::localToWorld);
 
-  // Wind Flag class
-  class_<btk::rendering::WindFlag>("WindFlag")
-    .constructor<float, float, float, float, int, float, float, float, float, float, float, float, float, float>()
-    .function("setPosition", &btk::rendering::WindFlag::setPosition)
-    .function("getPosition", &btk::rendering::WindFlag::getPosition)
-    .function("update", &btk::rendering::WindFlag::update)
-    .function("updateDisplay", &btk::rendering::WindFlag::updateDisplay)
-    .function("getVertices", &btk::rendering::WindFlag::getVertices)
-    .function("getUVs", &btk::rendering::WindFlag::getUVs)
-    .function("getIndices", &btk::rendering::WindFlag::getIndices)
-    .function("getNormals", &btk::rendering::WindFlag::getNormals);
+  // WindFlag removed - animation moved to GPU shader in WindFlag.js
 
   // Impact detection
   value_object<btk::rendering::ImpactResult>("ImpactResult")

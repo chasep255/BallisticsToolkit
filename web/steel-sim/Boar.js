@@ -938,7 +938,7 @@ export class BoarFactory
       // Check flag poles
       for (const flag of flags)
       {
-        const pos = flag.windFlag.getPosition();
+        const pos = flag.position; // JS WindFlag stores position directly
         const poleRadius = Config.WIND_FLAG_CONFIG.poleThickness / 2 + polePadding;
         if (rayIntersectsCircle(startX, startZ, endX, endZ, pos.x, pos.z, poleRadius))
         {
