@@ -518,10 +518,11 @@ export class SteelTargetFactory
       positions.push(rx * cos2, ry * sin2, hd);
       positions.push(rx * cos1, ry * sin1, hd);
 
-      // UVs: map to right half (u=0.5 to 1.0), flipped horizontally
+      // UVs: map to right half (u=0.5 to 1.0)
+      // Right side (cos=1) maps to u=1, left side (cos=-1) maps to u=0.5
       uvs.push(0.75, 0.5);  // center at u=0.75
-      uvs.push(0.75 - cos2 * 0.25, 0.5 + sin2 * 0.5);
-      uvs.push(0.75 - cos1 * 0.25, 0.5 + sin1 * 0.5);
+      uvs.push(0.75 + cos2 * 0.25, 0.5 + sin2 * 0.5);
+      uvs.push(0.75 + cos1 * 0.25, 0.5 + sin1 * 0.5);
     }
 
     // Edge faces (connecting front and back) - quads as 2 triangles each
