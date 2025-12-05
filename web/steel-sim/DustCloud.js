@@ -7,17 +7,20 @@ import * as THREE from 'three';
  */
 
 const ALPHA_THRESHOLD = 0.01; // Threshold for cloud visibility
+const POOL_SIZE = 16; // Number of dust clouds in the pool
 
 const DUST_VERTEX_SHADER = `
 attribute vec3 instanceRelativePosition;
 
 uniform vec3 centerPosition;
+uniform float initialRadius;
 uniform float radiusScale;
 uniform float particleScale;
 
 void main() {
   // Calculate world position: center + scaled relative position
-  vec3 worldPos = centerPosition + instanceRelativePosition * radiusScale;
+  // Relative positions are normalized (radius=1.0), so scale by initialRadius * radiusScale = currentRadius
+  vec3 worldPos = centerPosition + instanceRelativePosition * initialRadius * radiusScale;
   
   // Transform sphere vertex position relative to world position
   vec3 localPos = position * particleScale;
@@ -58,7 +61,7 @@ function truncatedNormalRandom()
 export class DustCloud
 {
   /**
-   * Create a new dust cloud
+   * Create a new dust cloud (for object pool - geometry created once, reused)
    * @param {Object} options - Configuration options
    * @param {THREE.Vector3} options.position - Initial cloud center position in meters (required)
    * @param {THREE.Scene} options.scene - Three.js scene to add mesh to (required)
@@ -67,6 +70,7 @@ export class DustCloud
    * @param {number} options.initialRadius - Initial cloud radius in meters (required)
    * @param {number} options.growthRate - Cloud radius growth rate in m/s (required)
    * @param {number} options.particleDiameter - Particle diameter in meters (required)
+   * @param {boolean} options.addToScene - Whether to add mesh to scene immediately (default: true)
    */
   constructor(options)
   {
@@ -75,51 +79,34 @@ export class DustCloud
       position,
       scene,
       numParticles,
-      color,
-      initialRadius,
-      growthRate,
-      particleDiameter
+      addToScene = true
     } = options;
 
     if (!scene) throw new Error('Scene is required');
-    if (!position) throw new Error('Position is required');
 
     this.scene = scene;
+    this.active = false; // Start inactive (will be activated by reset())
 
-    // Store state
-    this.centerPosition = position.clone();
-    this.initialRadius = initialRadius;
-    this.growthRate = growthRate;
-    this.radius = initialRadius;
-    this.alpha = 1.0;
-    this.particleDiameter = particleDiameter;
-    this.particleScale = Math.max(particleDiameter / 2, 0.01); // Constant particle radius
-    this.numParticles = numParticles; // Store for later use
-
-    // Scale alpha to account for particle overlap (many particles overlap at center)
-    // Use inverse square root to reduce alpha without making it too transparent
-    this.alphaScale = 1.0 / Math.sqrt(numParticles);
-
+    // Store numParticles for geometry generation
+    this.numParticles = numParticles || 200; // Default to 200 if not provided
 
     // Generate relative positions using truncated normal distribution (reject outside 2 std dev)
-    const relativePositions = new Float32Array(numParticles * 3);
-    for (let i = 0; i < numParticles; i++)
+    // This geometry is created once and reused - same pattern every time
+    const relativePositions = new Float32Array(this.numParticles * 3);
+    for (let i = 0; i < this.numParticles; i++)
     {
-      // Scale by initialRadius so particles are distributed within the cloud size
+      // Use a fixed initialRadius of 1.0 for geometry generation (will be scaled in shader)
       // Truncated at 2 standard deviations (about 95% of particles within radius)
-      const relX = truncatedNormalRandom() * initialRadius;
-      const relY = truncatedNormalRandom() * initialRadius;
-      const relZ = truncatedNormalRandom() * initialRadius;
+      const relX = truncatedNormalRandom();
+      const relY = truncatedNormalRandom();
+      const relZ = truncatedNormalRandom();
       relativePositions[i * 3 + 0] = relX;
       relativePositions[i * 3 + 1] = relY;
       relativePositions[i * 3 + 2] = relZ;
     }
 
-    // Convert color to normalized RGB
-    const baseR = color.r / 255.0;
-    const baseG = color.g / 255.0;
-    const baseB = color.b / 255.0;
-    const avgColor = new THREE.Color(baseR, baseG, baseB);
+    // Create default color (will be updated in reset())
+    const defaultColor = new THREE.Color(0.5, 0.5, 0.5);
 
     // Create shader material - GPU calculates positions, no JavaScript loop needed
     this.material = new THREE.ShaderMaterial(
@@ -130,7 +117,11 @@ export class DustCloud
       {
         centerPosition:
         {
-          value: this.centerPosition
+          value: new THREE.Vector3(0, 0, 0)
+        },
+        initialRadius:
+        {
+          value: 0.02
         },
         radiusScale:
         {
@@ -138,15 +129,15 @@ export class DustCloud
         },
         particleScale:
         {
-          value: this.particleScale
+          value: 0.01
         },
         color:
         {
-          value: avgColor
+          value: defaultColor
         },
         alpha:
         {
-          value: 1.0
+          value: 0.0
         }
       },
       transparent: true,
@@ -161,11 +152,78 @@ export class DustCloud
     const relativePositionAttribute = new THREE.InstancedBufferAttribute(relativePositions, 3);
     sphereGeometry.setAttribute('instanceRelativePosition', relativePositionAttribute);
 
-    // Create instanced mesh
-    this.mesh = new THREE.InstancedMesh(sphereGeometry, this.material, numParticles);
+    // Create instanced mesh (geometry kept permanently, never disposed)
+    this.mesh = new THREE.InstancedMesh(sphereGeometry, this.material, this.numParticles);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 2; // Render after decals (renderOrder 1) so dust appears on top
-    this.scene.add(this.mesh);
+    this.mesh.visible = false; // Start hidden
+    
+    // Only add to scene if requested (for pool initialization, we'll add later)
+    if (addToScene && position)
+    {
+      this.scene.add(this.mesh);
+    }
+    
+    // Initialize state if position provided (for backward compatibility)
+    if (position)
+    {
+      this.reset(options);
+    }
+  }
+
+  /**
+   * Reset cloud state for reuse (doesn't recreate geometry)
+   * @param {Object} options - Configuration options
+   * @param {THREE.Vector3} options.position - Initial cloud center position in meters (required)
+   * @param {Object} options.color - RGB color {r, g, b} 0-255 (required)
+   * @param {number} options.initialRadius - Initial cloud radius in meters (required)
+   * @param {number} options.growthRate - Cloud radius growth rate in m/s (required)
+   * @param {number} options.particleDiameter - Particle diameter in meters (required)
+   */
+  reset(options)
+  {
+    const
+    {
+      position,
+      color,
+      initialRadius,
+      growthRate,
+      particleDiameter
+    } = options;
+
+    if (!position) throw new Error('Position is required');
+
+    // Reset state
+    this.centerPosition = position.clone();
+    this.initialRadius = initialRadius;
+    this.growthRate = growthRate;
+    this.radius = initialRadius;
+    this.alpha = 1.0;
+    this.particleDiameter = particleDiameter;
+    this.particleScale = Math.max(particleDiameter / 2, 0.01);
+
+    // Convert color to normalized RGB
+    const baseR = color.r / 255.0;
+    const baseG = color.g / 255.0;
+    const baseB = color.b / 255.0;
+    const avgColor = new THREE.Color(baseR, baseG, baseB);
+
+    // Update uniforms
+    const uniforms = this.material.uniforms;
+    uniforms.centerPosition.value.copy(this.centerPosition);
+    uniforms.initialRadius.value = this.initialRadius;
+    uniforms.radiusScale.value = 1.0; // Start at initial radius
+    uniforms.particleScale.value = this.particleScale;
+    uniforms.color.value.copy(avgColor);
+    uniforms.alpha.value = this.alpha;
+
+    // Ensure mesh is in scene and visible
+    if (!this.mesh.parent)
+    {
+      this.scene.add(this.mesh);
+    }
+    this.mesh.visible = true;
+    this.active = true;
   }
 
   /**
@@ -174,7 +232,7 @@ export class DustCloud
    */
   update(dt)
   {
-    if (!this.mesh)
+    if (!this.active || !this.mesh)
     {
       return;
     }
@@ -191,12 +249,9 @@ export class DustCloud
     // 3. Update uniforms - GPU does all the position calculations in parallel
     const uniforms = this.material.uniforms;
     uniforms.centerPosition.value.copy(this.centerPosition);
-    uniforms.radiusScale.value = this.radius / this.initialRadius;
+    uniforms.radiusScale.value = this.radius / this.initialRadius; // Current radius / initial radius
     uniforms.particleScale.value = this.particleScale;
     uniforms.alpha.value = this.alpha;
-
-    // 4. Ensure mesh stays visible
-    this.mesh.visible = true;
   }
 
   /**
@@ -210,135 +265,154 @@ export class DustCloud
   }
 
   /**
-   * Clean up all resources
+   * Mark cloud as inactive (for object pool reuse)
+   * Does not dispose geometry/mesh - they are kept for reuse
    */
-  dispose()
+  deactivate()
   {
-    // Clean up instanced mesh
+    this.active = false;
     if (this.mesh)
     {
-      this.scene.remove(this.mesh);
-
-      // Clean up geometry
-      if (this.mesh.geometry)
-      {
-        this.mesh.geometry.dispose();
-      }
-
-      this.mesh = null;
-    }
-
-    // Clean up material
-    if (this.material)
-    {
-      this.material.dispose();
-      this.material = null;
+      this.mesh.visible = false;
+      // Update alpha to 0 to ensure it doesn't render
+      this.material.uniforms.alpha.value = 0.0;
     }
   }
 }
 
 /**
- * Factory class for managing collections of dust clouds
+ * Factory class for managing a pool of dust clouds
  */
 export class DustCloudFactory
 {
   /**
-   * Static collection of all active dust clouds
+   * Static pool of pre-allocated dust clouds
    * @type {DustCloud[]}
    */
-  static clouds = [];
+  static pool = [];
+  static scene = null;
 
   /**
-   * Create a new dust cloud and add it to the collection
+   * Initialize the factory with a pool of clouds
+   * Must be called before creating clouds
+   * @param {THREE.Scene} scene - Three.js scene
+   */
+  static initialize(scene)
+  {
+    if (DustCloudFactory.pool.length > 0)
+    {
+      return; // Already initialized
+    }
+
+    DustCloudFactory.scene = scene;
+
+    // Create pool of clouds with default geometry (will be reset when used)
+    for (let i = 0; i < POOL_SIZE; i++)
+    {
+      const cloud = new DustCloud(
+      {
+        scene: scene,
+        numParticles: 200, // Default particle count
+        addToScene: false // Don't add to scene yet
+      });
+      cloud.active = false;
+      DustCloudFactory.pool.push(cloud);
+    }
+  }
+
+  /**
+   * Create a new dust cloud by reusing a pool cloud
    * @param {Object} options - Configuration options for DustCloud
-   * @returns {DustCloud} The created dust cloud instance
+   * @returns {DustCloud|null} The activated dust cloud instance, or null if pool is exhausted
    */
   static create(options)
   {
-    const cloud = new DustCloud(options);
-    DustCloudFactory.clouds.push(cloud);
+    if (DustCloudFactory.pool.length === 0)
+    {
+      throw new Error('DustCloudFactory.initialize() must be called before creating clouds');
+    }
+
+    // Find first available cloud in pool
+    let cloud = null;
+    for (let i = 0; i < DustCloudFactory.pool.length; i++)
+    {
+      if (!DustCloudFactory.pool[i].active)
+      {
+        cloud = DustCloudFactory.pool[i];
+        break;
+      }
+    }
+
+    // If all clouds are active, reuse the oldest one (first in pool)
+    if (!cloud)
+    {
+      cloud = DustCloudFactory.pool[0];
+    }
+
+    // Reset cloud with new options
+    cloud.reset(options);
     return cloud;
   }
 
   /**
-   * Delete a specific cloud by reference
-   * @param {DustCloud} cloud - The cloud instance to delete
-   * @returns {boolean} True if cloud was found and deleted, false otherwise
+   * Deactivate a specific cloud (returns it to pool)
+   * @param {DustCloud} cloud - The cloud instance to deactivate
+   * @returns {boolean} True if cloud was found and deactivated, false otherwise
    */
   static delete(cloud)
   {
-    const index = DustCloudFactory.clouds.indexOf(cloud);
-    if (index === -1)
+    if (!cloud || !DustCloudFactory.pool.includes(cloud))
     {
       return false;
     }
 
-    cloud.dispose();
-    DustCloudFactory.clouds.splice(index, 1);
+    cloud.deactivate();
     return true;
   }
 
   /**
-   * Delete a cloud by index
-   * @param {number} index - Index of cloud to delete
-   * @returns {boolean} True if cloud was found and deleted, false otherwise
-   */
-  static deleteAt(index)
-  {
-    if (index < 0 || index >= DustCloudFactory.clouds.length)
-    {
-      return false;
-    }
-
-    const cloud = DustCloudFactory.clouds[index];
-    cloud.dispose();
-    DustCloudFactory.clouds.splice(index, 1);
-    return true;
-  }
-
-  /**
-   * Delete all dust clouds
+   * Deactivate all dust clouds (return all to pool)
    */
   static deleteAll()
   {
-    for (const cloud of DustCloudFactory.clouds)
+    for (const cloud of DustCloudFactory.pool)
     {
-      cloud.dispose();
+      cloud.deactivate();
     }
-    DustCloudFactory.clouds = [];
   }
 
   /**
-   * Update all dust clouds (physics and rendering)
-   * Automatically disposes clouds when animation is complete
+   * Update all active dust clouds (physics and rendering)
+   * Automatically deactivates clouds when animation is complete
    * @param {number} dt - Time step in seconds
    */
   static updateAll(dt)
   {
-    // Iterate backwards to safely remove items while iterating
-    for (let i = DustCloudFactory.clouds.length - 1; i >= 0; i--)
+    for (const cloud of DustCloudFactory.pool)
     {
-      const cloud = DustCloudFactory.clouds[i];
+      if (!cloud.active)
+      {
+        continue;
+      }
 
       // Update physics and rendering
       cloud.update(dt);
 
-      // Check if animation is complete and auto-dispose
+      // Check if animation is complete and deactivate
       if (cloud.isDone())
       {
-        cloud.dispose();
-        DustCloudFactory.clouds.splice(i, 1);
+        cloud.deactivate();
       }
     }
   }
 
   /**
-   * Get all dust clouds
+   * Get all active dust clouds
    * @returns {DustCloud[]} Array of all active dust clouds
    */
   static getAll()
   {
-    return DustCloudFactory.clouds;
+    return DustCloudFactory.pool.filter(cloud => cloud.active);
   }
 
   /**
@@ -347,20 +421,20 @@ export class DustCloudFactory
    */
   static getCount()
   {
-    return DustCloudFactory.clouds.length;
+    return DustCloudFactory.pool.filter(cloud => cloud.active).length;
   }
 
   /**
-   * Get a dust cloud by index
-   * @param {number} index - Index of cloud to get
+   * Get a dust cloud by index in pool
+   * @param {number} index - Index of cloud in pool (0-15)
    * @returns {DustCloud|null} Cloud instance or null if index is invalid
    */
   static getAt(index)
   {
-    if (index < 0 || index >= DustCloudFactory.clouds.length)
+    if (index < 0 || index >= DustCloudFactory.pool.length)
     {
       return null;
     }
-    return DustCloudFactory.clouds[index];
+    return DustCloudFactory.pool[index];
   }
 }

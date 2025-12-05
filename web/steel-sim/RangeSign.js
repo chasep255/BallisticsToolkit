@@ -217,8 +217,6 @@ export class RangeSign
             DustCloudFactory.create(
             {
               position: pos,
-              scene: scene,
-              numParticles: dustConfig.numParticles,
               color: dustConfig.color,
               initialRadius: dustConfig.initialRadius,
               growthRate: dustConfig.growthRate,
@@ -379,8 +377,6 @@ export class RangeSignFactory
                 DustCloudFactory.create(
                 {
                   position: pos,
-                  scene: scene,
-                  numParticles: Config.WOOD_DUST_CONFIG.numParticles,
                   color: Config.WOOD_DUST_CONFIG.color,
                   initialRadius: Config.WOOD_DUST_CONFIG.initialRadius,
                   growthRate: Config.WOOD_DUST_CONFIG.growthRate,
@@ -466,8 +462,6 @@ export class RangeSignFactory
                 DustCloudFactory.create(
                 {
                   position: pos,
-                  scene: scene,
-                  numParticles: Config.SIGN_BOARD_DUST_CONFIG.numParticles,
                   color: Config.SIGN_BOARD_DUST_CONFIG.color,
                   initialRadius: Config.SIGN_BOARD_DUST_CONFIG.initialRadius,
                   growthRate: Config.SIGN_BOARD_DUST_CONFIG.growthRate,

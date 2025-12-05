@@ -254,8 +254,6 @@ export class BermFactory
               DustCloudFactory.create(
               {
                 position: pos,
-                scene: scene,
-                numParticles: Config.BERM_DUST_CONFIG.numParticles,
                 color: Config.BERM_DUST_CONFIG.color,
                 initialRadius: Config.BERM_DUST_CONFIG.initialRadius,
                 growthRate: Config.BERM_DUST_CONFIG.growthRate,

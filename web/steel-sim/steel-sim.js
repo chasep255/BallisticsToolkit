@@ -622,6 +622,9 @@ class SteelSimulator
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb);
 
+    // Initialize dust cloud factory (must be done after scene is created)
+    DustCloudFactory.initialize(this.scene);
+
     // Setup lighting first
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
     const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
@@ -1276,8 +1279,6 @@ class SteelSimulator
             DustCloudFactory.create(
             {
               position: pos,
-              scene: scene,
-              numParticles: Config.METAL_DUST_CONFIG.numParticles,
               color: Config.METAL_DUST_CONFIG.color,
               initialRadius: Config.METAL_DUST_CONFIG.initialRadius,
               growthRate: Config.METAL_DUST_CONFIG.growthRate,
@@ -2282,8 +2283,6 @@ class SteelSimulator
     DustCloudFactory.create(
     {
       position: impactPointThree, // Already in meters
-      scene: this.scene,
-      numParticles: Config.GROUND_DUST_CONFIG.numParticles,
       color: Config.GROUND_DUST_CONFIG.color,
       initialRadius: Config.GROUND_DUST_CONFIG.initialRadius, // Already in meters from config
       growthRate: Config.GROUND_DUST_CONFIG.growthRate, // Already in m/s from config
@@ -2303,8 +2302,6 @@ class SteelSimulator
     DustCloudFactory.create(
     {
       position: impactPointThree, // Already in meters
-      scene: this.scene,
-      numParticles: Config.METAL_DUST_CONFIG.numParticles,
       color: Config.METAL_DUST_CONFIG.color,
       initialRadius: Config.METAL_DUST_CONFIG.initialRadius, // Already in meters from config
       growthRate: Config.METAL_DUST_CONFIG.growthRate, // Already in m/s from config
@@ -2375,8 +2372,6 @@ class SteelSimulator
             DustCloudFactory.create(
             {
               position: impactPointThree,
-              scene: this.scene,
-              numParticles: 250,
               color:
               {
                 r: 255,
@@ -2428,8 +2423,6 @@ class SteelSimulator
             DustCloudFactory.create(
             {
               position: impactPointThree,
-              scene: this.scene,
-              numParticles: 250,
               color:
               {
                 r: 255,

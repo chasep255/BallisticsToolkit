@@ -265,8 +265,6 @@ export class TargetRack
             DustCloudFactory.create(
             {
               position: pos,
-              scene: scene,
-              numParticles: Config.METAL_FRAME_DUST_CONFIG.numParticles,
               color: Config.METAL_FRAME_DUST_CONFIG.color,
               initialRadius: Config.METAL_FRAME_DUST_CONFIG.initialRadius,
               growthRate: Config.METAL_FRAME_DUST_CONFIG.growthRate,
