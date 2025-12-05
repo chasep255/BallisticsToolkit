@@ -676,6 +676,7 @@ export class WindFlagFactory
     this.flagMesh = new THREE.InstancedMesh(geometry, material, numFlags);
     this.flagMesh.castShadow = true;
     this.flagMesh.receiveShadow = true;
+    this.flagMesh.raycast = () => {}; // Disable raycaster interaction
 
     // Set instance matrices to position each flag
     const matrix = new THREE.Matrix4();
