@@ -84,7 +84,8 @@ import
 from './Time.js';
 import
 {
-  ShotFactory
+  ShotFactory,
+  BulletGlowPool
 }
 from './Shot.js';
 import
@@ -624,6 +625,7 @@ class SteelSimulator
 
     // Initialize dust cloud factory (must be done after scene is created)
     DustCloudFactory.initialize(this.scene);
+    BulletGlowPool.initialize(this.scene);
 
     // Setup lighting first
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));

@@ -38,12 +38,8 @@ export class Shot
     this.lastCheckedCollisionTime = 0.0; // Track last collision check time
 
     // Bullet animation state
-    this.bulletMesh = null;
-    this.bulletGeometry = null;
-    this.bulletMaterial = null;
     this.bulletGlowSprite = null;
-    this.bulletGlowTexture = null;
-    this.bulletGlowMaterial = null;
+    this.bulletGlowScale = 1.0; // Store scale for cleanup
 
     // Rendering config
     this.shadowsEnabled = config.shadowsEnabled ?? true;
@@ -112,90 +108,45 @@ export class Shot
    */
   updateAnimation()
   {
+    if (!this.bulletGlowSprite) return;
 
     const currentBullet = this.ballisticSimulator.getCurrentBullet();
     const posBtk = currentBullet.getPosition();
     const pos = this.btkToThreeJsPosition(posBtk);
 
-    this.bulletMesh.position.set(pos.x, pos.y, pos.z);
-    if (this.bulletGlowSprite)
-    {
-      this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
-    }
+    this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
 
     posBtk.delete();
   }
 
-  /**
-   * Create bullet glow texture (pressure wave effect)
-   */
-  createBulletGlowTexture()
-  {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const maxRadius = Math.min(centerX, centerY);
-
-    // Create radial gradient for pressure wave
-    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
-    gradient.addColorStop(0.3, 'rgba(200, 200, 255, 0.4)');
-    gradient.addColorStop(0.6, 'rgba(150, 150, 255, 0.2)');
-    gradient.addColorStop(1, 'rgba(100, 100, 255, 0)');
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    this.bulletGlowTexture = new THREE.CanvasTexture(canvas);
-    return this.bulletGlowTexture;
-  }
 
   /**
-   * Create bullet mesh and glow sprite
+   * Create bullet glow sprite (pressure wave) using pooled sprite
    */
   createBulletMesh()
   {
-    // Copper color material
-    this.bulletMaterial = new THREE.MeshBasicMaterial(
+    // Get pooled glow sprite from factory
+    this.bulletGlowSprite = BulletGlowPool.acquire();
+    if (!this.bulletGlowSprite)
     {
-      color: new THREE.Color(0.722, 0.451, 0.200), // Copper color
-      toneMapped: false
-    });
+      console.warn('[Shot] No bullet glow sprite available in pool');
+      return;
+    }
 
-    // Use actual bullet diameter from parameters
-    const radiusYards = this.btk.Conversions.metersToYards(this.bulletParams.diameter) / 2.0;
-    this.bulletGeometry = new THREE.SphereGeometry(radiusYards, 16, 16);
-
-    // Create mesh
-    this.bulletMesh = new THREE.Mesh(this.bulletGeometry, this.bulletMaterial);
-    this.bulletMesh.castShadow = this.shadowsEnabled;
-    this.bulletMesh.receiveShadow = false;
+    // Scale sprite to match bullet diameter
+    const glowSize = this.btk.Conversions.metersToYards(this.bulletParams.diameter) * 15.0;
+    const baseSize = BulletGlowPool.BASE_SIZE_YARDS;
+    const scale = glowSize / baseSize;
+    this.bulletGlowSprite.scale.set(scale, scale, 1);
 
     // Set initial position
     const posBtk = this.initialPosition;
     const pos = this.btkToThreeJsPosition(posBtk);
-    this.bulletMesh.position.set(pos.x, pos.y, pos.z);
-
-    this.scene.add(this.bulletMesh);
-
-    // Create pressure wave glow sprite
-    const glowTexture = this.createBulletGlowTexture();
-    this.bulletGlowMaterial = new THREE.SpriteMaterial(
-    {
-      map: glowTexture,
-      transparent: true,
-      blending: THREE.NormalBlending,
-      depthWrite: false
-    });
-    this.bulletGlowSprite = new THREE.Sprite(this.bulletGlowMaterial);
-    const glowSize = this.btk.Conversions.metersToYards(this.bulletParams.diameter) * 15.0;
-    this.bulletGlowSprite.scale.set(glowSize, glowSize, 1);
     this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
-    this.scene.add(this.bulletGlowSprite);
+    this.bulletGlowSprite.visible = true;
+
+    // Store scale for cleanup
+    this.bulletGlowScale = scale;
   }
 
   /**
@@ -240,11 +191,11 @@ export class Shot
    */
   getCurrentPosition()
   {
-    if (!this.bulletMesh) return null;
+    if (!this.bulletGlowSprite) return null;
     return {
-      x: this.bulletMesh.position.x,
-      y: this.bulletMesh.position.y,
-      z: this.bulletMesh.position.z
+      x: this.bulletGlowSprite.position.x,
+      y: this.bulletGlowSprite.position.y,
+      z: this.bulletGlowSprite.position.z
     };
   }
 
@@ -288,38 +239,14 @@ export class Shot
     // Mark as dead
     this.alive = false;
 
-    // Remove from scene
-    if (this.bulletMesh)
-    {
-      this.scene.remove(this.bulletMesh);
-      this.bulletMesh = null;
-    }
+    // Return glow sprite to pool
     if (this.bulletGlowSprite)
     {
-      this.scene.remove(this.bulletGlowSprite);
+      // Reset scale and hide
+      this.bulletGlowSprite.scale.set(BulletGlowPool.BASE_SIZE_YARDS, BulletGlowPool.BASE_SIZE_YARDS, 1);
+      this.bulletGlowSprite.visible = false;
+      BulletGlowPool.release(this.bulletGlowSprite);
       this.bulletGlowSprite = null;
-    }
-
-    // Dispose geometries and materials
-    if (this.bulletGeometry)
-    {
-      this.bulletGeometry.dispose();
-      this.bulletGeometry = null;
-    }
-    if (this.bulletMaterial)
-    {
-      this.bulletMaterial.dispose();
-      this.bulletMaterial = null;
-    }
-    if (this.bulletGlowMaterial)
-    {
-      this.bulletGlowMaterial.dispose();
-      this.bulletGlowMaterial = null;
-    }
-    if (this.bulletGlowTexture)
-    {
-      this.bulletGlowTexture.dispose();
-      this.bulletGlowTexture = null;
     }
 
     // Dispose BTK objects
@@ -428,5 +355,123 @@ export class ShotFactory
       shot.dispose();
     }
     ShotFactory.shots = [];
+  }
+}
+
+// ===== BULLET GLOW POOL =====
+
+/**
+ * Object pool for bullet glow sprites (pressure wave effect) to avoid allocation overhead
+ * Similar to DustCloudFactory pooling pattern
+ */
+export class BulletGlowPool
+{
+  static POOL_SIZE = 32;
+  static BASE_SIZE_YARDS = 1.0; // Base size for pooled glow sprites (Three.js sprite default is 1x1)
+  
+  static pool = [];
+  static scene = null;
+  static glowTexture = null;
+
+  /**
+   * Create bullet glow texture (pressure wave effect)
+   */
+  static createGlowTexture()
+  {
+    if (BulletGlowPool.glowTexture) return BulletGlowPool.glowTexture;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const maxRadius = Math.min(centerX, centerY);
+
+    // Create radial gradient for pressure wave (white center, blue fade)
+    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+    gradient.addColorStop(0.3, 'rgba(200, 200, 255, 0.4)');
+    gradient.addColorStop(0.6, 'rgba(150, 150, 255, 0.2)');
+    gradient.addColorStop(1, 'rgba(100, 100, 255, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    BulletGlowPool.glowTexture = new THREE.CanvasTexture(canvas);
+    return BulletGlowPool.glowTexture;
+  }
+
+  /**
+   * Initialize the bullet glow sprite pool
+   * @param {THREE.Scene} scene - Three.js scene to add sprites to
+   */
+  static initialize(scene)
+  {
+    BulletGlowPool.scene = scene;
+    
+    // Create shared glow texture
+    const glowTexture = BulletGlowPool.createGlowTexture();
+    
+    // Create shared material
+    const glowMaterial = new THREE.SpriteMaterial(
+    {
+      map: glowTexture,
+      transparent: true,
+      blending: THREE.NormalBlending,
+      depthWrite: false
+    });
+
+    // Pre-create all glow sprites
+    for (let i = 0; i < BulletGlowPool.POOL_SIZE; i++)
+    {
+      const glowSprite = new THREE.Sprite(glowMaterial);
+      glowSprite.scale.set(BulletGlowPool.BASE_SIZE_YARDS, BulletGlowPool.BASE_SIZE_YARDS, 1);
+      glowSprite.visible = false;
+      glowSprite.raycast = () => {}; // Disable raycaster interaction
+      
+      scene.add(glowSprite);
+      BulletGlowPool.pool.push(glowSprite);
+    }
+
+    console.log(`[BulletGlowPool] Initialized ${BulletGlowPool.POOL_SIZE} glow sprites`);
+  }
+
+  /**
+   * Acquire a glow sprite from the pool
+   * @returns {THREE.Sprite|null} Available glow sprite or null if pool exhausted
+   */
+  static acquire()
+  {
+    // Find first invisible (available) sprite
+    for (const sprite of BulletGlowPool.pool)
+    {
+      if (!sprite.visible)
+      {
+        return sprite;
+      }
+    }
+    
+    // Pool exhausted - log warning
+    console.warn(`[BulletGlowPool] Pool exhausted (${BulletGlowPool.POOL_SIZE} bullets active)`);
+    return null;
+  }
+
+  /**
+   * Release a glow sprite back to the pool
+   * @param {THREE.Sprite} sprite - Glow sprite to release
+   */
+  static release(sprite)
+  {
+    if (!sprite) return;
+    
+    // Sprite should already be invisible and scale reset by caller
+    // Just verify it's in our pool and ensure it's reset
+    if (BulletGlowPool.pool.includes(sprite))
+    {
+      sprite.visible = false;
+      sprite.scale.set(BulletGlowPool.BASE_SIZE_YARDS, BulletGlowPool.BASE_SIZE_YARDS, 1);
+    }
   }
 }
