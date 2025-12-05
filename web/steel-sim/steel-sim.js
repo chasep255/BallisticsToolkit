@@ -415,7 +415,8 @@ class SteelSimulator
     ShotFactory.deleteAll();
     SteelTargetFactory.deleteAll();
     TargetRackFactory.deleteAll();
-    DustCloudFactory.deleteAll();
+    DustCloudFactory.dispose(); // Full dispose to allow re-initialization
+    BulletGlowPool.dispose();   // Full dispose to allow re-initialization
     WindFlagFactory.deleteAll();
     RangeSignFactory.deleteAll();
     BermFactory.deleteAll();

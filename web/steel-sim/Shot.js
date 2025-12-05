@@ -474,4 +474,27 @@ export class BulletGlowPool
       sprite.scale.set(BulletGlowPool.BASE_SIZE_YARDS, BulletGlowPool.BASE_SIZE_YARDS, 1);
     }
   }
+
+  /**
+   * Fully dispose of all sprites and clear the pool
+   * Must be called on scene destruction to allow re-initialization
+   */
+  static dispose()
+  {
+    for (const sprite of BulletGlowPool.pool)
+    {
+      if (BulletGlowPool.scene)
+      {
+        BulletGlowPool.scene.remove(sprite);
+      }
+      sprite.material?.dispose();
+    }
+    if (BulletGlowPool.glowTexture)
+    {
+      BulletGlowPool.glowTexture.dispose();
+      BulletGlowPool.glowTexture = null;
+    }
+    BulletGlowPool.pool = [];
+    BulletGlowPool.scene = null;
+  }
 }

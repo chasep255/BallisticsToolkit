@@ -382,6 +382,30 @@ export class DustCloudFactory
   }
 
   /**
+   * Fully dispose of all clouds and clear the pool
+   * Must be called on scene destruction to allow re-initialization
+   */
+  static dispose()
+  {
+    for (const cloud of DustCloudFactory.pool)
+    {
+      // Remove mesh from scene
+      if (cloud.mesh && DustCloudFactory.scene)
+      {
+        DustCloudFactory.scene.remove(cloud.mesh);
+      }
+      // Dispose geometry and material
+      if (cloud.mesh)
+      {
+        cloud.mesh.geometry?.dispose();
+        cloud.material?.dispose();
+      }
+    }
+    DustCloudFactory.pool = [];
+    DustCloudFactory.scene = null;
+  }
+
+  /**
    * Update all active dust clouds (physics and rendering)
    * Automatically deactivates clouds when animation is complete
    * @param {number} dt - Time step in seconds
