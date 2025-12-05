@@ -285,8 +285,8 @@ export function initConfig()
   // ===== ENVIRONMENT CONFIGURATIONS =====
   Config.MOUNTAIN_CONFIG = {
     count: 10,
-    heightMin: btk.Conversions.yardsToMeters(50), // 50 yards
-    heightMax: btk.Conversions.yardsToMeters(150), // 150 yards
+    heightMin: btk.Conversions.yardsToMeters(25), // 25 yards
+    heightMax: btk.Conversions.yardsToMeters(75), // 75 yards
     distanceMin: btk.Conversions.yardsToMeters(2200), // 2200 yards
     distanceMax: btk.Conversions.yardsToMeters(2500) // 2500 yards
   };
