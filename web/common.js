@@ -137,18 +137,27 @@ function setupCommonPageStructure()
     footer.className = 'site-footer';
     footer.style.cssText = 'margin-top:40px;padding:20px 0;border-top:1px solid #e5e5e5;color:#666;font-size:14px;';
     footer.innerHTML = `
-      <div class="app-container" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
-        <span>© ${new Date().getFullYear()} Ballistics Toolkit</span>
-        <span style="flex:1 1 auto"></span>
-        <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener">GitHub</a>
-        <span>·</span>
-        <a href="${pathPrefix}about.html">About</a>
-        <span>·</span>
-        <a href="${pathPrefix}contact.html">Contact</a>
-        <span>·</span>
-        <a href="${pathPrefix}terms.html">Terms</a>
-        <span>·</span>
-        <a href="${pathPrefix}privacy.html">Privacy</a>
+      <div class="app-container">
+        <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:12px 16px;margin-bottom:20px;border-radius:4px;">
+          <p style="margin:0;color:#856404;font-weight:500;font-size:13px;">
+            <strong>⚠️ Safety Disclaimer:</strong> Ballistics Toolkit provides theoretical ballistic simulations for entertainment and educational use only. 
+            <strong>Not for real shooting decisions.</strong> Do not rely on these simulations for setting real-world dope or live-fire decisions. 
+            <a href="${pathPrefix}terms.html" style="color:#856404;text-decoration:underline;">See full disclaimers</a>.
+          </p>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+          <span>© ${new Date().getFullYear()} Ballistics Toolkit</span>
+          <span style="flex:1 1 auto"></span>
+          <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener">GitHub</a>
+          <span>·</span>
+          <a href="${pathPrefix}about.html">About</a>
+          <span>·</span>
+          <a href="${pathPrefix}contact.html">Contact</a>
+          <span>·</span>
+          <a href="${pathPrefix}terms.html">Terms</a>
+          <span>·</span>
+          <a href="${pathPrefix}privacy.html">Privacy</a>
+        </div>
       </div>`;
     document.body.appendChild(footer);
   }
