@@ -13,6 +13,13 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Spin Effects** - Spin drift and crosswind jump modeling with bullet spin rate calculation
 - **Client-Side Performance** - WebAssembly for fast calculations, no server needed
 
+### ⚖️ Load Comparison
+- **Side-by-Side Comparison** - Compare two loads with drop, velocity, energy, wind drift, and flight time
+- **100-Yard Intervals** - Data at every 100 yards out to your specified max range
+- **Percentage Advantage** - See how much better or worse Bullet 2 is compared to Bullet 1
+- **Flexible Units** - Display drop and drift in MOA, MRAD, or inches
+- **10 mph Crosswind** - Standard crosswind for consistent drift comparison
+
 ### 🎯 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
 - **Target Library** - 14 competitive targets to choose from
@@ -60,6 +67,15 @@ Visit the [Ballistic Calculator](https://www.ballisticstoolkit.com/ballistic-cal
 
 Results display drop and drift corrections (including spin drift) in your choice of milliradians or MOA for precise long-range adjustments.
 
+### Load Comparison
+Visit the [Load Comparison](https://www.ballisticstoolkit.com/load-comp/load-comp.html) to compare two loads:
+
+1. **Bullet 1** - Weight, BC, drag model (G1/G7), muzzle velocity
+2. **Bullet 2** - Weight, BC, drag model (G1/G7), muzzle velocity
+3. **Settings** - Max range, display units (MOA/MRAD/inches)
+
+Results show drop, velocity, energy, wind drift, and flight time for each bullet at 100-yard intervals, with percentage advantage highlighting which load performs better.
+
 ### Target Simulator
 Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/target-sim.html) for match simulation:
 
@@ -79,6 +95,16 @@ Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclas
 4. **Match Format** - Three 20-minute relays, 20 shots each; Relay 1: unlimited sighters until "Go For Record"; Relays 2–3: 2 sighters each
 
 Experience authentic F-Class matches with wind reading (heat mirage and reactive flags), realistic wind simulation, and detailed scoring. Spin drift and crosswind jump are automatically included in trajectory calculations. Use mirage and flags together—mirage leans with crosswind and increases with zoom.
+
+### Steel Target Simulator
+Visit the [Steel Target Simulator](https://www.ballisticstoolkit.com/steel-sim/steel-sim.html) for interactive steel shooting:
+
+1. **Bullet Setup** - BC, muzzle velocity, diameter, weight, twist rate, MV variation, rifle accuracy
+2. **Environment** - Wind preset selection, optional mirage effects
+3. **Controls** - Click scope to enter, mouse to aim, click to fire, Tab to switch scopes, Esc to exit
+4. **Targets** - Steel plates from 100 to 1760 yards with reactive physics and impact feedback
+
+Shoot reactive steel targets with realistic ballistics, dust effects, and audio feedback. Optional hunting mode adds prairie dogs and boars.
 
 ## Building from Source
 

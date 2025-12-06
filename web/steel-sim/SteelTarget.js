@@ -6,7 +6,7 @@ import
 from './config.js';
 
 // Atlas configuration - texture is 2x width for front/back halves
-const ATLAS_TILE_WIDTH = 1024;  // 2x for front/back
+const ATLAS_TILE_WIDTH = 1024; // 2x for front/back
 const ATLAS_TILE_HEIGHT = 512;
 
 /**
@@ -58,9 +58,9 @@ export class SteelTarget
 
     // Target index in merged geometry (assigned by factory)
     this.targetIndex = null;
-    this.vertexOffset = null;   // Offset in merged vertex buffer
-    this.vertexCount = null;    // Number of vertices for this target
-    this.atlasOffset = null;    // Offset in atlas (y position)
+    this.vertexOffset = null; // Offset in merged vertex buffer
+    this.vertexCount = null; // Number of vertices for this target
+    this.atlasOffset = null; // Offset in atlas (y position)
 
     // Calculate attachment points
     let attachmentX, attachmentY;
@@ -413,28 +413,30 @@ export class SteelTargetFactory
     const geometry = new THREE.BufferGeometry();
 
     // Half dimensions
-    const hw = 0.5, hh = 0.5, hd = 0.5;
+    const hw = 0.5,
+      hh = 0.5,
+      hd = 0.5;
 
     // Vertices: front face (z=-0.5), back face (z=+0.5), and 4 edge faces
     const positions = new Float32Array([
       // Front face (facing -Z) - 2 triangles
-      -hw, -hh, -hd,  hw, -hh, -hd,  hw,  hh, -hd,
-      -hw, -hh, -hd,  hw,  hh, -hd, -hw,  hh, -hd,
+      -hw, -hh, -hd, hw, -hh, -hd, hw, hh, -hd,
+      -hw, -hh, -hd, hw, hh, -hd, -hw, hh, -hd,
       // Back face (facing +Z) - 2 triangles
-      hw, -hh,  hd, -hw, -hh,  hd, -hw,  hh,  hd,
-      hw, -hh,  hd, -hw,  hh,  hd,  hw,  hh,  hd,
+      hw, -hh, hd, -hw, -hh, hd, -hw, hh, hd,
+      hw, -hh, hd, -hw, hh, hd, hw, hh, hd,
       // Bottom edge (facing -Y)
-      -hw, -hh, -hd, -hw, -hh,  hd,  hw, -hh,  hd,
-      -hw, -hh, -hd,  hw, -hh,  hd,  hw, -hh, -hd,
+      -hw, -hh, -hd, -hw, -hh, hd, hw, -hh, hd,
+      -hw, -hh, -hd, hw, -hh, hd, hw, -hh, -hd,
       // Top edge (facing +Y)
-      -hw,  hh,  hd, -hw,  hh, -hd,  hw,  hh, -hd,
-      -hw,  hh,  hd,  hw,  hh, -hd,  hw,  hh,  hd,
+      -hw, hh, hd, -hw, hh, -hd, hw, hh, -hd,
+      -hw, hh, hd, hw, hh, -hd, hw, hh, hd,
       // Left edge (facing -X)
-      -hw, -hh,  hd, -hw, -hh, -hd, -hw,  hh, -hd,
-      -hw, -hh,  hd, -hw,  hh, -hd, -hw,  hh,  hd,
+      -hw, -hh, hd, -hw, -hh, -hd, -hw, hh, -hd,
+      -hw, -hh, hd, -hw, hh, -hd, -hw, hh, hd,
       // Right edge (facing +X)
-      hw, -hh, -hd,  hw, -hh,  hd,  hw,  hh,  hd,
-      hw, -hh, -hd,  hw,  hh,  hd,  hw,  hh, -hd,
+      hw, -hh, -hd, hw, -hh, hd, hw, hh, hd,
+      hw, -hh, -hd, hw, hh, hd, hw, hh, -hd,
     ]);
 
     // UVs: texture is 2x width - left half (u=0-0.5) for front, right half (u=0.5-1) for back
@@ -442,14 +444,14 @@ export class SteelTargetFactory
     const uvs = new Float32Array([
       // Front face - uses left half of texture (u=0 to 0.5)
       // Vertices: (-hw,-hh,-hd), (hw,-hh,-hd), (hw,hh,-hd), (-hw,-hh,-hd), (hw,hh,-hd), (-hw,hh,-hd)
-      0, 0,    0.5, 0,    0.5, 1,
-      0, 0,    0.5, 1,    0, 1,
+      0, 0, 0.5, 0, 0.5, 1,
+      0, 0, 0.5, 1, 0, 1,
       // Back face - uses right half of texture (u=0.5 to 1.0)
       // Vertices: (hw,-hh,hd), (-hw,-hh,hd), (-hw,hh,hd), (hw,-hh,hd), (-hw,hh,hd), (hw,hh,hd)
       // When viewed from +Z: (hw,-hh) is RIGHT, (-hw,-hh) is LEFT
       // Map so right side gets u=1, left side gets u=0.5
-      1, 0,    0.5, 0,    0.5, 1,
-      1, 0,    0.5, 1,    1, 1,
+      1, 0, 0.5, 0, 0.5, 1,
+      1, 0, 0.5, 1, 1, 1,
       // Edge faces - negative UVs to signal "no texture"
       -1, -1, -1, -1, -1, -1,
       -1, -1, -1, -1, -1, -1,
@@ -480,7 +482,9 @@ export class SteelTargetFactory
     const positions = [];
     const uvs = [];
 
-    const rx = 0.5, ry = 0.5, hd = 0.5; // Half dimensions
+    const rx = 0.5,
+      ry = 0.5,
+      hd = 0.5; // Half dimensions
 
     // Front face (z = -hd) - triangle fan from center
     // Uses left half of texture (u=0 to 0.5)
@@ -489,8 +493,10 @@ export class SteelTargetFactory
       const angle1 = (2 * Math.PI * i) / segments;
       const angle2 = (2 * Math.PI * (i + 1)) / segments;
 
-      const cos1 = Math.cos(angle1), sin1 = Math.sin(angle1);
-      const cos2 = Math.cos(angle2), sin2 = Math.sin(angle2);
+      const cos1 = Math.cos(angle1),
+        sin1 = Math.sin(angle1);
+      const cos2 = Math.cos(angle2),
+        sin2 = Math.sin(angle2);
 
       // Triangle: center, v1, v2
       positions.push(0, 0, -hd);
@@ -498,7 +504,7 @@ export class SteelTargetFactory
       positions.push(rx * cos2, ry * sin2, -hd);
 
       // UVs: map to left half (u=0 to 0.5)
-      uvs.push(0.25, 0.5);  // center at u=0.25
+      uvs.push(0.25, 0.5); // center at u=0.25
       uvs.push(0.25 + cos1 * 0.25, 0.5 + sin1 * 0.5);
       uvs.push(0.25 + cos2 * 0.25, 0.5 + sin2 * 0.5);
     }
@@ -510,8 +516,10 @@ export class SteelTargetFactory
       const angle1 = (2 * Math.PI * i) / segments;
       const angle2 = (2 * Math.PI * (i + 1)) / segments;
 
-      const cos1 = Math.cos(angle1), sin1 = Math.sin(angle1);
-      const cos2 = Math.cos(angle2), sin2 = Math.sin(angle2);
+      const cos1 = Math.cos(angle1),
+        sin1 = Math.sin(angle1);
+      const cos2 = Math.cos(angle2),
+        sin2 = Math.sin(angle2);
 
       // Triangle: center, v2, v1 (reversed for correct facing)
       positions.push(0, 0, hd);
@@ -520,7 +528,7 @@ export class SteelTargetFactory
 
       // UVs: map to right half (u=0.5 to 1.0)
       // Right side (cos=1) maps to u=1, left side (cos=-1) maps to u=0.5
-      uvs.push(0.75, 0.5);  // center at u=0.75
+      uvs.push(0.75, 0.5); // center at u=0.75
       uvs.push(0.75 + cos2 * 0.25, 0.5 + sin2 * 0.5);
       uvs.push(0.75 + cos1 * 0.25, 0.5 + sin1 * 0.5);
     }
@@ -531,11 +539,15 @@ export class SteelTargetFactory
       const angle1 = (2 * Math.PI * i) / segments;
       const angle2 = (2 * Math.PI * (i + 1)) / segments;
 
-      const cos1 = Math.cos(angle1), sin1 = Math.sin(angle1);
-      const cos2 = Math.cos(angle2), sin2 = Math.sin(angle2);
+      const cos1 = Math.cos(angle1),
+        sin1 = Math.sin(angle1);
+      const cos2 = Math.cos(angle2),
+        sin2 = Math.sin(angle2);
 
-      const x1 = rx * cos1, y1 = ry * sin1;
-      const x2 = rx * cos2, y2 = ry * sin2;
+      const x1 = rx * cos1,
+        y1 = ry * sin1;
+      const x2 = rx * cos2,
+        y2 = ry * sin2;
 
       // Two triangles for the edge quad
       positions.push(x1, y1, -hd);
@@ -563,7 +575,8 @@ export class SteelTargetFactory
    */
   static createInstancedMaterial()
   {
-    const material = new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshStandardMaterial(
+    {
       side: THREE.DoubleSide,
       roughness: 0.7,
       metalness: 0.1,
@@ -572,7 +585,8 @@ export class SteelTargetFactory
       polygonOffsetUnits: -1
     });
 
-    material.onBeforeCompile = (shader) => {
+    material.onBeforeCompile = (shader) =>
+    {
       // Add per-instance target index attribute and varying
       shader.vertexShader = `
         attribute float instanceTargetIndex;
@@ -591,7 +605,9 @@ export class SteelTargetFactory
       );
 
       // Add texture array uniform
-      shader.uniforms.mapArray = { value: this.atlasTexture };
+      shader.uniforms.mapArray = {
+        value: this.atlasTexture
+      };
 
       shader.fragmentShader = `
         uniform sampler2DArray mapArray;
@@ -664,7 +680,11 @@ export class SteelTargetFactory
       targetIndexArray[i] = target.targetIndex;
 
       // Store instance info for updates
-      this.instanceData.set(target, { instanceId: i, isOval: target.steelTarget.isOval() });
+      this.instanceData.set(target,
+      {
+        instanceId: i,
+        isOval: target.steelTarget.isOval()
+      });
     }
 
     // Add target index as instanced attribute
@@ -687,7 +707,8 @@ export class SteelTargetFactory
     const chainGeometry = new THREE.CylinderGeometry(chainRadius, chainRadius, 1.0, 8);
     chainGeometry.computeVertexNormals();
 
-    const chainMaterial = new THREE.MeshStandardMaterial({
+    const chainMaterial = new THREE.MeshStandardMaterial(
+    {
       color: 0x666666,
       roughness: 0.5,
       metalness: 0.6
@@ -719,7 +740,11 @@ export class SteelTargetFactory
     const instanceInfo = this.instanceData.get(target);
     if (!instanceInfo) return;
 
-    const { instanceId, isOval } = instanceInfo;
+    const
+    {
+      instanceId,
+      isOval
+    } = instanceInfo;
     const instancedMesh = isOval ? this.ovalInstancedMesh : this.rectInstancedMesh;
     if (!instancedMesh) return;
 
@@ -750,7 +775,7 @@ export class SteelTargetFactory
     const layerIndex = target.atlasOffset;
     const pixelsPerLayer = ATLAS_TILE_WIDTH * ATLAS_TILE_HEIGHT * 4;
     const layerOffset = layerIndex * pixelsPerLayer;
-    
+
     this.atlasData.set(srcData, layerOffset);
     this.atlasTexture.needsUpdate = true;
   }

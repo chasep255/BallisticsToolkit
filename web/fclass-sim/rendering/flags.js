@@ -318,7 +318,8 @@ export class FlagRenderer
   createFlagAtPosition(xPosition, zPosition)
   {
     // Store pole position for later instancing
-    this.polePositions.push({
+    this.polePositions.push(
+    {
       x: xPosition,
       y: this.cfg.poleHeight / 2,
       z: zPosition

@@ -416,7 +416,7 @@ class SteelSimulator
     SteelTargetFactory.deleteAll();
     TargetRackFactory.deleteAll();
     DustCloudFactory.dispose(); // Full dispose to allow re-initialization
-    BulletGlowPool.dispose();   // Full dispose to allow re-initialization
+    BulletGlowPool.dispose(); // Full dispose to allow re-initialization
     WindFlagFactory.deleteAll();
     RangeSignFactory.deleteAll();
     BermFactory.deleteAll();
@@ -619,7 +619,7 @@ class SteelSimulator
     // Check for debug mode once at the start
     const urlParams = new URLSearchParams(window.location.search);
     const debugMode = urlParams.get('debug') === '1';
-    
+
     // Create scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb);
@@ -841,12 +841,13 @@ class SteelSimulator
       const btk = window.btk;
       const range1000yd = btk.Conversions.yardsToMeters(1000);
       const cubeZ = -range1000yd; // 1000 yards downrange
-      
+
       // 8 MRAD square at 1000 yards
       // angle = 8 mrad = 8 / 1000 rad, size = angle * distance
       const cube8MradSize = range1000yd * (8.0 / 1000.0);
       const cube8MradGeom = new THREE.PlaneGeometry(cube8MradSize, cube8MradSize);
-      const cube4YardMat = new THREE.MeshBasicMaterial({
+      const cube4YardMat = new THREE.MeshBasicMaterial(
+      {
         color: 0x00ff00, // Bright green
         wireframe: false, // Solid for visibility
         transparent: true,
@@ -858,13 +859,14 @@ class SteelSimulator
       cube8Mrad.renderOrder = 1000; // Render on top
       this.scene.add(cube8Mrad);
       this.debugCube4Yard = cube8Mrad;
-      
+
       // 10 MOA square at 1000 yards
       // angle = moaToRadians(10), size = angle * distance
       const angle10MoaRad = btk.Conversions.moaToRadians(10.0);
       const cube10MoaSize = angle10MoaRad * range1000yd;
       const cube4MOAGeom = new THREE.PlaneGeometry(cube10MoaSize, cube10MoaSize);
-      const cube4MOAMat = new THREE.MeshBasicMaterial({
+      const cube4MOAMat = new THREE.MeshBasicMaterial(
+      {
         color: 0xff00ff, // Bright magenta
         wireframe: false, // Solid for visibility
         transparent: true,
@@ -876,7 +878,7 @@ class SteelSimulator
       cube4MOA.renderOrder = 1000; // Render on top
       this.scene.add(cube4MOA);
       this.debugCube4MOA = cube4MOA;
-      
+
       console.log(`[Debug] Created 8 mrad square (${cube8MradSize.toFixed(3)}m) at 1000 yards, position (${cube8Mrad.position.x.toFixed(1)}, ${cube8Mrad.position.y.toFixed(1)}, ${cubeZ.toFixed(1)})`);
       console.log(`[Debug] Created 10 MOA square (${cube10MoaSize.toFixed(3)}m) at 1000 yards, position (${cube4MOA.position.x.toFixed(1)}, ${cube4MOA.position.y.toFixed(1)}, ${cubeZ.toFixed(1)})`);
     }
@@ -1239,7 +1241,8 @@ class SteelSimulator
     if (!this.landscape) return;
 
     // Collect flag positions from configuration
-    const positions = Config.WIND_FLAGS.map(flagConfig => ({
+    const positions = Config.WIND_FLAGS.map(flagConfig => (
+    {
       x: flagConfig.x,
       y: this.landscape.getHeightAt(flagConfig.x, flagConfig.z) || 0,
       z: flagConfig.z
@@ -1492,7 +1495,7 @@ class SteelSimulator
     // Prevent context menu when right-clicking on scopes
     const norm = this.compositionRenderer.screenToNormalized(event.clientX, event.clientY);
     if ((this.scope && this.scope.isPointInside(norm.x, norm.y)) ||
-        (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y)))
+      (this.spottingScope && this.spottingScope.isPointInside(norm.x, norm.y)))
     {
       event.preventDefault();
     }
@@ -1506,15 +1509,15 @@ class SteelSimulator
   {
     // Only update borders in desktop mode (not mobile)
     if (!this.scopeLayer || !this.spottingScopeLayer) return;
-    
+
     const activeBorderColor = 0x8b0000; // Dull red (dark red)
     const inactiveBorderColor = 0x000000; // Black (default)
     const borderWidth = 0.015; // Border width in normalized coordinates
-    
+
     // Update rifle scope border
     const rifleBorderColor = this.activeScope === 'rifle' ? activeBorderColor : inactiveBorderColor;
     this.updateScopeLayerBorder(this.scopeLayer, rifleBorderColor, borderWidth);
-    
+
     // Update spotting scope border
     const spottingBorderColor = this.activeScope === 'spotting' ? activeBorderColor : inactiveBorderColor;
     this.updateScopeLayerBorder(this.spottingScopeLayer, spottingBorderColor, borderWidth);
@@ -1526,7 +1529,7 @@ class SteelSimulator
   updateScopeLayerBorder(layer, borderColor, borderWidth)
   {
     if (!layer || !layer._mesh) return;
-    
+
     // Remove existing border if present
     if (layer._borderMesh)
     {
@@ -1538,21 +1541,22 @@ class SteelSimulator
       if (layer._borderMesh.material) layer._borderMesh.material.dispose();
       layer._borderMesh = null;
     }
-    
+
     // Only add border if it's the active scope (dull red)
     if (borderColor === 0x000000) return;
-    
+
     // Create border ring geometry
     const positions = layer._mesh.position;
     const width = layer.width;
     const height = layer.height;
-    
+
     // Create a ring geometry for the border (using normalized coordinates)
     const outerRadius = Math.min(width, height) / 2;
     const innerRadius = Math.max(0.01, outerRadius - borderWidth);
     const borderGeometry = new THREE.RingGeometry(innerRadius, outerRadius, 64);
-    
-    const borderMaterial = new THREE.MeshBasicMaterial({
+
+    const borderMaterial = new THREE.MeshBasicMaterial(
+    {
       color: borderColor,
       transparent: true,
       opacity: 0.6,
@@ -1560,12 +1564,12 @@ class SteelSimulator
       depthWrite: false,
       side: THREE.DoubleSide
     });
-    
+
     const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial);
     borderMesh.position.set(positions.x, positions.y, positions.z + 0.001); // Slightly in front
     borderMesh.renderOrder = layer._mesh.renderOrder + 1;
     borderMesh.frustumCulled = false;
-    
+
     // Add to composition scene (same parent as the scope layer mesh)
     if (layer._mesh.parent)
     {
@@ -1648,7 +1652,7 @@ class SteelSimulator
     const locked = document.pointerLockElement === this.canvas;
     this.scopeMode = locked;
     this.canvas.style.cursor = locked ? 'none' : 'default';
-    
+
     if (locked)
     {
       // When entering scope mode, set activeScope from pendingActiveScope (set by click handler)
@@ -1662,7 +1666,7 @@ class SteelSimulator
       this.activeScope = null;
       this.pendingActiveScope = null; // Also clear pending in case lock failed
     }
-    
+
     this.updateScopeBorders();
   }
 
@@ -1675,7 +1679,7 @@ class SteelSimulator
       {
         return; // Only work when in pointer lock mode
       }
-      
+
       event.preventDefault();
       if (this.activeScope === 'rifle')
       {
@@ -2868,7 +2872,7 @@ async function restartGame()
   {
     // Explicitly save current UI values to cookies (in case auto-save didn't fire)
     SettingsCookies.saveAll();
-    
+
     // Get current parameters
     const params = getGameParams();
 
@@ -3122,7 +3126,7 @@ document.addEventListener('DOMContentLoaded', async () =>
   {
     // Set default values immediately (before BTK loads)
     setDefaultValues();
-    
+
     // Get start button and show loading state
     const startBtn = document.getElementById('startBtn');
     if (startBtn)
@@ -3152,7 +3156,7 @@ document.addEventListener('DOMContentLoaded', async () =>
     setupUI();
 
     // Attach auto-save listeners to all settings inputs
-    
+
 
     // Try to lock orientation to landscape (may require user gesture on some browsers)
     // Also try on first user interaction since many browsers require a gesture

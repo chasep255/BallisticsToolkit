@@ -13,6 +13,10 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.ballisticstoolkit.com/load-comp/load-comp.html</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://www.ballisticstoolkit.com/target-sim/target-sim.html</loc>
     <priority>0.7</priority>
   </url>

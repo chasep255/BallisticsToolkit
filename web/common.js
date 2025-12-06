@@ -44,6 +44,7 @@ function setActiveNavLink()
   const pageNavMap = {
     'index': 'index.html',
     'ballistic-calc': 'ballistic-calc/ballistic-calc.html',
+    'load-comp': 'load-comp/load-comp.html',
     'target-sim': 'target-sim/target-sim.html',
     'wind-sim': 'wind-sim/wind-sim.html',
     'steel-sim': 'steel-sim/steel-sim.html',
@@ -78,6 +79,7 @@ function generateNavigation(currentPageName)
   // Determine active states
   const isHome = currentPageName === 'index';
   const isBallisticCalc = currentPageName === 'ballistic-calc';
+  const isLoadComp = currentPageName === 'load-comp';
   const isTargetSim = currentPageName === 'target-sim';
   const isWindSim = currentPageName === 'wind-sim';
   const isSteelSim = currentPageName === 'steel-sim';
@@ -92,6 +94,7 @@ function generateNavigation(currentPageName)
             </a>
             <div class="nav-links">
                 <a href="${pathPrefix}ballistic-calc/ballistic-calc.html" ${isBallisticCalc ? 'class="active"' : ''}>Ballistic Calc</a>
+                <a href="${pathPrefix}load-comp/load-comp.html" ${isLoadComp ? 'class="active"' : ''}>Load Comp</a>
                 <a href="${pathPrefix}target-sim/target-sim.html" ${isTargetSim ? 'class="active"' : ''}>Target Sim</a>
                 <a href="${pathPrefix}wind-sim/wind-sim.html" ${isWindSim ? 'class="active"' : ''}>Wind Sim</a>
                 <a href="${pathPrefix}steel-sim/steel-sim.html" ${isSteelSim ? 'class="active"' : ''}>Steel Sim</a>

@@ -183,7 +183,7 @@ export class BallisticsTable
   {
     if (this.dropTable.length === 0) return 0;
     if (range_m <= 0) return 0;
-    
+
     // Find the two entries to interpolate between
     let prevEntry = this.dropTable[0];
     for (let i = 1; i < this.dropTable.length; i++)
@@ -197,7 +197,7 @@ export class BallisticsTable
       }
       prevEntry = entry;
     }
-    
+
     // Beyond table range, return last entry's drop
     return prevEntry.drop_mrad;
   }

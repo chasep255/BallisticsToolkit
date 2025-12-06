@@ -53,7 +53,7 @@ export class AudioManager
     this.scheduledSources = new Set(); // Track scheduled sources for cleanup
     this.loopingSources = new Map(); // Map<soundId, {source, gainNode}>
     this.loadingProgress = 0;
-    
+
     // Pre-created gain nodes for instant playback (node pooling)
     this.gainNodePool = [];
     this.poolSize = 10; // Pre-create 10 gain nodes
@@ -70,7 +70,7 @@ export class AudioManager
     {
       this.audioContext = new(window.AudioContext || window.webkitAudioContext)();
       console.log(`${LOG_PREFIX} Audio context created (sample rate: ${this.audioContext.sampleRate}Hz)`);
-      
+
       // Initialize gain node pool for low-latency playback
       this.initializeGainNodePool();
     }
@@ -89,14 +89,14 @@ export class AudioManager
 
     return this.audioContext;
   }
-  
+
   /**
    * Pre-create gain nodes for instant playback (reduces latency on mobile)
    */
   initializeGainNodePool()
   {
     if (!this.audioContext) return;
-    
+
     this.gainNodePool = [];
     for (let i = 0; i < this.poolSize; i++)
     {
@@ -104,10 +104,10 @@ export class AudioManager
       gainNode.connect(this.audioContext.destination);
       this.gainNodePool.push(gainNode);
     }
-    
+
     console.log(`${LOG_PREFIX} Pre-created ${this.poolSize} gain nodes for low-latency playback`);
   }
-  
+
   /**
    * Get a gain node from the pool (or create new if pool is empty)
    */
@@ -117,13 +117,13 @@ export class AudioManager
     {
       return this.gainNodePool.pop();
     }
-    
+
     // Pool exhausted, create a new one
     const gainNode = this.audioContext.createGain();
     gainNode.connect(this.audioContext.destination);
     return gainNode;
   }
-  
+
   /**
    * Return a gain node to the pool for reuse
    */

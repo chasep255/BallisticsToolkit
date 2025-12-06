@@ -49,10 +49,10 @@ function fovDegFromFeetAtSpecDistance(widthFeet)
 export class Scope
 {
   // Scope geometry constants (in NDC space, orthographic camera bounds [-1, 1])
-  static SCOPE_MASK_RADIUS = 0.98;        // Stencil mask radius (visible scope circle edge)
-  static SCOPE_OVERLAP = 0.005;           // Overlap between scope circle and mask (prevents gap)
-  static SCOPE_CIRCLE_RADIUS = 0.985;     // Scope texture circle radius (SCOPE_MASK_RADIUS + SCOPE_OVERLAP)
-  static HOUSING_OUTER_RADIUS = 1.0;      // Housing ring outer radius
+  static SCOPE_MASK_RADIUS = 0.98; // Stencil mask radius (visible scope circle edge)
+  static SCOPE_OVERLAP = 0.005; // Overlap between scope circle and mask (prevents gap)
+  static SCOPE_CIRCLE_RADIUS = 0.985; // Scope texture circle radius (SCOPE_MASK_RADIUS + SCOPE_OVERLAP)
+  static HOUSING_OUTER_RADIUS = 1.0; // Housing ring outer radius
 
   constructor(config)
   {
@@ -925,7 +925,7 @@ export class Scope
 
       // Create instanced mesh after collecting all line data
       this.createInstancedReticle();
-      
+
       // Create drop indicator (red circle showing predicted bullet drop) - only if BDC enabled
       if (this.bdcEnabled)
       {
@@ -1008,14 +1008,14 @@ export class Scope
   mradToHudY(mrad, fovDeg = null)
   {
     const angleRad = mrad * 0.001; // mrad → rad
-    const fovRad = fovDeg !== null 
-      ? THREE.MathUtils.degToRad(fovDeg) 
-      : this.getFovRad(); // Use specified FOV or current FOV
-    
+    const fovRad = fovDeg !== null ?
+      THREE.MathUtils.degToRad(fovDeg) :
+      this.getFovRad(); // Use specified FOV or current FOV
+
     // Use exact perspective projection: tan(angle) / tan(fov/2)
     // For small angles, tan(θ) ≈ θ, but we use exact formula for precision
     const y_ndc = Math.tan(angleRad) / Math.tan(fovRad / 2);
-    
+
     // Convert NDC [-1, 1] to HUD space using scope mask radius
     // HUD space is orthographic with scope circle radius = SCOPE_MASK_RADIUS
     return y_ndc * Scope.SCOPE_MASK_RADIUS;
@@ -1347,20 +1347,20 @@ export class Scope
     // at the current FOV. For FFP behavior, we need to rebuild the reticle when FOV changes.
     // However, rebuilding every frame would be expensive, so we use a scale factor that
     // approximates the FFP behavior while maintaining angular accuracy.
-    
+
     // The scale factor accounts for the change in FOV:
     // At new FOV, the same mrad angle projects to a different HUD position.
     // Scale = tan(fov_old/2) / tan(fov_new/2)
     const fovOldRad = THREE.MathUtils.degToRad(this.initialFOV);
     const fovNewRad = this.getFovRad();
-    
+
     // Use exact perspective projection scaling
     const scale = Math.tan(fovOldRad / 2) / Math.tan(fovNewRad / 2);
-    
+
     // For small FOV changes, this is approximately: initialFOV / currentFOV
     // But we use the exact formula for precision
     this.reticleGroup.scale.set(scale, scale, 1);
-    
+
     // Drop indicator position is calculated at initialFOV, so it scales automatically
     // with reticleGroup. We only need to update it when focal distance changes,
     // not when FOV changes (the group scale handles FFP).
@@ -1375,24 +1375,25 @@ export class Scope
   createDropIndicator()
   {
     if (!this.reticleGroup || !this.ballisticsTable) return;
-    
+
     // Create canvas for circle rendering
     const canvas = document.createElement('canvas');
     const size = 128; // Canvas size for circle
     canvas.width = size;
     canvas.height = size;
     this.dropIndicatorCanvas = canvas;
-    
+
     const ctx = canvas.getContext('2d');
     this.dropIndicatorCtx = ctx;
-    
+
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     this.dropIndicatorTexture = texture;
-    
+
     // Create plane geometry material
-    const planeMaterial = new THREE.MeshBasicMaterial({
+    const planeMaterial = new THREE.MeshBasicMaterial(
+    {
       map: texture,
       transparent: true,
       depthTest: false,
@@ -1404,21 +1405,21 @@ export class Scope
       stencilZPass: THREE.KeepStencilOp
     });
     this.dropIndicatorMaterial = planeMaterial;
-    
+
     // Create plane geometry for circle (0.30 mrad diameter = 0.15 mrad radius)
     // Calculate at initialFOV so it scales correctly with reticleGroup (FFP behavior)
     const radiusMrad = 0.15;
     const radiusHud = this.mradToHudY(radiusMrad, this.initialFOV);
     const planeSize = radiusHud * 2; // Diameter
-    
+
     const planeGeom = new THREE.PlaneGeometry(planeSize, planeSize);
     const planeMesh = new THREE.Mesh(planeGeom, planeMaterial);
     planeMesh.position.set(0, 0, 0.01); // Slightly in front of reticle
-    
+
     this.dropIndicatorMesh = planeMesh;
     // Add to reticleGroup so it scales consistently with the rest of the reticle (FFP)
     this.reticleGroup.add(planeMesh);
-    
+
     // Initial update
     this.updateDropIndicator();
   }
@@ -1431,44 +1432,44 @@ export class Scope
   updateDropIndicator()
   {
     if (!this.dropIndicatorMesh || !this.ballisticsTable || !this.dropIndicatorCanvas || !this.dropIndicatorCtx || !this.dropIndicatorTexture) return;
-    
+
     const ctx = this.dropIndicatorCtx;
     const canvas = this.dropIndicatorCanvas;
-    
+
     // Clear canvas with transparent background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     // Get dialed elevation angle (not holdover) in mrad
     const dialedElevation_mrad = this.hasDials ? this.elevationClicks * this.MINOR_CLICK_MRAD : 0;
-    
+
     // Get drop in mrad for current focal distance at zero elevation
     // The drop table gives drop relative to line of sight at zero elevation
     const dropAtZero_mrad = this.ballisticsTable.getDropForRange(this.focalDistance);
-    
+
     // When elevation is dialed, the reticle is pointing at a different angle.
     // The drop table assumes zero elevation, so we need to account for the dial offset.
     // If dialed up (positive elevation), the reticle moved up, so drop relative to reticle increases.
     // Formula: drop_relative_to_reticle = drop_at_zero - dialed_elevation
     const dropRelativeToReticle_mrad = dropAtZero_mrad + dialedElevation_mrad;
-    
+
     // Convert to HUD space at initialFOV (like reticle lines)
     // This ensures the drop indicator scales correctly with reticleGroup (FFP behavior)
     // Drop is negative (bullet drops below line of sight), so indicator goes below crosshair
     const dropHud = this.mradToHudY(dropRelativeToReticle_mrad, this.initialFOV);
-    
+
     // Position on vertical crosshair (x=0, y=drop)
     // Position is in reticleGroup space, so it will be scaled by reticleGroup.scale
     this.dropIndicatorMesh.position.set(0, dropHud, 0.01);
-    
+
     // Draw circle with glow effect (matching range finder text style)
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     const radius = canvas.width / 2 - 4; // Leave small margin
-    
+
     // Digital red color (#ff0000) with glow effect
     const redColor = '#ff0000';
     const glowColor = '#ff6666';
-    
+
     // Draw glow effect using shadowBlur
     ctx.shadowBlur = 8;
     ctx.shadowColor = redColor;
@@ -1476,14 +1477,14 @@ export class Scope
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // Draw main circle in bright red
     ctx.shadowBlur = 0;
     ctx.fillStyle = redColor;
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // Update texture
     this.dropIndicatorTexture.needsUpdate = true;
   }
@@ -1908,15 +1909,15 @@ export class Scope
     canvas.width = 512;
     canvas.height = 128;
     this.focalDistanceCanvas = canvas;
-    
+
     const ctx = canvas.getContext('2d');
     this.focalDistanceCtx = ctx;
-    
+
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     this.focalDistanceTexture = texture;
-    
+
     // Create plane geometry material (more reliable than sprite in orthographic view)
     const planeMaterial = new THREE.MeshBasicMaterial(
     {
@@ -1930,7 +1931,7 @@ export class Scope
       stencilFunc: THREE.EqualStencilFunc,
       stencilZPass: THREE.KeepStencilOp
     });
-    
+
     // Create plane geometry for text
     // Size matches canvas aspect ratio (640x160 = 4:1)
     const planeGeometry = new THREE.PlaneGeometry(0.6, 0.15);
@@ -1939,15 +1940,15 @@ export class Scope
     // Position at (0.5, -0.5) to ensure it's well within the circle: sqrt(0.5^2 + 0.5^2) ≈ 0.71 < 1.0
     textMesh.position.set(0.5, -0.5, 0.05);
     textMesh.renderOrder = 100; // Render after reticle
-    
+
     // Add directly to internalScene to ensure it renders
     this.internalScene.add(textMesh);
     this.focalDistanceMesh = textMesh;
-    
+
     // Initial update
     this.updateFocalDistanceText();
   }
-  
+
   /**
    * Update the focal distance text display
    */
@@ -1957,40 +1958,40 @@ export class Scope
     {
       return;
     }
-    
+
     const ctx = this.focalDistanceCtx;
     const canvas = this.focalDistanceCanvas;
-    
+
     // Clear canvas with transparent background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     // Convert focal distance from meters to yards
     const focalYards = btk.Conversions.metersToYards(this.focalDistance);
-    
+
     // Format text - just the number, no "yd"
     const text = `${Math.round(focalYards)}`;
-    
+
     // Set text style for 7-segment digital display look
     // Use monospace font for digital appearance, much larger size
     ctx.font = 'bold 120px "Courier New", Courier, monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    
+
     // Digital red color (#ff0000) with slight glow effect
     const redColor = '#ff0000';
     const glowColor = '#ff6666';
-    
+
     // Draw glow effect (multiple passes for soft glow)
     ctx.shadowBlur = 8;
     ctx.shadowColor = redColor;
     ctx.fillStyle = glowColor;
     ctx.fillText(text, canvas.width - 20, canvas.height / 2);
-    
+
     // Draw main text in bright red
     ctx.shadowBlur = 0;
     ctx.fillStyle = redColor;
     ctx.fillText(text, canvas.width - 20, canvas.height / 2);
-    
+
     // Update texture
     this.focalDistanceTexture.needsUpdate = true;
   }

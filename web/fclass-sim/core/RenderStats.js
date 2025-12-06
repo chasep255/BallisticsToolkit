@@ -201,4 +201,3 @@ export class RenderStats
     return this.stats;
   }
 }
-

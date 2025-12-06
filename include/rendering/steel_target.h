@@ -162,7 +162,7 @@ namespace btk::rendering
      * @brief Get all chain anchors
      */
     const std::vector<ChainAnchor>& getAnchors() const { return anchors_; }
-    
+
     /**
      * @brief Get all chain anchors (non-const for Emscripten bindings)
      */

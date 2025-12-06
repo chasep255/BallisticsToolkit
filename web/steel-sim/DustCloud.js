@@ -157,13 +157,13 @@ export class DustCloud
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 2; // Render after decals (renderOrder 1) so dust appears on top
     this.mesh.visible = false; // Start hidden
-    
+
     // Only add to scene if requested (for pool initialization, we'll add later)
     if (addToScene && position)
     {
       this.scene.add(this.mesh);
     }
-    
+
     // Initialize state if position provided (for backward compatibility)
     if (position)
     {

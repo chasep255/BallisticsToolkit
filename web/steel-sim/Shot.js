@@ -368,7 +368,7 @@ export class BulletGlowPool
 {
   static POOL_SIZE = 32;
   static BASE_SIZE_YARDS = 1.0; // Base size for pooled glow sprites (Three.js sprite default is 1x1)
-  
+
   static pool = [];
   static scene = null;
   static glowTexture = null;
@@ -410,10 +410,10 @@ export class BulletGlowPool
   static initialize(scene)
   {
     BulletGlowPool.scene = scene;
-    
+
     // Create shared glow texture
     const glowTexture = BulletGlowPool.createGlowTexture();
-    
+
     // Create shared material
     const glowMaterial = new THREE.SpriteMaterial(
     {
@@ -429,8 +429,9 @@ export class BulletGlowPool
       const glowSprite = new THREE.Sprite(glowMaterial);
       glowSprite.scale.set(BulletGlowPool.BASE_SIZE_YARDS, BulletGlowPool.BASE_SIZE_YARDS, 1);
       glowSprite.visible = false;
-      glowSprite.raycast = () => {}; // Disable raycaster interaction
-      
+      glowSprite.raycast = () =>
+      {}; // Disable raycaster interaction
+
       scene.add(glowSprite);
       BulletGlowPool.pool.push(glowSprite);
     }
@@ -452,7 +453,7 @@ export class BulletGlowPool
         return sprite;
       }
     }
-    
+
     // Pool exhausted - log warning
     console.warn(`[BulletGlowPool] Pool exhausted (${BulletGlowPool.POOL_SIZE} bullets active)`);
     return null;
@@ -465,7 +466,7 @@ export class BulletGlowPool
   static release(sprite)
   {
     if (!sprite) return;
-    
+
     // Sprite should already be invisible and scale reset by caller
     // Just verify it's in our pool and ensure it's reset
     if (BulletGlowPool.pool.includes(sprite))

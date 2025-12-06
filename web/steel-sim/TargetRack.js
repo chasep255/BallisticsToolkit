@@ -113,7 +113,8 @@ export class TargetRack
     if (height === undefined || height === null) throw new Error('Height is required');
 
     // Just store the configuration - target created in buildTargets()
-    this.targets.push({
+    this.targets.push(
+    {
       width,
       height,
       thickness,
@@ -141,8 +142,14 @@ export class TargetRack
       const fraction = (i + 0.5) / totalTargets;
       const targetX = this.bottomLeft.x + fraction * (this.topRight.x - this.bottomLeft.x);
 
-      targetConfig.steelTarget = SteelTargetFactory.create({
-        position: { x: targetX, y: this.center.y, z: this.center.z },
+      targetConfig.steelTarget = SteelTargetFactory.create(
+      {
+        position:
+        {
+          x: targetX,
+          y: this.center.y,
+          z: this.center.z
+        },
         width: targetConfig.width,
         height: targetConfig.height,
         thickness: targetConfig.thickness,

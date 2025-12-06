@@ -11,11 +11,9 @@
 namespace btk::rendering
 {
   SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, int texture_size)
-    : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(0.0f, 0.0f, -1.0f),
-      orientation_(btk::math::Quaternion()),
-      velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true),
-      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f),
-      texture_width_(texture_size * 2), texture_height_(texture_size)  // 2x width for front/back halves
+    : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(0.0f, 0.0f, 0.0f), normal_(0.0f, 0.0f, -1.0f), orientation_(btk::math::Quaternion()),
+      velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f),
+      texture_width_(texture_size * 2), texture_height_(texture_size) // 2x width for front/back halves
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
@@ -31,9 +29,8 @@ namespace btk::rendering
 
   SteelTarget::SteelTarget(float width, float height, float thickness, bool is_oval, const btk::math::Vector3D& position, const btk::math::Vector3D& normal, int texture_size)
     : width_(width), height_(height), thickness_(thickness), is_oval_(is_oval), position_(position), normal_(normal.normalized()), orientation_(btk::math::Quaternion()),
-      velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true),
-      time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f),
-      texture_width_(texture_size * 2), texture_height_(texture_size)  // 2x width for front/back halves
+      velocity_ms_(0.0f, 0.0f, 0.0f), angular_velocity_(0.0f, 0.0f, 0.0f), is_moving_(true), time_below_threshold_s_(0.0f), mass_kg_(0.0f), inertia_tensor_(0.0f, 0.0f, 0.0f),
+      texture_width_(texture_size * 2), texture_height_(texture_size) // 2x width for front/back halves
   {
     // Default colors: bright red paint, gray metal
     paint_color_[0] = 255;
