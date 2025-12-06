@@ -1,59 +1,71 @@
-# GitHub Pages headers file
-# Cache assets for 1 day (86400 seconds)
+############################################################
+# 1-HOUR CACHING FOR DYNAMICALLY UPDATED CONTENT
+############################################################
 
-# HTML files - 1 day cache
-/*.html
-  Cache-Control: public, max-age=86400
+# HTML – usually should not be cached long
+/**/*.html
+  Cache-Control: public, max-age=3600, must-revalidate
 
-# JavaScript files - 1 day cache  
-/*.js
-  Cache-Control: public, max-age=86400
+# JavaScript
+/**/*.js
+  Cache-Control: public, max-age=3600, must-revalidate
 
-# WebAssembly files - 1 day cache
-/*.wasm
-  Cache-Control: public, max-age=86400
+# WebAssembly
+/**/*.wasm
+  Cache-Control: public, max-age=3600, must-revalidate
 
-# CSS files - 1 day cache
-/*.css
-  Cache-Control: public, max-age=86400
+# CSS
+/**/*.css
+  Cache-Control: public, max-age=3600, must-revalidate
 
-# Image files - 1 day cache
-/*.png
-  Cache-Control: public, max-age=86400
-/*.jpg
-  Cache-Control: public, max-age=86400
-/*.jpeg
-  Cache-Control: public, max-age=86400
-/*.ico
-  Cache-Control: public, max-age=86400
-/*.svg
-  Cache-Control: public, max-age=86400
-/*.webp
-  Cache-Control: public, max-age=86400
 
-# Audio files - 1 day cache
-/*.mp3
-  Cache-Control: public, max-age=86400
-/*.wav
-  Cache-Control: public, max-age=86400
-/*.ogg
-  Cache-Control: public, max-age=86400
 
-# 3D model files - 1 day cache
-/*.glb
-  Cache-Control: public, max-age=86400
-/*.gltf
-  Cache-Control: public, max-age=86400
+############################################################
+# LONG-TERM CACHING FOR STATIC ASSETS (30 DAYS)
+############################################################
 
-# Data files - 1 day cache
-/*.json
-  Cache-Control: public, max-age=86400
-/*.xml
-  Cache-Control: public, max-age=86400
-/*.txt
-  Cache-Control: public, max-age=86400
+# Images
+/**/*.png
+  Cache-Control: public, max-age=2592000
+/**/*.jpg
+  Cache-Control: public, max-age=2592000
+/**/*.jpeg
+  Cache-Control: public, max-age=2592000
+/**/*.svg
+  Cache-Control: public, max-age=2592000
+/**/*.webp
+  Cache-Control: public, max-age=2592000
+/**/*.ico
+  Cache-Control: public, max-age=2592000
 
-# Global security headers (applied to all paths)
+# Audio
+/**/*.mp3
+  Cache-Control: public, max-age=2592000
+/**/*.wav
+  Cache-Control: public, max-age=2592000
+/**/*.ogg
+  Cache-Control: public, max-age=2592000
+
+# 3D Models
+/**/*.glb
+  Cache-Control: public, max-age=2592000
+/**/*.gltf
+  Cache-Control: public, max-age=2592000
+
+# Data Files
+/**/*.json
+  Cache-Control: public, max-age=2592000
+/**/*.xml
+  Cache-Control: public, max-age=2592000
+/**/*.txt
+  Cache-Control: public, max-age=2592000
+
+
+
+############################################################
+# GLOBAL SECURITY HEADERS
+############################################################
+
 /*
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
