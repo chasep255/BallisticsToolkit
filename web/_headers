@@ -1,21 +1,57 @@
 # GitHub Pages headers file
-# Cache assets for 7 days (604800 seconds)
+# Cache assets for 1 day (86400 seconds)
 
-# HTML files - 7 day cache
+# HTML files - 1 day cache
 /*.html
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=86400
 
-# JavaScript files - 7 day cache  
+# JavaScript files - 1 day cache  
 /*.js
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=86400
 
-# WebAssembly files - 7 day cache
+# WebAssembly files - 1 day cache
 /*.wasm
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=86400
 
-# CSS files - 7 day cache
+# CSS files - 1 day cache
 /*.css
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=86400
+
+# Image files - 1 day cache
+/*.png
+  Cache-Control: public, max-age=86400
+/*.jpg
+  Cache-Control: public, max-age=86400
+/*.jpeg
+  Cache-Control: public, max-age=86400
+/*.ico
+  Cache-Control: public, max-age=86400
+/*.svg
+  Cache-Control: public, max-age=86400
+/*.webp
+  Cache-Control: public, max-age=86400
+
+# Audio files - 1 day cache
+/*.mp3
+  Cache-Control: public, max-age=86400
+/*.wav
+  Cache-Control: public, max-age=86400
+/*.ogg
+  Cache-Control: public, max-age=86400
+
+# 3D model files - 1 day cache
+/*.glb
+  Cache-Control: public, max-age=86400
+/*.gltf
+  Cache-Control: public, max-age=86400
+
+# Data files - 1 day cache
+/*.json
+  Cache-Control: public, max-age=86400
+/*.xml
+  Cache-Control: public, max-age=86400
+/*.txt
+  Cache-Control: public, max-age=86400
 
 # Global security headers (applied to all paths)
 /*
