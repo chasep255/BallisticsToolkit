@@ -226,6 +226,19 @@
                 </div>
                 
                 <div class="help-section">
+                    <h3>Spin Effects</h3>
+                    <div class="param-help">
+                        <strong>Enable Spin Effects:</strong> Check this box to include spin drift and crosswind jump in trajectory calculations. Uncheck to disable these effects and use standard trajectory calculation (wind drift is still included, but spin-induced effects are not).<br><br>
+                        <strong>What are Spin Effects?</strong> When a bullet spins, it experiences additional forces beyond simple wind drift:<br>
+                        • <strong>Spin Drift:</strong> A rightward drift (for right-hand twist) caused by gyroscopic precession. This effect increases with range and is independent of wind direction.<br>
+                        • <strong>Crosswind Jump:</strong> Vertical deflection when crosswinds interact with the spinning bullet, causing it to rise or fall slightly.<br><br>
+                        <strong>Twist Rate:</strong> Enter your barrel twist rate (e.g., 8 for 1:8 twist). Positive values = right-hand twist, negative = left-hand twist. This determines the bullet's spin rate, which affects both spin drift magnitude and direction.<br><br>
+                        <strong>Modeling Approach:</strong> Spin effects use simplified, empirically tuned aerodynamics. The model tracks bullet spin and computes lateral/vertical accelerations from wind, spin, and angle-of-attack dynamics. Right-hand twist yields rightward spin drift; left-hand twist reverses the direction.<br><br>
+                        <strong>Accuracy Note:</strong> These effects are modeled to illustrate expected trends and add realism. They are not a substitute for live-fire data (dope) and may not match all bullet/rifle combinations precisely. For critical applications, verify with actual range testing.
+                    </div>
+                </div>
+                
+                <div class="help-section">
                     <h3>Trajectory Parameters</h3>
                     <div class="param-help">
                         <strong>Max Range:</strong> Maximum distance for trajectory calculation.<br><br>
@@ -239,7 +252,7 @@
                     <div class="param-help">
                         <strong>Range:</strong> Distance in yards from muzzle.<br><br>
                         <strong>Drop:</strong> Vertical bullet drop from line of sight. Positive = below crosshairs, negative = above crosshairs.<br><br>
-                        <strong>Drift:</strong> Horizontal wind deflection including spin drift effects. Spin drift is a rightward drift (for right-hand twist) due to bullet spin.<br><br>
+                        <strong>Drift:</strong> Total horizontal deflection including wind drift and spin drift (if spin effects are enabled). Wind drift depends on wind speed and direction. Spin drift adds a rightward component for right-hand twist barrels.<br><br>
                         <strong>Velocity:</strong> Bullet speed at that range. Decreases due to air resistance.<br><br>
                         <strong>Energy:</strong> Kinetic energy in foot-pounds. Decreases with velocity.<br><br>
                         <strong>Time:</strong> Flight time from muzzle to that range.
@@ -256,20 +269,19 @@
                 </div>
 
                 <div class="help-section">
-                    <h3>Disclaimer</h3>
-                    <div class="param-help">
-                        <strong>Experimental Spin Effects:</strong> Spin drift and crosswind jump are modeled with a simplified, empirically tuned approach. These effects are primarily intended to add realism to the F‑Class simulator and to illustrate expected trends. They are not a substitute for live‑fire data (dope) and may not match all bullet/rifle combinations precisely.
-                    </div>
-                </div>
-
-                <div class="help-section">
                     <h3>Technical Details</h3>
                     <div class="param-help">
                         <strong>Model (4DOF):</strong> Trajectory is integrated with a 4DOF model that tracks position (x,y,z) and spin rate. Integration uses RK2 with small time steps for stability and performance.<br><br>
                         <strong>Drag (G1/G7):</strong> Uses standard empirical drag tables (G1/G7). Air density corrections are applied from temperature, humidity, and altitude to adjust deceleration along the velocity vector.<br><br>
-                        <strong>Spin Effects:</strong> Spin drift and crosswind jump are modeled with simplified, empirically tuned aerodynamics. Lateral and vertical accelerations are computed from local wind, bullet spin, and angle-of-attack dynamics. Right-hand twist yields rightward spin drift; sign flips for left-hand twist.<br><br>
-                        <strong>Moment of Inertia:</strong> Estimated from bullet weight, length, and diameter. Affects how the spinning bullet responds to wind.<br><br>
-                        <strong>Limitations:</strong> Spin aerodynamics are simplified and tuned to typical match bullets rather than derived from full CFD or 6DOF data. Expect qualitative accuracy for spin drift and crosswind jump trends, not a perfect substitute for live-fire dope or more advanced calculators.
+                        <strong>Moment of Inertia:</strong> When spin effects are enabled, moment of inertia is estimated from bullet weight, length, and diameter. This affects how the spinning bullet responds to wind forces.<br><br>
+                        <strong>Limitations:</strong> Spin aerodynamics use simplified models tuned to typical match bullets rather than derived from full CFD or 6DOF data. For critical applications, verify results with live-fire testing.
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3>Disclaimer</h3>
+                    <div class="param-help">
+                        <strong>Accuracy Limitations:</strong> This calculator provides estimates based on mathematical models. Actual trajectory may vary due to bullet manufacturing variations, barrel harmonics, atmospheric micro-variations, and other factors. Always verify critical calculations with live-fire testing (dope) before relying on them for competition or hunting.
                     </div>
                 </div>
             </div>
