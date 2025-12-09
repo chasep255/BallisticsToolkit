@@ -1,6 +1,6 @@
 # Ballistics Toolkit
 
-Client-side web-based ballistics calculator and simulation suite for long-range shooting. Fast, accurate trajectory calculations with atmospheric and wind compensation, spin effects (spin drift and crosswind jump), Monte Carlo target simulation, and interactive F-Class match simulator with wind visualization.
+Client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides trajectory calculations with atmospheric and wind compensation, spin effects, load comparison, Performance Matrix analysis, Monte Carlo target simulation, interactive steel target simulator, and an interactive F-Class match simulator with wind visualization.
 
 **Website:** https://www.ballisticstoolkit.com/  
 **Contact:** admin@ballisticstoolkit.com
@@ -85,7 +85,7 @@ Visit the [Load Comparison](https://www.ballisticstoolkit.com/load-comp/load-com
 Results show drop, velocity, energy, wind drift, and flight time for each bullet at 100-yard intervals, with percentage advantage highlighting which load performs better.
 
 ### Performance Matrix
-Visit the [Performance Matrix](https://www.ballisticstoolkit.com/bc-comp/bc-comp.html) to analyze BC/MV performance:
+Visit the [Performance Matrix](https://www.ballisticstoolkit.com/perf-matrix/perf-matrix.html) to analyze BC/MV performance:
 
 1. **Simulation Settings** - Range, drag model (G1/G7), display units (MOA/MRAD/inches)
 2. **Atmosphere** - Temperature, altitude, humidity
@@ -149,7 +149,7 @@ Opens local server at http://localhost:8001
 - **Language**: C++17 compiled to WebAssembly with Emscripten
 - **Frontend**: Vanilla JavaScript with modern CSS
 - **Performance**: Optimized C++ core with WebGL graphics
-- **Spin Aerodynamics**: 4DOF trajectory with simplified, empirically tuned spin effects (spin drift and crosswind jump); spin rate from twist and muzzle velocity
+- **Spin Aerodynamics**: 4DOF trajectory with simplified, empirically tuned spin effects; spin rate from twist and muzzle velocity
 - **Wind Module**: 2D curl‑noise wind field with presets; realistic, evolving patterns
 - **Match Scoring**: Competitive scoring system with statistics
 - **Deployment**: GitHub Actions auto‑deploys to GitHub Pages

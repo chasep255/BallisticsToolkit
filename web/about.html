@@ -36,42 +36,22 @@
         <div class="content-section">
             <h2>Project Overview</h2>
             <div class="highlight-box">
-                <p><strong>The Ballistics Toolkit</strong> is a client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides trajectory calculations with atmospheric, wind, and spin effects (spin drift and crosswind jump), load comparison, performance matrix analysis, Monte Carlo target simulation, wind visualization, interactive steel target simulator, and an interactive F-Class match simulator. Everything runs in your browser with a high-performance WebAssembly core: explore trajectories, practice wind reading, and simulate matches without installing software.</p>
+                <p><strong>Ballistics Toolkit</strong> is a client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides trajectory calculations with atmospheric, wind, and spin effects, load comparison, Performance Matrix analysis, Monte Carlo target simulation, wind visualization, interactive steel target simulator, and an interactive F‑Class match simulator—all running in your browser without any software installation.</p>
             </div>
         </div>
         
         <div class="content-section">
-            <h2>Features</h2>
-            <div class="feature-grid">
-                <div class="feature-box">
-                    <h3>📊 Ballistic Calculator</h3>
-                    <p>Complete trajectory calculations with environmental factors, wind conditions, multiple drag models, and spin effects.</p>
-                </div>
-                <div class="feature-box">
-                    <h3>⚖️ Load Comparison</h3>
-                    <p>Compare two loads side-by-side with drop, velocity, energy, wind drift, and flight time at 100-yard intervals.</p>
-                </div>
-                <div class="feature-box">
-                    <h3>🎛️ Performance Matrix</h3>
-                    <p>Compare wind drift, drop, and MV sensitivity across different BC and muzzle velocity combinations with color-coded grids.</p>
-                </div>
-                <div class="feature-box">
-                    <h3>🎯 Target Simulator</h3>
-                    <p>Monte Carlo simulation with statistical variability modeling and realistic accuracy assessment.</p>
-                </div>
-                <div class="feature-box">
-                    <h3>🌬️ Wind Simulator</h3>
-                    <p>Real‑time wind field powered by multi‑octave curl noise (Simplex). Powers the Steel and F-Class Simulator's wind flags, mirage effect, and feeds directly into the ballistic calculator used on each shot.</p>
-                </div>
-                <div class="feature-box">
-                    <h3>🎮 F-Class Simulator</h3>
-                    <p>Interactive 3D F‑Class match simulation (300–1000 yards). Real match flow (3× relays with sighters and record fire), mirage effect for wind reading, reactive wind flags, procedural terrain, and a 3D HUD with per‑relay stats and scorecard.</p>
-                </div>
-                <div class="feature-box">
-                    <h3>🔩 Steel Target Simulator</h3>
-                    <p>Interactive steel range built on the same 4DOF ballistics engine as the other tools. Shoot from 100 to 1760 yards (1 mile) at reactive steel racks using a pointer-lock FFP scope with MRAD/MOA selection, optional heat mirage effects, wind presets, and realistic steel target physics with impact marks, dust effects, and a HUD for elevation and windage. Optional hunting mode with prairie dogs and boars.</p>
-                </div>
-            </div>
+            <h2>Tools in the Suite</h2>
+            <p>Ballistics Toolkit currently includes a set of calculators and simulators that share the same WebAssembly ballistics engine:</p>
+            <ul class="tech-list">
+                <li class="tech-item">📊 <strong>Ballistic Calculator</strong> – trajectory tables with G1/G7 drag models, atmosphere, wind, and optional spin effects.</li>
+                <li class="tech-item">⚖️ <strong>Load Comparison</strong> – side‑by‑side comparison of two loads (drop, drift, velocity, energy, time).</li>
+                <li class="tech-item">🎛️ <strong>Performance Matrix</strong> – BC/MV grid showing wind drift, drop, and MV sensitivity with color‑coded cells.</li>
+                <li class="tech-item">🎯 <strong>Target Simulator</strong> – Monte‑Carlo target simulations with realistic accuracy and wind variability.</li>
+                <li class="tech-item">🌬️ <strong>Wind Simulator</strong> – standalone view of the curl‑noise wind field that powers the simulators.</li>
+                <li class="tech-item">🎮 <strong>F‑Class Simulator</strong> – interactive 3D F‑Class match simulator (300–1000 yards) with mirage and flags.</li>
+                <li class="tech-item">🔩 <strong>Steel Target Simulator</strong> – interactive steel range with reactive targets, mirage, hunting mode, and impact visuals.</li>
+            </ul>
         </div>
         
         <div class="content-section">
@@ -82,7 +62,14 @@
                 <li class="tech-item"><strong>Drag Models:</strong> G1 and G7 standard drag functions</li>
                 <li class="tech-item"><strong>Atmosphere:</strong> Uses temperature, humidity, and altitude inputs. Atmospheric pressure is calculated automatically from altitude.</li>
                 <li class="tech-item"><strong>Spin Aerodynamics:</strong> 4DOF trajectory with simplified, empirically tuned spin effects.</li>
-                <li class="tech-item"><strong>Wind Modeling:</strong> 2D curl field from Simplex noise with multi-octave components.</li>
+                <li class="tech-item"><strong>Wind Modeling:</strong> 2D curl field from time varying 3D Simplex noise with multi-octave components.</li>
+                <li class="tech-item"><strong>Focus:</strong> Depth-of-field style blur in the scope view, using a depth texture and thin‑lens model (focal distance, f‑number, sensor width) to weight a separable Gaussian blur.</li>
+                <li class="tech-item"><strong>Mirage:</strong> Post-process heat-shimmer shader that samples 3D simplex noise and the wind field along the line of sight at the focal distance, with distortion strength modulated by FOV, focal distance, and wind speed.</li>
+                <li class="tech-item"><strong>Three.js & Shaders:</strong> WebGL rendering built on Three.js with custom materials and post-processing passes for scopes, mirage, and particle effects.</li>
+                <li class="tech-item"><strong>Steel Target Physics:</strong> Hanging targets with simple rigid-body style motion—momentum transfer, damping, and rotation—so center impacts swing and edge hits induce spin.</li>
+                <li class="tech-item"><strong>Impact & Dust Effects:</strong> Instanced impact marks on steel and ground plus particle-based dust clouds whose visibility responds to impact location, zoom, and environment.</li>
+                <li class="tech-item"><strong>Scopes:</strong> Pointer-lock rifle and spotting scopes with true FFP-style reticles and angular units matched to the underlying ballistics (MRAD/MOA).</li>
+                <li class="tech-item"><strong>Shared Engine:</strong> Calculators, simulators, and the Performance Matrix all use the same underlying ballistics core so results stay consistent between tools.</li>
             </ul>
         </div>
 
