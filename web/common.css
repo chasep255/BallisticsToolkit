@@ -479,8 +479,8 @@ th {
 
 /* Feature grid pattern (for about page and future use) */
 .feature-grid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 15px;
     margin: 20px 0;
 }
@@ -490,8 +490,6 @@ th {
     padding: 15px;
     border-radius: 5px;
     border-left: 3px solid #007bff;
-    flex: 1 1 300px;
-    min-width: 250px;
 }
 
 .feature-box h3 {
@@ -548,6 +546,17 @@ th {
     
     .help-modal-body {
         padding: 15px;
+    }
+    
+    .feature-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Tablet responsive for feature grid */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .feature-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
