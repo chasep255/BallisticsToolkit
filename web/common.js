@@ -140,8 +140,7 @@ function setupCommonPageStructure()
       <div class="app-container">
         <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:12px 16px;margin-bottom:20px;border-radius:4px;">
           <p style="margin:0;color:#856404;font-weight:500;font-size:13px;">
-            <strong>⚠️ Safety Disclaimer:</strong> Ballistics Toolkit provides theoretical ballistic simulations for entertainment and educational use only. 
-            <strong>Not for real shooting decisions.</strong> Do not rely on these simulations for setting real-world dope or live-fire decisions. 
+            <strong>⚠️ Safety Notice:</strong> Ballistics Toolkit may contain errors or inaccuracies. Do not use this tool for any purpose where incorrect ballistic data could create a hazardous or unsafe condition. Real-world use is entirely at your own risk. 
             <a href="${pathPrefix}terms.html" style="color:#856404;text-decoration:underline;">See full disclaimers</a>.
           </p>
         </div>
