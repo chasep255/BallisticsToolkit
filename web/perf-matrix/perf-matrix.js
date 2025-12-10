@@ -30,6 +30,7 @@ function getInputValues()
     range: parseFloat(document.getElementById('range').value),
     dragModel: document.getElementById('dragModel').value,
     units: document.getElementById('units').value,
+    energyUnits: document.getElementById('energyUnits').value,
     temperature: parseFloat(document.getElementById('temperature').value),
     altitude: parseFloat(document.getElementById('altitude').value),
     humidity: parseFloat(document.getElementById('humidity').value),
@@ -67,11 +68,6 @@ function validateInputs(params)
     showError('Range must be positive');
     return false;
   }
-  if (params.crosswind < 0)
-  {
-    showError('Crosswind cannot be negative');
-    return false;
-  }
 
   // Check for reasonable grid sizes
   const bcSteps = Math.floor((params.bcEnd - params.bcStart) / params.bcIncrement) + 1;
@@ -92,7 +88,7 @@ function validateInputs(params)
 }
 
 /**
- * Calculate wind drift grid
+ * Calculate all grids
  */
 function calculateGrid()
 {
@@ -145,16 +141,17 @@ function calculateGrid()
       // Fixed 10 mph crosswind for drift calculations
       const crosswindMph = 10;
 
-      // Calculate drift, drop, and sensitivity grids
-      const driftData = computeGrid(bcValues, mvValues, params.range, crosswindMph, 'drift', 
-                                     dragFunction, temperatureK, altitudeMeters, humidityFraction);
-      const dropData = computeGrid(bcValues, mvValues, params.range, crosswindMph, 'drop', 
-                                    dragFunction, temperatureK, altitudeMeters, humidityFraction);
+      // Compute all data in optimized passes
+      const driftData = computeTrajectoryGrid(bcValues, mvValues, params.range, crosswindMph, 
+                                               dragFunction, temperatureK, altitudeMeters, humidityFraction, 'drift');
+      const mainData = computeTrajectoryGrid(bcValues, mvValues, params.range, 0, 
+                                              dragFunction, temperatureK, altitudeMeters, humidityFraction, 'all');
       const sensitivityData = computeSensitivityGrid(bcValues, mvValues, params.range, 
                                                       dragFunction, temperatureK, altitudeMeters, humidityFraction);
 
       // Display results
-      displayResults(driftData, dropData, sensitivityData, bcValues, mvValues, params);
+      displayResults(driftData, mainData.drop, sensitivityData, mainData.velocity, mainData.energy, 
+                     bcValues, mvValues, params);
 
       document.getElementById('loading').style.display = 'none';
     }
@@ -168,30 +165,37 @@ function calculateGrid()
 }
 
 /**
- * Compute wind drift or drop for each BC/MV combination
+ * Compute trajectory data for each BC/MV combination
+ * Returns drift OR {drop, velocity, energy} depending on mode
  */
-function computeGrid(bcValues, mvValues, rangeYards, crosswindMph, tableType, 
-                     dragFunction, temperatureK, altitudeMeters, humidityFraction)
+function computeTrajectoryGrid(bcValues, mvValues, rangeYards, crosswindMph, 
+                                dragFunction, temperatureK, altitudeMeters, humidityFraction, mode)
 {
   const rangeMeters = btk.Conversions.yardsToMeters(rangeYards);
   const crosswindMps = btk.Conversions.mphToMps(crosswindMph);
 
   // Wind: crosswind from 3 o'clock (wind blowing left, -X direction)
-  // Only apply wind if doing drift table
-  const windX = tableType === 'drift' ? -crosswindMps : 0;
+  const windX = -crosswindMps;
   const windY = 0;
   const windZ = 0;
 
-  // Typical bullet dimensions (for G7 bullets, these don't matter much since spin is disabled)
-  const diameterMeters = btk.Conversions.inchesToMeters(0.264); // ~6.5mm
+  // Typical bullet dimensions
+  const diameterMeters = btk.Conversions.inchesToMeters(0.264);
   const lengthMeters = btk.Conversions.inchesToMeters(1.3);
-  const weightKg = btk.Conversions.grainsToKg(140); // arbitrary weight
+  const weightKg = btk.Conversions.grainsToKg(140);
 
-  const grid = [];
+  // Initialize result grids
+  const driftGrid = [];
+  const dropGrid = [];
+  const velocityGrid = [];
+  const energyGrid = [];
 
   for (const bc of bcValues)
   {
-    const row = [];
+    const driftRow = [];
+    const dropRow = [];
+    const velocityRow = [];
+    const energyRow = [];
     
     for (const mvFps of mvValues)
     {
@@ -212,7 +216,7 @@ function computeGrid(bcValues, mvValues, rangeYards, crosswindMph, tableType,
       // Create bullet with flight state (fire horizontally from origin)
       const initialPos = new btk.Vector3D(0, 0, 0);
       const initialVel = new btk.Vector3D(0, 0, -mvMps);
-      const bulletWithState = new btk.Bullet(bullet, initialPos, initialVel, 0); // no spin
+      const bulletWithState = new btk.Bullet(bullet, initialPos, initialVel, 0);
       initialPos.delete();
       initialVel.delete();
       
@@ -230,38 +234,48 @@ function computeGrid(bcValues, mvValues, rangeYards, crosswindMph, tableType,
       simulator.simulate(rangeMeters, 0.001, 60.0);
       const trajectoryObj = simulator.getTrajectory();
       
-      // Get value at range (drift or drop)
+      // Get values at range
       const point = trajectoryObj.atDistance(rangeMeters);
       
-      let valueMrad = 0;
       if (point)
       {
         const state = point.getState();
         const position = state.getPosition();
+        const velocity = state.getVelocity();
         
-        if (tableType === 'drift')
-        {
-          // Drift: crossrange position (X component)
-          const driftMeters = Math.abs(position.x);
-          
-          // Convert meters to MRAD: angle = atan(drift / range)
-          const angleRad = Math.atan(driftMeters / rangeMeters);
-          valueMrad = angleRad * 1000; // 1 mrad = 0.001 radians
-        }
-        else // 'drop'
-        {
-          // Drop: vertical position (Y component) - negative means below muzzle
-          const dropMeters = Math.abs(position.y);
-          
-          // Convert meters to MRAD: angle = atan(drop / range)
-          const angleRad = Math.atan(dropMeters / rangeMeters);
-          valueMrad = angleRad * 1000; // 1 mrad = 0.001 radians
-        }
+        // Drift (X component)
+        const driftMeters = Math.abs(position.x);
+        const driftAngleRad = Math.atan(driftMeters / rangeMeters);
+        const driftMrad = driftAngleRad * 1000;
+        driftRow.push(driftMrad);
         
+        // Drop (Y component)
+        const dropMeters = Math.abs(position.y);
+        const dropAngleRad = Math.atan(dropMeters / rangeMeters);
+        const dropMrad = dropAngleRad * 1000;
+        dropRow.push(dropMrad);
+        
+        // Velocity (magnitude of velocity vector)
+        const speedMps = velocity.magnitude();
+        const speedFps = btk.Conversions.mpsToFps(speedMps);
+        velocityRow.push(speedFps);
+        
+        // Energy: KE = 0.5 * m * v^2
+        const energyJoules = 0.5 * weightKg * speedMps * speedMps;
+        const energyFtLbs = btk.Conversions.joulesToFootPounds(energyJoules);
+        energyRow.push(energyFtLbs);
+        
+        velocity.delete();
+        position.delete();
         point.delete();
       }
-      
-      row.push(valueMrad);
+      else
+      {
+        driftRow.push(0);
+        dropRow.push(0);
+        velocityRow.push(0);
+        energyRow.push(0);
+      }
       
       // Cleanup
       simulator.delete();
@@ -270,25 +284,33 @@ function computeGrid(bcValues, mvValues, rangeYards, crosswindMph, tableType,
       bullet.delete();
     }
     
-    grid.push(row);
+    driftGrid.push(driftRow);
+    dropGrid.push(dropRow);
+    velocityGrid.push(velocityRow);
+    energyGrid.push(energyRow);
   }
 
-  return grid;
+  if (mode === 'drift')
+  {
+    return driftGrid;
+  }
+  
+  return {
+    drop: dropGrid,
+    velocity: velocityGrid,
+    energy: energyGrid
+  };
 }
 
 /**
  * Compute MV sensitivity for each BC/MV combination
- * Sensitivity = drop difference between MV+10fps and MV-10fps
+ * Sensitivity = drop difference between MV ±0.5% (1% total spread)
  */
 function computeSensitivityGrid(bcValues, mvValues, rangeYards, 
                                 dragFunction, temperatureK, altitudeMeters, humidityFraction)
 {
   const rangeMeters = btk.Conversions.yardsToMeters(rangeYards);
-
-  // No wind for sensitivity calculation
-  const windX = 0;
-  const windY = 0;
-  const windZ = 0;
+  const MV_VARIATION_PERCENT = 0.5; // ±0.5% = 1% total spread
 
   // Typical bullet dimensions
   const diameterMeters = btk.Conversions.inchesToMeters(0.264);
@@ -303,15 +325,18 @@ function computeSensitivityGrid(bcValues, mvValues, rangeYards,
     
     for (const mvFps of mvValues)
     {
-      // Calculate drop at MV - 10 fps
-      const mvSlowMps = btk.Conversions.fpsToMps(mvFps - 10);
-      const dropSlowMrad = calculateDrop(bc, mvSlowMps, rangeMeters, temperatureK, altitudeMeters, humidityFraction, 
-                                         weightKg, diameterMeters, lengthMeters, windX, windY, windZ, dragFunction);
+      // Calculate ±0.5% variation
+      const mvDelta = mvFps * (MV_VARIATION_PERCENT / 100);
       
-      // Calculate drop at MV + 10 fps
-      const mvFastMps = btk.Conversions.fpsToMps(mvFps + 10);
+      // Calculate drop at MV - 0.5%
+      const mvSlowMps = btk.Conversions.fpsToMps(mvFps - mvDelta);
+      const dropSlowMrad = calculateDrop(bc, mvSlowMps, rangeMeters, temperatureK, altitudeMeters, humidityFraction, 
+                                         weightKg, diameterMeters, lengthMeters, dragFunction);
+      
+      // Calculate drop at MV + 0.5%
+      const mvFastMps = btk.Conversions.fpsToMps(mvFps + mvDelta);
       const dropFastMrad = calculateDrop(bc, mvFastMps, rangeMeters, temperatureK, altitudeMeters, humidityFraction,
-                                         weightKg, diameterMeters, lengthMeters, windX, windY, windZ, dragFunction);
+                                         weightKg, diameterMeters, lengthMeters, dragFunction);
       
       // Sensitivity is the absolute difference in drop
       const sensitivity = Math.abs(dropSlowMrad - dropFastMrad);
@@ -329,7 +354,7 @@ function computeSensitivityGrid(bcValues, mvValues, rangeYards,
  * Helper function to calculate drop for a single trajectory
  */
 function calculateDrop(bc, mvMps, rangeMeters, temperatureK, altitudeMeters, humidityFraction,
-                       weightKg, diameterMeters, lengthMeters, windX, windY, windZ, dragFunction)
+                       weightKg, diameterMeters, lengthMeters, dragFunction)
 {
   // Create bullet
   const bullet = new btk.Bullet(
@@ -355,8 +380,8 @@ function calculateDrop(bc, mvMps, rangeMeters, temperatureK, altitudeMeters, hum
   simulator.setInitialBullet(bulletWithState);
   simulator.setAtmosphere(atmosphere);
   
-  // Set wind
-  const windVector = new btk.Vector3D(windX, windY, windZ);
+  // No wind for sensitivity calculation
+  const windVector = new btk.Vector3D(0, 0, 0);
   simulator.setWind(windVector);
   windVector.delete();
   
@@ -380,6 +405,7 @@ function calculateDrop(bc, mvMps, rangeMeters, temperatureK, altitudeMeters, hum
     const angleRad = Math.atan(dropMeters / rangeMeters);
     dropMrad = angleRad * 1000;
     
+    position.delete();
     point.delete();
   }
   
@@ -395,7 +421,7 @@ function calculateDrop(bc, mvMps, rangeMeters, temperatureK, altitudeMeters, hum
 /**
  * Display comparison results in tables
  */
-function displayResults(driftData, dropData, sensitivityData, bcValues, mvValues, params)
+function displayResults(driftData, dropData, sensitivityData, velocityData, energyData, bcValues, mvValues, params)
 {
   // Update info display
   document.getElementById('display-range').textContent = params.range;
@@ -403,20 +429,37 @@ function displayResults(driftData, dropData, sensitivityData, bcValues, mvValues
   document.getElementById('display-units').textContent = getUnitLabel(params.units);
   document.getElementById('display-atmosphere').textContent = 
     `${params.temperature}°F, ${params.altitude} ft, ${params.humidity}% humidity`;
+  
+  // Update table header units
+  const unitLabel = getUnitLabel(params.units);
+  document.getElementById('drift-units').textContent = unitLabel;
+  document.getElementById('drop-units').textContent = unitLabel;
+  document.getElementById('sensitivity-units').textContent = unitLabel;
+  document.getElementById('energy-units').textContent = params.energyUnits === 'joules' ? 'Joules' : 'ft-lbs';
 
-  // Build all three tables
-  buildTable('driftTable', driftData, bcValues, mvValues, params.range, params.units);
-  buildTable('dropTable', dropData, bcValues, mvValues, params.range, params.units);
-  buildTable('sensitivityTable', sensitivityData, bcValues, mvValues, params.range, params.units);
+  // Build all tables
+  // Lower is better: drift, drop, sensitivity
+  buildTable('driftTable', driftData, bcValues, mvValues, params.range, params.units, false);
+  buildTable('dropTable', dropData, bcValues, mvValues, params.range, params.units, false);
+  buildTable('sensitivityTable', sensitivityData, bcValues, mvValues, params.range, params.units, false);
+  
+  // Higher is better: velocity, energy
+  buildTableRaw('velocityTable', velocityData, bcValues, mvValues, 0, true);
+  
+  // Convert energy if needed
+  const energyDisplayData = params.energyUnits === 'joules' 
+    ? energyData.map(row => row.map(ftlbs => btk.Conversions.footPoundsToJoules(ftlbs)))
+    : energyData;
+  buildTableRaw('energyTable', energyDisplayData, bcValues, mvValues, 0, true);
 
   document.getElementById('results').style.display = 'block';
   document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
 }
 
 /**
- * Build a single table with color coding
+ * Build a table with MRAD/MOA/Inches conversion and color coding
  */
-function buildTable(tableId, gridData, bcValues, mvValues, rangeYards, units)
+function buildTable(tableId, gridData, bcValues, mvValues, rangeYards, units, higherIsBetter)
 {
   const table = document.getElementById(tableId);
   table.innerHTML = '';
@@ -453,9 +496,9 @@ function buildTable(tableId, gridData, bcValues, mvValues, rangeYards, units)
   // MV column headers
   for (const mv of mvValues)
   {
-    const th = document.createElement('th');
-    th.textContent = `${mv} fps`;
-    headerRow.appendChild(th);
+    const mvTh = document.createElement('th');
+    mvTh.textContent = `${mv}`;
+    headerRow.appendChild(mvTh);
   }
 
   // Build table body
@@ -475,8 +518,69 @@ function buildTable(tableId, gridData, bcValues, mvValues, rangeYards, units)
       const value = convertedData[i][j];
       cell.textContent = value.toFixed(decimals);
       
-      // Apply color based on value (lower is better)
-      const color = interpolateColor(value, minValue, maxValue);
+      // Apply color based on value
+      const color = interpolateColor(value, minValue, maxValue, higherIsBetter);
+      cell.style.backgroundColor = color;
+    }
+  }
+}
+
+/**
+ * Build a table with raw values (no unit conversion) and color coding
+ */
+function buildTableRaw(tableId, gridData, bcValues, mvValues, decimals, higherIsBetter)
+{
+  const table = document.getElementById(tableId);
+  table.innerHTML = '';
+
+  // Find min and max values for color scaling
+  let minValue = Infinity;
+  let maxValue = -Infinity;
+  for (const row of gridData)
+  {
+    for (const value of row)
+    {
+      if (value < minValue) minValue = value;
+      if (value > maxValue) maxValue = value;
+    }
+  }
+
+  // Build table header
+  const thead = table.createTHead();
+  const headerRow = thead.insertRow();
+  
+  // First column header
+  const th = document.createElement('th');
+  th.textContent = 'BC';
+  headerRow.appendChild(th);
+  
+  // MV column headers
+  for (const mv of mvValues)
+  {
+    const mvTh = document.createElement('th');
+    mvTh.textContent = `${mv}`;
+    headerRow.appendChild(mvTh);
+  }
+
+  // Build table body
+  const tbody = table.createTBody();
+  for (let i = 0; i < bcValues.length; i++)
+  {
+    const row = tbody.insertRow();
+    
+    // BC label (first column)
+    const bcCell = row.insertCell();
+    bcCell.textContent = bcValues[i].toFixed(3);
+    
+    // Values with color coding
+    for (let j = 0; j < mvValues.length; j++)
+    {
+      const cell = row.insertCell();
+      const value = gridData[i][j];
+      cell.textContent = Math.round(value).toLocaleString();
+      
+      // Apply color based on value
+      const color = interpolateColor(value, minValue, maxValue, higherIsBetter);
       cell.style.backgroundColor = color;
     }
   }
@@ -538,12 +642,13 @@ function getDecimals(units)
 
 /**
  * Interpolate color from green (best) to red (worst)
- * @param {number} value - Current drift value
- * @param {number} min - Minimum drift (best - green)
- * @param {number} max - Maximum drift (worst - red)
+ * @param {number} value - Current value
+ * @param {number} min - Minimum value
+ * @param {number} max - Maximum value
+ * @param {boolean} higherIsBetter - If true, high values are green; if false, low values are green
  * @returns {string} RGB color string
  */
-function interpolateColor(value, min, max)
+function interpolateColor(value, min, max, higherIsBetter)
 {
   // Handle edge case where all values are the same
   if (max === min)
@@ -552,28 +657,32 @@ function interpolateColor(value, min, max)
   }
 
   // Normalize value to 0-1 range
-  const t = (value - min) / (max - min);
+  let t = (value - min) / (max - min);
+  
+  // If higher is better, invert so high values get green
+  if (higherIsBetter)
+  {
+    t = 1 - t;
+  }
 
   // Interpolate from green (0,255,0) to red (255,0,0)
   // Green -> Yellow -> Red
-  let r, g, b;
+  let r, g;
   
   if (t < 0.5)
   {
     // Green to yellow (increase red)
     r = Math.round(t * 2 * 255);
     g = 255;
-    b = 0;
   }
   else
   {
     // Yellow to red (decrease green)
     r = 255;
     g = Math.round((1 - t) * 2 * 255);
-    b = 0;
   }
 
-  return `rgb(${r}, ${g}, ${b})`;
+  return `rgb(${r}, ${g}, 0)`;
 }
 
 function showError(message)
@@ -587,4 +696,3 @@ function hideError()
 {
   document.getElementById('error').style.display = 'none';
 }
-

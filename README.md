@@ -21,11 +21,11 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **10 mph Crosswind** - Standard crosswind for consistent drift comparison
 
 ### 🎛️ Performance Matrix
-- **BC/MV Grid Comparison** - Compare wind drift, drop, and MV sensitivity across different ballistic coefficients and muzzle velocities
-- **Three Analysis Tables** - Wind drift (10 mph crosswind), drop, and MV sensitivity (±10 fps variation)
+- **BC/MV Grid Comparison** - Compare wind drift, drop, velocity, energy, and MV sensitivity across different ballistic coefficients and muzzle velocities
+- **Five Analysis Tables** - Wind drift (10 mph crosswind), drop, final velocity, final energy, and MV sensitivity (±0.5% velocity variation)
 - **Color-Coded Results** - Green shows best performance, red shows worst, with smooth interpolation between
 - **Customizable Ranges** - Define BC range (start/end/increment) and MV range
-- **Flexible Settings** - G1/G7 drag models, MOA/MRAD/inches units, full atmosphere controls (temperature, altitude, humidity)
+- **Flexible Settings** - G1/G7 drag models, MOA/MRAD/inches units, ft-lbs/Joules energy, full atmosphere controls
 - **Load Development** - Identify optimal BC/MV combinations and evaluate sensitivity to velocity variations
 
 ### 🎯 Target Simulator
@@ -92,7 +92,7 @@ Visit the [Performance Matrix](https://www.ballisticstoolkit.com/perf-matrix/per
 3. **BC Range** - Start, end, and increment for ballistic coefficients
 4. **MV Range** - Start (100-6000 fps), end, and increment for muzzle velocities
 
-Results display three color-coded grids: wind drift (10 mph crosswind), drop, and MV sensitivity (drop difference between ±10 fps). Green indicates best performance, red indicates worst. Use this to identify optimal BC/MV combinations and evaluate how sensitive a load is to velocity variations.
+Results display five color-coded grids: wind drift (10 mph crosswind), drop, final velocity, final energy, and MV sensitivity (drop difference at ±0.5% velocity). Green indicates best performance, red indicates worst. Use this to identify optimal BC/MV combinations and evaluate how sensitive a load is to velocity variations.
 
 ### Target Simulator
 Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/target-sim.html) for match simulation:

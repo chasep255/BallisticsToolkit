@@ -89,16 +89,18 @@ body {
 
 .nav-links {
     display: flex;
-    gap: 20px;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .nav-links a {
     color: white;
     text-decoration: none;
-    padding: 8px 16px;
+    padding: 8px 12px;
     border-radius: 4px;
     transition: background-color 0.2s;
     font-weight: 500;
+    white-space: nowrap;
 }
 
 .nav-links a:hover {

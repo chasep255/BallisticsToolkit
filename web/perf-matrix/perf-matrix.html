@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Performance Matrix | Ballistics Toolkit</title>
-  <meta name="description" content="Compare wind drift, drop, and MV sensitivity across different ballistic coefficients and muzzle velocities.">
+  <meta name="description" content="Compare wind drift, drop, MV sensitivity, velocity, and energy across different ballistic coefficients and muzzle velocities.">
   <meta name="keywords" content="ballistic coefficient, BC comparison, wind drift, muzzle velocity, trajectory, drop, sensitivity, performance matrix">
   <link rel="canonical" href="https://www.ballisticstoolkit.com/perf-matrix/perf-matrix.html">
   
@@ -12,14 +12,14 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.ballisticstoolkit.com/perf-matrix/perf-matrix.html">
   <meta property="og:title" content="Performance Matrix">
-  <meta property="og:description" content="Compare wind drift, drop, and MV sensitivity across different ballistic coefficients and muzzle velocities.">
+  <meta property="og:description" content="Compare wind drift, drop, MV sensitivity, velocity, and energy across different ballistic coefficients and muzzle velocities.">
   <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://www.ballisticstoolkit.com/perf-matrix/perf-matrix.html">
   <meta property="twitter:title" content="Performance Matrix">
-  <meta property="twitter:description" content="Compare wind drift, drop, and MV sensitivity across different ballistic coefficients and muzzle velocities.">
+  <meta property="twitter:description" content="Compare wind drift, drop, MV sensitivity, velocity, and energy across different ballistic coefficients and muzzle velocities.">
   <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
@@ -31,7 +31,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Performance Matrix",
-    "description": "Compare wind drift, drop, and MV sensitivity across different ballistic coefficients and muzzle velocities",
+    "description": "Compare wind drift, drop, MV sensitivity, velocity, and energy across different ballistic coefficients and muzzle velocities",
     "url": "https://www.ballisticstoolkit.com/perf-matrix/perf-matrix.html",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Web Browser",
@@ -130,7 +130,7 @@
   <div class="app-container">
     <h1>🎛️ Performance Matrix</h1>
     <p style="text-align: center; margin-bottom: 20px; color: #666;">
-      Compare wind drift, drop, and MV sensitivity across different ballistic coefficients and muzzle velocities.
+      Compare wind drift, drop, MV sensitivity, velocity, and energy across different BC and MV combinations.
     </p>
 
     <!-- Simulation Settings -->
@@ -154,6 +154,13 @@
             <option value="mrad" selected>MRAD</option>
             <option value="moa">MOA</option>
             <option value="in">Inches</option>
+          </select>
+        </div>
+        <div class="param-item">
+          <label for="energyUnits" title="Units for energy">Energy Units</label>
+          <select id="energyUnits" title="Units for energy">
+            <option value="ft-lbs" selected>ft-lbs</option>
+            <option value="joules">Joules</option>
           </select>
         </div>
       </div>
@@ -230,19 +237,41 @@
         <span id="display-atmosphere"></span>
       </p>
       
-      <h2>Wind Drift (10 mph)</h2>
+      <h2>Wind Drift (<span id="drift-units">MRAD</span>)</h2>
+      <p style="text-align: center; color: #666; font-size: 0.9em; margin-bottom: 10px;">
+        Horizontal deflection from a 10 mph full-value crosswind (lower = better wind resistance)
+      </p>
       <div style="overflow-x: auto; margin-bottom: 30px;">
         <table id="driftTable"></table>
       </div>
       
-      <h2>Drop</h2>
+      <h2>Drop (<span id="drop-units">MRAD</span>)</h2>
+      <p style="text-align: center; color: #666; font-size: 0.9em; margin-bottom: 10px;">
+        Bullet drop below muzzle line at target range (lower = flatter trajectory)
+      </p>
       <div style="overflow-x: auto; margin-bottom: 30px;">
         <table id="dropTable"></table>
       </div>
-      
-      <h2>MV Sensitivity</h2>
+
+      <h2>Final Velocity (fps)</h2>
       <p style="text-align: center; color: #666; font-size: 0.9em; margin-bottom: 10px;">
-        Drop difference between MV ±10 fps (higher values = more sensitive to velocity changes)
+        Remaining bullet speed at target range (higher = better energy retention)
+      </p>
+      <div style="overflow-x: auto; margin-bottom: 30px;">
+        <table id="velocityTable"></table>
+      </div>
+      
+      <h2>Final Energy (<span id="energy-units">ft-lbs</span>)</h2>
+      <p style="text-align: center; color: #666; font-size: 0.9em; margin-bottom: 10px;">
+        Kinetic energy at target range (higher = more terminal performance)
+      </p>
+      <div style="overflow-x: auto; margin-bottom: 30px;">
+        <table id="energyTable"></table>
+      </div>
+      
+      <h2>MV Sensitivity (<span id="sensitivity-units">MRAD</span>)</h2>
+      <p style="text-align: center; color: #666; font-size: 0.9em; margin-bottom: 10px;">
+        Drop difference between MV ±0.5% (lower = more forgiving of velocity variations)
       </p>
       <div style="overflow-x: auto;">
         <table id="sensitivityTable"></table>
@@ -250,7 +279,7 @@
     </div>
 
     <div id="loading" class="loading" style="display: none;">
-      <p>Calculating wind drift...</p>
+      <p>Calculating...</p>
     </div>
 
     <div id="error" class="error" style="display: none;"></div>
@@ -274,7 +303,7 @@
 
         <div class="help-section">
           <h3>Purpose</h3>
-          <p>This tool generates three grids showing wind drift, drop, and MV sensitivity for different combinations of ballistic coefficients and muzzle velocities at a fixed range. Use it to understand how BC and MV affect trajectory performance and to identify optimal load combinations.</p>
+          <p>This tool generates five grids showing wind drift, drop, final velocity, final energy, and MV sensitivity for different combinations of ballistic coefficients and muzzle velocities at a fixed range. Use it to understand how BC and MV affect trajectory performance and to identify optimal load combinations.</p>
         </div>
 
         <div class="help-section">
@@ -283,6 +312,7 @@
             <strong>Range:</strong> Distance to the target in yards.<br><br>
             <strong>Drag Model:</strong> G7 generally better suited for modern boat-tail bullets. G1 for older flat-base bullets.<br><br>
             <strong>Drop/Drift Units:</strong> Choose between MRAD, MOA, or inches for displaying drop and drift values.<br><br>
+            <strong>Energy Units:</strong> Choose between ft-lbs or Joules for the energy table.<br><br>
             <strong>Temperature:</strong> Air temperature in degrees Fahrenheit. Higher temperature = less air density = less drag.<br><br>
             <strong>Altitude:</strong> Elevation above sea level in feet. Higher altitude = less air density = less drag.<br><br>
             <strong>Humidity:</strong> Relative humidity percentage. Higher humidity slightly reduces air density.<br><br>
@@ -296,7 +326,9 @@
           <div class="param-help">
             <strong>Wind Drift (10 mph):</strong> Shows drift at the specified range with a 10 mph full-value crosswind from 3 o'clock. Lower values (green) are better.<br><br>
             <strong>Drop:</strong> Shows bullet drop below the muzzle line. Lower values (green) mean less drop.<br><br>
-            <strong>MV Sensitivity:</strong> Shows the drop difference between shooting 10 fps slower and 10 fps faster. Lower values (green) mean the load is less sensitive to velocity variations, making it more forgiving of inconsistent ammunition.<br><br>
+            <strong>MV Sensitivity:</strong> Shows the drop difference between MV ±0.5% (1% total spread). Lower values (green) mean the load is less sensitive to velocity variations, making it more forgiving of inconsistent ammunition.<br><br>
+            <strong>Final Velocity:</strong> Remaining velocity at target range in fps. Higher values (green) are better.<br><br>
+            <strong>Final Energy:</strong> Remaining kinetic energy at target range in ft-lbs. Higher values (green) are better.<br><br>
             Each row represents a different BC, and each column represents a different MV. Color coding helps identify the best (green) and worst (red) combinations.
           </div>
         </div>
