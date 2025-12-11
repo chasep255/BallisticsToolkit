@@ -1,8 +1,6 @@
 #include "physics/atmosphere.h"
 #include "physics/constants.h"
 #include <cmath>
-#include <iomanip>
-#include <sstream>
 
 namespace btk
 {
@@ -10,7 +8,12 @@ namespace btk
   {
 
     // Atmosphere implementation
-    Atmosphere::Atmosphere() : temperature_(btk::physics::Constants::TEMPERATURE_STANDARD_FAHRENHEIT), altitude_(0.0f), humidity_(0.5f), pressure_(calculateStandardPressure(0.0f)) {}
+    Atmosphere::Atmosphere()
+      : temperature_(btk::physics::Constants::TEMPERATURE_STANDARD_KELVIN),
+        altitude_(0.0f),
+        humidity_(0.5f),
+        pressure_(calculateStandardPressure(0.0f))
+    {}
 
     Atmosphere::Atmosphere(float temperature, float altitude, float humidity, float pressure)
       : temperature_(temperature), altitude_(altitude), humidity_(humidity), pressure_(pressure > 0 ? pressure : calculateStandardPressure(altitude))
@@ -48,13 +51,14 @@ namespace btk
 
     float Atmosphere::getSpeedOfSound() const
     {
-      // Speed of sound: c = sqrt(γ * R * T)
-      // where γ = heat capacity ratio, R = specific gas constant, T = temperature
-
-      float temperature_k = temperature_;
-      float R_specific = btk::physics::Constants::GAS_CONSTANT_UNIVERSAL / btk::physics::Constants::MOLAR_MASS_DRY_AIR;
-
-      float speed_of_sound = std::sqrt(btk::physics::Constants::HEAT_CAPACITY_RATIO_AIR * R_specific * temperature_k);
+      // Speed of sound with humidity correction
+      // c = sqrt(γ * P / ρ) where γ = heat capacity ratio, P = pressure, ρ = density
+      // This automatically accounts for temperature, pressure, and humidity via density
+      
+      float pressure_pa = getPressure();
+      float density = getAirDensity();
+      
+      float speed_of_sound = std::sqrt(btk::physics::Constants::HEAT_CAPACITY_RATIO_AIR * pressure_pa / density);
 
       return speed_of_sound;
     }

@@ -17,9 +17,9 @@ namespace btk::physics
     // Atmospheric constants
     static constexpr float AIR_DENSITY_STANDARD = 1.225f; // kg/m³ - standard air density at sea level, 15°C
 
-    // Temperature constants
-    static constexpr float TEMPERATURE_STANDARD_FAHRENHEIT = 288.15f; // K - standard temperature at sea level (59°F)
-    static constexpr float TEMPERATURE_STANDARD_KELVIN = 288.15f;     // K - ICAO standard temperature at sea level
+    // Temperature constants (all in kelvin)
+    // Standard sea-level temperature (ISA): 288.15 K ≈ 15 °C ≈ 59 °F
+    static constexpr float TEMPERATURE_STANDARD_KELVIN = 288.15f;
 
     // Pressure constants
     static constexpr float PRESSURE_STANDARD_PASCALS = 101325.0f; // Pa - standard atmospheric pressure at sea level
