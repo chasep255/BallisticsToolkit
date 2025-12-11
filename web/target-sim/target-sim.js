@@ -406,7 +406,7 @@ class TargetSimulator
       else
       {
         // Schedule next shot
-        setTimeout(() => this.fireNextShot(), 50);
+        setTimeout(() => this.fireNextShot(), 1);
       }
 
     }
