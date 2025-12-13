@@ -140,6 +140,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getTotalVelocity", &Bullet::getTotalVelocity)
     .function("getElevationAngle", &Bullet::getElevationAngle)
     .function("getAzimuthAngle", &Bullet::getAzimuthAngle)
+    .function("computeMillerStabilityFactor", &Bullet::computeMillerStabilityFactor)
+    .function("computeIdealTwistRate", &Bullet::computeIdealTwistRate)
     .class_function("computeSpinRateFromTwist", &Bullet::computeSpinRateFromTwist);
 
   // Atmosphere class

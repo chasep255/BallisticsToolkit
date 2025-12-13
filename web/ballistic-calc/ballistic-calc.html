@@ -125,7 +125,7 @@
             </div>
             <div class="param-item">
                 <label for="step" title="Step size for trajectory calculation in yards">Step (yd)</label>
-                <input type="number" id="step" value="50" step="10" title="Step size for trajectory calculation in yards">
+                <input type="number" id="step" value="100" step="10" title="Step size for trajectory calculation in yards">
             </div>
             <div class="param-item">
                 <label for="angleUnits" title="Units for displaying drop and drift angles">Angle Units</label>
@@ -138,11 +138,13 @@
 
         <div style="text-align: center; margin-top: 20px;">
             <button id="calculateBtn" class="btn btn-primary">Calculate Trajectory</button>
+            <button id="printBtn" class="btn btn-secondary" style="margin-left: 10px;" disabled>Print</button>
             <button id="helpBtn" class="btn btn-secondary" style="margin-left: 10px;">Help</button>
         </div>
 
         <!-- Results Table -->
         <div id="results" class="results" style="display: none;">
+            <div id="atmosphericInfo" class="atmospheric-info" style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px; font-family: monospace;"></div>
             <table id="trajectoryTable">
                 <thead>
                     <tr>
@@ -213,7 +215,7 @@
                     <div class="param-help">
                         <strong>Temperature:</strong> Air temperature in Fahrenheit. Affects air density - higher temperature = less dense air. Standard: 59°F.<br><br>
                         <strong>Humidity:</strong> Relative humidity percentage. Minimal effect on ballistics. Typical: 20-80%.<br><br>
-                        <strong>Altitude:</strong> Height above sea level in feet. Higher altitude = less air resistance. Sea level: 0 ft, high altitude: 5000+ ft.
+                        <strong>Altitude:</strong> Height above sea level in feet. Higher altitude = less air resistance. Sea level: 0 ft.
                     </div>
                 </div>
                 
@@ -232,7 +234,7 @@
                         <strong>What are Spin Effects?</strong> When a bullet spins, it experiences additional forces beyond simple wind drift:<br>
                         • <strong>Spin Drift:</strong> A rightward drift (for right-hand twist) caused by gyroscopic precession. This effect increases with range and is independent of wind direction.<br>
                         • <strong>Crosswind Jump:</strong> Vertical deflection when crosswinds interact with the spinning bullet, causing it to rise or fall slightly.<br><br>
-                        <strong>Twist Rate:</strong> Enter your barrel twist rate (e.g., 8 for 1:8 twist). Positive values = right-hand twist, negative = left-hand twist. This determines the bullet's spin rate, which affects both spin drift magnitude and direction.<br><br>
+                        <strong>Twist Rate:</strong> Enter your barrel twist rate (e.g., 8 for 1:8 twist). Positive values = right-hand twist, negative = left-hand twist. This determines the bullet's spin rate, which affects both spin drift magnitude and direction. The calculated spin rate (in RPM) is always displayed in the results, regardless of whether spin effects are enabled in the simulation.<br><br>
                         <strong>Modeling Approach:</strong> Spin effects use simplified, empirically tuned aerodynamics. The model tracks bullet spin and computes lateral/vertical accelerations from wind, spin, and angle-of-attack dynamics. Right-hand twist yields rightward spin drift; left-hand twist reverses the direction.<br><br>
                         <strong>Accuracy Note:</strong> These effects are modeled to illustrate expected trends and add realism. They are not a substitute for live-fire data (dope) and may not match all bullet/rifle combinations precisely. For critical applications, verify with actual range testing.
                     </div>
@@ -244,6 +246,24 @@
                         <strong>Max Range:</strong> Maximum distance for trajectory calculation.<br><br>
                         <strong>Step Size:</strong> Distance between trajectory points. Smaller steps = more detailed data. Typical: 25-100 yards.<br><br>
                         <strong>Angle Units:</strong> Units for drop and drift display. MOA (Minutes of Angle) or mrad (milliradians).
+                    </div>
+                </div>
+                
+                <div class="help-section">
+                    <h3>Displayed Information</h3>
+                    <div class="param-help">
+                        <strong>Atmospheric Conditions:</strong> The calculator displays calculated atmospheric properties used in the simulation:<br>
+                        • <strong>Air Density:</strong> Shows in lb/ft³ and kg/m³. Affects drag and bullet deceleration.<br>
+                        • <strong>Pressure:</strong> Shows in inHg and Pa. Calculated from altitude using the barometric formula (standard atmospheric pressure decreases with altitude).<br>
+                        • <strong>Speed of Sound:</strong> Shows in fps and m/s. Useful for understanding supersonic/subsonic transitions.<br>
+                        • <strong>Temperature:</strong> Shows in °F. Confirms the input temperature value.<br><br>
+                        <strong>Bullet Properties:</strong> Displays calculated bullet characteristics:<br>
+                        • <strong>Sectional Density:</strong> Weight divided by diameter squared, shown in lb/in². Higher values indicate better penetration potential.<br>
+                        • <strong>Spin Rate:</strong> Bullet rotation rate in RPM, calculated from muzzle velocity and barrel twist rate. Displayed regardless of whether spin effects are enabled in the simulation.<br><br>
+                        <strong>Miller Twist Rule:</strong> Calculates bullet stability using the Miller stability factor (SG):<br>
+                        • <strong>Stability Factor (SG):</strong> Indicates bullet stability. Values below 1.0 are unstable (red), 1.0-1.5 is marginal stability (orange), and 1.5+ is good stability (green).<br>
+                        • <strong>Ideal Twist Rate:</strong> For stable bullets (SG ≥ 1.5), shows the twist rate that would produce the current SG value. For unstable/marginal bullets, shows the minimum twist rate needed for SG = 1.5 (good stability).<br>
+                        • The Miller formula accounts for bullet weight, diameter, length, and twist rate to determine gyroscopic stability.
                     </div>
                 </div>
                 

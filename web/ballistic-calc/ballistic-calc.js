@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', async () =>
     // Set up UI
     Utils.setupHelpModal('helpBtn', 'helpModal');
     document.getElementById('calculateBtn').addEventListener('click', calculateTrajectory);
+    document.getElementById('printBtn').addEventListener('click', printResults);
 
   }
   catch (error)
@@ -63,9 +64,10 @@ function calculateTrajectory()
   const windOriginAngle = btk.Conversions.oclockToRadians(parseFloat(document.getElementById('windDirection').value));
   const windDirection = -windOriginAngle;
 
-  // Calculate spin rate from twist rate (or 0 if spin effects disabled)
+  // Calculate spin rate from twist rate (always calculate for display, but only use in simulation if enabled)
   const enableSpinEffects = document.getElementById('enableSpinEffects').checked;
-  const spinRate = enableSpinEffects ? btk.Bullet.computeSpinRateFromTwist(muzzleVelocity, btk.Conversions.inchesToMeters(twistRate)) : 0.0;
+  const spinRateForDisplay = btk.Bullet.computeSpinRateFromTwist(muzzleVelocity, btk.Conversions.inchesToMeters(twistRate));
+  const spinRate = enableSpinEffects ? spinRateForDisplay : 0.0;
 
   // Create bullet
   const bullet = new btk.Bullet(
@@ -156,8 +158,50 @@ function calculateTrajectory()
     point.delete(); // Dispose TrajectoryPoint to prevent memory leak
   }
 
+  // Get atmospheric data before deleting the atmosphere object
+  const airDensity = atmosphere.getAirDensity();
+  const pressure = atmosphere.getPressure();
+  const speedOfSound = atmosphere.getSpeedOfSound();
+  const tempKelvin = atmosphere.getTemperature();
+
+  // Get bullet properties before deleting
+  const sectionalDensity = bullet.getSectionalDensity();
+
+  // Convert spin rate to RPM (using BTK's conversion formula: rpm = radps * 60 / (2 * π))
+  // Always calculate from the display spin rate, not the simulation spin rate
+  const spinRateRpm = spinRateForDisplay * 60.0 / (2.0 * Math.PI);
+
+  // Calculate Miller stability factor and ideal twist rate
+  const twistRateInches = parseFloat(document.getElementById('twistRate').value);
+  const millerStabilityFactor = bullet.computeMillerStabilityFactor(twistRateInches);
+  // Calculate ideal twist rate for current SG (or minimum of 1.5 if unstable)
+  const targetSG = millerStabilityFactor >= 1.5 ? millerStabilityFactor : 1.5;
+  const idealTwistRate = bullet.computeIdealTwistRate(targetSG);
+
+  // Collect all input parameters for display
+  const inputParams = {
+    weight: parseFloat(document.getElementById('weight').value),
+    diameter: parseFloat(document.getElementById('diameter').value),
+    bc: parseFloat(document.getElementById('bc').value),
+    dragFunction: dragFunction,
+    length: parseFloat(document.getElementById('length').value),
+    twistRate: twistRateInches,
+    enableSpinEffects: enableSpinEffects,
+    muzzleVelocity: parseFloat(document.getElementById('muzzleVelocity').value),
+    zeroRange: parseFloat(document.getElementById('zeroRange').value),
+    scopeHeight: parseFloat(document.getElementById('scopeHeight').value),
+    temperature: parseFloat(document.getElementById('temperature').value),
+    humidity: parseFloat(document.getElementById('humidity').value),
+    altitude: parseFloat(document.getElementById('altitude').value),
+    windSpeed: parseFloat(document.getElementById('windSpeed').value),
+    windDirection: parseFloat(document.getElementById('windDirection').value),
+    maxRange: parseFloat(document.getElementById('maxRange').value),
+    step: parseFloat(document.getElementById('step').value),
+    angleUnits: document.getElementById('angleUnits').value
+  };
+
   // Display results
-  displayResults(trajectory);
+  displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, idealTwistRate, twistRateInches, inputParams);
 
   // Dispose BTK objects to prevent memory leaks
   // Note: trajectoryObj is owned by simulator, don't delete it
@@ -166,10 +210,77 @@ function calculateTrajectory()
   bullet.delete();
 }
 
-function displayResults(trajectory)
+function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, idealTwistRate, twistRateInches, inputParams)
 {
   const tableBody = document.getElementById('trajectoryTable').getElementsByTagName('tbody')[0];
   tableBody.innerHTML = '';
+
+  // Display atmospheric info
+  const atmosphericInfo = document.getElementById('atmosphericInfo');
+  // Convert density: kg/m³ to lb/ft³ using BTK's conversion factor (matches kgpm3ToLbpft3)
+  const densityLbPerCuFt = airDensity * 0.062428;
+  // Convert pressure using BTK conversion
+  const pressureInHg = btk.Conversions.pascalsToInHg(pressure);
+  // Convert speed of sound to fps
+  const speedOfSoundFps = btk.Conversions.mpsToFps(speedOfSound);
+  // Convert temperature to Fahrenheit
+  const tempFahrenheit = btk.Conversions.kelvinToFahrenheit(tempKelvin);
+  // Convert sectional density to lb/in² (from kg/m²)
+  // Sectional density = weight / diameter²
+  // Convert: kg/m² → lb/in² using BTK conversions
+  // 1 kg/m² = (1 kg / 1 m²) = (kgToPounds(1) / (metersToInches(1))²)
+  const sectionalDensityLbPerSqIn = btk.Conversions.kgToPounds(sectionalDensity) / Math.pow(btk.Conversions.metersToInches(1.0), 2);
+
+  // Format wind direction description
+  const windDirDesc = inputParams.windDirection === 12 ? 'Headwind (from target)' :
+                      inputParams.windDirection === 6 ? 'Tailwind (from behind)' :
+                      inputParams.windDirection === 3 ? 'Crosswind (from right)' :
+                      inputParams.windDirection === 9 ? 'Crosswind (from left)' :
+                      `${inputParams.windDirection} o'clock`;
+
+  let infoHTML = `<strong>Input Parameters:</strong><br>`;
+  infoHTML += `• <strong>Bullet:</strong> ${inputParams.weight.toFixed(1)} gr, ${inputParams.diameter.toFixed(3)}" dia, ${inputParams.length.toFixed(2)}" length, BC(${inputParams.dragFunction}) ${inputParams.bc.toFixed(3)}<br>`;
+  infoHTML += `• <strong>Barrel:</strong> ${inputParams.twistRate.toFixed(1)} in/turn twist, Spin Effects: ${inputParams.enableSpinEffects ? 'Enabled' : 'Disabled'}<br>`;
+  infoHTML += `• <strong>Shooting:</strong> MV ${inputParams.muzzleVelocity.toFixed(0)} fps, Zero ${inputParams.zeroRange.toFixed(0)} yd, Scope Height ${inputParams.scopeHeight.toFixed(1)}"<br>`;
+  infoHTML += `• <strong>Environment:</strong> ${inputParams.temperature.toFixed(0)}°F, ${inputParams.humidity.toFixed(0)}% RH, ${inputParams.altitude.toFixed(0)} ft altitude<br>`;
+  infoHTML += `• <strong>Wind:</strong> ${inputParams.windSpeed.toFixed(0)} mph ${windDirDesc}<br>`;
+  infoHTML += `• <strong>Trajectory:</strong> Max Range ${inputParams.maxRange.toFixed(0)} yd, Step ${inputParams.step.toFixed(0)} yd, Units ${inputParams.angleUnits.toUpperCase()}<br><br>`;
+  
+  infoHTML += `<strong>Atmospheric Conditions:</strong> Air Density: ${densityLbPerCuFt.toFixed(4)} lb/ft³ | Pressure: ${pressureInHg.toFixed(2)} inHg | Speed of Sound: ${speedOfSoundFps.toFixed(0)} fps | Temperature: ${tempFahrenheit.toFixed(1)}°F`;
+  
+  infoHTML += `<br><strong>Bullet Properties:</strong> Sectional Density: ${sectionalDensityLbPerSqIn.toFixed(3)} lb/in²`;
+  
+  if (spinRateRpm > 0)
+  {
+    infoHTML += ` | Spin Rate: ${Math.abs(spinRateRpm).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} RPM`;
+  }
+  
+  // Add Miller stability factor and ideal twist rate
+  infoHTML += `<br><strong>Miller Twist Rule:</strong> Stability Factor (SG): ${millerStabilityFactor.toFixed(2)}`;
+  if (millerStabilityFactor < 1.0)
+  {
+    infoHTML += ` <span style="color: #d32f2f;">(Unstable - SG &lt; 1.0)</span>`;
+  }
+  else if (millerStabilityFactor < 1.5)
+  {
+    infoHTML += ` <span style="color: #f57c00;">(Marginal Stability - 1.0 ≤ SG &lt; 1.5)</span>`;
+  }
+  else
+  {
+    infoHTML += ` <span style="color: #388e3c;">(Good Stability - SG ≥ 1.5)</span>`;
+  }
+  if (millerStabilityFactor >= 1.5)
+  {
+    // Show what twist rate would give their current SG
+    infoHTML += ` | Twist Rate for SG=${millerStabilityFactor.toFixed(2)}: ${idealTwistRate.toFixed(2)} in/turn (current: ${twistRateInches.toFixed(1)} in/turn)`;
+  }
+  else
+  {
+    // Show minimum twist rate needed for comfortable stability
+    infoHTML += ` | Minimum Twist Rate for SG=1.5: ${idealTwistRate.toFixed(2)} in/turn (current: ${twistRateInches.toFixed(1)} in/turn)`;
+  }
+  
+  atmosphericInfo.innerHTML = infoHTML;
 
   const angleUnits = document.getElementById('angleUnits').value;
 
@@ -202,6 +313,7 @@ function displayResults(trajectory)
   });
 
   document.getElementById('results').style.display = 'block';
+  document.getElementById('printBtn').disabled = false;
 }
 
 function showError(message)
@@ -209,9 +321,53 @@ function showError(message)
   const errorDiv = document.getElementById('error');
   errorDiv.textContent = message;
   errorDiv.style.display = 'block';
+  document.getElementById('printBtn').disabled = true;
 }
 
 function hideError()
 {
   document.getElementById('error').style.display = 'none';
+}
+
+function printResults()
+{
+  const resultsDiv = document.getElementById('results');
+  if (resultsDiv.style.display === 'none')
+  {
+    return; // Nothing to print
+  }
+
+  // Create a new window for printing
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Ballistic Calculator Results</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { margin-bottom: 10px; }
+          .info-section { margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px; font-family: monospace; font-size: 12px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #4CAF50; color: white; }
+          tr:nth-child(even) { background-color: #f2f2f2; }
+          @media print {
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>📊 Ballistic Calculator Results</h1>
+        <div class="info-section">${document.getElementById('atmosphericInfo').innerHTML}</div>
+        ${document.getElementById('trajectoryTable').outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  
+  // Wait for content to load, then print
+  setTimeout(() => {
+    printWindow.print();
+  }, 250);
 }

@@ -156,6 +156,81 @@ namespace btk::ballistics
       return weight_ * r_eff * r_eff; // m * (k_rg * d)^2
     }
 
+    /**
+     * @brief Calculate Miller stability factor (SG) for a given twist rate
+     *
+     * Based on Miller twist rule: s = 30m / (t²d³l(1+l²))
+     * where:
+     *   m = bullet mass in grains
+     *   t = twist rate in calibers per turn (T/d)
+     *   d = bullet diameter in inches
+     *   l = bullet length in calibers (L/d)
+     *
+     * @param twist_inches_per_turn Twist rate in inches per turn
+     * @return Stability factor (dimensionless). Values > 1.5 are generally stable, > 2.0 is safer.
+     */
+    constexpr float computeMillerStabilityFactor(float twist_inches_per_turn) const
+    {
+      // Convert SI units to imperial for Miller formula
+      float m_grains = btk::math::Conversions::kgToGrains(weight_);
+      float d_inches = btk::math::Conversions::metersToInches(diameter_);
+      float L_inches = btk::math::Conversions::metersToInches(length_);
+
+      // Calculate length in calibers
+      float l_calibers = L_inches / d_inches;
+
+      // Calculate twist rate in calibers per turn
+      float t_calibers_per_turn = twist_inches_per_turn / d_inches;
+
+      // Miller formula: s = 30m / (t²d³l(1+l²))
+      float numerator = 30.0f * m_grains;
+      float t_squared = t_calibers_per_turn * t_calibers_per_turn;
+      float d_cubed = d_inches * d_inches * d_inches;
+      float l_term = l_calibers * (1.0f + l_calibers * l_calibers);
+      float denominator = t_squared * d_cubed * l_term;
+
+      if(denominator == 0.0f)
+        return 0.0f;
+
+      return numerator / denominator;
+    }
+
+    /**
+     * @brief Calculate ideal twist rate using Miller twist rule
+     *
+     * Based on Miller twist rule: T = √(30m / (sdL(1+l²)))
+     * where:
+     *   T = twist rate in inches per turn
+     *   m = bullet mass in grains
+     *   s = stability factor (typically 2.0 for safe values)
+     *   d = bullet diameter in inches
+     *   L = bullet length in inches
+     *   l = L/d (length in calibers)
+     *
+     * @param stability_factor Desired stability factor (default 2.0, Miller's safe value)
+     * @return Ideal twist rate in inches per turn
+     */
+    constexpr float computeIdealTwistRate(float stability_factor = 2.0f) const
+    {
+      // Convert SI units to imperial for Miller formula
+      float m_grains = btk::math::Conversions::kgToGrains(weight_);
+      float d_inches = btk::math::Conversions::metersToInches(diameter_);
+      float L_inches = btk::math::Conversions::metersToInches(length_);
+
+      // Calculate length in calibers
+      float l_calibers = L_inches / d_inches;
+
+      // Miller formula: T = √(30m / (sdL(1+l²)))
+      float numerator = 30.0f * m_grains;
+      float l_term = l_calibers * (1.0f + l_calibers * l_calibers);
+      float denominator = stability_factor * d_inches * L_inches * l_term;
+
+      if(denominator <= 0.0f)
+        return 0.0f;
+
+      return std::sqrt(numerator / denominator);
+    }
+
     private:
     float weight_;   // kg
     float diameter_; // m
