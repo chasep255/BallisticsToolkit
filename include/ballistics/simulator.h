@@ -182,9 +182,17 @@ namespace btk::ballistics
     float getYawOfReposeScale() const { return yaw_of_repose_scale_; }
     float getBetaLagScale() const { return beta_lag_scale_; }
 
+    /**
+     * @brief Get deceleration (drag retardation) for a bullet state
+     *
+     * @param bullet Bullet state to calculate deceleration for
+     * @return Deceleration magnitude in m/s²
+     */
+    float getDeceleration(const Bullet& bullet) const;
+
     private:
     // Physics helpers
-    float calculateDragRetardationFor(const Bullet& s) const;
+    float computeDeceleration(const Bullet& s) const;
     btk::math::Vector3D calculateAccelerationFor(Bullet& s, float dt);
     btk::math::Vector3D computeSpinWindAccel(Bullet& s, const btk::math::Vector3D& gravity, const btk::math::Vector3D& wind, float dt);
 

@@ -145,6 +145,10 @@ function calculateTrajectory()
     const driftMeters = position.x; // Crossrange component is now X
     const driftMrad = range > 0 ? (driftMeters / range) * 1000 : 0;
 
+    // Get deceleration (drag retardation) for this bullet state
+    const decelerationMps2 = simulator.getDeceleration(state);
+    const decelerationFps2 = btk.Conversions.mpsToFps(decelerationMps2);
+
     trajectory.push(
     {
       range: btk.Conversions.metersToYards(range),
@@ -152,7 +156,8 @@ function calculateTrajectory()
       drift: driftMrad,
       velocity: btk.Conversions.mpsToFps(state.getTotalVelocity()),
       energy: point.getKineticEnergy(),
-      time: point.getTime()
+      time: point.getTime(),
+      deceleration: decelerationFps2
     });
 
     point.delete(); // Dispose TrajectoryPoint to prevent memory leak
@@ -309,7 +314,8 @@ function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelv
 
     row.insertCell(3).textContent = point.velocity.toFixed(0);
     row.insertCell(4).textContent = point.energy.toFixed(0);
-    row.insertCell(5).textContent = point.time.toFixed(3);
+    row.insertCell(5).textContent = point.deceleration.toFixed(1);
+    row.insertCell(6).textContent = point.time.toFixed(3);
   });
 
   document.getElementById('results').style.display = 'block';

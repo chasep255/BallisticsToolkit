@@ -199,7 +199,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("simulate", select_overload<void(float, float, float)>(&btk::ballistics::Simulator::simulate))
     .function("simulateWithWind", select_overload<void(float, float, float, const WindGenerator&)>(&btk::ballistics::Simulator::simulate))
     .function("getTrajectory", select_overload<Trajectory&()>(&btk::ballistics::Simulator::getTrajectory), return_value_policy::reference())
-    .function("timeStep", &btk::ballistics::Simulator::timeStep);
+    .function("timeStep", &btk::ballistics::Simulator::timeStep)
+    .function("getDeceleration", &btk::ballistics::Simulator::getDeceleration);
 
   // Target class
   class_<btk::match::Target>("Target")

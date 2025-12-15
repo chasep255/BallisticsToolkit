@@ -71,8 +71,8 @@ namespace btk::ballistics
     return {std::get<1>(data[data_size - 1]), std::get<2>(data[data_size - 1])};
   }
 
-  // Calculate drag retardation for a specific bullet state
-  float Simulator::calculateDragRetardationFor(const Bullet& s) const
+  // Compute deceleration (drag retardation) for a specific bullet state
+  float Simulator::computeDeceleration(const Bullet& s) const
   {
     btk::math::Vector3D v_rel = s.getVelocity() - wind_;
     float v_rel_mag = v_rel.magnitude();
@@ -172,7 +172,7 @@ namespace btk::ballistics
     if(v_rel_mag <= 0.0f)
       return gravity;
 
-    float drag_ret = calculateDragRetardationFor(s);
+    float drag_ret = computeDeceleration(s);
     btk::math::Vector3D drag_accel = -drag_ret * (v_rel / v_rel_mag);
 
     // Add spin-aerodynamic effects
@@ -200,6 +200,12 @@ namespace btk::ballistics
   const btk::physics::Atmosphere& Simulator::getAtmosphere() const { return atmosphere_; }
 
   const btk::math::Vector3D& Simulator::getWind() const { return wind_; }
+
+  // Get deceleration for a bullet state
+  float Simulator::getDeceleration(const Bullet& bullet) const
+  {
+    return computeDeceleration(bullet);
+  }
 
   // State management
   void Simulator::resetToInitial()
