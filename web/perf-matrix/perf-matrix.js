@@ -31,6 +31,7 @@ function getInputValues()
     dragModel: document.getElementById('dragModel').value,
     units: document.getElementById('units').value,
     energyUnits: document.getElementById('energyUnits').value,
+    bulletWeight: parseFloat(document.getElementById('bulletWeight').value),
     temperature: parseFloat(document.getElementById('temperature').value),
     altitude: parseFloat(document.getElementById('altitude').value),
     humidity: parseFloat(document.getElementById('humidity').value),
@@ -141,13 +142,16 @@ function calculateGrid()
       // Fixed 10 mph crosswind for drift calculations
       const crosswindMph = 10;
 
+      // Convert bullet weight to kg
+      const bulletWeightKg = btk.Conversions.grainsToKg(params.bulletWeight);
+
       // Compute all data in optimized passes
       const driftData = computeTrajectoryGrid(bcValues, mvValues, params.range, crosswindMph, 
-                                               dragFunction, temperatureK, altitudeMeters, humidityFraction, 'drift');
+                                               dragFunction, temperatureK, altitudeMeters, humidityFraction, bulletWeightKg, 'drift');
       const mainData = computeTrajectoryGrid(bcValues, mvValues, params.range, 0, 
-                                              dragFunction, temperatureK, altitudeMeters, humidityFraction, 'all');
+                                              dragFunction, temperatureK, altitudeMeters, humidityFraction, bulletWeightKg, 'all');
       const sensitivityData = computeSensitivityGrid(bcValues, mvValues, params.range, 
-                                                      dragFunction, temperatureK, altitudeMeters, humidityFraction);
+                                                      dragFunction, temperatureK, altitudeMeters, humidityFraction, bulletWeightKg);
 
       // Display results
       displayResults(driftData, mainData.drop, sensitivityData, mainData.velocity, mainData.energy, 
@@ -169,7 +173,7 @@ function calculateGrid()
  * Returns drift OR {drop, velocity, energy} depending on mode
  */
 function computeTrajectoryGrid(bcValues, mvValues, rangeYards, crosswindMph, 
-                                dragFunction, temperatureK, altitudeMeters, humidityFraction, mode)
+                                dragFunction, temperatureK, altitudeMeters, humidityFraction, weightKg, mode)
 {
   const rangeMeters = btk.Conversions.yardsToMeters(rangeYards);
   const crosswindMps = btk.Conversions.mphToMps(crosswindMph);
@@ -179,10 +183,9 @@ function computeTrajectoryGrid(bcValues, mvValues, rangeYards, crosswindMph,
   const windY = 0;
   const windZ = 0;
 
-  // Typical bullet dimensions
+  // Typical bullet dimensions (only diameter/length affect trajectory minimally, weight is passed in)
   const diameterMeters = btk.Conversions.inchesToMeters(0.264);
   const lengthMeters = btk.Conversions.inchesToMeters(1.3);
-  const weightKg = btk.Conversions.grainsToKg(140);
 
   // Initialize result grids
   const driftGrid = [];
@@ -307,7 +310,7 @@ function computeTrajectoryGrid(bcValues, mvValues, rangeYards, crosswindMph,
  * Sensitivity = drop difference between MV ±0.5% (1% total spread)
  */
 function computeSensitivityGrid(bcValues, mvValues, rangeYards, 
-                                dragFunction, temperatureK, altitudeMeters, humidityFraction)
+                                dragFunction, temperatureK, altitudeMeters, humidityFraction, weightKg)
 {
   const rangeMeters = btk.Conversions.yardsToMeters(rangeYards);
   const MV_VARIATION_PERCENT = 0.5; // ±0.5% = 1% total spread
@@ -315,7 +318,6 @@ function computeSensitivityGrid(bcValues, mvValues, rangeYards,
   // Typical bullet dimensions
   const diameterMeters = btk.Conversions.inchesToMeters(0.264);
   const lengthMeters = btk.Conversions.inchesToMeters(1.3);
-  const weightKg = btk.Conversions.grainsToKg(140);
 
   const grid = [];
 
