@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Steel Target Simulator | Ballistics Toolkit</title>
-  <meta name="description" content="Interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile).">
+  <meta name="description" content="Interactive steel range with ballistics simulation, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile).">
   <meta name="keywords" content="steel target simulator, shooting simulator, long range shooting, 3D shooting game, ballistics simulation, steel target physics, FFP scope, MRAD dials, wind reading, spin drift, crosswind jump, impact detection">
   <link rel="canonical" href="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
   
@@ -12,14 +12,14 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
   <meta property="og:title" content="Steel Target Simulator">
-  <meta property="og:description" content="Interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile). Shoot with a pointer-lock FFP scope, MRAD dials, and realistic steel target physics with impact marks and dust effects.">
+  <meta property="og:description" content="Interactive steel range with ballistics simulation, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile). Shoot with a pointer-lock FFP scope, MRAD dials, and simulation-oriented steel target physics with impact marks and dust effects.">
   <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://www.ballisticstoolkit.com/steel-sim/steel-sim.html">
   <meta property="twitter:title" content="Steel Target Simulator">
-  <meta property="twitter:description" content="Interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile). Shoot with a pointer-lock FFP scope, MRAD dials, and realistic steel target physics with impact marks and dust effects.">
+  <meta property="twitter:description" content="Interactive steel range with ballistics simulation, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile). Shoot with a pointer-lock FFP scope, MRAD dials, and simulation-oriented steel target physics with impact marks and dust effects.">
   <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
@@ -32,7 +32,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Steel Target Simulator",
-    "description": "Interactive steel range with full ballistics, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile).",
+    "description": "Interactive steel range with ballistics simulation, wind presets, and reactive steel targets from 100 to 1760 yards (1 mile).",
     "url": "https://www.ballisticstoolkit.com/steel-sim/steel-sim.html",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Web Browser",
@@ -197,7 +197,7 @@
         <!-- Overview -->
         <div class="help-section">
           <h3>Overview</h3>
-          <p>Steel Target Simulator is an interactive steel range with full ballistics and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and realistic target responses. Features dual scopes (rifle + spotting), MRAD/MOA dial adjustments, optional heat mirage effects, wind flags, dust/metal effects, and a HUD.</p>
+          <p>Steel Target Simulator is an interactive steel range with ballistics simulation and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and simulation-oriented target responses. Features dual scopes (rifle + spotting), MRAD/MOA dial adjustments, optional heat mirage effects, wind flags, dust/metal effects, and a HUD.</p>
         </div>
         
         <!-- Quick Start -->
@@ -307,7 +307,7 @@
 
             <strong>Mirage/Optical Effects:</strong><br>
             - Toggle via the checkbox in the settings bar<br>
-            - Simulates realistic heat mirage/shimmer visible through the scope<br>
+            - Simulates heat mirage/shimmer visible through the scope (visual effect)<br>
             - Mirage moves with the wind—watch it to read wind direction and speed<br>
             - Higher magnification = stronger mirage (just like a real scope)<br>
             - Farther distances = stronger mirage (more air to look through)<br>
@@ -400,7 +400,7 @@
           <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
           <div class="param-help">
             <strong>Ballistics Model:</strong> Uses 4DOF trajectory with highly approximate, empirically tuned spin effects. These are rough approximations and may differ significantly from real-world behavior.<br><br>
-            <strong>Wind Model:</strong> 2D curl-noise field provides realistic patterns but does not model terrain effects, thermals, or turbulence.<br><br>
+            <strong>Wind Model:</strong> 2D curl-noise field provides simulation-oriented patterns but does not model terrain effects, thermals, or turbulence.<br><br>
             <strong>Target Physics:</strong> Simplified rigid-body response. Real steel targets may behave differently based on mounting, material, and wear.
           </div>
         </div>
