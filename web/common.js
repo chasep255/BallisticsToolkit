@@ -1,31 +1,138 @@
-// Google Analytics - only load on production domain
-(function()
+/**
+ * Consent + Analytics
+ * - Show a first-visit consent modal requiring acceptance of Terms/Privacy and essential cookies.
+ * - Only load Google Analytics if user explicitly consents to analytics cookies.
+ */
+
+const BTK_CONSENT_VERSION = '2026-01-25';
+const BTK_CONSENT_STORAGE_KEY = 'btkConsent';
+
+function btkGetCookie(name)
+{
+  const nameEQ = name + '=';
+  const cookies = document.cookie.split(';');
+  for (let i = 0; i < cookies.length; i++)
+  {
+    let cookie = cookies[i];
+    while (cookie.charAt(0) === ' ') cookie = cookie.substring(1, cookie.length);
+    if (cookie.indexOf(nameEQ) === 0) return decodeURIComponent(cookie.substring(nameEQ.length, cookie.length));
+  }
+  return null;
+}
+
+function btkSetCookie(name, value, days = 365)
+{
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  const secure = window.location.protocol === 'https:' ? ';Secure' : '';
+  document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires.toUTCString()};path=/;SameSite=Lax${secure}`;
+}
+
+function btkGetStoredConsent()
+{
+  try
+  {
+    const raw = window.localStorage.getItem(BTK_CONSENT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.version !== BTK_CONSENT_VERSION) return null;
+    return parsed;
+  }
+  catch
+  {
+    return null;
+  }
+}
+
+function btkStoreConsent(consent)
+{
+  const stored = {
+    version: BTK_CONSENT_VERSION,
+    acceptedAt: new Date().toISOString(),
+    termsAccepted: !!consent.termsAccepted,
+    privacyAccepted: !!consent.privacyAccepted,
+    essentialCookiesAccepted: !!consent.essentialCookiesAccepted,
+    analyticsCookiesAccepted: !!consent.analyticsCookiesAccepted
+  };
+  try
+  {
+    window.localStorage.setItem(BTK_CONSENT_STORAGE_KEY, JSON.stringify(stored));
+  }
+  catch
+  {
+    // ignore
+  }
+
+  // Optional cookie marker (user requested this). Keep minimal.
+  btkSetCookie('btk_consent', '1');
+  btkSetCookie('btk_consent_version', BTK_CONSENT_VERSION);
+  btkSetCookie('btk_consent_analytics', stored.analyticsCookiesAccepted ? '1' : '0');
+  return stored;
+}
+
+function btkClearConsent()
+{
+  try
+  {
+    window.localStorage.removeItem(BTK_CONSENT_STORAGE_KEY);
+  }
+  catch
+  {
+    // ignore
+  }
+
+  // Expire consent cookies
+  const expire = (name) =>
+  {
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax`;
+  };
+  expire('btk_consent');
+  expire('btk_consent_version');
+  expire('btk_consent_analytics');
+}
+
+function btkHasAnalyticsConsent()
+{
+  const stored = btkGetStoredConsent();
+  if (stored) return !!stored.analyticsCookiesAccepted;
+  // Fallback to cookie in case localStorage is blocked
+  return btkGetCookie('btk_consent_version') === BTK_CONSENT_VERSION && btkGetCookie('btk_consent_analytics') === '1';
+}
+
+function btkIsProductionDomain()
 {
   const hostname = window.location.hostname;
-  const isProduction = hostname === 'ballisticstoolkit.com' || hostname === 'www.ballisticstoolkit.com';
+  return hostname === 'ballisticstoolkit.com' || hostname === 'www.ballisticstoolkit.com';
+}
 
-  if (isProduction)
+function btkLoadGoogleAnalytics()
+{
+  if (!btkIsProductionDomain()) return;
+  if (!btkHasAnalyticsConsent()) return;
+  if (window.__btkGaLoaded) return;
+  window.__btkGaLoaded = true;
+
+  const GA_MEASUREMENT_ID = 'G-JWTD9KG6D6';
+  const gtagScript = document.createElement('script');
+  gtagScript.async = true;
+  gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+  document.head.appendChild(gtagScript);
+
+  window.dataLayer = window.dataLayer || [];
+  function gtag()
   {
-    const GA_MEASUREMENT_ID = 'G-JWTD9KG6D6';
-    const gtagScript = document.createElement('script');
-    gtagScript.async = true;
-    gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
-    document.head.appendChild(gtagScript);
-
-    window.dataLayer = window.dataLayer || [];
-
-    function gtag()
-    {
-      dataLayer.push(arguments);
-    }
-    window.gtag = gtag;
-    gtag('js', new Date());
-    gtag('config', GA_MEASUREMENT_ID,
-    {
-      'anonymize_ip': true
-    });
+    dataLayer.push(arguments);
   }
-})();
+  window.gtag = gtag;
+  gtag('js', new Date());
+  gtag('config', GA_MEASUREMENT_ID,
+  {
+    anonymize_ip: true
+  });
+}
+
+// Try to load GA early if already consented (non-blocking)
+btkLoadGoogleAnalytics();
 
 /**
  * Common JavaScript functionality for BallisticsToolkit
@@ -171,6 +278,21 @@ document.addEventListener('DOMContentLoaded', function()
   // Setup common page structure and navigation
   setupCommonPageStructure();
   setActiveNavLink();
+
+  // Consent modal (first visit or when consent version changes)
+  btkEnsureConsentModal();
+
+  // Optional: allow consent reset from the Privacy page control
+  const resetBtn = document.getElementById('btkResetConsentBtn');
+  if (resetBtn)
+  {
+    resetBtn.addEventListener('click', (e) =>
+    {
+      e.preventDefault();
+      btkClearConsent();
+      window.location.reload();
+    });
+  }
 });
 
 // Utility functions
@@ -318,3 +440,114 @@ const Utils = {
 
 // Export for use in other scripts
 window.Utils = Utils;
+
+function btkGetPathPrefix()
+{
+  const body = document.body;
+  const currentPageName = body?.dataset?.page || 'index';
+  const isRootPage = currentPageName === 'index' || currentPageName === 'about';
+  return isRootPage ? '' : '../';
+}
+
+function btkEnsureConsentModal()
+{
+  const existing = btkGetStoredConsent();
+  if (existing) return;
+
+  // Avoid showing consent on Terms/Privacy themselves (still accessible without blocking)
+  const page = document.body?.dataset?.page;
+  if (page === 'terms' || page === 'privacy') return;
+
+  const pathPrefix = btkGetPathPrefix();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'btk-consent-modal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+
+  overlay.innerHTML = `
+    <div class="btk-consent-content">
+      <div class="btk-consent-header">
+        <div class="btk-consent-title">⚠️ Before you continue</div>
+      </div>
+      <div class="btk-consent-body">
+        <p style="margin-top:0;">
+          Ballistics Toolkit is free, non-commercial software provided “as is” and makes no guarantee of accuracy or correctness.
+          It may contain errors and/or inaccuracies.
+        </p>
+        <p>
+          Do not use this tool for any purpose where incorrect ballistic data could create a hazardous or unsafe condition.
+          Real-world use is entirely at your own risk.
+        </p>
+        <p>
+          Please review and accept the <a href="${pathPrefix}terms.html" target="_blank" rel="noopener">Terms of Service</a> and
+          <a href="${pathPrefix}privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
+        </p>
+
+        <div class="btk-consent-checks">
+          <label class="btk-consent-check">
+            <input type="checkbox" id="btkConsentTerms">
+            <span>I have read and agree to the Terms of Service and Privacy Policy.</span>
+          </label>
+
+          <label class="btk-consent-check">
+            <input type="checkbox" id="btkConsentEssential">
+            <span>I consent to essential cookies used to remember site settings (e.g., simulator preferences).</span>
+          </label>
+
+          <label class="btk-consent-check">
+            <input type="checkbox" id="btkConsentAnalytics">
+            <span>Allow analytics cookies (Google Analytics) to help improve the site. (Optional)</span>
+          </label>
+        </div>
+
+        <div class="btk-consent-actions">
+          <button class="btn btn-secondary" id="btkConsentDecline">Decline</button>
+          <button class="btn btn-primary" id="btkConsentAccept" disabled>Accept & Continue</button>
+        </div>
+
+        <div class="btk-consent-footnote">
+          You can change your analytics choice later by clearing site data. Consent version: ${BTK_CONSENT_VERSION}.
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const terms = overlay.querySelector('#btkConsentTerms');
+  const essential = overlay.querySelector('#btkConsentEssential');
+  const analytics = overlay.querySelector('#btkConsentAnalytics');
+  const acceptBtn = overlay.querySelector('#btkConsentAccept');
+  const declineBtn = overlay.querySelector('#btkConsentDecline');
+
+  // Require Terms+Privacy and Essential cookies to proceed.
+  function updateAcceptEnabled()
+  {
+    acceptBtn.disabled = !(terms.checked && essential.checked);
+  }
+  terms.addEventListener('change', updateAcceptEnabled);
+  essential.addEventListener('change', updateAcceptEnabled);
+  updateAcceptEnabled();
+
+  acceptBtn.addEventListener('click', () =>
+  {
+    btkStoreConsent({
+      termsAccepted: true,
+      privacyAccepted: true,
+      essentialCookiesAccepted: true,
+      analyticsCookiesAccepted: !!analytics.checked
+    });
+    overlay.remove();
+    // Load GA now if they opted in.
+    btkLoadGoogleAnalytics();
+  });
+
+  // Decline = keep analytics off; but still require Terms/Privacy + essential to use site.
+  declineBtn.addEventListener('click', () =>
+  {
+    analytics.checked = false;
+    // Provide a gentle nudge: take them to Terms so they can decide.
+    window.location.href = `${pathPrefix}terms.html`;
+  });
+}
