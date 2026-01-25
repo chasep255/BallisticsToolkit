@@ -357,6 +357,8 @@ function printResults()
           th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
           th { background-color: #4CAF50; color: white; }
           tr:nth-child(even) { background-color: #f2f2f2; }
+          .disclaimer { margin-top: 20px; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; font-size: 11px; color: #856404; }
+          .disclaimer strong { color: #664d03; }
           @media print {
             .no-print { display: none; }
           }
@@ -366,6 +368,9 @@ function printResults()
         <h1>📊 Ballistic Calculator Results</h1>
         <div class="info-section">${document.getElementById('atmosphericInfo').innerHTML}</div>
         ${document.getElementById('trajectoryTable').outerHTML}
+        <div class="disclaimer">
+          <strong>⚠️ Safety Notice:</strong> Ballistics Toolkit is free, non-commercial software provided &ldquo;as is&rdquo; and makes no guarantee of accuracy or correctness. It may contain errors and/or inaccuracies. Do not use this tool for any purpose where incorrect ballistic data could create a hazardous or unsafe condition. Real-world use is entirely at your own risk. <a href="https://www.ballisticstoolkit.com/terms.html">See full disclaimers</a>.
+        </div>
       </body>
     </html>
   `);

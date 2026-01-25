@@ -193,9 +193,17 @@
                     <h3>Technical Notes</h3>
                     <div class="param-help">
                         <strong>Monte Carlo:</strong> Per‑shot draws from statistical distributions (velocity, wind, accuracy). Wind/MV treated as normal with clipping for outliers; accuracy modeled as a uniform circle in MOA for simplicity.<br><br>
-                        <strong>Trajectory Engine:</strong> Same WebAssembly core as the Ballistic Calculator (RK2 integration). 4DOF with simplified spin effects available for realism.
-                        <br><br>
+                        <strong>Trajectory Engine:</strong> Same WebAssembly core as the Ballistic Calculator (RK2 integration). 4DOF with simplified spin effects available for realism.<br><br>
                         <strong>Scoring:</strong> Competitive target specs with line‑breaking; bullet diameter is used to determine ring breaks on boundaries.
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3>Known Limitations</h3>
+                    <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
+                    <div class="param-help">
+                        <strong>Simplified Wind Model:</strong> Wind is drawn independently for each shot from Gaussian distributions (clipped to 3-sigma). Wind remains constant throughout each shot's trajectory. Real wind varies along the bullet path and has temporal correlation between shots not captured here.<br><br>
+                        <strong>Accuracy Model:</strong> Rifle accuracy is modeled as a uniform distribution within a circle (diameter = accuracy MOA). Real dispersion patterns may differ and are typically not uniform.
                     </div>
                 </div>
             </div>
