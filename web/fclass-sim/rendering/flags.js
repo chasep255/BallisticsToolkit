@@ -49,7 +49,7 @@ export class FlagRenderer
       flagSegments: config.flagSegments ?? FlagRenderer.FLAG_SEGMENTS,
       flagMinAngle: config.flagMinAngle ?? FlagRenderer.FLAG_MIN_ANGLE,
       flagMaxAngle: config.flagMaxAngle ?? FlagRenderer.FLAG_MAX_ANGLE,
-      flagDegreesPerMph: config.flagDegreesPerMph ?? FlagRenderer.FLAG_DEGREES_PER_MPH,
+      flagAngleResponseK: config.flagAngleResponseK ?? FlagRenderer.FLAG_ANGLE_RESPONSE_K,
       flagAngleInterpolationSpeed: config.flagAngleInterpolationSpeed ?? FlagRenderer.FLAG_ANGLE_INTERPOLATION_SPEED,
       flagDirectionInterpolationSpeed: config.flagDirectionInterpolationSpeed ?? FlagRenderer.FLAG_DIRECTION_INTERPOLATION_SPEED,
       flagFlapFrequencyBase: config.flagFlapFrequencyBase ?? FlagRenderer.FLAG_FLAP_FREQUENCY_BASE,
@@ -79,11 +79,16 @@ export class FlagRenderer
       this.poleInstancedMesh = null;
     }
 
-    // Remove all flag cloth meshes from scene
+    // Remove all flag cloth meshes from scene and dispose per-flag materials
     for (const flag of this.flagMeshes)
     {
       this.scene.remove(flag.flagMesh);
       flag.flagGeometry.dispose();
+      // Dispose per-flag material (cloned from base)
+      if (flag.flagMaterial)
+      {
+        flag.flagMaterial.dispose();
+      }
     }
 
     // Dispose shared pole geometry
@@ -99,12 +104,13 @@ export class FlagRenderer
       {
         this.sharedMaterials.pole.dispose();
       }
-      if (this.sharedMaterials.flag)
+      // Dispose base flag material and its textures
+      if (this.sharedMaterials.flagBase)
       {
-        if (this.sharedMaterials.flag.map) this.sharedMaterials.flag.map.dispose();
-        if (this.sharedMaterials.flag.normalMap) this.sharedMaterials.flag.normalMap.dispose();
-        if (this.sharedMaterials.flag.roughnessMap) this.sharedMaterials.flag.roughnessMap.dispose();
-        this.sharedMaterials.flag.dispose();
+        if (this.sharedMaterials.flagBase.map) this.sharedMaterials.flagBase.map.dispose();
+        if (this.sharedMaterials.flagBase.normalMap) this.sharedMaterials.flagBase.normalMap.dispose();
+        if (this.sharedMaterials.flagBase.roughnessMap) this.sharedMaterials.flagBase.roughnessMap.dispose();
+        this.sharedMaterials.flagBase.dispose();
       }
     }
 
@@ -145,7 +151,8 @@ export class FlagRenderer
         roughness: 0.2,
         envMapIntensity: 1.0
       }),
-      flag: new THREE.MeshStandardMaterial(
+      // Base flag material - will be cloned per flag for individual uniforms
+      flagBase: new THREE.MeshStandardMaterial(
       {
         map: flagTexture,
         normalMap: clothNormalClone,
@@ -156,6 +163,133 @@ export class FlagRenderer
         side: THREE.DoubleSide
       })
     };
+  }
+
+  /**
+   * Create a shader-injected flag material with per-flag uniforms
+   * Uses GPU vertex shader for deformation instead of CPU
+   */
+  createFlagMaterial()
+  {
+    // Clone base material for independent uniforms
+    const material = this.sharedMaterials.flagBase.clone();
+
+    // Store uniforms for this flag
+    const uniforms = {
+      uAngle: { value: this.cfg.flagMinAngle }, // Current pitch angle in degrees
+      uDirection: { value: 0 }, // Current wind direction in radians
+      uWavePhase: { value: 0 }, // Accumulated wave phase
+      uFlagLength: { value: this.cfg.flagLength },
+      uFlapAmplitude: { value: this.cfg.flagFlapAmplitude },
+      uWaveLength: { value: this.cfg.flagWaveLength }
+    };
+
+    material.onBeforeCompile = (shader) =>
+    {
+      // Add uniforms
+      shader.uniforms.uAngle = uniforms.uAngle;
+      shader.uniforms.uDirection = uniforms.uDirection;
+      shader.uniforms.uWavePhase = uniforms.uWavePhase;
+      shader.uniforms.uFlagLength = uniforms.uFlagLength;
+      shader.uniforms.uFlapAmplitude = uniforms.uFlapAmplitude;
+      shader.uniforms.uWaveLength = uniforms.uWaveLength;
+
+      // Vertex shader: add attribute and uniforms
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `
+        #include <common>
+
+        attribute float segmentT;
+
+        uniform float uAngle;      // Pitch angle in degrees (pre-smoothed)
+        uniform float uDirection;  // Wind direction in radians (pre-smoothed)
+        uniform float uWavePhase;  // Accumulated wave phase
+        uniform float uFlagLength;
+        uniform float uFlapAmplitude;
+        uniform float uWaveLength;
+
+        // Helper function to compute deformed position
+        vec3 computeDeformedPosition(float localX, float localY, float localZ, float t) {
+          // Convert angle to radians
+          float angleRad = uAngle * 0.01745329;
+
+          float cosDir = cos(uDirection);
+          float sinDir = sin(uDirection);
+          float cosPitch = cos(angleRad);
+          float sinPitch = sin(angleRad);
+
+          // Wave/flapping animation
+          float waveArg = uWavePhase + t * uWaveLength * 6.28318;
+          float waveOffset = sin(waveArg) * uFlapAmplitude * t;
+
+          // Position after pitch rotation (flag tilts based on wind)
+          // localX is position along flag (0 to flagLength)
+          float pitchedX = localX * sinPitch;  // Horizontal extension in wind direction
+          float pitchedY = -localX * cosPitch; // Vertical droop (negative = down)
+
+          // Rotate into wind direction (around Y axis) and add wave
+          float rotatedX = pitchedX * cosDir + waveOffset * sinDir;
+          float rotatedY = pitchedY + localY; // Add width offset
+          float rotatedZ = -pitchedX * sinDir + waveOffset * cosDir + localZ;
+
+          return vec3(rotatedX, rotatedY, rotatedZ);
+        }
+        `
+      );
+
+      // Vertex shader: deform in local space
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+        #include <begin_vertex>
+
+        float localX = position.x;
+        float localY = position.y;
+        float localZ = position.z;
+        float t = segmentT;
+
+        transformed = computeDeformedPosition(localX, localY, localZ, t);
+        `
+      );
+
+      // Normal calculation: compute from deformed geometry
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <beginnormal_vertex>',
+        `
+        // Compute deformed normal
+        float nLocalX = position.x;
+        float nLocalY = position.y;
+        float nLocalZ = position.z;
+        float nT = segmentT;
+
+        // Compute position at current point
+        vec3 p = computeDeformedPosition(nLocalX, nLocalY, nLocalZ, nT);
+
+        // Compute tangent along flag length
+        float dx = uFlagLength * 0.001;
+        float tNext = clamp(nT + 0.001, 0.0, 1.0);
+        vec3 pt = computeDeformedPosition(nLocalX + dx, nLocalY, nLocalZ, tNext);
+        vec3 tangent = normalize(pt - p);
+
+        // Compute bitangent along flag width
+        float dy = 0.001;
+        vec3 py = computeDeformedPosition(nLocalX, nLocalY + dy, nLocalZ, nT);
+        vec3 bitangent = normalize(py - p);
+
+        // Normal = tangent × bitangent
+        vec3 objectNormal = normalize(cross(tangent, bitangent));
+
+        // Flip for back face (negative Z in local space)
+        if (position.z < 0.0) {
+          objectNormal = -objectNormal;
+        }
+        `
+      );
+    };
+
+    // Return material and uniforms reference
+    return { material, uniforms };
   }
 
   initialize()
@@ -195,102 +329,62 @@ export class FlagRenderer
     return texture;
   }
 
-  // Helper method - calculates vertex positions for one flag segment
-  calculateFlagSegmentPosition(segmentIndex, angleDeg, direction, flapPhase)
-  {
-    const halfBase = this.cfg.flagBaseWidth / 2;
-    const halfTip = this.cfg.flagTipWidth / 2;
-    const length = this.cfg.flagLength;
-    const thickness = this.cfg.flagThickness;
-    const numSegments = this.cfg.flagSegments;
-
-    const t = segmentIndex / (numSegments - 1);
-    const halfWidth = halfBase + (halfTip - halfBase) * t;
-
-    // Calculate position with wind angle and flapping
-    const angleRad = angleDeg * Math.PI / 180;
-    const cosDir = Math.cos(direction);
-    const sinDir = Math.sin(direction);
-    const cosPitch = Math.cos(angleRad);
-    const sinPitch = Math.sin(angleRad);
-
-    // In Three.js coords: X=right, Y=up, Z=towards camera (negative Z = downrange)
-    // Flag extends from pole: 0° = hanging down, 90° = horizontal
-    // Wind angle determines how much the flag lifts (0° = hanging down, 90° = straight out)
-    // direction parameter is the wind direction angle (0° = right, 90° = up, 180° = left, 270° = down)
-
-    const segmentX = Math.cos(direction) * sinPitch * length * t; // Horizontal extension in wind direction
-    const segmentY = -cosPitch * length * t; // Vertical droop (negative Y = down)
-    const segmentZ = Math.sin(direction) * sinPitch * length * t; // Depth extension in wind direction
-
-    // Flapping animation - flag waves in the wind
-    const wavePosition = t * this.cfg.flagWaveLength;
-    const waveOffset = Math.sin(flapPhase + wavePosition * 2 * Math.PI) * this.cfg.flagFlapAmplitude;
-    const flapAmplitude = waveOffset * t;
-
-    // Flapping perpendicular to wind direction (makes flag visible from all angles)
-    // When wind blows right (0°), flag flaps in Z (depth)
-    // When wind blows downrange (90°), flag flaps in X (horizontal)
-    const flapX = -Math.sin(direction) * flapAmplitude; // Horizontal flapping
-    const flapY = 0; // No vertical flapping
-    const flapZ = Math.cos(direction) * flapAmplitude; // Depth flapping
-
-    // Return 4 vertices: [topFront, bottomFront, topBack, bottomBack]
-    // Flag is vertical (in XY plane), with top/bottom in Y direction
-    // Front/back faces are offset in Z direction (thickness)
-    return {
-      topFront: [segmentX + flapX, segmentY + flapY + halfWidth, segmentZ + flapZ + thickness / 2],
-      bottomFront: [segmentX + flapX, segmentY + flapY - halfWidth, segmentZ + flapZ + thickness / 2],
-      topBack: [segmentX + flapX, segmentY + flapY + halfWidth, segmentZ + flapZ - thickness / 2],
-      bottomBack: [segmentX + flapX, segmentY + flapY - halfWidth, segmentZ + flapZ - thickness / 2]
-    };
-  }
-
   createFlagGeometry()
   {
-    // Create thick segmented trapezoid flag with configurable segments for flapping animation
-    // Uses helper method for initial positions (no wind, no flapping)
+    // Create static flag geometry in local space with segmentT attribute
+    // GPU shader handles all deformation - geometry never changes after creation
+    // Local space: X = along flag length, Y = width (top/bottom), Z = thickness (front/back)
     const geometry = new THREE.BufferGeometry();
     const numSegments = this.cfg.flagSegments;
+    const halfThickness = this.cfg.flagThickness / 2;
 
-    // Create vertices for thick flag using multiple layers
-    const vertices = [];
+    const positions = [];
     const uvs = [];
+    const segmentTs = [];
     const indices = [];
 
-    // Create front and back faces for each segment using helper
+    // Generate vertices for each segment
     for (let i = 0; i < numSegments; i++)
     {
       const t = i / (numSegments - 1); // 0 to 1
+      const halfWidth = this.cfg.flagBaseWidth / 2 + (this.cfg.flagTipWidth / 2 - this.cfg.flagBaseWidth / 2) * t;
+      const x = this.cfg.flagLength * t;
 
-      // Get initial positions (no wind, no flapping)
-      const positions = this.calculateFlagSegmentPosition(i, 0, 0, 0);
+      // Front face vertices (Z = +halfThickness)
+      // Top front
+      positions.push(x, halfWidth, halfThickness);
+      uvs.push(t, 0);
+      segmentTs.push(t);
 
-      // Add vertices in order: topFront, bottomFront, topBack, bottomBack
-      vertices.push(...positions.topFront);
-      vertices.push(...positions.bottomFront);
-      vertices.push(...positions.topBack);
-      vertices.push(...positions.bottomBack);
+      // Bottom front
+      positions.push(x, -halfWidth, halfThickness);
+      uvs.push(t, 1);
+      segmentTs.push(t);
 
-      // UV coordinates (red top, yellow bottom) for both faces
-      uvs.push(t, 0); // Top front
-      uvs.push(t, 1); // Bottom front
-      uvs.push(t, 0); // Top back
-      uvs.push(t, 1); // Bottom back
+      // Back face vertices (Z = -halfThickness)
+      // Top back
+      positions.push(x, halfWidth, -halfThickness);
+      uvs.push(t, 0);
+      segmentTs.push(t);
+
+      // Bottom back
+      positions.push(x, -halfWidth, -halfThickness);
+      uvs.push(t, 1);
+      segmentTs.push(t);
     }
 
     // Create indices for front and back faces
     for (let i = 0; i < numSegments - 1; i++)
     {
-      const idx = i * 4; // 4 vertices per segment (2 front + 2 back)
+      const idx = i * 4;
 
       // Front face triangles
-      indices.push(idx, idx + 1, idx + 4); // First triangle
-      indices.push(idx + 1, idx + 5, idx + 4); // Second triangle
+      indices.push(idx, idx + 1, idx + 4);
+      indices.push(idx + 1, idx + 5, idx + 4);
 
       // Back face triangles (reverse winding)
-      indices.push(idx + 2, idx + 6, idx + 3); // First triangle
-      indices.push(idx + 3, idx + 6, idx + 7); // Second triangle
+      indices.push(idx + 2, idx + 6, idx + 3);
+      indices.push(idx + 3, idx + 6, idx + 7);
     }
 
     // Add side faces to connect front and back
@@ -299,18 +393,18 @@ export class FlagRenderer
       const idx = i * 4;
 
       // Top edge side face
-      indices.push(idx, idx + 4, idx + 2); // First triangle
-      indices.push(idx + 2, idx + 4, idx + 6); // Second triangle
+      indices.push(idx, idx + 4, idx + 2);
+      indices.push(idx + 2, idx + 4, idx + 6);
 
       // Bottom edge side face
-      indices.push(idx + 1, idx + 3, idx + 5); // First triangle
-      indices.push(idx + 3, idx + 7, idx + 5); // Second triangle
+      indices.push(idx + 1, idx + 3, idx + 5);
+      indices.push(idx + 3, idx + 7, idx + 5);
     }
 
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geometry.setAttribute('segmentT', new THREE.BufferAttribute(new Float32Array(segmentTs), 1));
     geometry.setIndex(indices);
-    geometry.computeVertexNormals();
 
     return geometry;
   }
@@ -325,9 +419,13 @@ export class FlagRenderer
       z: zPosition
     });
 
-    // Create flag (unique geometry per flag for animation, share material)
+    // Create flag geometry (static - shader handles deformation)
     const flagGeometry = this.createFlagGeometry();
-    const flagMesh = new THREE.Mesh(flagGeometry, this.sharedMaterials.flag);
+
+    // Create shader-injected material with per-flag uniforms
+    const { material, uniforms } = this.createFlagMaterial();
+
+    const flagMesh = new THREE.Mesh(flagGeometry, material);
     flagMesh.castShadow = this.shadowsEnabled;
     flagMesh.receiveShadow = this.shadowsEnabled;
 
@@ -335,11 +433,13 @@ export class FlagRenderer
     flagMesh.position.set(xPosition, flagY, zPosition);
     this.scene.add(flagMesh);
 
-    // Store flag data
+    // Store flag data with uniforms reference for GPU updates
     this.flagMeshes.push(
     {
       flagGeometry: flagGeometry,
+      flagMaterial: material,
       flagMesh: flagMesh,
+      uniforms: uniforms, // Reference to shader uniforms for GPU updates
       position:
       {
         x: xPosition,
@@ -347,7 +447,6 @@ export class FlagRenderer
         z: zPosition
       },
       currentAngle: this.cfg.flagMinAngle,
-      targetAngle: this.cfg.flagMinAngle,
       currentDirection: 0,
       flapPhase: Math.random() * this.cfg.flagPhaseDriftRange
     });
@@ -391,9 +490,8 @@ export class FlagRenderer
   {
     // Get time from ResourceManager
     const deltaTime = ResourceManager.time.getDeltaTime();
-    const currentTime = ResourceManager.time.getElapsedTime();
 
-    // Update each flag mesh based on wind
+    // Update each flag's uniforms based on wind (GPU handles deformation)
     for (let i = 0; i < this.flagMeshes.length; i++)
     {
       const flag = this.flagMeshes[i];
@@ -407,7 +505,7 @@ export class FlagRenderer
 
       // Nonlinear angle response: angle = min + span * (1 - exp(-K * v_h^2))
       const span = this.cfg.flagMaxAngle - this.cfg.flagMinAngle;
-      const targetAngleDeg = this.cfg.flagMinAngle + span * (1 - Math.exp(-FlagRenderer.FLAG_ANGLE_RESPONSE_K * windHoriz_mph * windHoriz_mph));
+      const targetAngleDeg = this.cfg.flagMinAngle + span * (1 - Math.exp(-this.cfg.flagAngleResponseK * windHoriz_mph * windHoriz_mph));
 
       // Wind direction in ground plane
       const targetDirection = windHoriz_mph > 1e-6 ? Math.atan2(windZ_mph, windX_mph) : flag.currentDirection;
@@ -428,49 +526,13 @@ export class FlagRenderer
       const flapFrequency = this.cfg.flagFlapFrequencyBase + windHoriz_mph * this.cfg.flagFlapFrequencyScale;
       flag.flapPhase += flapFrequency * 2 * Math.PI * deltaTime;
 
-      // Update flag geometry with flapping
-      this.updateFlagVertices(flag, flag.currentAngle, flag.currentDirection, windHoriz_mph);
+      // Wrap phase to avoid floating point issues
+      flag.flapPhase = flag.flapPhase % (2 * Math.PI);
+
+      // Update shader uniforms (GPU handles all deformation)
+      flag.uniforms.uAngle.value = flag.currentAngle;
+      flag.uniforms.uDirection.value = flag.currentDirection;
+      flag.uniforms.uWavePhase.value = flag.flapPhase;
     }
-  }
-
-  updateFlagVertices(flag, angleDeg, direction, windSpeedMph)
-  {
-    // Update all segments with flapping animation
-    const numSegments = this.cfg.flagSegments;
-
-    // Get the position attribute from the geometry
-    const positions = flag.flagGeometry.attributes.position.array;
-
-    // Update each segment (4 vertices per segment: 2 front + 2 back)
-    for (let i = 0; i < numSegments; i++)
-    {
-      // Get positions using helper method with actual wind parameters
-      const segmentPositions = this.calculateFlagSegmentPosition(i, angleDeg, direction, flag.flapPhase);
-
-      // Update all 4 vertices for this segment (front and back faces)
-      const idx = i * 4; // 4 vertices per segment
-
-      // Front face vertices (positive X)
-      positions[idx * 3 + 0] = segmentPositions.topFront[0]; // Top front X
-      positions[idx * 3 + 1] = segmentPositions.topFront[1]; // Top front Y
-      positions[idx * 3 + 2] = segmentPositions.topFront[2]; // Top front Z
-
-      positions[(idx + 1) * 3 + 0] = segmentPositions.bottomFront[0]; // Bottom front X
-      positions[(idx + 1) * 3 + 1] = segmentPositions.bottomFront[1]; // Bottom front Y
-      positions[(idx + 1) * 3 + 2] = segmentPositions.bottomFront[2]; // Bottom front Z
-
-      // Back face vertices (negative X)
-      positions[(idx + 2) * 3 + 0] = segmentPositions.topBack[0]; // Top back X
-      positions[(idx + 2) * 3 + 1] = segmentPositions.topBack[1]; // Top back Y
-      positions[(idx + 2) * 3 + 2] = segmentPositions.topBack[2]; // Top back Z
-
-      positions[(idx + 3) * 3 + 0] = segmentPositions.bottomBack[0]; // Bottom back X
-      positions[(idx + 3) * 3 + 1] = segmentPositions.bottomBack[1]; // Bottom back Y
-      positions[(idx + 3) * 3 + 2] = segmentPositions.bottomBack[2]; // Bottom back Z
-    }
-
-    // Mark the geometry as needing an update
-    flag.flagGeometry.attributes.position.needsUpdate = true;
-    flag.flagGeometry.computeVertexNormals();
   }
 }
