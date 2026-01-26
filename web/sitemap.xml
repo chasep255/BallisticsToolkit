@@ -9,11 +9,27 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.ballisticstoolkit.com/contact.html</loc>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.ballisticstoolkit.com/terms.html</loc>
+    <priority>0.2</priority>
+  </url>
+  <url>
+    <loc>https://www.ballisticstoolkit.com/privacy.html</loc>
+    <priority>0.2</priority>
+  </url>
+  <url>
     <loc>https://www.ballisticstoolkit.com/ballistic-calc/ballistic-calc.html</loc>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://www.ballisticstoolkit.com/load-comp/load-comp.html</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.ballisticstoolkit.com/perf-matrix/perf-matrix.html</loc>
     <priority>0.7</priority>
   </url>
   <url>

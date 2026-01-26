@@ -184,17 +184,18 @@
         
         <div class="help-section">
           <h3>Quick Start</h3>
-          <p>Select a wind preset and watch simulated wind patterns evolve in real-time. Each simulation uses deterministic wind patterns for consistent behavior.</p>
+          <p>Select a wind preset and watch simulated wind patterns evolve in real-time.</p>
         </div>
-        
+
         <div class="help-section">
           <h3>Wind Presets</h3>
           <div class="param-help">
+            <strong>Zero:</strong> No wind (static field)<br><br>
             <strong>Dead:</strong> Minimal wind with very smooth, gradual variations<br><br>
             <strong>Calm:</strong> Light winds with smooth, gentle variations<br><br>
-            <strong>Moderate:</strong> Moderate wind speeds with smooth, predictable patterns<br><br>
-            <strong>Strong:</strong> Strong winds with smooth, consistent flow<br><br>
-            <strong>Shear:</strong> Sharp wind gradients with strong local variations
+            <strong>Moderate:</strong> Moderate wind speeds with smooth patterns<br><br>
+            <strong>Strong:</strong> Strong winds with consistent flow<br><br>
+            <strong>Extra Strong:</strong> Very strong winds for challenging conditions
           </div>
         </div>
         
@@ -265,12 +266,13 @@
           <h3>Known Limitations</h3>
           <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
           <div class="param-help">
+            <strong>Visualization Only:</strong> This is the wind engine that powers the Steel and F-Class simulators. It generates plausible wind patterns for simulation purposes, not meteorological predictions.<br><br>
             <strong>2D Field Only:</strong> The wind field is computed in the horizontal plane only. There is no vertical wind component variation, and the model assumes wind at shooting height is representative of conditions along the bullet path.<br><br>
             <strong>Not Divergence-Free:</strong> While the curl operator initially produces divergence-free (incompressible) flow fields, post-processing operations (RMS normalization, exponent reshaping, sigmoid gating, clipping) modify the field and break this property. The final wind field is not divergence-free and may not capture all atmospheric phenomena such as thermal updrafts, downdrafts, or compressible effects.<br><br>
             <strong>Smooth/Continuous Spatial Field:</strong> The field is spatially smooth and continuous by design. It cannot model sharp spatial wind shear boundaries or discrete spatial gusts that may occur at fixed locations. However, sudden direction changes over time are possible through rapid temporal evolution with shorter temporal scales.<br><br>
             <strong>No Terrain Interaction:</strong> The model does not account for terrain features (hills, valleys, obstacles) that can dramatically affect local wind patterns. All spatial variation comes from the noise field itself.<br><br>
-            <strong>Deterministic Evolution:</strong> Temporal evolution is based on a deterministic noise function rather than physical turbulence modeling. The field evolves smoothly over time but does not capture true turbulent fluctuations or chaotic dynamics.<br><br>
-            <strong>Fixed Spatial Scales:</strong> Each component has fixed spatial scales that remain constant throughout the simulation. Real wind patterns may have scales that vary based on atmospheric conditions, time of day, or local effects.
+                        <strong>Fixed Spatial Scales:</strong> Each component has fixed spatial scales that remain constant throughout the simulation. Real wind patterns may have scales that vary based on atmospheric conditions, time of day, or local effects.<br><br>
+            <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete information.
           </div>
         </div>
       </div>
