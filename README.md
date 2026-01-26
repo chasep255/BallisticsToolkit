@@ -38,8 +38,8 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 
 ### 🌬️ Wind Simulator
 - **Real-time Wind Visualization** - Interactive 2D wind field visualization showing wind speed and direction across the range
-- **Realistic Wind Patterns** - Multi-octave curl noise generates natural swirling wind patterns that evolve over time
-- **Multiple Presets** - Pre-configured wind patterns for different conditions
+- **Procedural Wind Patterns** - Multi-octave curl noise generates swirling wind patterns that evolve over time
+- **Wind Presets** - Zero, Dead, Calm, Moderate, Strong, Extra Strong
 - **Adjustable Time Speed** - Speed up or slow down simulation time to observe wind patterns
 
 ### 🎮 F-Class Simulator
@@ -55,7 +55,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 ### 🔩 Steel Target Simulator
 - **Interactive Steel Range** - Shooting simulator with reactive steel targets and full ballistics. Multiple target racks from 100 to 1760 yards (1 mile) with plates from ~2″ chips to large 6‑ft gongs.
 - **Hunting Mode** - Enable boars and prairie dogs via checkbox. Prairie dogs scattered 100-1000 yards, pop up/down randomly. Boars spawn 150-1200 yards, walk randomly.
-- **Realistic Ballistics** - 4DOF trajectory simulation with G1/G7 drag models, wind presets, spin drift, and crosswind jump. Muzzle velocity variation (MV σ) and rifle accuracy (MOA) model real-world shot-to-shot spreads.
+- **Physics-Based Ballistics** - 4DOF trajectory simulation with G1/G7 drag models, wind presets, spin drift, and crosswind jump. Muzzle velocity variation (MV σ) and rifle accuracy (MOA) model shot-to-shot spreads.
 - **Target Physics** - Steel targets hang from virtual chains with momentum transfer, damping, and rotation. Center hits drive linear swing; edge hits kick targets into rotation. Impacts leave visible mark splatter and spawn metal dust.
 - **Impact Detection** - Spatial binning system for efficient collision detection. Accurate hit/miss detection with visual feedback (HUD shows impact status).
 - **Wind & Environment** - 3D landscape with wind flags along the range driven by the same curl‑noise wind field used for the f-class sim. Brown ground dust when you miss; silver‑gray metallic dust when you hit steel.
@@ -122,7 +122,7 @@ Visit the [Steel Target Simulator](https://www.ballisticstoolkit.com/steel-sim/s
 3. **Controls** - Click scope to enter, mouse to aim, click to fire, Tab to switch scopes, Esc to exit
 4. **Targets** - Steel plates from 100 to 1760 yards with reactive physics and impact feedback
 
-Shoot reactive steel targets with realistic ballistics, dust effects, and audio feedback. Optional hunting mode adds prairie dogs and boars.
+Shoot reactive steel targets with physics-based ballistics, dust effects, and audio feedback. Optional hunting mode adds prairie dogs and boars.
 
 ## Building from Source
 
@@ -150,7 +150,7 @@ Opens local server at http://localhost:8001
 - **Frontend**: Vanilla JavaScript with modern CSS
 - **Performance**: Optimized C++ core with WebGL graphics
 - **Spin Aerodynamics**: 4DOF trajectory with simplified, empirically tuned spin effects; spin rate from twist and muzzle velocity
-- **Wind Module**: 2D curl‑noise wind field with presets; realistic, evolving patterns
+- **Wind Module**: 2D curl‑noise wind field with presets; procedural, evolving patterns
 - **Match Scoring**: Competitive scoring system with statistics
 - **Deployment**: GitHub Actions auto‑deploys to GitHub Pages
 - **Architecture**: Client‑side only, no server required
@@ -158,6 +158,10 @@ Opens local server at http://localhost:8001
 ## Contributing
 
 Pull requests are welcome. By submitting a PR that is merged, you agree to the contribution terms in [CONTRIBUTING.md](CONTRIBUTING.md) (copyright assignment + exclusive commercial license).
+
+## Disclaimer
+
+These tools are for educational and entertainment purposes. The calculators and simulators use physics-based models with approximations and may not accurately predict real-world results. Do not rely on these tools for any purpose where incorrect data could be hazardous. See the [Terms of Service](https://www.ballisticstoolkit.com/terms.html) for full details.
 
 ## License
 
