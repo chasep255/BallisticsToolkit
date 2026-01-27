@@ -66,9 +66,9 @@ function btkStoreConsent(consent)
   }
 
   // Optional cookie marker (user requested this). Keep minimal.
-  btkSetCookie('btk_consent', '1');
-  btkSetCookie('btk_consent_version', BTK_CONSENT_VERSION);
-  btkSetCookie('btk_consent_analytics', stored.analyticsCookiesAccepted ? '1' : '0');
+  btkSetCookie('btk_consent', '1', 7);
+  btkSetCookie('btk_consent_version', BTK_CONSENT_VERSION, 7);
+  btkSetCookie('btk_consent_analytics', stored.analyticsCookiesAccepted ? '1' : '0', 7);
   return stored;
 }
 
