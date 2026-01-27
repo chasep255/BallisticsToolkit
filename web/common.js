@@ -1,10 +1,12 @@
 /**
  * Consent + Analytics
  * - Show a first-visit consent modal requiring acceptance of Terms/Privacy and essential cookies.
- * - Only load Google Analytics if user explicitly consents to analytics cookies.
+ * - Google Analytics always loads using Consent Mode:
+ *   - If user declines analytics cookies: cookieless mode (anonymous aggregated data only)
+ *   - If user accepts analytics cookies: full tracking with cookies
  */
 
-const BTK_CONSENT_VERSION = '2026-01-25';
+const BTK_CONSENT_VERSION = '2026-01-26';
 const BTK_CONSENT_STORAGE_KEY = 'btkConsent';
 
 function btkGetCookie(name)
@@ -108,27 +110,51 @@ function btkIsProductionDomain()
 function btkLoadGoogleAnalytics()
 {
   if (!btkIsProductionDomain()) return;
-  if (!btkHasAnalyticsConsent()) return;
   if (window.__btkGaLoaded) return;
   window.__btkGaLoaded = true;
 
   const GA_MEASUREMENT_ID = 'G-JWTD9KG6D6';
-  const gtagScript = document.createElement('script');
-  gtagScript.async = true;
-  gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
-  document.head.appendChild(gtagScript);
+  const hasConsent = btkHasAnalyticsConsent();
 
+  // Initialize dataLayer and gtag function before setting consent
   window.dataLayer = window.dataLayer || [];
   function gtag()
   {
     dataLayer.push(arguments);
   }
   window.gtag = gtag;
+
+  // Set default consent state BEFORE loading the gtag script.
+  // When analytics_storage is 'denied', GA operates in cookieless mode:
+  // - No cookies are set on the user's device
+  // - Pings are still sent to Google for aggregated/modeled reporting
+  // - Individual users cannot be tracked across sessions
+  gtag('consent', 'default', {
+    analytics_storage: hasConsent ? 'granted' : 'denied',
+    ad_storage: 'denied'
+  });
+
+  // Load the gtag.js script
+  const gtagScript = document.createElement('script');
+  gtagScript.async = true;
+  gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+  document.head.appendChild(gtagScript);
+
   gtag('js', new Date());
-  gtag('config', GA_MEASUREMENT_ID,
-  {
+  gtag('config', GA_MEASUREMENT_ID, {
     anonymize_ip: true
   });
+}
+
+// Update analytics consent at runtime (e.g., after user accepts in modal)
+function btkUpdateAnalyticsConsent(granted)
+{
+  if (window.gtag)
+  {
+    window.gtag('consent', 'update', {
+      analytics_storage: granted ? 'granted' : 'denied'
+    });
+  }
 }
 
 // Try to load GA early if already consented (non-blocking)
@@ -497,7 +523,7 @@ function btkEnsureConsentModal()
 
           <label class="btk-consent-check">
             <input type="checkbox" id="btkConsentAnalytics">
-            <span>Allow analytics cookies (Google Analytics) to help improve the site. (Optional)</span>
+            <span>Allow analytics cookies for enhanced tracking (Google Analytics). If declined, basic anonymous/aggregated analytics are still collected without cookies. (Optional)</span>
           </label>
         </div>
 
@@ -507,7 +533,8 @@ function btkEnsureConsentModal()
         </div>
 
         <div class="btk-consent-footnote">
-          You can change your analytics choice later by clearing site data. Consent version: ${BTK_CONSENT_VERSION}.
+          Basic anonymous analytics (page views, general traffic) are collected without cookies using Google Analytics Consent Mode.
+          You can change your cookie preferences later by clearing site data. Consent version: ${BTK_CONSENT_VERSION}.
         </div>
       </div>
     </div>
@@ -532,15 +559,16 @@ function btkEnsureConsentModal()
 
   acceptBtn.addEventListener('click', () =>
   {
+    const analyticsAccepted = !!analytics.checked;
     btkStoreConsent({
       termsAccepted: true,
       privacyAccepted: true,
       essentialCookiesAccepted: true,
-      analyticsCookiesAccepted: !!analytics.checked
+      analyticsCookiesAccepted: analyticsAccepted
     });
     overlay.remove();
-    // Load GA now if they opted in.
-    btkLoadGoogleAnalytics();
+    // Update GA consent state (GA is already loaded in cookieless mode)
+    btkUpdateAnalyticsConsent(analyticsAccepted);
   });
 
   // Decline = keep analytics off; but still require Terms/Privacy + essential to use site.

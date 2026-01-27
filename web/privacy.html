@@ -39,13 +39,18 @@
         <div class="content-section">
             <h2>2. Information I Collect</h2>
             <p>Ballistics Toolkit collects only limited data:</p>
-            
-            <p><strong>Usage data via Google Analytics:</strong> When you visit the site, I use Google Analytics to collect pseudonymous information such as pages visited, referrer URLs, approximate geographic location based on IP address, device and browser type, and interaction events (e.g., clicks). IP addresses may be anonymized according to your region and Google's settings.</p>
-            
-            <p><strong>Cookies and local storage:</strong> The site uses essential cookies for core functionality (such as remembering your preferences) and analytics cookies for Google Analytics. I do not use advertising or marketing cookies.</p>
-            
+
+            <p><strong>Usage data via Google Analytics (Consent Mode):</strong> I use Google Analytics with Consent Mode to collect usage information. This operates in two modes:</p>
+            <ul>
+                <li><strong>Cookieless mode (default):</strong> If you decline analytics cookies, Google Analytics still collects basic, anonymous data (page views, general traffic patterns) without setting any cookies or storing identifiers on your device. Google uses this data to provide aggregated and modeled statistics. Individual users cannot be tracked across sessions in this mode.</li>
+                <li><strong>Full mode (opt-in):</strong> If you consent to analytics cookies, Google Analytics sets cookies to collect more detailed pseudonymous information such as session duration, return visits, referrer URLs, approximate geographic location, device/browser type, and interaction events. This enables more accurate reporting but involves storing identifiers on your device.</li>
+            </ul>
+            <p>In both modes, IP addresses are anonymized.</p>
+
+            <p><strong>Cookies and local storage:</strong> The site uses essential cookies for core functionality (such as remembering your preferences and consent choices). Analytics cookies are only set if you explicitly opt in. I do not use advertising or marketing cookies.</p>
+
             <p><strong>Feedback:</strong> If you voluntarily contact me (for example, by opening an issue on GitHub), I may collect your username and any information you provide. I do not operate contact forms or email subscriptions.</p>
-            
+
             <p>I do not intentionally collect names, mailing addresses, payment details, or other personally identifying information.</p>
         </div>
 
@@ -58,17 +63,17 @@
 
         <div class="content-section">
             <h2>4. Third‑Party Access and Data Sharing</h2>
-            <p>Google Analytics is the analytics provider. Google processes information to provide aggregated usage statistics. You can learn more in <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a> and its <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">partner‑site policy</a>.</p>
+            <p>Google Analytics is the analytics provider. I use Google Analytics Consent Mode, which allows Google to collect basic anonymous data even when you decline cookies, while respecting your choice not to be tracked with persistent identifiers. When you opt in to analytics cookies, Google processes more detailed pseudonymous information. You can learn more in <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a> and its <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">partner‑site policy</a>.</p>
             <p>I may share aggregated, non‑identifiable usage statistics in open‑source project reports.</p>
             <p>I do not otherwise share personal data with third parties.</p>
         </div>
 
         <div class="content-section">
             <h2>5. Cookies and Tracking Technologies</h2>
-            <p><strong>Essential cookies:</strong> Required for basic operation, such as remembering user preferences for units or simulation options.</p>
-            <p><strong>Analytics cookies:</strong> Set by Google Analytics to measure site usage and performance.</p>
+            <p><strong>Essential cookies:</strong> Required for basic operation, such as remembering user preferences for units, simulation options, and consent choices.</p>
+            <p><strong>Analytics cookies (opt-in only):</strong> If you consent to analytics cookies, Google Analytics sets cookies to track sessions and return visits. If you decline, Google Analytics operates in cookieless mode—basic anonymous data (page views, general traffic) is still sent to Google for aggregated reporting, but no cookies or persistent identifiers are stored on your device.</p>
             <p><strong>Advertising cookies:</strong> None. I do not serve ads.</p>
-            <p>You can disable or delete cookies via your browser settings. For Google Analytics, you can also install the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics Opt‑out Browser Add‑on</a>.</p>
+            <p>You can disable or delete cookies via your browser settings. To block all Google Analytics data collection (including cookieless pings), you can install the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics Opt‑out Browser Add‑on</a>.</p>
         </div>
 
         <div class="content-section">
@@ -83,14 +88,16 @@
             <h2>6. Your Rights and Choices</h2>
             <p><strong>Access and deletion:</strong> Because I do not maintain user accounts, I cannot identify individual analytics records. If you wish to manage or delete analytics data associated with your device/browser, you may:</p>
             <ul>
-                <li>Clear your browser's cookies and site data, which removes local identifiers.</li>
+                <li>Clear your browser's cookies and site data, which removes local identifiers and resets your consent preferences.</li>
                 <li>Use Google's privacy tools and the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics opt‑out add‑on</a> to manage data.</li>
             </ul>
-            
-            <p><strong>Opt‑out of analytics:</strong> You may install the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics opt‑out browser add‑on</a> or configure your browser to block cookies.</p>
-            
+
+            <p><strong>Opt‑out of analytics cookies:</strong> You can decline analytics cookies when first visiting the site. This prevents Google Analytics from setting cookies, but basic anonymous data (page views, general traffic) is still collected in cookieless mode for aggregated reporting.</p>
+
+            <p><strong>Fully opt‑out of all analytics:</strong> To block all Google Analytics data collection (including cookieless pings), install the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics opt‑out browser add‑on</a> or use a browser extension that blocks analytics scripts.</p>
+
             <p><strong>Children's data:</strong> The Services are intended for users aged 18 and older. I do not knowingly collect information from children or minors and will delete any such information if discovered.</p>
-            
+
             <p>Privacy laws such as the GDPR or CCPA grant individuals the right to access, correct, or delete personal data. Because I hold no personal data on servers for Ballistics Toolkit, I cannot directly fulfill such requests; however, I encourage users to use the methods above to manage their data.</p>
         </div>
 
