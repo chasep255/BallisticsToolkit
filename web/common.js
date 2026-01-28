@@ -6,7 +6,7 @@
  *   - If user accepts analytics cookies: full tracking with cookies
  */
 
-const BTK_CONSENT_VERSION = '2026-01-26';
+const BTK_CONSENT_VERSION = '2026-01-28';
 const BTK_CONSENT_STORAGE_KEY = 'btkConsent';
 
 function btkGetCookie(name)
@@ -512,6 +512,11 @@ function btkEnsureConsentModal()
 
         <div class="btk-consent-checks">
           <label class="btk-consent-check">
+            <input type="checkbox" id="btkConsentAge">
+            <span>I am 18 years of age or older.</span>
+          </label>
+
+          <label class="btk-consent-check">
             <input type="checkbox" id="btkConsentTerms">
             <span>I have read and agree to the Terms of Service and Privacy Policy.</span>
           </label>
@@ -542,17 +547,19 @@ function btkEnsureConsentModal()
 
   document.body.appendChild(overlay);
 
+  const age = overlay.querySelector('#btkConsentAge');
   const terms = overlay.querySelector('#btkConsentTerms');
   const essential = overlay.querySelector('#btkConsentEssential');
   const analytics = overlay.querySelector('#btkConsentAnalytics');
   const acceptBtn = overlay.querySelector('#btkConsentAccept');
   const declineBtn = overlay.querySelector('#btkConsentDecline');
 
-  // Require Terms+Privacy and Essential cookies to proceed.
+  // Require Age, Terms+Privacy, and Essential cookies to proceed.
   function updateAcceptEnabled()
   {
-    acceptBtn.disabled = !(terms.checked && essential.checked);
+    acceptBtn.disabled = !(age.checked && terms.checked && essential.checked);
   }
+  age.addEventListener('change', updateAcceptEnabled);
   terms.addEventListener('change', updateAcceptEnabled);
   essential.addEventListener('change', updateAcceptEnabled);
   updateAcceptEnabled();
@@ -561,6 +568,7 @@ function btkEnsureConsentModal()
   {
     const analyticsAccepted = !!analytics.checked;
     btkStoreConsent({
+      ageVerified: true,
       termsAccepted: true,
       privacyAccepted: true,
       essentialCookiesAccepted: true,
