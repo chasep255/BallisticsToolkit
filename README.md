@@ -157,7 +157,7 @@ Opens local server at http://localhost:8001
 
 ## Contributing
 
-Pull requests are welcome. By submitting a PR that is merged, you agree to the contribution terms in [CONTRIBUTING.md](CONTRIBUTING.md) (copyright assignment + exclusive commercial license).
+Pull requests are welcome. For guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Disclaimer
 
@@ -165,4 +165,4 @@ These tools are for educational and entertainment purposes. The calculators and 
 
 ## License
 
-This project is licensed under the PolyForm Noncommercial License 1.0.0. See the [LICENSE](LICENSE) file or https://polyformproject.org/licenses/noncommercial/1.0.0/ for details. Commercial use is not permitted without a separate license from the copyright holder.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
