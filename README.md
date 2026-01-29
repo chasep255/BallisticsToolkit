@@ -30,11 +30,11 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 
 ### 🎯 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
-- **Target Library** - 14 competitive targets to choose from
+- **Target Library** - 12 competitive targets to choose from
 - **Realistic Variability** - Muzzle velocity, wind, and rifle accuracy modeling
 - **Spin Effects** - Crosswind jump included in analysis
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
-- **Match Scoring** - Complete competitive scoring with X-counts, line breaking, and group size analysis
+- **Match Scoring** - Competitive scoring with X-counts, line breaking, and group size analysis
 
 ### 🌬️ Wind Simulator
 - **Real-time Wind Visualization** - Interactive 2D wind field visualization showing wind speed and direction across the range
@@ -54,7 +54,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 
 ### 🔩 Steel Target Simulator
 - **Interactive Steel Range** - Shooting simulator with reactive steel targets and full ballistics. Multiple target racks from 100 to 1760 yards (1 mile) with plates from ~2″ chips to large 6‑ft gongs.
-- **Hunting Mode** - Enable boars and prairie dogs via checkbox. Prairie dogs scattered 100-1000 yards, pop up/down randomly. Boars spawn 150-1200 yards, walk randomly.
+- **Hunting Mode** - Enable boars and prairie dogs via separate checkboxes. Prairie dogs scattered 100-1000 yards, pop up/down randomly. Boars spawn 150-1200 yards, walk randomly.
 - **Physics-Based Ballistics** - 4DOF trajectory simulation with G1/G7 drag models, wind presets, spin drift, and crosswind jump. Muzzle velocity variation (MV σ) and rifle accuracy (MOA) model shot-to-shot spreads.
 - **Target Physics** - Steel targets hang from virtual chains with momentum transfer, damping, and rotation. Center hits drive linear swing; edge hits kick targets into rotation. Impacts leave visible mark splatter and spawn metal dust.
 - **Impact Detection** - Spatial binning system for efficient collision detection. Accurate hit/miss detection with visual feedback (HUD shows impact status).
