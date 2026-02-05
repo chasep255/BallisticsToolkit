@@ -4,11 +4,11 @@ This project includes or references third‑party software. The following notice
 
 ## Three.js
 - Project: three.js (used via unpkg CDN)
-- Version: 0.160.0
+- Version: 0.160.0 (wind-sim, fclass-sim) and 0.180.0 (steel-sim)
 - License: MIT
 - Website: https://threejs.org/
 - Source: https://github.com/mrdoob/three.js
-- CDN: https://unpkg.com/three@0.160.0/
+- CDN: https://unpkg.com/three@0.160.0/ and https://unpkg.com/three@0.180.0/
 
 ## WebGL Noise (Simplex/Perlin)
 - Authors: Stefan Gustavson; Ashima Arts (Ian McEwan et al.)

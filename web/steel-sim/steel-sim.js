@@ -193,9 +193,9 @@ class SteelSimulator
       params.length_m === undefined || params.twist_mPerTurn === undefined || params.mvSd_mps === undefined ||
       params.rifleAccuracy_rad === undefined || params.bc === undefined || params.dragFunction === undefined ||
       params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined ||
-      params.opticalEffectsEnabled === undefined || params.rangeFinderEnabled === undefined || params.bdcEnabled === undefined || params.scopeType === undefined)
+      params.opticalEffectsEnabled === undefined || params.rangeFinderEnabled === undefined || params.bdcEnabled === undefined || params.scopeType === undefined || params.recoilPreset === undefined)
     {
-      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled, rangeFinderEnabled, bdcEnabled, scopeType). Use getGameParams() to convert from frontend inputs.');
+      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled, rangeFinderEnabled, bdcEnabled, scopeType, recoilPreset). Use getGameParams() to convert from frontend inputs.');
     }
 
     // Store all params (all must be in SI units, no defaults)
@@ -215,6 +215,7 @@ class SteelSimulator
     this.rangeFinderEnabled = params.rangeFinderEnabled;
     this.bdcEnabled = params.bdcEnabled;
     this.scopeType = params.scopeType;
+    this.recoilPreset = params.recoilPreset;
 
     // State
     this.isRunning = false;
@@ -752,6 +753,7 @@ class SteelSimulator
       bdcEnabled: this.bdcEnabled,
       windGenerator: this.windGenerator,
       scopeType: this.scopeType,
+      recoilPreset: this.recoilPreset,
       ballisticsTable: this.ballisticsTable, // For drop indicator
       cameraPosition:
       {
@@ -2274,6 +2276,13 @@ class SteelSimulator
       scene: this.scene,
       shadowsEnabled: true
     });
+
+    // Trigger recoil *after* the shot is created so the ballistics for this shot
+    // use the pre-recoil aim (recoil affects subsequent shots unless corrected).
+    if (this.scope)
+    {
+      this.scope.triggerRecoil();
+    }
   }
 
   // ===== DUST CLOUD EFFECTS =====
@@ -2751,6 +2760,8 @@ function getGameParams()
   const bdcEnabled = bdcCheckbox ? bdcCheckbox.checked : true;
   const scopeTypeSelect = document.getElementById('scopeType');
   const scopeType = scopeTypeSelect ? scopeTypeSelect.value : 'mrad';
+  const recoilPresetSelect = document.getElementById('recoilPreset');
+  const recoilPreset = recoilPresetSelect ? recoilPresetSelect.value : 'None';
 
   // Convert to SI units (all parameters required, no defaults)
   return {
@@ -2769,7 +2780,8 @@ function getGameParams()
     opticalEffectsEnabled: opticalEffectsEnabled,
     rangeFinderEnabled: rangeFinderEnabled,
     bdcEnabled: bdcEnabled,
-    scopeType: scopeType
+    scopeType: scopeType,
+    recoilPreset: recoilPreset
   };
 }
 
@@ -2926,6 +2938,21 @@ function setupUI()
       setDefaultValues();
       SettingsCookies.saveAll(); // Explicitly save defaults to cookies
       console.log('[UI] Reset all parameters to defaults and saved to cookies');
+    });
+  }
+
+  // Recoil preset change listener (update running sim immediately)
+  const recoilPresetSelect = document.getElementById('recoilPreset');
+  if (recoilPresetSelect)
+  {
+    recoilPresetSelect.addEventListener('change', () =>
+    {
+      if (steelSimulator && steelSimulator.scope)
+      {
+        const newPreset = recoilPresetSelect.value;
+        steelSimulator.scope.setRecoilPreset(newPreset);
+        SettingsCookies.saveAll(); // Auto-save
+      }
     });
   }
 

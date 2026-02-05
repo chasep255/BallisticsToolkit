@@ -24,6 +24,7 @@ export const DEFAULT_PARAMS = {
   zeroDistance: '100',
   scopeHeight: '2.0',
   scopeType: 'mrad',
+  recoilPreset: 'Light',
   opticalEffects: true,
   rangeFinder: true,
   bdc: true,
@@ -51,7 +52,7 @@ export function initConfig()
   // ===== CAMERA & SCENE CONSTANTS =====
   Config.SHOOTER_HEIGHT = btk.Conversions.yardsToMeters(3);
   Config.CAMERA_FOV = 35; // degrees (Three.js uses degrees)
-  Config.CAMERA_NEAR_PLANE = btk.Conversions.yardsToMeters(30); // 2 yards near plane
+  Config.CAMERA_NEAR_PLANE = btk.Conversions.yardsToMeters(30); // 30 yards near plane
   Config.CAMERA_FAR_PLANE = btk.Conversions.yardsToMeters(2500); // 2500 yards
   Config.SCOPE_MAX_PAN_DEG = 10; // Limit scope horizontal movement to ±10°
   Config.SCOPE_MAX_PITCH_UP_DEG = 10; // Maximum look up angle (degrees)

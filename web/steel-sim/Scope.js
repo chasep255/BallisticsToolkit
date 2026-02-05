@@ -202,6 +202,18 @@ export class Scope
     this.mirageAdvectionVertical = 0.0; // Accumulated vertical heat rise advection (radians)
     this.mirageAdvectionTime = 0.0; // Accumulated time for noise animation (seconds)
 
+    // Recoil effect state
+    this.recoilPreset = config.recoilPreset || 'None';
+    // Recoil applies to the *aim* (yaw/pitch), so the reticle stays truthful.
+    // Each shot: kick instantly to boostDeg, then smoothly settle to settleDeg.
+    this.recoilTransitionT = Infinity; // Time since recoil trigger (Infinity = inactive)
+    this.recoilTransitionAppliedYawRad = 0; // Current applied recoil offset for this shot (radians)
+    this.recoilTransitionAppliedPitchRad = 0; // Current applied recoil offset for this shot (radians)
+    this.recoilTransitionBoostYawRad = 0; // Initial boost offset (radians)
+    this.recoilTransitionBoostPitchRad = 0; // Initial boost offset (radians)
+    this.recoilTransitionSettleYawRad = 0; // Final settle offset (radians)
+    this.recoilTransitionSettlePitchRad = 0; // Final settle offset (radians)
+
     // Shooter position
     this.cameraPosition = config.cameraPosition ||
     {
@@ -233,6 +245,181 @@ export class Scope
     this.createMiragePass();
 
     this.createInternalComposition(renderWidth, renderHeight);
+  }
+
+  // ===== RECOIL EFFECT METHODS =====
+
+  /**
+   * Recoil preset configuration constants
+   * Format: {boostDeg, settleDeg}
+   * - boostDeg: instant kick amount in degrees (per shot)
+   * - settleDeg: remaining offset in degrees after the settle (user must correct)
+   */
+  static RECOIL_BOOST_TO_SETTLE_TIME_S = 0.22;
+  static RECOIL_PRESETS = {
+    None: null, // Disabled
+    Light: {boostDeg: 0.1, settleDeg: 0.025},
+    Medium: {boostDeg: 0.30, settleDeg: 0.175},
+    Heavy: {boostDeg: 0.45, settleDeg: 0.275}
+  };
+
+  /**
+   * Set recoil preset
+   * @param {string} preset - 'None', 'Light', 'Medium', or 'Heavy'
+   */
+  setRecoilPreset(preset)
+  {
+    if (!Scope.RECOIL_PRESETS.hasOwnProperty(preset))
+    {
+      console.warn(`[Scope] Unknown recoil preset: "${preset}", defaulting to 'None'`);
+      preset = 'None';
+    }
+    this.recoilPreset = preset;
+    // Stop any active transition immediately (preserve current aim)
+    this.cancelRecoilTransition();
+  }
+
+  cancelRecoilTransition()
+  {
+    if (this.recoilTransitionT === Infinity)
+    {
+      return;
+    }
+
+    // Finish the transition immediately (settle to final X degrees).
+    const deltaYaw = this.recoilTransitionSettleYawRad - this.recoilTransitionAppliedYawRad;
+    const deltaPitch = this.recoilTransitionSettlePitchRad - this.recoilTransitionAppliedPitchRad;
+
+    this.yaw = THREE.MathUtils.clamp(
+      this.yaw + deltaYaw,
+      -this.maxPanAngleRad,
+      this.maxPanAngleRad
+    );
+    this.pitch = THREE.MathUtils.clamp(
+      this.pitch + deltaPitch,
+      -this.maxPitchDownRad,
+      this.maxPitchUpRad
+    );
+
+    this.recoilTransitionT = Infinity;
+    this.recoilTransitionAppliedYawRad = 0;
+    this.recoilTransitionAppliedPitchRad = 0;
+    this.recoilTransitionBoostYawRad = 0;
+    this.recoilTransitionBoostPitchRad = 0;
+    this.recoilTransitionSettleYawRad = 0;
+    this.recoilTransitionSettlePitchRad = 0;
+  }
+
+  /**
+   * Trigger recoil effect (called on shot fire)
+   */
+  triggerRecoil()
+  {
+    if (this.recoilPreset === 'None' || !Scope.RECOIL_PRESETS[this.recoilPreset])
+    {
+      return; // Disabled
+    }
+
+    const preset = Scope.RECOIL_PRESETS[this.recoilPreset];
+    // Ensure any previous transition is completed before applying a new shot recoil.
+    this.cancelRecoilTransition();
+
+    // Random kick direction within 15° cone around "up"
+    // Sample theta ∈ [0, 15°] and phi ∈ [0, 2π)
+    const maxThetaDeg = 15.0;
+    const thetaRad = THREE.MathUtils.degToRad(Math.random() * maxThetaDeg);
+    const phiRad = Math.random() * Math.PI * 2.0;
+
+    // Convert to yaw/pitch components (pitch always positive = upward)
+    // yawDir = sin(theta) * cos(phi)  [horizontal component]
+    // pitchDir = cos(theta)  [vertical component, always positive]
+    const yawDir = Math.sin(thetaRad) * Math.cos(phiRad);
+    const pitchDir = Math.cos(thetaRad);
+
+    const boostRad = THREE.MathUtils.degToRad(preset.boostDeg);
+    const settleRad = THREE.MathUtils.degToRad(preset.settleDeg);
+
+    const boostYawRad = yawDir * boostRad;
+    const boostPitchRad = pitchDir * boostRad;
+    const settleYawRad = yawDir * settleRad;
+    const settlePitchRad = pitchDir * settleRad;
+
+    // Apply the boost immediately to the *aim* (so reticle stays truthful).
+    // Called after the shot is created, so ballistics for that shot are unaffected.
+    this.yaw = THREE.MathUtils.clamp(
+      this.yaw + boostYawRad,
+      -this.maxPanAngleRad,
+      this.maxPanAngleRad
+    );
+    this.pitch = THREE.MathUtils.clamp(
+      this.pitch + boostPitchRad,
+      -this.maxPitchDownRad,
+      this.maxPitchUpRad
+    );
+
+    // Start boost -> settle transition (N degrees -> X degrees).
+    this.recoilTransitionT = 0.0;
+    this.recoilTransitionAppliedYawRad = boostYawRad;
+    this.recoilTransitionAppliedPitchRad = boostPitchRad;
+    this.recoilTransitionBoostYawRad = boostYawRad;
+    this.recoilTransitionBoostPitchRad = boostPitchRad;
+    this.recoilTransitionSettleYawRad = settleYawRad;
+    this.recoilTransitionSettlePitchRad = settlePitchRad;
+  }
+
+  applyRecoilTransition(dt)
+  {
+    if (this.recoilTransitionT === Infinity)
+    {
+      return;
+    }
+
+    this.recoilTransitionT += dt;
+
+    const s = THREE.MathUtils.clamp(
+      this.recoilTransitionT / Scope.RECOIL_BOOST_TO_SETTLE_TIME_S,
+      0,
+      1
+    );
+
+    // Smooth sine ease (0 -> 1)
+    const eased = 0.5 - 0.5 * Math.cos(Math.PI * s);
+
+    const desiredYaw =
+      this.recoilTransitionBoostYawRad +
+      (this.recoilTransitionSettleYawRad - this.recoilTransitionBoostYawRad) * eased;
+    const desiredPitch =
+      this.recoilTransitionBoostPitchRad +
+      (this.recoilTransitionSettlePitchRad - this.recoilTransitionBoostPitchRad) * eased;
+
+    const deltaYaw = desiredYaw - this.recoilTransitionAppliedYawRad;
+    const deltaPitch = desiredPitch - this.recoilTransitionAppliedPitchRad;
+
+    this.yaw = THREE.MathUtils.clamp(
+      this.yaw + deltaYaw,
+      -this.maxPanAngleRad,
+      this.maxPanAngleRad
+    );
+    this.pitch = THREE.MathUtils.clamp(
+      this.pitch + deltaPitch,
+      -this.maxPitchDownRad,
+      this.maxPitchUpRad
+    );
+
+    this.recoilTransitionAppliedYawRad = desiredYaw;
+    this.recoilTransitionAppliedPitchRad = desiredPitch;
+
+    if (s >= 1.0)
+    {
+      // Transition complete; stop updating and clear per-shot bookkeeping.
+      this.recoilTransitionT = Infinity;
+      this.recoilTransitionAppliedYawRad = 0;
+      this.recoilTransitionAppliedPitchRad = 0;
+      this.recoilTransitionBoostYawRad = 0;
+      this.recoilTransitionBoostPitchRad = 0;
+      this.recoilTransitionSettleYawRad = 0;
+      this.recoilTransitionSettlePitchRad = 0;
+    }
   }
 
   // No static helpers here; Scope owns its own geometry/materials.
@@ -1626,6 +1813,9 @@ export class Scope
 
   render(dt = 0)
   {
+    // Apply recoil boost -> settle transition (aim is updated directly)
+    this.applyRecoilTransition(dt);
+
     // Lazy resize: update internal render target if output size changed
     const outputWidth = this.outputRenderTarget.width;
     const outputHeight = this.outputRenderTarget.height;
@@ -1674,6 +1864,9 @@ export class Scope
         this.camera.updateProjectionMatrix();
       }
     }
+
+    // Update camera look-at (applies recoil offsets if active)
+    this.updateCameraLookAt();
 
     // Step 1: Render 3D scene to internal render target
     this.renderer.setRenderTarget(this.sceneRenderTarget);

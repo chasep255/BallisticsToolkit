@@ -124,6 +124,15 @@
         </select>
       </div>
       <div class="param-item">
+        <label for="recoilPreset" title="Recoil effect intensity - aim kick and settle on firing">Recoil</label>
+        <select id="recoilPreset" title="Recoil effect intensity - aim kick and settle on firing">
+          <option value="None">None</option>
+          <option value="Light" selected>Light</option>
+          <option value="Medium">Medium</option>
+          <option value="Heavy">Heavy</option>
+        </select>
+      </div>
+      <div class="param-item">
         <label for="opticalEffects" title="Enable heat mirage and depth-of-field effects in scopes">Mirage/Optical Effects</label>
         <input type="checkbox" id="opticalEffects" checked>
       </div>
@@ -228,15 +237,15 @@
             - FFP reticle scales with zoom (maintains angular subtensions)<br><br>
 
             <strong>Desktop - Dial Controls:</strong><br>
-            - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation (0.1 MRAD or 0.25 MOA; hold <kbd>Shift</kbd> for 1.0)<br>
-            - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage (0.1 MRAD or 0.25 MOA; hold <kbd>Shift</kbd> for 1.0)<br>
+            - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation (0.1 MRAD or 0.25 MOA; hold <kbd>Shift</kbd> for 1.0 MRAD / 1.0 MOA)<br>
+            - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage (0.1 MRAD or 0.25 MOA; hold <kbd>Shift</kbd> for 1.0 MRAD / 1.0 MOA)<br>
             - <kbd>R</kbd> reset both dials to zero (only when in rifle scope mode)<br>
             - On-screen dial buttons (U/D/L/R/⟲) next to HUD work anytime<br><br>
 
             <strong>Desktop - Focus/Range Finder:</strong><br>
             - <kbd>F</kbd> or <kbd>Right-click</kbd> refocus the active scope at center crosshair distance<br>
             - Sets the focal distance for mirage and depth-of-field blur effects (when optical effects enabled)<br>
-            - Focal distance is displayed in the bottom-right corner of each scope as a red digital readout (yards) when Smart Scope is enabled<br>
+            - Focal distance is displayed in the bottom-right corner of each scope as a red digital readout (yards) when Range Finder is enabled<br>
             - The active scope is indicated by the dull red border<br><br>
 
             <strong>Mobile/Touch:</strong><br>
@@ -273,7 +282,7 @@
             <strong>Prairie Dogs:</strong><br>
             - Scattered from 100 to 1000 yards, approximately 16 inches tall<br>
             - Randomly pop up and down (roughly 30% up, 70% down)<br>
-            - Each state lasts 5-90s seconds before changing<br>
+            - Each state lasts 5-90 seconds before changing<br>
             - When hit: quick upward jump + red mist effect, respawn after ~1 minute<br><br>
             
             <strong>Boars:</strong><br>
@@ -305,6 +314,16 @@
             - MOA mode: 2.0 MOA minor ticks, 4.0 MOA major ticks, 0.25 MOA clicks<br>
             - HUD displays dial values in the selected units<br><br>
 
+            <strong>Recoil Effect:</strong><br>
+            - Toggle via dropdown in the settings bar (None/Light/Medium/Heavy)<br>
+            - When enabled, each shot kicks the scope aim in a random direction (within a 15° cone, mostly upward)<br>
+            - After the kick, the aim settles to a reduced offset—you must manually return to target<br>
+            - None: No recoil effect<br>
+            - Light: Small kick, minimal settle offset<br>
+            - Medium: Moderate kick and settle<br>
+            - Heavy: Strong kick, larger settle offset<br>
+            - Recoil affects subsequent shots until you manually correct your aim<br><br>
+
             <strong>Mirage/Optical Effects:</strong><br>
             - Toggle via the checkbox in the settings bar<br>
             - Simulates heat mirage/shimmer visible through the scope (visual effect)<br>
@@ -318,7 +337,7 @@
 
             <strong>Range Finder:</strong><br>
             - Toggle via the checkbox in the settings bar (enabled by default)<br>
-            - Displays red digital readout in bottom-right of both scopes showing focal distance in yards<br>
+            - Displays red digital readout in bottom-right corner of both scopes showing focal distance in yards<br>
             - Updates when you focus using <kbd>F</kbd> or <kbd>Right-click</kbd><br>
             - Helps judge distance to targets and understand mirage/depth-of-field effects<br>
             - Disable to reduce visual clutter if desired<br><br>
@@ -353,7 +372,7 @@
             - Use wind flags at multiple distances to read wind gradients<br>
             - Watch target movement after impacts to understand hit location<br>
             - Make small dial adjustments for precise corrections<br>
-            - Use <kbd>Shift</kbd>+<kbd>Arrow</kbd> for larger adjustments (1.0 MRAD/MOA)<br>
+            - Use <kbd>Shift</kbd>+<kbd>Arrow</kbd> for larger adjustments (1.0 MRAD in MRAD mode, 1.0 MOA in MOA mode)<br>
             - Higher BC bullets drift less in the wind<br>
             - Lower MV σ = more consistent impacts<br>
             - Practice at shorter distances before attempting 1760 yards (1 mile)

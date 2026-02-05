@@ -136,12 +136,14 @@ cd emsdk
 ./emsdk activate latest
 source ./emsdk_env.sh
 
-# Build
-cd BallisticsToolkit
+# Build (from repository root)
 ./build_web.sh
+
+# Serve locally for testing
+./build_web.sh -s
 ```
 
-Opens local server at http://localhost:8001
+The `-s` flag starts a local server at http://localhost:8001
 
 ## Technical Details
 
