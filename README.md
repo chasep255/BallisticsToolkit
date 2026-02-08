@@ -59,7 +59,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Target Physics** - Steel targets hang from virtual chains with momentum transfer, damping, and rotation. Center hits drive linear swing; edge hits kick targets into rotation. Impacts leave visible mark splatter and spawn metal dust.
 - **Impact Detection** - Spatial binning system for efficient collision detection. Accurate hit/miss detection with visual feedback (HUD shows impact status).
 - **Wind & Environment** - 3D landscape with wind flags along the range driven by the same curl‑noise wind field used for the f-class sim. Brown ground dust when you miss; silver‑gray metallic dust when you hit steel.
-- **Scope & HUD** - Dual scopes (rifle + spotting) with pointer lock: click either scope to enter, `Tab` to switch between scopes, move mouse to pan, wheel or `+`/`-` to zoom (4×–40×), click to fire (rifle scope only), `Esc` to exit. Active scope shows a dull red border. MRAD or MOA scope type selection with matching reticle ticks and dial units. HUD shows current dial settings.
+- **Scope & HUD** - Dual scopes (rifle + spotting) with pointer lock: click either scope to enter, `Tab` to switch between scopes, move mouse to pan, wheel or `+`/`-` to zoom (rifle: 4×–40×, spotting: 4×–80×), click to fire (rifle scope only), `Esc` to exit. Active scope shows a dull red border. MRAD or MOA scope type selection with matching reticle ticks and dial units. HUD shows current dial settings.
 - **Mirage/Optical Effects** - Optional heat mirage simulation that moves with the wind, letting you read wind speed and direction through the shimmer. Includes depth-of-field blur based on focus distance. Refocus active scope with `F` key or right-click (desktop) or long-press (mobile).
 - **Audio Feedback** - Shot sounds play immediately; impact sounds (ping) play with distance-based delay and volume attenuation.
 
@@ -70,7 +70,7 @@ Visit the [Ballistic Calculator](https://www.ballisticstoolkit.com/ballistic-cal
 
 1. **Bullet specs** - Weight (grains), diameter (inches), length (inches), BC, drag function, twist rate (inches per turn)
 2. **Conditions** - Temperature, humidity, altitude (pressure derived)  
-3. **Wind** - Speed and direction using 12-hour clock (12=tailwind, 3=right crosswind, 6=headwind, 9=left crosswind)
+3. **Wind** - Speed and direction using 12-hour clock (wind coming from the clock direction, target at 12). 12=headwind, 6=tailwind, 3=from right, 9=from left
 4. **Shot data** - Muzzle velocity, zero range, scope height
 
 Results display drop and drift corrections (including spin drift) in your choice of milliradians or MOA for precise long-range adjustments.

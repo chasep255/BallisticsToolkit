@@ -6,7 +6,7 @@
  *   - If user accepts analytics cookies: full tracking with cookies
  */
 
-const BTK_CONSENT_VERSION = '2026-01-28';
+const BTK_CONSENT_VERSION = '2026-02-08';
 const BTK_CONSENT_STORAGE_KEY = 'btkConsent';
 
 function btkGetCookie(name)
