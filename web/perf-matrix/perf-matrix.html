@@ -118,6 +118,19 @@
       color: #666;
       margin-bottom: 15px;
     }
+
+    .results-disclaimer {
+      margin-top: 16px;
+      padding: 10px 12px;
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-left: 3px solid #95a5a6;
+      border-radius: 6px;
+      color: #666;
+      font-size: 12.5px;
+      line-height: 1.4;
+      text-align: left;
+    }
   </style>
   
   <script src="../common.js"></script>
@@ -280,6 +293,10 @@
       <div style="overflow-x: auto;">
         <table id="sensitivityTable"></table>
       </div>
+
+      <div class="results-disclaimer">
+        The trajectory values shown are not accurate for dialing a rifle in the real world because they don't account for zero distance, scope height, and other factors. Use for relative ballistic comparison only.
+      </div>
     </div>
 
     <div id="loading" class="loading" style="display: none;">
@@ -330,7 +347,7 @@
           <h3>Results</h3>
           <div class="param-help">
             <strong>Wind Drift (10 mph):</strong> Shows drift at the specified range with a 10 mph full-value crosswind from 3 o'clock. Lower values (green) are better.<br><br>
-            <strong>Drop:</strong> Shows bullet drop below the muzzle line. Lower values (green) mean less drop. These drop values are not accurate for dialing a rifle in the real world because they don't account for zero distance or scope height. Use for relative comparison only.<br><br>
+            <strong>Drop:</strong> Shows bullet drop below the muzzle line. Lower values (green) mean less drop.<br><br>
             <strong>MV Sensitivity:</strong> Shows the drop difference between MV ±0.5% (1% total spread). Lower values (green) mean the load is less sensitive to velocity variations, making it more forgiving of inconsistent ammunition.<br><br>
             <strong>Final Velocity:</strong> Remaining velocity at target range in fps. Higher values (green) are better.<br><br>
             <strong>Final Energy:</strong> Remaining kinetic energy at target range in ft-lbs. Higher values (green) are better.<br><br>
@@ -351,7 +368,7 @@
           <h3>Known Limitations</h3>
           <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
           <div class="param-help">
-            <strong>Drop Values Not for Real-World Dialing:</strong> The drop values shown are not accurate for dialing a rifle in the real world. This tool does not account for zero distance or scope height, which are essential for accurate holdover calculations. These values should only be used for relative comparison between loads.<br><br>
+            <strong>Trajectory Values Not for Real-World Dialing:</strong> The trajectory values shown are not accurate for dialing a rifle in the real world. This tool does not account for zero distance, scope height, and other factors, which are essential for accurate holdover calculations. These values should only be used for relative comparison between loads.<br><br>
             <strong>Comparative Only:</strong> This tool is for comparative analysis. Not intended for live fire trajectory predictions. Do not rely on these calculations for any purpose where incorrect data could be hazardous.<br><br>
             <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete safety and liability information.
           </div>

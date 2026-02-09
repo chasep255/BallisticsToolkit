@@ -7,6 +7,12 @@ body[data-page="target-sim"] {
     justify-content: flex-start;
 }
 
+/* In this app the body is a flex container; ensure the main container still
+   fills available width like the other tools. */
+body[data-page="target-sim"] .app-container {
+    width: 100%;
+}
+
 .header-controls {
     display: none;
 }
@@ -81,6 +87,18 @@ body[data-page="target-sim"] {
     justify-content: center;
     align-items: center;
     aspect-ratio: 1/1;
+}
+
+.sim-disclaimer {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-left: 3px solid #95a5a6;
+    border-radius: 6px;
+    color: #666;
+    font-size: 12.5px;
+    line-height: 1.4;
 }
 
 .mouse-position-box {

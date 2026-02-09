@@ -251,6 +251,8 @@ function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelv
   infoHTML += `• <strong>Wind:</strong> ${inputParams.windSpeed.toFixed(0)} mph ${windDirDesc}<br>`;
   infoHTML += `• <strong>Trajectory:</strong> Max Range ${inputParams.maxRange.toFixed(0)} yd, Step ${inputParams.step.toFixed(0)} yd, Units ${inputParams.angleUnits.toUpperCase()}<br><br>`;
   
+  infoHTML += `<strong>Disclaimer:</strong> Ballistics calculations are an approximation and may contain errors. They do not model all real-world factors (rifle/ammunition variation, sighting system details, local atmosphere, wind gradients, shooter inputs, etc.). Do not rely on these results for any purpose where incorrect data could be hazardous.<br><br>`;
+
   infoHTML += `<strong>Atmospheric Conditions:</strong> Air Density: ${densityLbPerCuFt.toFixed(4)} lb/ft³ | Pressure: ${pressureInHg.toFixed(2)} inHg | Speed of Sound: ${speedOfSoundFps.toFixed(0)} fps | Temperature: ${tempFahrenheit.toFixed(1)}°F`;
   
   infoHTML += `<br><strong>Bullet Properties:</strong> Sectional Density: ${sectionalDensityLbPerSqIn.toFixed(3)} lb/in²`;

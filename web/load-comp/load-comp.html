@@ -103,6 +103,19 @@
             color: #c62828;
             font-weight: bold;
         }
+
+        .results-disclaimer {
+            margin-top: 16px;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-left: 3px solid #95a5a6;
+            border-radius: 6px;
+            color: #666;
+            font-size: 12.5px;
+            line-height: 1.4;
+            text-align: left;
+        }
     </style>
     
     <script src="../common.js"></script>
@@ -223,6 +236,9 @@
                     <tbody></tbody>
                 </table>
             </div>
+            <div class="results-disclaimer">
+                The trajectory values shown are not accurate for dialing a rifle in the real world because they don't account for zero distance, scope height, and other factors. Use for relative ballistic comparison only.
+            </div>
         </div>
 
         <div id="loading" class="loading" style="display: none;">
@@ -267,7 +283,7 @@
                 <div class="help-section">
                     <h3>Results</h3>
                     <div class="param-help">
-                        <strong>Drop:</strong> Bullet drop below muzzle line. Units selectable: MOA, MRAD, or inches. These drop values are not accurate for dialing a rifle in the real world because they don't account for zero distance or scope height. Use for relative comparison only.<br><br>
+                        <strong>Drop:</strong> Bullet drop below muzzle line. Units selectable: MOA, MRAD, or inches.<br><br>
                         <strong>Velocity (fps):</strong> Remaining bullet velocity at that range.<br><br>
                         <strong>Energy (ft-lb):</strong> Kinetic energy at that range.<br><br>
                         <strong>Wind Drift:</strong> Wind deflection with 10 mph crosswind from 3 o'clock. Units selectable: MOA, MRAD, or inches.<br><br>
@@ -290,7 +306,7 @@
                     <h3>Known Limitations</h3>
                     <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
                     <div class="param-help">
-                        <strong>Drop Values Not for Real-World Dialing:</strong> The drop values shown are not accurate for dialing a rifle in the real world. This tool does not account for zero distance or scope height, which are essential for accurate holdover calculations. These values should only be used for relative comparison between loads.<br><br>
+                        <strong>Trajectory Values Not for Real-World Dialing:</strong> The trajectory values shown are not accurate for dialing a rifle in the real world. This tool does not account for zero distance, scope height, and other factors, which are essential for accurate holdover calculations. These values should only be used for relative comparison between loads.<br><br>
                         <strong>Accuracy:</strong> Simulation accuracy degrades at longer ranges, longer flight times, and with atypical bullet parameters (unusual BCs, extreme velocities, etc). Use results for relative comparison rather than absolute predictions. Do not rely on these calculations for any purpose where incorrect data could be hazardous.<br><br>
                         <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete safety and liability information.
                     </div>

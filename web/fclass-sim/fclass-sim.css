@@ -47,6 +47,15 @@
   gap: 6px;
 }
 
+.quick-keys-disclaimer {
+  flex-basis: 100%;
+  text-align: center;
+  color: #666;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
 .quick-keys kbd {
   display: inline-block;
   padding: 3px 6px;
