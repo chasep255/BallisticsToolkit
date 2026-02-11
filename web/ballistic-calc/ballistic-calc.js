@@ -176,12 +176,9 @@ function calculateTrajectory()
   // Always calculate from the display spin rate, not the simulation spin rate
   const spinRateRpm = spinRateForDisplay * 60.0 / (2.0 * Math.PI);
 
-  // Calculate Miller stability factor and ideal twist rate
+  // Calculate Miller stability factor
   const twistRateInches = parseFloat(document.getElementById('twistRate').value);
   const millerStabilityFactor = bullet.computeMillerStabilityFactor(twistRateInches);
-  // Calculate ideal twist rate for current SG (or minimum of 1.5 if unstable)
-  const targetSG = millerStabilityFactor >= 1.5 ? millerStabilityFactor : 1.5;
-  const idealTwistRate = bullet.computeIdealTwistRate(targetSG);
 
   // Collect all input parameters for display
   const inputParams = {
@@ -206,7 +203,7 @@ function calculateTrajectory()
   };
 
   // Display results
-  displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, idealTwistRate, twistRateInches, inputParams);
+  displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, inputParams);
 
   // Dispose BTK objects to prevent memory leaks
   // Note: trajectoryObj is owned by simulator, don't delete it
@@ -215,7 +212,7 @@ function calculateTrajectory()
   bullet.delete();
 }
 
-function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, idealTwistRate, twistRateInches, inputParams)
+function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, inputParams)
 {
   const tableBody = document.getElementById('trajectoryTable').getElementsByTagName('tbody')[0];
   tableBody.innerHTML = '';
@@ -276,17 +273,7 @@ function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelv
   {
     infoHTML += ` <span style="color: #388e3c;">(Good Stability - SG ≥ 1.5)</span>`;
   }
-  if (millerStabilityFactor >= 1.5)
-  {
-    // Show what twist rate would give their current SG
-    infoHTML += ` | Twist Rate for SG=${millerStabilityFactor.toFixed(2)}: ${idealTwistRate.toFixed(2)} in/turn (current: ${twistRateInches.toFixed(1)} in/turn)`;
-  }
-  else
-  {
-    // Show minimum twist rate needed for comfortable stability
-    infoHTML += ` | Minimum Twist Rate for SG=1.5: ${idealTwistRate.toFixed(2)} in/turn (current: ${twistRateInches.toFixed(1)} in/turn)`;
-  }
-  
+
   atmosphericInfo.innerHTML = infoHTML;
 
   const angleUnits = document.getElementById('angleUnits').value;
