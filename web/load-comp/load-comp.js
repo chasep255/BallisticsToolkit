@@ -130,6 +130,8 @@ function simulateBullet(params, maxRangeYards)
       time: point.getTime()
     });
 
+    position.delete();
+    state.delete();
     point.delete();
   }
 

@@ -2376,7 +2376,9 @@ class SteelSimulator
           const boar = BoarFactory.getByObjectId(userData.boarObjectId);
           if (boar && !boar.isDead)
           {
-            console.log(`[Boar] HIT! objectId=${userData.boarObjectId}, position=(${impactPosition.x.toFixed(2)}, ${impactPosition.y.toFixed(2)}, ${impactPosition.z.toFixed(2)}), velocity=(${impactBullet.getVelocity().x.toFixed(2)}, ${impactBullet.getVelocity().y.toFixed(2)}, ${impactBullet.getVelocity().z.toFixed(2)})`);
+            const boarVel = impactBullet.getVelocity();
+            console.log(`[Boar] HIT! objectId=${userData.boarObjectId}, position=(${impactPosition.x.toFixed(2)}, ${impactPosition.y.toFixed(2)}, ${impactPosition.z.toFixed(2)}), velocity=(${boarVel.x.toFixed(2)}, ${boarVel.y.toFixed(2)}, ${boarVel.z.toFixed(2)})`);
+            boarVel.delete();
 
             // Create red dust cloud at impact point
             const impactPointThree = new THREE.Vector3(
@@ -2569,7 +2571,8 @@ class SteelSimulator
 
       // Get the last point from trajectory (has time and bullet state)
       const lastPoint = trajectory.getPoint(pointCount - 1);
-      const lastPos = lastPoint.getState().getPosition();
+      const lastState = lastPoint.getState();
+      const lastPos = lastState.getPosition();
 
       // Check if bullet is below ground (y < 0)
       if (lastPos.y < 0)
@@ -2597,10 +2600,12 @@ class SteelSimulator
               vel.delete();
 
               testPos.delete();
+              bulletState.delete();
               optPoint.delete();
               break;
             }
             testPos.delete();
+            bulletState.delete();
             optPoint.delete();
           }
         }
@@ -2629,6 +2634,10 @@ class SteelSimulator
         // Mark shot as dead (will be disposed by ShotFactory.updateAll)
         shot.markDead();
       }
+
+      lastPos.delete();
+      lastState.delete();
+      lastPoint.delete();
     }
   }
 

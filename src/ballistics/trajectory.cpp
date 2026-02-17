@@ -67,6 +67,12 @@ namespace btk
       float dist1 = points_[left].getDistance();
       float dist2 = points_[right].getDistance();
 
+      // Guard against division by zero (duplicate distance points)
+      if(std::abs(dist2 - dist1) < 1e-9f)
+      {
+        return points_[left];
+      }
+
       // Interpolate between the two points
       float t = (distance - dist1) / (dist2 - dist1);
 
@@ -119,6 +125,12 @@ namespace btk
       // Interpolate between points_[left] and points_[right] by time
       float time1 = points_[left].getTime();
       float time2 = points_[right].getTime();
+
+      // Guard against division by zero (duplicate time points)
+      if(std::abs(time2 - time1) < 1e-9f)
+      {
+        return points_[left];
+      }
 
       float t = (time - time1) / (time2 - time1);
 
@@ -297,7 +309,8 @@ namespace btk
       float dist1 = point1.getDistance();
       float dist2 = point2.getDistance();
 
-      float t = (distance - dist1) / (dist2 - dist1);
+      // Guard against division by zero (duplicate distance points)
+      float t = (std::abs(dist2 - dist1) < 1e-9f) ? 0.0f : (distance - dist1) / (dist2 - dist1);
 
       const Bullet& state1 = point1.getState();
       const Bullet& state2 = point2.getState();

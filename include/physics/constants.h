@@ -29,8 +29,8 @@ namespace btk::physics
     static constexpr float PRESSURE_SCALE_HEIGHT = 8400.0f;   // m - atmospheric scale height for pressure
 
     // Gas constants (dimensionless ratios)
-    static constexpr float GAS_CONSTANT_UNIVERSAL = 8.314f; // J/(mol·K) - universal gas constant
-    static constexpr float MOLAR_MASS_DRY_AIR = 0.02897f;   // kg/mol - molar mass of dry air
+    static constexpr float GAS_CONSTANT_UNIVERSAL = 8.31446f; // J/(mol·K) - universal gas constant (CODATA 2018)
+    static constexpr float MOLAR_MASS_DRY_AIR = 0.028965f;   // kg/mol - molar mass of dry air
     static constexpr float HEAT_CAPACITY_RATIO_AIR = 1.4f;  // dimensionless - heat capacity ratio for air
   };
 

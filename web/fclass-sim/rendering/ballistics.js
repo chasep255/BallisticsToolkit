@@ -465,11 +465,13 @@ export class BallisticsEngine
     const optPoint0 = this.lastTrajectory.atTime(0);
     if (optPoint0 !== undefined)
     {
-      const posBtk = optPoint0.getState().getPosition();
+      const state0 = optPoint0.getState();
+      const posBtk = state0.getPosition();
       const pos = btkToThreeJsPosition(posBtk); // Convert meters to yards
       this.bulletMesh.position.set(pos.x, pos.y, pos.z);
       posBtk.delete();
-      optPoint0.delete(); // Dispose TrajectoryPoint to prevent memory leak
+      state0.delete();
+      optPoint0.delete();
     }
 
   }
@@ -498,12 +500,14 @@ export class BallisticsEngine
     const optPoint = this.lastTrajectory.atTime(t);
     if (optPoint !== undefined)
     {
-      const posBtk = optPoint.getState().getPosition();
+      const stateAnim = optPoint.getState();
+      const posBtk = stateAnim.getPosition();
       const pos = btkToThreeJsPosition(posBtk); // Convert meters to yards
       this.bulletMesh.position.set(pos.x, pos.y, pos.z);
       this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
       posBtk.delete();
-      optPoint.delete(); // Dispose TrajectoryPoint to prevent memory leak
+      stateAnim.delete();
+      optPoint.delete();
     }
 
     // Check if animation is complete

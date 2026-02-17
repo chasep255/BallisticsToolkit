@@ -252,6 +252,11 @@ namespace btk::ballistics
   // Compute zeroed initial state (instance method)
   const Bullet& Simulator::computeZero(float muzzle_velocity, const btk::math::Vector3D& target_position, float dt, int max_iterations, float tolerance, float spin_rate)
   {
+    if(std::abs(target_position.z) < 1e-6f)
+    {
+      throw std::invalid_argument("computeZero: target distance (-z) must be > 0");
+    }
+
     float best_pitch = 0.01f; // Start with reasonable elevation guess (about 0.57 degrees)
     float best_yaw = 0.0f;    // azimuth/windage (rad)
 

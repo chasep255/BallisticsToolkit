@@ -270,6 +270,7 @@ function computeTrajectoryGrid(bcValues, mvValues, rangeYards, crosswindMph,
         
         velocity.delete();
         position.delete();
+        state.delete();
         point.delete();
       }
       else
@@ -408,6 +409,7 @@ function calculateDrop(bc, mvMps, rangeMeters, temperatureK, altitudeMeters, hum
     dropMrad = angleRad * 1000;
     
     position.delete();
+    state.delete();
     point.delete();
   }
   

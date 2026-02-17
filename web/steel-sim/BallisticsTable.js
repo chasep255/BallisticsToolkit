@@ -92,6 +92,8 @@ export class BallisticsTable
 
       console.log(`[BallisticsTable] Range: ${range}m, Drop: ${drop_mrad.toFixed(2)}mrad, Spin Drift: ${spinDrift_mrad.toFixed(2)}mrad`);
 
+      position.delete();
+      state.delete();
       point.delete();
     }
 
