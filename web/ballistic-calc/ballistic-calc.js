@@ -160,7 +160,9 @@ function calculateTrajectory()
       deceleration: decelerationFps2
     });
 
-    point.delete(); // Dispose TrajectoryPoint to prevent memory leak
+    position.delete();
+    state.delete();
+    point.delete();
   }
 
   // Get atmospheric data before deleting the atmosphere object
@@ -219,8 +221,10 @@ function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelv
 
   // Display atmospheric info
   const atmosphericInfo = document.getElementById('atmosphericInfo');
-  // Convert density: kg/m³ to lb/ft³ using BTK's conversion factor (matches kgpm3ToLbpft3)
-  const densityLbPerCuFt = airDensity * 0.062428;
+  // Convert density: kg/m³ -> lb/ft³ using BTK conversions (no hardcoded factors).
+  // 1 kg/m³ = kgToPounds(1) / metersToFeet(1)^3  [lb/ft³]
+  const densityLbPerCuFt = airDensity *
+    (btk.Conversions.kgToPounds(1.0) / Math.pow(btk.Conversions.metersToFeet(1.0), 3));
   // Convert pressure using BTK conversion
   const pressureInHg = btk.Conversions.pascalsToInHg(pressure);
   // Convert speed of sound to fps
