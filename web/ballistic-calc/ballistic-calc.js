@@ -155,7 +155,7 @@ function calculateTrajectory()
       drop: dropMrad,
       drift: driftMrad,
       velocity: btk.Conversions.mpsToFps(state.getTotalVelocity()),
-      energy: point.getKineticEnergy(),
+      energy: btk.Conversions.joulesToFootPounds(point.getKineticEnergy()),
       time: point.getTime(),
       deceleration: decelerationFps2
     });

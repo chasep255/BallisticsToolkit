@@ -94,19 +94,19 @@
             <div class="param-item">
                 <label for="zeroRange" title="Zero range in yards - where the bullet will hit the crosshairs">Zero (yd)</label>
                 <input type="number" id="zeroRange" value="100" step="10" title="Zero range in yards - where the bullet will hit the crosshairs">
-        </div>
+            </div>
             <div class="param-item">
                 <label for="scopeHeight" title="Height of scope centerline above bore in inches">Scope (in)</label>
                 <input type="number" id="scopeHeight" value="2" step="0.1" title="Height of scope centerline above bore in inches">
-                </div>
+            </div>
             <div class="param-item">
                 <label for="temperature" title="Temperature in degrees Fahrenheit">Temp (°F)</label>
                 <input type="number" id="temperature" value="59" step="1" title="Temperature in degrees Fahrenheit">
-                </div>
+            </div>
             <div class="param-item">
                 <label for="humidity" title="Relative humidity percentage">Humidity (%)</label>
                 <input type="number" id="humidity" value="50" step="1" min="0" max="100" title="Relative humidity percentage">
-                </div>
+            </div>
             <div class="param-item">
                 <label for="altitude" title="Altitude in feet above sea level">Alt (ft)</label>
                 <input type="number" id="altitude" value="0" step="100" title="Altitude in feet above sea level">
@@ -114,7 +114,7 @@
             <div class="param-item">
                 <label for="windSpeed" title="Wind speed in miles per hour">Wind (mph)</label>
                 <input type="number" id="windSpeed" value="0" step="1" title="Wind speed in miles per hour">
-        </div>
+            </div>
             <div class="param-item">
                 <label for="windDirection" title="Wind direction using 12-hour clock, where the wind is COMING FROM (target at 12). 3 = from right, 9 = from left, 12 = from target (headwind), 6 = from behind (tailwind).">Wind Dir</label>
                 <input type="number" id="windDirection" value="3" step="1" min="1" max="12" title="Wind direction using 12-hour clock, where the wind is COMING FROM (target at 12). 3 = from right, 9 = from left, 12 = from target (headwind), 6 = from behind (tailwind).">
@@ -152,8 +152,8 @@
                         <th>Drop</th>
                         <th>Drift</th>
                         <th>Velocity (fps)</th>
-                        <th>Energy (ft-lbf)</th>
-                        <th>Deceleration (fps²)</th>
+                        <th>Energy (ft-lbs)</th>
+                        <th>Deceleration (ft/s²)</th>
                         <th>Time (s)</th>
                     </tr>
                 </thead>
@@ -194,7 +194,7 @@
                     <h3>Bullet Parameters</h3>
                     <div class="param-help">
                         <strong>Weight (grains):</strong> Bullet weight in grains. Typical: .223 (55-77 gr), .308 (150-180 gr), .30-06 (150-220 gr).<br><br>
-                        <strong>BC (Ballistic Coefficient):</strong> Drag efficiency relative to standard projectile. Range: 0.1-0.8. Higher = better aerodynamics.<br><br>
+                        <strong>BC (Ballistic Coefficient):</strong> Drag efficiency relative to standard projectile. Typical: 0.1-0.8 for most rifle bullets; input accepts 0.001-1.0. Higher = better aerodynamics.<br><br>
                         <strong>Diameter (inches):</strong> Bullet diameter. Used for spin aerodynamics and moment of inertia calculations. Typical: .223 (0.224"), .308 (0.308").<br><br>
                         <strong>Length (inches):</strong> Bullet length from tip to base. Used for moment of inertia and spin aerodynamics calculations. Typical: .223 (0.7-1.0"), .308 (1.0-1.4").<br><br>
                         <strong>Twist (in/turn):</strong> Barrel twist rate. Enter positive for right-hand (RH) twist (e.g., 8 for 1:8 twist), negative for left-hand (LH). Common: .223 (1:7 or 1:8), .308 (1:10 or 1:12). Used to calculate bullet spin rate for spin drift and crosswind jump effects.<br><br>
@@ -276,7 +276,7 @@
                         <strong>Drift:</strong> Total horizontal deflection including wind drift and spin drift (if spin effects are enabled). Wind drift depends on wind speed and direction. Spin drift adds a rightward component for right-hand twist barrels.<br><br>
                         <strong>Velocity:</strong> Bullet speed at that range. Decreases due to air resistance.<br><br>
                         <strong>Energy:</strong> Kinetic energy in foot-pounds. Decreases with velocity.<br><br>
-                        <strong>Deceleration:</strong> Rate of velocity loss in fps². Higher values indicate faster velocity loss due to drag. Typically highest at muzzle velocity and decreases as the bullet slows.<br><br>
+                        <strong>Deceleration:</strong> Rate of velocity loss in ft/s². Higher values indicate faster velocity loss due to drag. Typically highest at muzzle velocity and decreases as the bullet slows.<br><br>
                         <strong>Time:</strong> Flight time from muzzle to that range.
                     </div>
                 </div>
