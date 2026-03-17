@@ -75,12 +75,15 @@ namespace btk
 
     float Atmosphere::calculateStandardPressure(float altitude) const
     {
-      // Barometric formula: P = P0 * exp(-h / H)
-      // where P0 = standard pressure, h = altitude, H = scale height
+      // ISA power-law: P = P0 * (T0/(T0+L*h))^(gM/(R*L)) = P0 * (1+L*h/T0)^(-g/(R_specific*L))
+      constexpr float R_specific = btk::physics::Constants::GAS_CONSTANT_UNIVERSAL / btk::physics::Constants::MOLAR_MASS_DRY_AIR;
+      constexpr float exponent = -btk::physics::Constants::GRAVITY / (R_specific * btk::physics::Constants::TEMPERATURE_LAPSE_RATE);
 
-      float pressure_pa = btk::physics::Constants::PRESSURE_STANDARD_PASCALS * std::exp(-altitude / btk::physics::Constants::PRESSURE_SCALE_HEIGHT);
+      float base = 1.0f + (btk::physics::Constants::TEMPERATURE_LAPSE_RATE * altitude) / btk::physics::Constants::TEMPERATURE_STANDARD_KELVIN;
+      if(base <= 0.0f)
+        return 0.0f;
 
-      return pressure_pa;
+      return btk::physics::Constants::PRESSURE_STANDARD_PASCALS * std::pow(base, exponent);
     }
 
   } // namespace physics

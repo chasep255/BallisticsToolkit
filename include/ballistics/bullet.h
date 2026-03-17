@@ -132,21 +132,23 @@ namespace btk::ballistics
     /**
      * @brief Calculate elevation angle (pitch) from velocity vector
      *
-     * @return Angle above horizontal plane in radians
+     * @return Angle above horizontal plane in radians (positive = up)
      */
     constexpr float getElevationAngle() const
     {
-      return std::atan2(velocity_.z, velocity_.x); // rad
+      float horizontal = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
+      return std::atan2(velocity_.y, horizontal); // rad
     }
 
     /**
-     * @brief Calculate azimuth angle (bearing/yaw) from velocity vector
+     * @brief Calculate azimuth angle (bearing) from velocity vector
      *
-     * @return Horizontal angle from X-axis in radians (downrange direction)
+     * Coordinate system: X=crossrange, Y=up, Z=-downrange
+     * @return Horizontal angle from downrange (-Z) in radians (positive = rightward)
      */
     constexpr float getAzimuthAngle() const
     {
-      return std::atan2(velocity_.y, velocity_.x); // rad
+      return std::atan2(velocity_.x, -velocity_.z); // rad
     }
 
     constexpr float estimateSpinMomentOfInertia() const
@@ -198,12 +200,12 @@ namespace btk::ballistics
     /**
      * @brief Calculate ideal twist rate using Miller twist rule
      *
-     * Based on Miller twist rule: T = √(30m / (sdL(1+l²)))
+     * Inverted from SG = 30m / (t²d³l(1+l²)), solving for T = t*d:
+     *   T = √(30m / (s * L * (1+l²)))
      * where:
      *   T = twist rate in inches per turn
      *   m = bullet mass in grains
-     *   s = stability factor (typically 2.0 for safe values)
-     *   d = bullet diameter in inches
+     *   s = desired stability factor
      *   L = bullet length in inches
      *   l = L/d (length in calibers)
      *
@@ -212,18 +214,14 @@ namespace btk::ballistics
      */
     constexpr float computeIdealTwistRate(float stability_factor = 2.0f) const
     {
-      // Convert SI units to imperial for Miller formula
       float m_grains = btk::math::Conversions::kgToGrains(weight_);
       float d_inches = btk::math::Conversions::metersToInches(diameter_);
       float L_inches = btk::math::Conversions::metersToInches(length_);
 
-      // Calculate length in calibers
       float l_calibers = L_inches / d_inches;
 
-      // Miller formula: T = √(30m / (sdL(1+l²)))
       float numerator = 30.0f * m_grains;
-      float l_term = l_calibers * (1.0f + l_calibers * l_calibers);
-      float denominator = stability_factor * d_inches * L_inches * l_term;
+      float denominator = stability_factor * L_inches * (1.0f + l_calibers * l_calibers);
 
       if(denominator <= 0.0f)
         return 0.0f;

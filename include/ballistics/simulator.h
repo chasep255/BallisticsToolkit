@@ -68,7 +68,7 @@ namespace btk::ballistics
     /**
      * @brief Set wind conditions
      *
-     * @param wind Wind vector in Cartesian coordinates (x=downrange m/s, y=crossrange m/s, z=vertical m/s)
+     * @param wind Wind vector in Cartesian coordinates (x=crossrange m/s, y=vertical m/s, z=-downrange m/s)
      */
     void setWind(const btk::math::Vector3D& wind);
 

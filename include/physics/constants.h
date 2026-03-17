@@ -26,7 +26,6 @@ namespace btk::physics
 
     // Atmospheric lapse rates (dimensionless ratios)
     static constexpr float TEMPERATURE_LAPSE_RATE = -0.0065f; // K/m - temperature lapse rate (troposphere)
-    static constexpr float PRESSURE_SCALE_HEIGHT = 8400.0f;   // m - atmospheric scale height for pressure
 
     // Gas constants (dimensionless ratios)
     static constexpr float GAS_CONSTANT_UNIVERSAL = 8.31446f; // J/(mol·K) - universal gas constant (CODATA 2018)

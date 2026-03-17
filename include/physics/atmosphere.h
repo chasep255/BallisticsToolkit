@@ -65,7 +65,7 @@ namespace btk::physics
     float pressure_;    // Pa
 
     /**
-     * @brief Calculate standard pressure for given altitude
+     * @brief Calculate standard pressure for given altitude using ISA power-law
      */
     float calculateStandardPressure(float altitude) const; // altitude in m, returns Pa
   };

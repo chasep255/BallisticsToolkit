@@ -16,7 +16,7 @@ namespace btk::ballistics
                                                                             {1260.0f, 7.97592111627665e-04f, 1.67688974440324f},
                                                                             {1110.0f, 5.71086414289273e-12f, 4.3212826264889f},
                                                                             {960.0f, 3.02865108244904e-17f, 5.99074203776707f},
-                                                                            {670.0f, 7.52285155782565e-06f, 2.1738019851075f},
+                                                                            {670.0f, 7.52285155782535e-06f, 2.1738019851075f},
                                                                             {540.0f, 1.31766281225189e-05f, 2.08774690257991f},
                                                                             {0.0f, 1.34504843776525e-05f, 2.08702306738884f}}};
 
@@ -139,10 +139,10 @@ namespace btk::ballistics
       return btk::math::Vector3D(0.0f, 0.0f, 0.0f);
     btk::math::Vector3D tHat = v.magnitude() > 1e-6f ? (v / v.magnitude()) : (u / V);
 
-    // Normal-plane basis (ensure right ≈ +X for tHat ≈ -Z, upInPl ≈ +Y)
+    // Normal-plane basis: right ≈ +X, upInPl ≈ +Y for tHat ≈ -Z
     btk::math::Vector3D worldUp = btk::math::Vector3D(0.0f, 1.0f, 0.0f);
     btk::math::Vector3D right = safe_norm(tHat.cross(worldUp), btk::math::Vector3D(1.0f, 0.0f, 0.0f));
-    btk::math::Vector3D upInPl = safe_norm(tHat.cross(right), btk::math::Vector3D(0.0f, 1.0f, 0.0f));
+    btk::math::Vector3D upInPl = safe_norm(right.cross(tHat), btk::math::Vector3D(0.0f, 1.0f, 0.0f));
 
     // Aero scalars
     float rho = atmosphere_.getAirDensity();
@@ -185,8 +185,8 @@ namespace btk::ballistics
     float hpU = betaU - betaEqUp;
 
     // 90° rotation around tHat; sign by twist hand
-    float jumpR = yaw_of_repose_scale_ * (hand * (-hpU));
-    float jumpU = yaw_of_repose_scale_ * (hand * (-hpR));
+    float jumpR = yaw_of_repose_scale_ * (hand * hpU);
+    float jumpU = yaw_of_repose_scale_ * (hand * hpR);
 
     // Convert tiny angles -> acceleration with lift slope
     float gain = (qDyn * Sref * lift_slope_per_rad_) / s.getWeight();

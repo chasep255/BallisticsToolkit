@@ -194,7 +194,7 @@
                     <h3>Bullet Parameters</h3>
                     <div class="param-help">
                         <strong>Weight (grains):</strong> Bullet weight in grains. Typical: .223 (55-77 gr), .308 (150-180 gr), .30-06 (150-220 gr).<br><br>
-                        <strong>BC (Ballistic Coefficient):</strong> Drag efficiency relative to standard projectile. Typical: 0.1-0.8 for most rifle bullets; input accepts 0.001-1.0. Higher = better aerodynamics.<br><br>
+                        <strong>BC (Ballistic Coefficient):</strong> Drag efficiency relative to standard projectile. Typical: 0.1-0.5 for most rifle bullets. Higher = better aerodynamics.<br><br>
                         <strong>Diameter (inches):</strong> Bullet diameter. Used for spin aerodynamics and moment of inertia calculations. Typical: .223 (0.224"), .308 (0.308").<br><br>
                         <strong>Length (inches):</strong> Bullet length from tip to base. Used for moment of inertia and spin aerodynamics calculations. Typical: .223 (0.7-1.0"), .308 (1.0-1.4").<br><br>
                         <strong>Twist (in/turn):</strong> Barrel twist rate. Enter positive for right-hand (RH) twist (e.g., 8 for 1:8 twist), negative for left-hand (LH). Common: .223 (1:7 or 1:8), .308 (1:10 or 1:12). Used to calculate bullet spin rate for spin drift and crosswind jump effects.<br><br>
@@ -255,7 +255,7 @@
                     <div class="param-help">
                         <strong>Atmospheric Conditions:</strong> The calculator displays calculated atmospheric properties used in the simulation:<br>
                         • <strong>Air Density:</strong> Shows in lb/ft³ and kg/m³. Affects drag and bullet deceleration.<br>
-                        • <strong>Pressure:</strong> Shows in inHg and Pa. Calculated from altitude using the barometric formula (standard atmospheric pressure decreases with altitude).<br>
+                        • <strong>Pressure:</strong> Shows in inHg and Pa. Calculated from altitude using the ISA power-law barometric formula (standard atmospheric pressure decreases with altitude).<br>
                         • <strong>Speed of Sound:</strong> Shows in fps and m/s. Useful for understanding supersonic/subsonic transitions.<br>
                         • <strong>Temperature:</strong> Shows in °F. Confirms the input temperature value.<br><br>
                         <strong>Bullet Properties:</strong> Displays calculated bullet characteristics:<br>
@@ -272,7 +272,7 @@
                     <h3>Results</h3>
                     <div class="param-help">
                         <strong>Range:</strong> Distance in yards from muzzle.<br><br>
-                        <strong>Drop:</strong> Vertical bullet drop from line of sight. Positive = below crosshairs, negative = above crosshairs.<br><br>
+                        <strong>Drop:</strong> Vertical angle from line of sight to bullet. Negative = bullet is below the crosshairs (add elevation), positive = bullet is above the crosshairs.<br><br>
                         <strong>Drift:</strong> Total horizontal deflection including wind drift and spin drift (if spin effects are enabled). Wind drift depends on wind speed and direction. Spin drift adds a rightward component for right-hand twist barrels.<br><br>
                         <strong>Velocity:</strong> Bullet speed at that range. Decreases due to air resistance.<br><br>
                         <strong>Energy:</strong> Kinetic energy in foot-pounds. Decreases with velocity.<br><br>
