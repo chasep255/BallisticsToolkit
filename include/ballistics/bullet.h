@@ -63,9 +63,9 @@ namespace btk::ballistics
      * @brief Initialize a flying bullet with 4DOF state (legacy constructor)
      *
      * @param bullet The bullet object with physical properties and BC
-     * @param position_x Position along X axis in m (downrange/horizontal)
-     * @param position_y Position along Y axis in m (crossrange/windage)
-     * @param position_z Position along Z axis in m (vertical/elevation)
+     * @param position_x Position along X axis in m (crossrange)
+     * @param position_y Position along Y axis in m (vertical/up)
+     * @param position_z Position along Z axis in m (-downrange)
      * @param velocity_x Velocity component along X axis in m/s
      * @param velocity_y Velocity component along Y axis in m/s
      * @param velocity_z Velocity component along Z axis in m/s

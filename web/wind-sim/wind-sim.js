@@ -968,9 +968,6 @@ function buildAllVisualizations()
 
   // No bias visualization - we removed bias concept
 
-  // Create a reusable Vector3D to avoid allocating on every sample
-  const reusablePos = new btk.Vector3D(0, 0, 0);
-
   // Create component visualizations
   for (let i = 0; i < numComponents; i++)
   {

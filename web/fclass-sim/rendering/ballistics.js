@@ -306,9 +306,10 @@ export class BallisticsEngine
       const bulletVel = btkToThreeJsVelocity(bulletVelBtk); // Convert m/s to fps
       const impactVelocityFps = Math.sqrt(bulletVel.x ** 2 + bulletVel.y ** 2 + bulletVel.z ** 2); // fps
 
-      // Dispose BTK vectors
+      // Dispose BTK objects
       bulletPosBtk.delete();
       bulletVelBtk.delete();
+      bulletState.delete();
 
       // Get target coordinates from target system (Three.js coords, yards)
       const targetCenter = this.targets.getUserTargetCenter();

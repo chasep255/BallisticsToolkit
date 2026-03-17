@@ -31,9 +31,9 @@ namespace btk::physics
     /**
      * @brief Sample wind at given position using current internal time
      *
-     * @param x_m Downrange position in meters
-     * @param y_m Crossrange position in meters
-     * @param z_m Vertical position in meters (ignored - no altitude variation)
+     * @param x_m Crossrange position in meters
+     * @param y_m Vertical position in meters
+     * @param z_m -Downrange position in meters
      * @return Wind vector (m/s) in BTK coordinates: (x=crosswind, y=vertical, z=-headwind)
      */
     btk::math::Vector3D operator()(float x_m, float y_m, float z_m) const;
@@ -41,7 +41,7 @@ namespace btk::physics
     /**
      * @brief Sample wind at a specific location using Vector3D
      *
-     * @param pos Position vector (x=downrange, y=crossrange, z=height) in meters
+     * @param pos Position vector (x=crossrange, y=vertical, z=-downrange) in meters
      * @return Wind vector (m/s) in BTK coordinates: (x=crosswind, y=vertical, z=-headwind)
      */
     btk::math::Vector3D operator()(const btk::math::Vector3D& pos) const;
@@ -49,9 +49,9 @@ namespace btk::physics
     /**
      * @brief Sample wind at a specific location
      *
-     * @param x_m X coordinate in meters (downrange)
-     * @param y_m Y coordinate in meters (crossrange, positive = right)
-     * @param z_m Z coordinate in meters (height)
+     * @param x_m X coordinate in meters (crossrange)
+     * @param y_m Y coordinate in meters (vertical/height)
+     * @param z_m Z coordinate in meters (-downrange)
      * @return Wind vector (m/s) in BTK coordinates: (x=crosswind, y=vertical, z=-headwind)
      */
     btk::math::Vector3D sample(float x_m, float y_m, float z_m) const;
@@ -59,7 +59,7 @@ namespace btk::physics
     /**
      * @brief Sample wind at a specific location using Vector3D
      *
-     * @param pos Position vector (x=downrange, y=crossrange, z=height) in meters
+     * @param pos Position vector (x=crossrange, y=vertical, z=-downrange) in meters
      * @return Wind vector (m/s) in BTK coordinates: (x=crosswind, y=vertical, z=-headwind)
      */
     btk::math::Vector3D sample(const btk::math::Vector3D& pos) const;

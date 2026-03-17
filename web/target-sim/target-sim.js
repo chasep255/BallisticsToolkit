@@ -314,7 +314,7 @@ class TargetSimulator
     const windSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('windSd').value));
     const headwindSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('headwindSd').value));
     const updraftSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('updraftSd').value));
-    const rifleAccuracyMrad = btk.Conversions.moaToRadians(parseFloat(document.getElementById('rifleAccuracy').value));
+    const rifleAccuracyRad = btk.Conversions.moaToRadians(parseFloat(document.getElementById('rifleAccuracy').value));
     const altitude = btk.Conversions.feetToMeters(parseFloat(document.getElementById('altitude').value));
     const temperature = btk.Conversions.fahrenheitToKelvin(parseFloat(document.getElementById('temperature').value));
     const humidity = parseFloat(document.getElementById('humidity').value) / 100.0;
@@ -349,7 +349,7 @@ class TargetSimulator
       windSd,
       headwindSd,
       updraftSd,
-      rifleAccuracyMrad,
+      rifleAccuracyRad,
       0.001, // timestep
       twistMetersPerTurn // twist rate
     );
@@ -561,6 +561,8 @@ class TargetSimulator
     this.ctx.moveTo(this.targetCenterX - xSize, this.targetCenterY + xSize);
     this.ctx.lineTo(this.targetCenterX + xSize, this.targetCenterY - xSize);
     this.ctx.stroke();
+
+    target.delete();
   }
 
   drawShotImpact(simulatedShot)

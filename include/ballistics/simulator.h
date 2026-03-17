@@ -149,9 +149,9 @@ namespace btk::ballistics
 
     // State queries
     /**
-     * @brief Get current bullet distance (X position)
+     * @brief Get current bullet downrange distance
      *
-     * @return Current bullet X position in m
+     * @return Current downrange distance along -Z axis in m
      */
     float getCurrentDistance() const;
 

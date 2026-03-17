@@ -676,6 +676,10 @@ export class SteelTargetFactory
       this._matrix.compose(this._position, this._quaternion, this._scale);
       instancedMesh.setMatrixAt(i, this._matrix);
 
+      pos.delete();
+      orient.delete();
+      dims.delete();
+
       // Store target index for texture array
       targetIndexArray[i] = target.targetIndex;
 
@@ -761,6 +765,10 @@ export class SteelTargetFactory
     this._matrix.compose(this._position, this._quaternion, this._scale);
     instancedMesh.setMatrixAt(instanceId, this._matrix);
     instancedMesh.instanceMatrix.needsUpdate = true;
+
+    pos.delete();
+    orient.delete();
+    dims.delete();
   }
 
   /**

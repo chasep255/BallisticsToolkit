@@ -24,10 +24,10 @@ namespace btk::physics
     // Pressure constants
     static constexpr float PRESSURE_STANDARD_PASCALS = 101325.0f; // Pa - standard atmospheric pressure at sea level
 
-    // Atmospheric lapse rates (dimensionless ratios)
+    // Atmospheric lapse rate
     static constexpr float TEMPERATURE_LAPSE_RATE = -0.0065f; // K/m - temperature lapse rate (troposphere)
 
-    // Gas constants (dimensionless ratios)
+    // Gas constants
     static constexpr float GAS_CONSTANT_UNIVERSAL = 8.31446f; // J/(mol·K) - universal gas constant (CODATA 2018)
     static constexpr float MOLAR_MASS_DRY_AIR = 0.028965f;   // kg/mol - molar mass of dry air
     static constexpr float HEAT_CAPACITY_RATIO_AIR = 1.4f;  // dimensionless - heat capacity ratio for air

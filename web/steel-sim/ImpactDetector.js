@@ -183,6 +183,8 @@ export class ImpactDetector
     const position = new btk.Vector3D(x, y, z);
     const rotation = new btk.Quaternion(qw, qx, qy, qz);
     this.detector.moveCollider(handle, position, rotation);
+    position.delete();
+    rotation.delete();
   }
 
   /**

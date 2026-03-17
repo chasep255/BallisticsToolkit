@@ -109,7 +109,7 @@ namespace btk::match
     // Get impact position and velocity
     float impact_x = impact_point->getState().getPosition().x;         // X is crossrange
     float impact_y = impact_point->getState().getPosition().y;         // Y is vertical
-    float impact_velocity = -impact_point->getState().getVelocity().z; // Forward velocity at impact (magnitude of -Z)
+    float impact_velocity = impact_point->getState().getTotalVelocity(); // Total speed at impact
 
     // Score the shot and add to match
     const Hit& hit = match_.addHit(impact_x, impact_y, target_, bullet_.getDiameter());
