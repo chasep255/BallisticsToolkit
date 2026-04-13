@@ -37,6 +37,10 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://www.ballisticstoolkit.com/hit-prob/hit-prob.html</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://www.ballisticstoolkit.com/wind-sim/wind-sim.html</loc>
     <priority>0.2</priority>
   </url>

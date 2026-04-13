@@ -1,6 +1,6 @@
 # Ballistics Toolkit
 
-Client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides trajectory calculations with atmospheric and wind compensation, spin effects, load comparison, Performance Matrix analysis, Monte Carlo target simulation, interactive steel target simulator, and an interactive F-Class match simulator with wind visualization.
+Client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides trajectory calculations with atmospheric and wind compensation, spin effects, load comparison, Performance Matrix analysis, Monte Carlo target simulation, hit simulation, interactive steel target simulator, and an interactive F-Class match simulator with wind visualization.
 
 **Website:** https://www.ballisticstoolkit.com/  
 **Contact:** admin@ballisticstoolkit.com
@@ -35,6 +35,13 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Spin Effects** - Crosswind jump included in analysis
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
 - **Match Scoring** - Competitive scoring with X-counts, line breaking, and group size analysis
+
+### 🎲 Hit Simulator
+- **Monte Carlo Simulation** - Run up to 50,000 shots against custom target shapes
+- **Custom Target Shapes** - Circle (by diameter) or rectangle (by width/height) in inches
+- **Dispersion Statistics** - Hit probability, horizontal/vertical spread, extreme spread, mean radius, radial standard deviation, and CEP
+- **Full Ballistics** - Same G1/G7 drag models, atmosphere, spin effects, and wind variability as the other tools
+- **Persistent Settings** - Cookie-based save/restore of all parameters
 
 ### 🌬️ Wind Simulator
 - **Real-time Wind Visualization** - Interactive 2D wind field visualization showing wind speed and direction across the range
@@ -103,6 +110,16 @@ Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/
 4. **Environment** - Altitude, temperature, humidity (pressure derived)
 
 Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis. Trajectories include crosswind jump effects.
+
+### Hit Simulator
+Visit the [Hit Simulator](https://www.ballisticstoolkit.com/hit-prob/hit-prob.html) for dispersion analysis:
+
+1. **Bullet Parameters** - BC, drag function (G1/G7), muzzle velocity, weight, diameter, length, twist rate
+2. **Target Shape** - Circle (diameter in inches) or rectangle (width/height in inches)
+3. **Range & Variability** - Target range, MV σ, wind σ (cross/head-tail/vertical), rifle accuracy (MOA)
+4. **Environment** - Altitude, temperature, humidity
+
+Run the Monte Carlo simulation and view hit probability, group spreads, extreme spread, mean radius, CEP, and radial standard deviation with a visual impact plot.
 
 ### F-Class Simulator
 Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclass-sim.html) for an interactive match experience:
