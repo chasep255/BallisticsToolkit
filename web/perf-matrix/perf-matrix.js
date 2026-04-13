@@ -1,18 +1,61 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
+import { createSettingsCookies } from '../settings-cookies.js';
+
+const SettingsCookies = createSettingsCookies('perf_matrix_');
+
+const DEFAULT_PARAMS = {
+  range: '1000',
+  dragModel: 'G7',
+  units: 'mrad',
+  energyUnits: 'ft-lbs',
+  bulletWeight: '140',
+  temperature: '59',
+  altitude: '0',
+  humidity: '50',
+  'bc-start': '0.250',
+  'bc-end': '0.350',
+  'bc-increment': '0.010',
+  'mv-start': '700',
+  'mv-end': '3000',
+  'mv-increment': '100'
+};
+
+function setDefaultValues()
+{
+  for (const [key, value] of Object.entries(DEFAULT_PARAMS))
+  {
+    const element = document.getElementById(key);
+    if (element)
+    {
+      if (element.type === 'checkbox') element.checked = value;
+      else element.value = value;
+    }
+  }
+}
 
 let btk = null;
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () =>
 {
   try
   {
+    setDefaultValues();
+
     btk = await BallisticsToolkit();
     console.log('BallisticsToolkit WASM module ready');
 
-    // Set up UI
+    SettingsCookies.loadAll();
+    SettingsCookies.attachAutoSave();
+
     Utils.setupHelpModal('helpBtn', 'helpModal');
     document.getElementById('calculateBtn').addEventListener('click', calculateGrid);
+
+    document.getElementById('resetDefaults').addEventListener('click', (e) =>
+    {
+      e.preventDefault();
+      setDefaultValues();
+      SettingsCookies.saveAll();
+    });
   }
   catch (error)
   {

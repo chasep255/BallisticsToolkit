@@ -1,20 +1,66 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
+import { createSettingsCookies } from '../settings-cookies.js';
+
+const SettingsCookies = createSettingsCookies('ballistic_calc_');
+
+const DEFAULT_PARAMS = {
+  weight: '140',
+  diameter: '0.264',
+  bc: '0.311',
+  dragFunction: 'G7',
+  length: '1.4',
+  twistRate: '8',
+  enableSpinEffects: true,
+  muzzleVelocity: '2750',
+  zeroRange: '100',
+  scopeHeight: '2',
+  temperature: '59',
+  humidity: '50',
+  altitude: '0',
+  windSpeed: '0',
+  windDirection: '3',
+  maxRange: '1000',
+  step: '100',
+  angleUnits: 'mrad'
+};
+
+function setDefaultValues()
+{
+  for (const [key, value] of Object.entries(DEFAULT_PARAMS))
+  {
+    const element = document.getElementById(key);
+    if (element)
+    {
+      if (element.type === 'checkbox') element.checked = value;
+      else element.value = value;
+    }
+  }
+}
 
 let btk = null;
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () =>
 {
   try
   {
+    setDefaultValues();
+
     btk = await BallisticsToolkit();
     console.log('BallisticsToolkit WASM module ready');
 
-    // Set up UI
+    SettingsCookies.loadAll();
+    SettingsCookies.attachAutoSave();
+
     Utils.setupHelpModal('helpBtn', 'helpModal');
     document.getElementById('calculateBtn').addEventListener('click', calculateTrajectory);
     document.getElementById('printBtn').addEventListener('click', printResults);
 
+    document.getElementById('resetDefaults').addEventListener('click', (e) =>
+    {
+      e.preventDefault();
+      setDefaultValues();
+      SettingsCookies.saveAll();
+    });
   }
   catch (error)
   {

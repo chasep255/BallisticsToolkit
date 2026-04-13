@@ -62,87 +62,23 @@
   <div class="app-container">
         <h1>🎮 F-Class Simulator</h1>
 
-    <!-- Game Settings & Accuracy -->
+    <!-- Parameters -->
     <div class="params-bar">
-      <div class="param-item">
-        <label for="graphicsPreset" title="Graphics quality preset">Graphics</label>
-        <select id="graphicsPreset" title="Graphics quality preset">
-          <option value="Low">Low</option>
-          <option value="Medium" selected>Medium</option>
-          <option value="High">High</option>
-        </select>
-      </div>
-      <div class="param-item">
-        <label for="fclassMode" title="Target distance and type">Range</label>
-        <select id="fclassMode" title="Target distance and type">
-          <option value="fclass-300">300 yards</option>
-          <option value="fclass-500">500 yards</option>
-          <option value="fclass-600">600 yards</option>
-          <option value="fclass-800">800 yards</option>
-          <option value="fclass-900">900 yards</option>
-          <option value="fclass-1000" selected>1000 yards</option>
-        </select>
-      </div>
-      <div class="param-item">
-        <label for="windPreset" title="Wind conditions">Wind</label>
-        <select id="windPreset" title="Wind conditions">
-          <!-- Options will be populated dynamically from C++ -->
-        </select>
-      </div>
-      <div class="param-item">
-        <label for="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom">Reticle</label>
-        <select id="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom">
-          <option value="SFP" selected>SFP (Fixed)</option>
-          <option value="FFP">FFP (Scaling)</option>
-        </select>
-      </div>
-      <div class="param-item">
-        <label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label>
-        <input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps">
-      </div>
-      <div class="param-item">
-        <label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label>
-        <input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">
-      </div>
-    </div>
-
-    <!-- Ballistics Settings -->
-    <div class="params-bar">
-      <div class="param-item">
-        <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
-        <input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">
-      </div>
-      <div class="param-item">
-        <label for="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">Drag</label>
-        <select id="dragFunction" title="G7 is recommended for modern bullets, G1 for older data">
-          <option value="G1">G1</option>
-          <option value="G7" selected>G7</option>
-        </select>
-      </div>
-      <div class="param-item">
-        <label for="mv" title="Muzzle velocity in feet per second">MV (fps)</label>
-        <input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second">
-      </div>
-      <div class="param-item">
-        <label for="diameter" title="Bullet diameter in inches">Dia (in)</label>
-        <input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches">
-      </div>
-      <div class="param-item">
-        <label for="weight" title="Bullet weight in grains">Wt (gr)</label>
-        <input type="number" id="weight" value="140" step="1" min="10" max="1000" title="Bullet weight in grains">
-      </div>
-      <div class="param-item">
-        <label for="length" title="Bullet length in inches">Len (in)</label>
-        <input type="number" id="length" value="1.4" step="0.01" min="0.1" max="5.0" title="Bullet length in inches">
-      </div>
-      <div class="param-item">
-        <label for="twist" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)">Twist (in/turn)</label>
-        <input type="number" id="twist" value="8.0" step="0.1" min="1" max="20" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist)">
-      </div>
-      <div class="param-item" style="display: flex; align-items: center; gap: 8px;">
-        <input type="checkbox" id="enableSpinEffects" checked style="width: auto; margin: 0;">
-        <label for="enableSpinEffects" style="margin: 0; font-weight: normal;" title="Enable spin drift and crosswind jump effects. Uncheck to disable experimental spin effects.">Enable Spin Effects</label>
-      </div>
+      <div class="param-item"><label for="graphicsPreset" title="Graphics quality preset">Graphics</label><select id="graphicsPreset" title="Graphics quality preset"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
+      <div class="param-item"><label for="fclassMode" title="Target distance and type">Range</label><select id="fclassMode" title="Target distance and type"><option value="fclass-300">300 yards</option><option value="fclass-500">500 yards</option><option value="fclass-600">600 yards</option><option value="fclass-800">800 yards</option><option value="fclass-900">900 yards</option><option value="fclass-1000" selected>1000 yards</option></select></div>
+      <div class="param-item"><label for="windPreset" title="Wind conditions">Wind</label><select id="windPreset" title="Wind conditions"><!-- populated dynamically --></select></div>
+      <div class="param-item"><label for="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom">Reticle</label><select id="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom"><option value="SFP" selected>SFP (Fixed)</option><option value="FFP">FFP (Scaling)</option></select></div>
+      <div class="param-item"><label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label><input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps"></div>
+      <div class="param-item"><label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label><input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)"></div>
+      <div class="param-item"><label for="bc" title="Ballistic Coefficient (0.001-1.0)">BC</label><input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0)"></div>
+      <div class="param-item"><label for="dragFunction" title="G7 for modern bullets, G1 for older data">Drag</label><select id="dragFunction" title="G7 for modern bullets, G1 for older data"><option value="G1">G1</option><option value="G7" selected>G7</option></select></div>
+      <div class="param-item"><label for="mv" title="Muzzle velocity in feet per second">MV (fps)</label><input type="number" id="mv" value="2750" step="10" min="1000" max="5000" title="Muzzle velocity in feet per second"></div>
+      <div class="param-item"><label for="diameter" title="Bullet diameter in inches">Dia (in)</label><input type="number" id="diameter" value="0.264" step="0.001" min="0.1" max="1.0" title="Bullet diameter in inches"></div>
+      <div class="param-item"><label for="weight" title="Bullet weight in grains">Wt (gr)</label><input type="number" id="weight" value="140" step="1" min="10" max="1000" title="Bullet weight in grains"></div>
+      <div class="param-item"><label for="length" title="Bullet length in inches">Len (in)</label><input type="number" id="length" value="1.4" step="0.01" min="0.1" max="5.0" title="Bullet length in inches"></div>
+      <div class="param-item"><label for="twist" title="Barrel twist rate in inches per turn">Twist (in/turn)</label><input type="number" id="twist" value="8.0" step="0.1" min="1" max="20" title="Barrel twist rate in inches per turn"></div>
+      <div class="param-item" style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="enableSpinEffects" checked style="width: auto; margin: 0;"><label for="enableSpinEffects" style="margin: 0; font-weight: normal;" title="Enable spin drift and crosswind jump effects.">Enable Spin Effects</label></div>
+      <div class="param-item" style="display: flex; align-items: center;"><a href="#" id="resetDefaults" style="color: #007bff; text-decoration: none; font-size: 13px; cursor: pointer;" title="Reset all parameters to default values">Reset to Defaults</a></div>
     </div>
 
     <!-- Control Buttons -->

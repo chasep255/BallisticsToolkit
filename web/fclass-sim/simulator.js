@@ -22,11 +22,39 @@ import
   GraphicsPresets
 }
 from './core/graphics-presets.js';
-import
+import { createSettingsCookies } from '../settings-cookies.js';
+
+const SettingsCookies = createSettingsCookies('fclass_sim_');
+
+const DEFAULT_PARAMS = {
+  graphicsPreset: 'Medium',
+  fclassMode: 'fclass-1000',
+  windPreset: 'Moderate',
+  focalPlane: 'SFP',
+  mvSd: '7.0',
+  rifleAccuracy: '0.25',
+  bc: '0.311',
+  dragFunction: 'G7',
+  mv: '2750',
+  diameter: '0.264',
+  weight: '140',
+  length: '1.4',
+  twist: '8.0',
+  enableSpinEffects: true
+};
+
+function setDefaultValues()
 {
-  SettingsCookies
+  for (const [key, value] of Object.entries(DEFAULT_PARAMS))
+  {
+    const element = document.getElementById(key);
+    if (element)
+    {
+      if (element.type === 'checkbox') element.checked = value;
+      else element.value = value;
+    }
+  }
 }
-from './core/settings-cookies.js';
 
 // Import ResourceManager (triggers auto-loading)
 import ResourceManager from './resources/manager.js';
@@ -2061,15 +2089,26 @@ async function initializeApp()
     // Wait for BTK to load
     await waitForBTK();
 
+    setDefaultValues();
+
     setupUI();
-    lockCanvasSize(); // Lock canvas size once on page load
+    lockCanvasSize();
     populateWindPresetDropdown();
 
-    // Load saved settings from cookies (after wind presets are populated)
     SettingsCookies.loadAll();
-
-    // Attach auto-save listeners to all settings inputs
     SettingsCookies.attachAutoSave();
+
+    const resetBtn = document.getElementById('resetDefaults');
+    if (resetBtn)
+    {
+      resetBtn.addEventListener('click', (e) =>
+      {
+        e.preventDefault();
+        setDefaultValues();
+        populateWindPresetDropdown();
+        SettingsCookies.saveAll();
+      });
+    }
 
     setupHelpMenu();
 

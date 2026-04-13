@@ -4,6 +4,45 @@
  */
 
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
+import { createSettingsCookies } from '../settings-cookies.js';
+
+const SettingsCookies = createSettingsCookies('target_sim_');
+
+const DEFAULT_PARAMS = {
+  bc: '0.311',
+  dragFunction: 'G7',
+  mv: '2750',
+  weight: '140',
+  diameter: '0.264',
+  length: '1.4',
+  twistRate: '8',
+  enableSpinEffects: true,
+  target: 'MR-1FCA',
+  range: '600',
+  shots: '60',
+  matches: '10',
+  mvSd: '7.0',
+  windSd: '1.0',
+  headwindSd: '0.0',
+  updraftSd: '0.0',
+  rifleAccuracy: '0.25',
+  altitude: '0',
+  temperature: '59',
+  humidity: '50'
+};
+
+function setDefaultValues()
+{
+  for (const [key, value] of Object.entries(DEFAULT_PARAMS))
+  {
+    const element = document.getElementById(key);
+    if (element)
+    {
+      if (element.type === 'checkbox') element.checked = value;
+      else element.value = value;
+    }
+  }
+}
 
 let btk = null;
 
@@ -152,11 +191,15 @@ class TargetSimulator
       targetSelect.appendChild(option);
     }
 
-    // Set default selection to MR-1FCA if available, otherwise first target
-    const defaultTarget = targetNames.includes('MR-1FCA') ? 'MR-1FCA' : targetNames[0];
-    if (defaultTarget)
+    const savedValue = SettingsCookies.get('target_sim_target');
+    if (savedValue && targetNames.includes(savedValue))
     {
-      targetSelect.value = defaultTarget;
+      targetSelect.value = savedValue;
+    }
+    else
+    {
+      const defaultTarget = targetNames.includes('MR-1FCA') ? 'MR-1FCA' : targetNames[0];
+      if (defaultTarget) targetSelect.value = defaultTarget;
     }
 
     console.log(`Loaded ${targetNames.length} targets:`, targetNames);
@@ -865,18 +908,27 @@ class TargetSimulator
   }
 }
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () =>
 {
   try
   {
+    setDefaultValues();
+
     btk = await BallisticsToolkit();
     console.log('BallisticsToolkit WASM module ready');
 
-    // Create simulator instance after WASM is loaded
     window.targetSimulator = new TargetSimulator();
-    console.log('Target Simulator initialized successfully');
 
+    SettingsCookies.loadAll();
+    SettingsCookies.attachAutoSave();
+
+    document.getElementById('resetDefaults').addEventListener('click', (e) =>
+    {
+      e.preventDefault();
+      setDefaultValues();
+      window.targetSimulator.populateTargetDropdown();
+      SettingsCookies.saveAll();
+    });
   }
   catch (error)
   {

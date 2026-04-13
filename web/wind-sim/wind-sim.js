@@ -1,10 +1,18 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
+import { createSettingsCookies } from '../settings-cookies.js';
 import * as THREE from 'three';
 import
 {
   SmokeSimulation
 }
 from './core/smoke-sim.js';
+
+const SettingsCookies = createSettingsCookies('wind_sim_');
+
+const DEFAULT_PARAMS = {
+  timeScale: '1.0',
+  colorThreshold: '7.5'
+};
 
 let btk = null; // WASM module
 let wind = null; // BTK wind generator (WASM)
@@ -798,6 +806,40 @@ function setupUI()
 
   // Load presets once at startup
   populatePresets();
+
+  // Restore saved settings from cookies
+  SettingsCookies.loadAll();
+  SettingsCookies.attachAutoSave();
+
+  // Sync slider display values after cookie restore
+  state.timeScale = parseFloat(timeScale.value) || 1.0;
+  timeScaleVal.textContent = `${state.timeScale.toFixed(1)}x`;
+  colorThreshold = parseFloat(document.getElementById('colorThreshold').value) || 7.5;
+  document.getElementById('colorThresholdVal').textContent = `${colorThreshold.toFixed(1)} mph`;
+
+  // Reset to defaults
+  const resetBtn = document.getElementById('resetDefaults');
+  if (resetBtn)
+  {
+    resetBtn.addEventListener('click', (e) =>
+    {
+      e.preventDefault();
+      for (const [key, value] of Object.entries(DEFAULT_PARAMS))
+      {
+        const el = document.getElementById(key);
+        if (el) el.value = value;
+      }
+      // Reset preset to first available
+      if (preset.options.length > 0) preset.value = preset.options[0].value;
+      state.timeScale = 1.0;
+      timeScaleVal.textContent = '1.0x';
+      colorThreshold = 7.5;
+      document.getElementById('colorThresholdVal').textContent = '7.5 mph';
+      SettingsCookies.saveAll();
+      rebuild();
+      startAnimation();
+    });
+  }
 
   rebuild();
 

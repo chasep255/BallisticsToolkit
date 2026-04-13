@@ -88,11 +88,9 @@ import
   BulletGlowPool
 }
 from './Shot.js';
-import
-{
-  SettingsCookies
-}
-from './SettingsCookies.js';
+import { createSettingsCookies } from '../settings-cookies.js';
+
+const SettingsCookies = createSettingsCookies('steel_sim_');
 import
 {
   AudioManager

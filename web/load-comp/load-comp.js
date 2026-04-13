@@ -1,22 +1,60 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
+import { createSettingsCookies } from '../settings-cookies.js';
+
+const SettingsCookies = createSettingsCookies('load_comp_');
+
+const DEFAULT_PARAMS = {
+  b1Weight: '140',
+  b1BC: '0.311',
+  b1Drag: 'G7',
+  b1MV: '2750',
+  b2Weight: '175',
+  b2BC: '0.250',
+  b2Drag: 'G7',
+  b2MV: '2700',
+  maxRange: '1000',
+  units: 'moa'
+};
+
+function setDefaultValues()
+{
+  for (const [key, value] of Object.entries(DEFAULT_PARAMS))
+  {
+    const element = document.getElementById(key);
+    if (element)
+    {
+      if (element.type === 'checkbox') element.checked = value;
+      else element.value = value;
+    }
+  }
+}
 
 let btk = null;
 
-// Constants
-const STEP_YARDS = 100; // Step size in yards
-const WIND_SPEED_MPH = 10; // 10 mph crosswind
+const STEP_YARDS = 100;
+const WIND_SPEED_MPH = 10;
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () =>
 {
   try
   {
+    setDefaultValues();
+
     btk = await BallisticsToolkit();
     console.log('BallisticsToolkit WASM module ready');
 
-    // Set up UI
+    SettingsCookies.loadAll();
+    SettingsCookies.attachAutoSave();
+
     Utils.setupHelpModal('helpBtn', 'helpModal');
     document.getElementById('calculateBtn').addEventListener('click', compareLoads);
+
+    document.getElementById('resetDefaults').addEventListener('click', (e) =>
+    {
+      e.preventDefault();
+      setDefaultValues();
+      SettingsCookies.saveAll();
+    });
   }
   catch (error)
   {

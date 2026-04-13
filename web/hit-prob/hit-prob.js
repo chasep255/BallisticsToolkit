@@ -4,7 +4,9 @@
  */
 
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
-import { SettingsCookies } from './settings-cookies.js';
+import { createSettingsCookies } from '../settings-cookies.js';
+
+const SettingsCookies = createSettingsCookies('hit_prob_');
 
 let btk = null;
 
