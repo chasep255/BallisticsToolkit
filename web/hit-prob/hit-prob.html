@@ -131,15 +131,15 @@
     <div id="helpModal" class="help-modal" style="display: none;">
         <div class="help-modal-content">
             <div class="help-modal-header">
-                <h2>Hit Simulator Help</h2>
+                <h2>🎲 Hit Simulator Help</h2>
                 <span class="help-close">&times;</span>
             </div>
             <div class="help-modal-body">
                 <div class="help-section">
                     <h3>Need Help or Found an Issue?</h3>
                     <div class="param-help">
-                        <strong>Email:</strong> <a href="mailto:admin@ballisticstoolkit.com">admin@ballisticstoolkit.com</a><br>
-                        <strong>GitHub:</strong> <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener noreferrer">github.com/chasep255/BallisticsToolkit</a>
+                        <strong>📧 Email:</strong> <a href="mailto:admin@ballisticstoolkit.com">admin@ballisticstoolkit.com</a><br>
+                        <strong>💻 GitHub:</strong> <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener noreferrer">github.com/chasep255/BallisticsToolkit</a>
                     </div>
                 </div>
 
@@ -149,10 +149,42 @@
                 </div>
 
                 <div class="help-section">
+                    <h3>Ballistic Parameters</h3>
+                    <div class="param-help">
+                        <strong>BC (Ballistic Coefficient):</strong> Aerodynamic efficiency. Higher = less drift and drop.<br><br>
+                        <strong>Drag:</strong> G7 for modern boat-tails; G1 for older/flat-base data.<br><br>
+                        <strong>MV (fps):</strong> Muzzle velocity in feet per second.<br><br>
+                        <strong>Weight / Diameter / Length:</strong> Bullet geometry and mass used by the trajectory model.<br><br>
+                        <strong>Twist (in/turn):</strong> Barrel twist rate (e.g., 8 for 1:8 twist).<br><br>
+                        <strong>Spin Effects:</strong> Includes spin drift and crosswind jump for realism.
+                    </div>
+                </div>
+
+                <div class="help-section">
                     <h3>Target Shape</h3>
                     <div class="param-help">
                         <strong>Circle:</strong> Defined by diameter in inches. Hit = impact landing within the circle.<br><br>
                         <strong>Rectangle:</strong> Defined by width and height in inches. Hit = impact landing within the rectangle.
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3>Variability Parameters (Standard Deviations)</h3>
+                    <div class="param-help">
+                        <strong>MV σ (fps):</strong> Spread in muzzle velocity (lower = more consistent).<br><br>
+                        <strong>Cross Wind σ (mph):</strong> Side-to-side wind variability (main driver of horizontal spread).<br><br>
+                        <strong>H/T Wind σ (mph):</strong> Head/tail variability (small influence on drop).<br><br>
+                        <strong>Vert Wind σ (mph):</strong> Up/down air movement (usually minor).<br><br>
+                        <strong>Accuracy (MOA):</strong> Rifle+shooter precision; 1 MOA is about 1 inch at 100 yards.
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3>Environmental Parameters</h3>
+                    <div class="param-help">
+                        <strong>Altitude:</strong> Height above sea level in feet. Higher altitude reduces air density and drag.<br><br>
+                        <strong>Temperature:</strong> Air temperature in Fahrenheit. Warmer air is less dense.<br><br>
+                        <strong>Humidity:</strong> Relative humidity percentage. Higher humidity slightly reduces air resistance.
                     </div>
                 </div>
 
@@ -170,11 +202,12 @@
 
                 <div class="help-section">
                     <h3>Known Limitations</h3>
-                    <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive.</p>
+                    <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
                     <div class="param-help">
                         <strong>Simplified Wind:</strong> Wind drawn independently per shot from Gaussian distributions; constant along trajectory.<br><br>
                         <strong>Accuracy Model:</strong> Uniform distribution within a circle (diameter = MOA setting).<br><br>
-                        <strong>Statistical Tool:</strong> For exploring trends, not predicting field performance. See <a href="../terms.html">Terms of Service</a>.
+                        <strong>Statistical Tool:</strong> This simulator is for exploring statistical patterns, not predicting real-world performance.<br><br>
+                        <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete safety and liability information.
                     </div>
                 </div>
             </div>
