@@ -7,8 +7,6 @@
 #include "math/conversions.h"
 #include "math/vector.h"
 #include "physics/atmosphere.h"
-#include <random>
-#include <string>
 #include <vector>
 
 namespace btk::match

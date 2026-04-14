@@ -2,7 +2,6 @@
 
 #include "ballistics/bullet.h"
 #include "ballistics/trajectory.h"
-#include "math/conversions.h"
 #include "math/vector.h"
 #include "physics/atmosphere.h"
 #include "physics/wind_generator.h"
@@ -14,16 +13,6 @@ namespace btk::ballistics
   constexpr float DEFAULT_RESTORING_MOMENT_SLOPE_PER_RAD = -0.124862f;
   constexpr float DEFAULT_YAW_OF_REPOSE_SCALE = 0.426516f;
   constexpr float DEFAULT_BETA_LAG_SCALE = 0.670554f;
-
-  /**
-   * @brief Result of zeroing calculation
-   */
-  struct ZeroingResult
-  {
-    Bullet initial_state;
-    float elevation_angle; // rad
-    float azimuth_angle;   // rad (windage)
-  };
 
   /**
    * @brief Stateful ballistics flight simulator

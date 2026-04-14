@@ -5,7 +5,6 @@
 #include "math/vector.h"
 #include "rendering/steel_target.h"
 #include <map>
-#include <memory>
 #include <optional>
 #include <vector>
 

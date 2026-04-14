@@ -2,7 +2,6 @@
 
 #include "math/conversions.h"
 #include "math/vector.h"
-#include <memory>
 
 namespace btk::physics
 {

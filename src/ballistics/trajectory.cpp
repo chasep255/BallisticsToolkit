@@ -1,10 +1,6 @@
 #include "ballistics/trajectory.h"
-#include "math/conversions.h"
-#include <algorithm>
 #include <cmath>
-#include <iomanip>
 #include <limits>
-#include <sstream>
 #include <stdexcept>
 
 namespace btk
@@ -32,16 +28,9 @@ namespace btk
         return std::nullopt;
       }
 
-      // Check if target distance is beyond the last point
-      if(distance >= points_.back().getDistance())
+      if(distance > points_.back().getDistance() || distance < points_.front().getDistance())
       {
-        return points_.back();
-      }
-
-      // Check if target distance is before the first point
-      if(distance <= points_.front().getDistance())
-      {
-        return points_.front();
+        return std::nullopt;
       }
 
       // Binary search for the two points that bracket the target distance
@@ -95,14 +84,9 @@ namespace btk
         return std::nullopt;
       }
 
-      // Boundary checks
-      if(time <= points_.front().getTime())
+      if(time < points_.front().getTime() || time > points_.back().getTime())
       {
-        return points_.front();
-      }
-      if(time >= points_.back().getTime())
-      {
-        return points_.back();
+        return std::nullopt;
       }
 
       // Binary search to find bracketing indices [left, right]

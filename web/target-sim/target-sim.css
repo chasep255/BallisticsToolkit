@@ -13,10 +13,6 @@ body[data-page="target-sim"] .app-container {
     width: 100%;
 }
 
-.header-controls {
-    display: none;
-}
-
 .main-content { 
     display: flex; 
     gap: 20px; 
@@ -50,12 +46,6 @@ body[data-page="target-sim"] .app-container {
     gap: 10px;
 }
 
-.target-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
 .live-score { 
     background: #28a745; 
     color: white; 
@@ -63,14 +53,6 @@ body[data-page="target-sim"] .app-container {
     border-radius: 4px; 
     font-weight: 600; 
     font-size: 12px; 
-}
-
-.status { 
-    background: #e9ecef; 
-    color: #495057; 
-    padding: 3px 8px; 
-    border-radius: 4px; 
-    font-size: 11px; 
 }
 
 .target-container { 

@@ -4,7 +4,6 @@
 #include "physics/constants.h"
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <limits>
 #include <stdexcept>
 
@@ -94,8 +93,9 @@ namespace btk::rendering
     // Surface normal
     btk::math::Vector3D surface_normal = normal_;
 
-    // Calculate impact angle
-    btk::math::Vector3D impact_direction = velocity / velocity.magnitude();
+    float speed = velocity.magnitude();
+    if(speed < 1e-6f) return;
+    btk::math::Vector3D impact_direction = velocity / speed;
     float cos_angle = impact_direction.dot(surface_normal);
     float angle_to_normal = std::acos(std::fabs(cos_angle));
 

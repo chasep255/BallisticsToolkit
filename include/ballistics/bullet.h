@@ -4,8 +4,6 @@
 #include "math/vector.h"
 #include "physics/constants.h"
 #include <cmath>
-#include <string>
-#include <tuple>
 
 namespace btk::ballistics
 {

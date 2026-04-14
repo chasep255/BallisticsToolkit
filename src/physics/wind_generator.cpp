@@ -174,7 +174,9 @@ namespace btk::physics
     float downrange = -position.z - (-global_advection_offset_.z); // downrange is -Z
     float crossrange = position.x - global_advection_offset_.x;    // crossrange is X
 
-    // Scale coordinates by spatial scales (larger scale => slower spatial variation)
+    if(component.downrange_scale < 1e-6f || component.crossrange_scale < 1e-6f || component.temporal_scale < 1e-6f)
+      return btk::math::Vector3D(0.0f, 0.0f, 0.0f);
+
     float scaled_x = downrange / component.downrange_scale;
     float scaled_y = crossrange / component.crossrange_scale;
 

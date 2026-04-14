@@ -654,7 +654,7 @@ function convertFromMrad(mrad, rangeYards, units)
   else if (units === 'in')
   {
     // Convert to inches at range
-    const rangeInches = rangeYards * 36;
+    const rangeInches = btk.Conversions.yardsToInches(rangeYards);
     return Math.tan(angleRad) * rangeInches;
   }
 

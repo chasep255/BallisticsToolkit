@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ballistics/bullet.h"
-#include "math/conversions.h"
 #include "math/vector.h"
 #include <optional>
 #include <vector>

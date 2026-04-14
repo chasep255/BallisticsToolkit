@@ -20,7 +20,7 @@ const DEFAULT_PARAMS = {
   target: 'MR-1FCA',
   range: '600',
   shots: '60',
-  matches: '10',
+  matches: '100',
   mvSd: '7.0',
   windSd: '1.0',
   headwindSd: '0.0',
@@ -202,26 +202,7 @@ class TargetSimulator
       if (defaultTarget) targetSelect.value = defaultTarget;
     }
 
-    console.log(`Loaded ${targetNames.length} targets:`, targetNames);
-  }
-
-  populateTargetDropdownFallback()
-  {
-    const targetSelect = document.getElementById('target');
-    const fallbackTargets = [
-      'SR', 'SR-3', 'SR-1', 'SR-21', 'MR-63', 'MR-65', 'MR-1', 'MR-31', 'MR-52',
-      'LR', 'MR-63FCA', 'MR-65FCA', 'MR-1FCA', 'LR-FCA'
-    ];
-
-    targetSelect.innerHTML = '';
-    fallbackTargets.forEach(targetName =>
-    {
-      const option = document.createElement('option');
-      option.value = targetName;
-      option.textContent = targetName;
-      if (targetName === 'MR-1FCA') option.selected = true;
-      targetSelect.appendChild(option);
-    });
+    availableTargets.delete();
   }
 
   validateInputs()
@@ -287,7 +268,7 @@ class TargetSimulator
       // Start performance timer
       this.perfStartMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
       this.perfShotsFired = 0;
-      this.fireNextShot();
+      this.fireBatch();
 
     }
     catch (error)
@@ -410,78 +391,41 @@ class TargetSimulator
     this.redrawTarget();
   }
 
-  fireNextShot()
+  fireBatch()
   {
-    if (!this.isRunning)
-    {
-      return;
-    }
+    if (!this.isRunning) return;
 
     try
     {
-      // Fire shot
-      const simulatedShot = this.simulator.fireShot();
-      console.log(`Shot ${this.currentShot + 1}/${this.totalShots} (Match ${this.currentMatch}/${this.totalMatches}):`,
+      while (this.currentShot < this.totalShots)
       {
-        impact_x: simulatedShot.impact_x,
-        impact_y: simulatedShot.impact_y,
-        impact_x_inches: btk.Conversions.metersToInches(simulatedShot.impact_x),
-        impact_y_inches: btk.Conversions.metersToInches(simulatedShot.impact_y),
-        score: simulatedShot.score,
-        is_x: simulatedShot.is_x,
-        actual_mv: simulatedShot.actual_mv,
-        wind_crossrange: simulatedShot.wind_crossrange
-      });
-      this.perfShotsFired++;
-      this.currentShot++;
-      this.currentShots.push(simulatedShot);
-      this.allShots.push(simulatedShot);
+        const simulatedShot = this.simulator.fireShot();
+        this.perfShotsFired++;
+        this.currentShot++;
+        this.currentShots.push(simulatedShot);
+        this.allShots.push(simulatedShot);
+      }
 
-      // Update display
-      this.drawShotImpact(simulatedShot);
+      this.simulator.clearShots();
+      this.redrawTarget();
       this.updateLiveScore();
 
-      // Check if match is complete
-      if (this.currentShot >= this.totalShots)
+      if (this.currentMatch >= this.totalMatches)
       {
-        this.finishMatch();
-      }
-      else
-      {
-        // Schedule next shot
-        setTimeout(() => this.fireNextShot(), 1);
+        this.finishSimulation();
+        return;
       }
 
+      this.currentMatch++;
+      this.currentShot = 0;
+      this.currentShots = [];
+      requestAnimationFrame(() => this.fireBatch());
     }
     catch (error)
     {
       console.error('Shot simulation failed:', error);
       alert('Shot simulation failed: ' + error.message);
       this.stopSimulation();
-    }
-  }
-
-  finishMatch()
-  {
-    // Clear shots for next match
-    this.simulator.clearShots();
-
-    // Check if all matches are complete
-    if (this.currentMatch >= this.totalMatches)
-    {
-      this.finishSimulation();
-    }
-    else
-    {
-      // Start next match
-      this.currentMatch++;
-      this.currentShot = 0;
-      this.currentShots = [];
-
-      // Log match header
-
-      // Schedule next shot
-      setTimeout(() => this.fireNextShot(), 50);
     }
   }
 
@@ -888,24 +832,6 @@ class TargetSimulator
   }
 
 
-  mean(arr)
-  {
-    return arr.reduce((sum, val) => sum + val, 0) / arr.length;
-  }
-
-  median(arr)
-  {
-    const sorted = [...arr].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-  }
-
-  stdDev(arr)
-  {
-    const mean = this.mean(arr);
-    const variance = arr.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / arr.length;
-    return Math.sqrt(variance);
-  }
 }
 
 document.addEventListener('DOMContentLoaded', async () =>

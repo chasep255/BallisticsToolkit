@@ -52,9 +52,9 @@ namespace btk::match
     float mv_sd_mps = mv_sd_;
     float mv_mps = clipToThreeSigma(btk::math::Random::normal(nominal_mv_, mv_sd_mps), nominal_mv_, mv_sd_mps);
 
-    // Tweak the MV by scaling the velocity components (scale downrange and vertical, preserve crossrange)
     btk::math::Vector3D zeroed_velocity = initial_bullet.getVelocity();
-    btk::math::Vector3D scaled_velocity = btk::math::Vector3D(zeroed_velocity.x, mv_mps * (zeroed_velocity.y / nominal_mv_), mv_mps * (zeroed_velocity.z / nominal_mv_));
+    float scale = (nominal_mv_ > 1e-6f) ? (mv_mps / nominal_mv_) : 1.0f;
+    btk::math::Vector3D scaled_velocity = btk::math::Vector3D(zeroed_velocity.x, zeroed_velocity.y * scale, zeroed_velocity.z * scale);
 
     // Apply rifle accuracy (uniform distribution within circle of given diameter)
     float angle = btk::math::Random::uniform(0.0f, 2.0f * M_PI_F);

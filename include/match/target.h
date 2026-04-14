@@ -3,7 +3,6 @@
 #include "math/conversions.h"
 #include "math/vector.h"
 #include <cmath>
-#include <map>
 #include <string>
 
 namespace btk::match

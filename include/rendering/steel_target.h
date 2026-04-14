@@ -307,9 +307,6 @@ namespace btk::rendering
     // Time window for settle detection (must be below thresholds for this long)
     static constexpr float SETTLE_TIME_THRESHOLD_S = 1.0f; // seconds
 
-    // Maximum acceleration to prevent numerical instability
-    static constexpr float MAX_ACCELERATION = 50.0f; // m/s²
-
     // Shape definition (in YZ plane, normal in +X direction)
     float width_;
     float height_;

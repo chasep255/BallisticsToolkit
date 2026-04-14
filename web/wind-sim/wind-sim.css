@@ -97,21 +97,5 @@
   margin-top: 8px;
 }
 
-#overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform: none;
-  pointer-events: none;
-  width: 100%;
-  height: calc(100vh - 180px);
-}
-
-.legend {
-  color: #aaa;
-  font-size: 12px;
-  margin-top: 8px;
-}
-
 
 

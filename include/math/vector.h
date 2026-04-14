@@ -2,7 +2,6 @@
 
 #include "math/conversions.h"
 #include <cmath>
-#include <string>
 
 namespace btk::math
 {

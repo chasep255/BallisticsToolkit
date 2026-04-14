@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <stdexcept>
 #include <tuple>
 
 namespace btk::ballistics
@@ -285,10 +286,9 @@ namespace btk::ballistics
       // Get state at target distance using interpolation
       std::optional<TrajectoryPoint> point_at_target = trajectory.atDistance(-target_position.z);
 
-      // Check if the point is valid
       if(!point_at_target)
       {
-        break;
+        throw std::runtime_error("computeZero: bullet cannot reach target distance (MV too low or range too far)");
       }
 
       // Calculate error at target plane; ignore downrange (z) interpolation residue

@@ -117,6 +117,7 @@ export class Shot
     this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
 
     posBtk.delete();
+    currentBullet.delete();
   }
 
 

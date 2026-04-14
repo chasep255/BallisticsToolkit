@@ -1,6 +1,7 @@
 #include "physics/atmosphere.h"
 #include "physics/constants.h"
 #include <cmath>
+#include <stdexcept>
 
 namespace btk
 {
@@ -18,6 +19,10 @@ namespace btk
     Atmosphere::Atmosphere(float temperature, float altitude, float humidity, float pressure)
       : temperature_(temperature), altitude_(altitude), humidity_(humidity), pressure_(pressure > 0 ? pressure : calculateStandardPressure(altitude))
     {
+      if(temperature <= 0.0f)
+      {
+        throw std::invalid_argument("Temperature must be positive (Kelvin)");
+      }
       if(humidity < 0.0f || humidity > 1.0f)
       {
         throw std::invalid_argument("Humidity must be between 0.0f and 1.0f");

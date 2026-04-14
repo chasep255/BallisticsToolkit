@@ -2507,11 +2507,8 @@ class SteelSimulator
           // Calculate distance from target to shooter
           const distance_m = impactPosThree.distanceTo(shooterPos);
 
-          // Speed of sound: ~343 m/s at sea level, 20°C
-          const SPEED_OF_SOUND_MPS = 343.0;
-
-          // Calculate delay: time for sound to travel from target to shooter
-          const delaySeconds = distance_m / SPEED_OF_SOUND_MPS;
+          const speedOfSound = this.rifleZero.atmosphere.getSpeedOfSound();
+          const delaySeconds = distance_m / speedOfSound;
 
           // Volume attenuation: linear interpolation from 100% at 100 yards to 10% at max range distance
           const minDistance_m = btk.Conversions.yardsToMeters(100.0); // Full volume at 100 yards

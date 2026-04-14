@@ -1,10 +1,5 @@
 #include "match/target.h"
-#include "math/conversions.h"
-#include <iomanip>
 #include <limits>
-#include <sstream>
-#include <stdexcept>
-#include <vector>
 
 namespace btk::match
 {

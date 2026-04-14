@@ -257,7 +257,7 @@ function convertFromInches(inches, rangeYards, units)
   }
 
   // Convert to angle: angle = atan(inches / range_in_inches)
-  const rangeInches = rangeYards * 36; // 36 inches per yard
+  const rangeInches = btk.Conversions.yardsToInches(rangeYards);
   const angleRad = Math.atan(Math.abs(inches) / rangeInches);
 
   if (units === 'moa')

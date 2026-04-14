@@ -94,6 +94,11 @@ function calculateTrajectory()
   const scopeHeight = btk.Conversions.inchesToMeters(parseFloat(document.getElementById('scopeHeight').value));
   const maxRange = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('maxRange').value));
   const step = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('step').value));
+  if (step <= 0)
+  {
+    showError('Step size must be greater than 0.');
+    return;
+  }
   const windSpeed = btk.Conversions.mphToMps(parseFloat(document.getElementById('windSpeed').value));
 
   // Wind direction (o'clock convention): where the wind is COMING FROM,

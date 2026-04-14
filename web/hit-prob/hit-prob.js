@@ -385,26 +385,22 @@ class HitProbCalculator
     const cx = w / 2;
     const cy = h / 2;
 
-    ctx.strokeStyle = '#eee';
-    ctx.lineWidth = 1;
-    const gridStep = this.niceGridStep(extent * 2, 8);
-    if (gridStep > 0)
-    {
-      const gridStepIn = btk.Conversions.metersToInches(gridStep);
-      ctx.font = '10px sans-serif';
-      ctx.fillStyle = '#bbb';
-      ctx.textAlign = 'center';
+    const gridStep = btk.Conversions.inchesToMeters(1);
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#bbb';
+    ctx.textAlign = 'center';
 
-      for (let v = -Math.ceil(extent / gridStep) * gridStep; v <= extent; v += gridStep)
+    for (let v = -Math.ceil(extent / gridStep) * gridStep; v <= extent; v += gridStep)
+    {
+      const px = cx + v * scale;
+      const py = cy - v * scale;
+      ctx.strokeStyle = '#eee';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
+      if (Math.abs(v) > 1e-9)
       {
-        const px = cx + v * scale;
-        const py = cy - v * scale;
-        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
-        if (Math.abs(v) > 1e-9)
-        {
-          ctx.fillText(`${gridStepIn > 1 ? Math.round(btk.Conversions.metersToInches(v)) : btk.Conversions.metersToInches(v).toFixed(1)}"`, px, h - 4);
-        }
+        ctx.fillText(`${Math.round(btk.Conversions.metersToInches(v))}"`, px, h - 4);
       }
     }
 
@@ -443,22 +439,6 @@ class HitProbCalculator
     }
   }
 
-  niceGridStep(rangeM, targetLines)
-  {
-    const rangeIn = btk.Conversions.metersToInches(rangeM);
-    const raw = rangeIn / targetLines;
-    const candidates = [0.25, 0.5, 1, 2, 5, 10, 20, 50, 100];
-    let best = candidates[candidates.length - 1];
-    for (const c of candidates)
-    {
-      if (c >= raw * 0.5)
-      {
-        best = c;
-        break;
-      }
-    }
-    return btk.Conversions.inchesToMeters(best);
-  }
 }
 
 document.addEventListener('DOMContentLoaded', async () =>
