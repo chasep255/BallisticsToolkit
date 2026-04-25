@@ -13,13 +13,51 @@ body[data-page="target-sim"] .app-container {
     width: 100%;
 }
 
-.main-content { 
-    display: flex; 
-    gap: 20px; 
-    margin-top: 20px;
+/* Status bar + progress (aligned with Hit Simulator) */
+.status-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0;
+    gap: 8px;
+}
+
+.sim-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.progress-bar {
+    height: 22px;
     width: 100%;
-    max-width: 100%;
+    max-width: 400px;
+    background: #e9ecef;
+    border-radius: 4px;
+    position: relative;
     overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #28a745;
+    border-radius: 4px;
+    transition: width 0.1s ease;
+    width: 0%;
+}
+
+.progress-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
 }
 
 .target-panel { 
@@ -32,27 +70,7 @@ body[data-page="target-sim"] .app-container {
     flex-direction: column; 
     min-width: 0; 
     min-height: 0; 
-}
-
-.target-status-bar {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background: transparent;
-    padding: 6px 10px;
-    border-radius: 4px;
-    margin-bottom: 8px;
-    flex-shrink: 0;
-    gap: 10px;
-}
-
-.live-score { 
-    background: #28a745; 
-    color: white; 
-    padding: 4px 8px; 
-    border-radius: 4px; 
-    font-weight: 600; 
-    font-size: 12px; 
+    margin-top: 12px;
 }
 
 .target-container { 
@@ -69,6 +87,67 @@ body[data-page="target-sim"] .app-container {
     justify-content: center;
     align-items: center;
     aspect-ratio: 1/1;
+}
+
+/* Stats (aligned with Hit Simulator) */
+.stats-panel {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 16px 20px;
+    margin-top: 12px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+@media (max-width: 700px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.stats-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: #2c3e50;
+}
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.stats-table tr {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.stats-table tr:last-child {
+    border-bottom: none;
+}
+
+.stats-table td {
+    padding: 6px 4px;
+}
+
+.stat-label {
+    color: #555;
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.stat-value {
+    color: #2c3e50;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    text-align: right;
+    white-space: nowrap;
 }
 
 .sim-disclaimer {

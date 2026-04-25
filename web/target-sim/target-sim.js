@@ -26,6 +26,7 @@ const DEFAULT_PARAMS = {
   headwindSd: '0.0',
   updraftSd: '0.0',
   rifleAccuracy: '0.25',
+  scopeCant: '0',
   altitude: '0',
   temperature: '59',
   humidity: '50'
@@ -56,6 +57,7 @@ class TargetSimulator
     this.target = null;
     this.currentShots = [];
     this.allShots = [];
+    this.matchScores = [];
     this.currentMatch = 0;
     this.currentShot = 0;
     this.totalShots = 0;
@@ -98,7 +100,9 @@ class TargetSimulator
     this.elements = {
       runBtn: document.getElementById('runBtn'),
       stopBtn: document.getElementById('stopBtn'),
-      liveScore: document.getElementById('liveScore'),
+      progressBar: document.getElementById('progressBar'),
+      progressFill: document.getElementById('progressFill'),
+      progressText: document.getElementById('progressText'),
       canvas: document.getElementById('targetCanvas'),
       tooltip: document.getElementById('tooltip')
     };
@@ -110,6 +114,8 @@ class TargetSimulator
     // Set canvas size
     this.resizeCanvas();
     window.addEventListener('resize', () => this.resizeCanvas());
+
+    this.clearStats();
 
     // Populate target dropdown from C++
     this.populateTargetDropdown();
@@ -219,6 +225,7 @@ class TargetSimulator
       headwindSd: parseFloat(document.getElementById('headwindSd').value),
       updraftSd: parseFloat(document.getElementById('updraftSd').value),
       rifleAccuracy: parseFloat(document.getElementById('rifleAccuracy').value),
+      scopeCant: parseFloat(document.getElementById('scopeCant').value),
       altitude: parseFloat(document.getElementById('altitude').value),
       temperature: parseFloat(document.getElementById('temperature').value),
       humidity: parseFloat(document.getElementById('humidity').value) / 100.0
@@ -262,6 +269,7 @@ class TargetSimulator
       // Update UI
       this.elements.runBtn.disabled = true;
       this.elements.stopBtn.disabled = false;
+      this.elements.progressBar.style.display = '';
 
       // Start simulation
       this.isRunning = true;
@@ -285,6 +293,7 @@ class TargetSimulator
     this.isRunning = false;
     this.elements.runBtn.disabled = false;
     this.elements.stopBtn.disabled = true;
+    this.elements.progressBar.style.display = 'none';
 
     // If stopped mid-run, log partial performance stats
     if (wasRunning && this.perfStartMs != null && this.perfShotsFired > 0)
@@ -339,6 +348,7 @@ class TargetSimulator
     const headwindSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('headwindSd').value));
     const updraftSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('updraftSd').value));
     const rifleAccuracyRad = btk.Conversions.moaToRadians(parseFloat(document.getElementById('rifleAccuracy').value));
+    const scopeCantRad = btk.Conversions.degreesToRadians(parseFloat(document.getElementById('scopeCant').value));
     const altitude = btk.Conversions.feetToMeters(parseFloat(document.getElementById('altitude').value));
     const temperature = btk.Conversions.fahrenheitToKelvin(parseFloat(document.getElementById('temperature').value));
     const humidity = parseFloat(document.getElementById('humidity').value) / 100.0;
@@ -374,6 +384,7 @@ class TargetSimulator
       headwindSd,
       updraftSd,
       rifleAccuracyRad,
+      scopeCantRad,
       0.001, // timestep
       twistMetersPerTurn // twist rate
     );
@@ -406,9 +417,18 @@ class TargetSimulator
         this.allShots.push(simulatedShot);
       }
 
+      let matchPoints = 0;
+      let matchX = 0;
+      for (const s of this.currentShots)
+      {
+        matchPoints += s.score;
+        if (s.isX) matchX++;
+      }
+      this.matchScores.push({ score: matchPoints, xCount: matchX });
+
       this.simulator.clearShots();
       this.redrawTarget();
-      this.updateLiveScore();
+      this.updateStats();
 
       if (this.currentMatch >= this.totalMatches)
       {
@@ -434,6 +454,7 @@ class TargetSimulator
     this.isRunning = false;
     this.elements.runBtn.disabled = false;
     this.elements.stopBtn.disabled = true;
+    this.elements.progressBar.style.display = 'none';
 
     // Log performance summary
     if (this.perfStartMs != null && this.perfShotsFired > 0)
@@ -450,9 +471,11 @@ class TargetSimulator
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.currentShots = [];
     this.allShots = [];
+    this.matchScores = [];
     this.shotItems.clear();
     this.currentMatch = 0;
     this.currentShot = 0;
+    this.clearStats();
   }
 
   drawTarget()
@@ -750,10 +773,14 @@ class TargetSimulator
   showTooltip(e, simulatedShot)
   {
     const tooltip = this.elements.tooltip;
+    const cantLine = (simulatedShot.scopeCant !== undefined && simulatedShot.scopeCant !== null)
+      ? `<div>Scope cant: ${btk.Conversions.radiansToDegrees(simulatedShot.scopeCant).toFixed(2)}&deg;</div>`
+      : '';
     tooltip.innerHTML = `
             <div><strong>Shot Details:</strong></div>
             <div>Impact: X=${btk.Conversions.metersToInches(simulatedShot.impactX).toFixed(2)}" Y=${btk.Conversions.metersToInches(simulatedShot.impactY).toFixed(2)}"</div>
             <div>Score: ${simulatedShot.score}${simulatedShot.isX ? 'x' : ''}</div>
+            ${cantLine}
             <div>MV: ${btk.Conversions.mpsToFps(simulatedShot.actualMv).toFixed(0)} fps | IV: ${btk.Conversions.mpsToFps(simulatedShot.impactVelocity).toFixed(0)} fps</div>
             <div>Wind: (${btk.Conversions.mpsToMph(simulatedShot.windDownrange).toFixed(1)}, ${btk.Conversions.mpsToMph(simulatedShot.windCrossrange).toFixed(1)}, ${btk.Conversions.mpsToMph(simulatedShot.windVertical).toFixed(1)}) mph</div>
             <div>Release: (${btk.Conversions.radiansToMoa(simulatedShot.releaseAngleH).toFixed(2)}, ${btk.Conversions.radiansToMoa(simulatedShot.releaseAngleV).toFixed(2)}) MOA</div>
@@ -771,34 +798,119 @@ class TargetSimulator
 
 
 
-  updateLiveScore()
+  clearStats()
   {
+    const valueIds = [
+      'statAvgScore', 'statScoreSd', 'statScoreMinMax', 'statScorePct',
+      'statXAvg', 'statXSd', 'statXMinMax', 'statXPct', 'statCounts',
+      'distX', 'dist10', 'dist9', 'dist8', 'dist7', 'dist6', 'dist5', 'distMiss'
+    ];
+    for (const id of valueIds)
+    {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '--';
+    }
+    this.elements.progressFill.style.width = '0%';
+    this.elements.progressText.textContent = '0%';
+  }
+
+  updateStats()
+  {
+    const totalPlanned = this.totalShots * this.totalMatches;
+    const done = this.allShots.length;
+    if (totalPlanned > 0)
+    {
+      const pct = (done / totalPlanned) * 100;
+      this.elements.progressFill.style.width = `${pct}%`;
+      this.elements.progressText.textContent = `${done} / ${totalPlanned}`;
+    }
+
     if (this.allShots.length === 0)
     {
-      const totalShotsAllMatches = this.totalShots * this.totalMatches;
-      this.elements.liveScore.textContent = `Estimated Avg Match Score: --- | Shots: 0/${totalShotsAllMatches}`;
       return;
     }
 
-    const totalScore = this.allShots.reduce((sum, simulatedShot) => sum + simulatedShot.score, 0);
-    const xCount = this.allShots.filter(simulatedShot => simulatedShot.isX).length;
-    const shotsFired = this.allShots.length;
-    const totalShotsAllMatches = this.totalShots * this.totalMatches;
-
-    if (shotsFired > 0)
+    // Per-shot ring distribution
+    const ring = { x: 0, r10: 0, r9: 0, r8: 0, r7: 0, r6: 0, r5: 0, miss: 0 };
+    for (const s of this.allShots)
     {
-      const avgScorePerShot = totalScore / shotsFired;
-      const avgXRate = xCount / shotsFired;
-      const estimatedMatchScore = Math.round(avgScorePerShot * this.totalShots);
-      const estimatedMatchXCount = Math.round(avgXRate * this.totalShots);
-
-      this.elements.liveScore.textContent =
-        `Estimated Avg Match Score: ${estimatedMatchScore}-${estimatedMatchXCount}x | Shots: ${shotsFired}/${totalShotsAllMatches}`;
+      if (s.isX) ring.x++;
+      else if (s.score === 10) ring.r10++;
+      else if (s.score === 9) ring.r9++;
+      else if (s.score === 8) ring.r8++;
+      else if (s.score === 7) ring.r7++;
+      else if (s.score === 6) ring.r6++;
+      else if (s.score === 5) ring.r5++;
+      else ring.miss++;
     }
-    else
+    const n = this.allShots.length;
+    const fmt = (c) => `${(c / n * 100).toFixed(1)}% (${c})`;
+    const setD = (id, c) =>
     {
-      this.elements.liveScore.textContent = `Estimated Avg Match Score: --- | Shots: 0/${totalShotsAllMatches}`;
+      const el = document.getElementById(id);
+      if (el) el.textContent = fmt(c);
+    };
+    setD('distX', ring.x);
+    setD('dist10', ring.r10);
+    setD('dist9', ring.r9);
+    setD('dist8', ring.r8);
+    setD('dist7', ring.r7);
+    setD('dist6', ring.r6);
+    setD('dist5', ring.r5);
+    setD('distMiss', ring.miss);
+
+    // Match-level stats (one row per completed match)
+    const m = this.matchScores.length;
+    const matchesPlanned = this.totalMatches;
+    const statCounts = document.getElementById('statCounts');
+    if (statCounts) statCounts.textContent = `${m} / ${matchesPlanned}  |  ${done} / ${totalPlanned}`;
+
+    if (m === 0)
+    {
+      return;
     }
+
+    const pointTotals = this.matchScores.map(x => x.score);
+    const xTotals = this.matchScores.map(x => x.xCount);
+
+    const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    const sampleStd = (arr) =>
+    {
+      if (arr.length < 2) return 0;
+      const mu = mean(arr);
+      let s2 = 0;
+      for (const v of arr) s2 += (v - mu) * (v - mu);
+      return Math.sqrt(s2 / (arr.length - 1));
+    };
+    const percentile = (sorted, p) =>
+    {
+      if (sorted.length === 0) return null;
+      const idx = Math.floor((sorted.length - 1) * p);
+      return sorted[idx];
+    };
+
+    const sortNum = (a, b) => a - b;
+    const sortedPoints = [...pointTotals].sort(sortNum);
+    const sortedX = [...xTotals].sort(sortNum);
+
+    const ptMean = mean(pointTotals);
+    const xMean = mean(xTotals);
+    const ptSd = sampleStd(pointTotals);
+    const xSd = sampleStd(xTotals);
+
+    const setIf = (id, text) =>
+    {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
+    setIf('statAvgScore', `${ptMean.toFixed(1)}-${xMean.toFixed(1)}x`);
+    setIf('statScoreSd', ptSd.toFixed(2));
+    setIf('statScoreMinMax', `${Math.min(...pointTotals)} - ${Math.max(...pointTotals)}`);
+    setIf('statScorePct', `${percentile(sortedPoints, 0.05)} / ${percentile(sortedPoints, 0.5)} / ${percentile(sortedPoints, 0.95)}`);
+    setIf('statXAvg', xMean.toFixed(1));
+    setIf('statXSd', (m < 2 ? 0.0 : xSd).toFixed(2));
+    setIf('statXMinMax', `${Math.min(...xTotals)} - ${Math.max(...xTotals)}`);
+    setIf('statXPct', `${percentile(sortedX, 0.05)} / ${percentile(sortedX, 0.5)} / ${percentile(sortedX, 0.95)}`);
   }
 
 

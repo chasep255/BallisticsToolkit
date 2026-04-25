@@ -221,10 +221,11 @@ class HitProbCalculator
     targetList.delete();
     this.dummyTarget = btk.Targets.getTarget(firstName);
 
+    const scopeCantRad = 0.0;
     this.simulator = new btk.MatchSimulator(
       this.bullet, mv, this.dummyTarget, range, this.atmosphere,
       mvSd, windSd, headwindSd, updraftSd,
-      rifleAccuracyRad, 0.001, twistMeters
+      rifleAccuracyRad, scopeCantRad, 0.001, twistMeters
     );
   }
 

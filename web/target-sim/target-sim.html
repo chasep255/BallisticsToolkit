@@ -74,40 +74,78 @@
             <div class="param-item"><label for="headwindSd" title="Head/Tail wind component standard deviation in mph - parallel to bullet path">H/T Wind σ (mph)</label><input type="number" id="headwindSd" value="0.0" step="0.1" min="0" max="20" title="Head/Tail wind component standard deviation in mph - parallel to bullet path"></div>
             <div class="param-item"><label for="updraftSd" title="Vertical wind component standard deviation in mph - up/down air movement">Vert Wind σ (mph)</label><input type="number" id="updraftSd" value="0.0" step="0.1" min="0" max="20" title="Vertical wind component standard deviation in mph - up/down air movement"></div>
             <div class="param-item"><label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label><input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)"></div>
+            <div class="param-item"><label for="scopeCant" title="Scope Cant: simulates per-shot rifle tilt about the bore (Z) axis. A random angle is drawn uniformly from -value to +value degrees and the dialed velocity vector is rotated about Z. This converts some elevation hold into windage (and vice versa), modeling shooter hold-cant variability. Set 0 to disable. Typical: 0.5-2 deg.">Scope Cant (deg)</label><input type="number" id="scopeCant" value="0" step="0.1" min="0" max="90" title="Scope Cant: simulates per-shot rifle tilt about the bore (Z) axis. A random angle is drawn uniformly from -value to +value degrees and the dialed velocity vector is rotated about Z. This converts some elevation hold into windage (and vice versa), modeling shooter hold-cant variability. Set 0 to disable. Typical: 0.5-2 deg."></div>
             <div class="param-item"><label for="altitude" title="Altitude in feet above sea level">Alt (ft)</label><input type="number" id="altitude" value="0" step="100" min="0" max="10000" title="Altitude in feet above sea level"></div>
             <div class="param-item"><label for="temperature" title="Temperature in degrees Fahrenheit">Temp (°F)</label><input type="number" id="temperature" value="59" step="1" min="-50" max="120" title="Temperature in degrees Fahrenheit"></div>
             <div class="param-item"><label for="humidity" title="Relative humidity percentage">Humidity (%)</label><input type="number" id="humidity" value="50" step="1" min="0" max="100" title="Relative humidity percentage"></div>
             <div class="param-item" style="display: flex; align-items: center;"><a href="#" id="resetDefaults" style="color: #007bff; text-decoration: none; font-size: 13px; cursor: pointer;" title="Reset all parameters to default values">Reset to Defaults</a></div>
         </div>
 
+        <!-- Controls + Progress (same pattern as Hit Simulator) -->
+        <div class="status-bar">
+            <div class="sim-controls">
+                <button id="runBtn" class="btn btn-primary">Run Simulation</button>
+                <button id="stopBtn" class="btn btn-secondary" disabled>Stop</button>
+                <button id="helpBtn" class="btn btn-secondary">Help</button>
+            </div>
+            <div id="progressBar" class="progress-bar" style="display: none;">
+                <div id="progressFill" class="progress-fill"></div>
+                <span id="progressText" class="progress-text">0%</span>
+            </div>
+        </div>
 
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Target Panel -->
-            <div class="target-panel">
-                <div class="target-status-bar">
-                    <div style="display: flex; align-items: center; gap: 10px; justify-content: center;">
-                        <button id="runBtn" class="btn btn-primary">Run Simulation</button>
-                        <button id="stopBtn" class="btn btn-secondary" disabled>Stop</button>
-                        <button id="helpBtn" class="btn btn-secondary">Help</button>
+        <!-- Target canvas -->
+        <div class="target-panel">
+            <div class="target-container">
+                <div id="mousePositionBox" class="mouse-position-box" style="display: none;">
+                    <div class="mouse-position-title">Mouse Position</div>
+                    <div id="mousePositionContent" class="mouse-position-content">
+                        X: 0.00"<br>Y: 0.00"
                     </div>
-                    
-                    <div id="liveScore" class="live-score" style="text-align: center; margin-top: 10px;">Estimated Avg Match Score: --- | Shots: 0/0</div>
                 </div>
-                <div class="target-container">
-                    <div id="mousePositionBox" class="mouse-position-box" style="display: none;">
-                        <div class="mouse-position-title">Mouse Position</div>
-                        <div id="mousePositionContent" class="mouse-position-content">
-                            X: 0.00"<br>Y: 0.00"
-                        </div>
-                    </div>
-                    <canvas id="targetCanvas" width="600" height="600"></canvas>
-                </div>
+                <canvas id="targetCanvas" width="600" height="600"></canvas>
+            </div>
+        </div>
 
-                <div class="sim-disclaimer">
-                    This simulator is a Monte Carlo scoring/dispersion model for exploring statistical trends (expected scores, group spread, and sensitivity to MV/wind/accuracy inputs). It uses simplified assumptions (random draws per shot, simplified accuracy and wind models, and an idealized trajectory model) and may differ from real-world match performance. Do not use this to generate real-world firing solutions.
+        <!-- Results (match hit-prob stats panel) -->
+        <div class="stats-panel" id="statsPanel">
+            <div class="stats-grid">
+                <div class="stats-grid-col">
+                    <h3 class="stats-section-title">Match score variation</h3>
+                    <table class="stats-table" aria-label="Match score statistics">
+                        <tbody>
+                            <tr><td class="stat-label">Avg score &amp; X</td><td id="statAvgScore" class="stat-value">--</td></tr>
+                            <tr><td class="stat-label">Score std dev</td><td id="statScoreSd" class="stat-value">--</td></tr>
+                            <tr><td class="stat-label">Score min / max</td><td id="statScoreMinMax" class="stat-value">--</td></tr>
+                            <tr><td class="stat-label">Score 5th / 50th / 95th</td><td id="statScorePct" class="stat-value">--</td></tr>
+                            <tr><td class="stat-label">X-count avg</td><td id="statXAvg" class="stat-value">--</td></tr>
+                            <tr><td class="stat-label">X-count std dev</td><td id="statXSd" class="stat-value">--</td></tr>
+                            <tr><td class="stat-label">X-count min / max</td><td id="statXMinMax" class="stat-value">--</td></tr>
+                            <tr><td class="stat-label">X-count 5th / 50th / 95th</td><td id="statXPct" class="stat-value">--</td></tr>
+                            <tr><td class="stat-label">Matches / shots</td><td id="statCounts" class="stat-value">--</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="stats-grid-col">
+                    <h3 class="stats-section-title">Ring hit rates</h3>
+                    <table class="stats-table" id="ringDistTable" aria-label="Ring hit rates">
+                        <tbody>
+                            <tr><td class="stat-label">X</td><td class="stat-value" id="distX">--</td></tr>
+                            <tr><td class="stat-label">10</td><td class="stat-value" id="dist10">--</td></tr>
+                            <tr><td class="stat-label">9</td><td class="stat-value" id="dist9">--</td></tr>
+                            <tr><td class="stat-label">8</td><td class="stat-value" id="dist8">--</td></tr>
+                            <tr><td class="stat-label">7</td><td class="stat-value" id="dist7">--</td></tr>
+                            <tr><td class="stat-label">6</td><td class="stat-value" id="dist6">--</td></tr>
+                            <tr><td class="stat-label">5</td><td class="stat-value" id="dist5">--</td></tr>
+                            <tr><td class="stat-label">Miss</td><td class="stat-value" id="distMiss">--</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
+        </div>
+
+        <div class="sim-disclaimer">
+            This simulator is a Monte Carlo scoring/dispersion model for exploring statistical trends (expected scores, group spread, and sensitivity to MV/wind/accuracy inputs). It uses simplified assumptions (random draws per shot, simplified accuracy and wind models, and an idealized trajectory model) and may differ from real-world match performance. Do not use this to generate real-world firing solutions.
         </div>
     </div>
 
@@ -156,7 +194,7 @@
                 </div>
                 
                 <div class="help-section">
-                    <h3>Target & Match Parameters</h3>
+                    <h3>Target &amp; Match Parameters</h3>
                     <div class="param-help">
                         <strong>Target Type:</strong> Standard competitive targets with specific ring diameters. SR (200-300yd), MR (300-600yd), LR (800-1000yd). FCA variants are custom-designed targets optimized for F-Class shooting with different ring proportions.<br><br>
                         <strong>Range:</strong> Distance to target in yards.<br><br>
@@ -172,7 +210,8 @@
                         <strong>Cross Wind σ (mph):</strong> Side-to-side wind variability (main driver of horizontal spread).<br><br>
                         <strong>H/T Wind σ (mph):</strong> Head/tail variability (small influence on drop).<br><br>
                         <strong>Vert Wind σ (mph):</strong> Up/down air movement (usually minor).<br><br>
-                        <strong>Accuracy (MOA):</strong> Rifle+shooter precision; 1 MOA ≈ 1" at 100 yd.
+                        <strong>Accuracy (MOA):</strong> Rifle+shooter precision; 1 MOA ≈ 1" at 100 yd.<br><br>
+                        <strong>Scope Cant (deg):</strong> Per-shot uniform random rifle tilt about the bore axis, drawn from -value to +value degrees. A canted rifle redirects part of the dialed elevation into windage; this parameter models that hold variability. Set to 0 to disable.
                     </div>
                 </div>
 
@@ -188,9 +227,10 @@
                 <div class="help-section">
                     <h3>Simulation Results</h3>
                     <div class="param-help">
-                        <strong>Estimated Score:</strong> Running average of total points and X-ring hits across all completed matches (based on shots per match setting). This estimate converges to the true average as more iterations are completed. Updates continuously as simulation progresses. Example: "585-27x" = 585 total points with 27 X-ring hits.<br><br>
-                        <strong>Progress Display:</strong> Shows "Shots: XXX/YYY" indicating current shots processed vs total shots to simulate.<br><br>
-                        <strong>Target Visualization:</strong> Red dots represent bullet impact points. Click on any dot to see detailed hit information (coordinates, score, ring). Use mouse wheel to zoom, drag to pan.<br><br>
+                        <strong>Progress bar:</strong> Shots completed versus total (matches × shots per match). Updates after each full match.<br><br>
+                        <strong>Match score variation:</strong> Statistics across completed matches. Score avg shows average total and X-count (e.g. 585.0-27.0x). Both score and X-count have their own std dev, min/max, and 5th/50th/95th percentile rows so variation in each can be compared directly.<br><br>
+                        <strong>Ring hit rates:</strong> Percent and count of impacts in each ring (X, 10–5) and misses, computed over all simulated shots so far.<br><br>
+                        <strong>Target visualization:</strong> Red dots represent bullet impact points. Hover or tap a dot to see detailed hit information (coordinates, score, wind, etc.). Use mouse wheel to zoom, drag to pan.
                     </div>
                 </div>
 
@@ -209,6 +249,7 @@
                     <div class="param-help">
                         <strong>Simplified Wind Model:</strong> Wind is drawn independently for each shot from Gaussian distributions (clipped to 3-sigma). Wind remains constant throughout each shot's trajectory. Real wind varies along the bullet path and has temporal correlation between shots not captured here.<br><br>
                         <strong>Accuracy Model:</strong> Rifle accuracy is modeled as a uniform distribution within a circle (diameter = accuracy MOA). Real dispersion patterns may differ and are typically not uniform.<br><br>
+                        <strong>Scope cant:</strong> Each shot uses an independent, uniformly random cant angle with no shooter correction or learning between shots.<br><br>
                         <strong>Statistical Tool:</strong> This simulator is for exploring statistical patterns, not predicting real-world scores. Do not rely on these simulations for any purpose where incorrect data could be hazardous.<br><br>
                         <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete safety and liability information.
                     </div>

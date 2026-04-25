@@ -12,16 +12,16 @@ namespace btk::match
 {
 
   SimulatedShot::SimulatedShot(float impact_x, float impact_y, int score, bool is_x, float actual_mv, float actual_bc, float wind_downrange, float wind_crossrange, float wind_vertical,
-                               float release_angle_h, float release_angle_v, float impact_velocity)
+                               float release_angle_h, float release_angle_v, float impact_velocity, float scope_cant)
     : impact_x(impact_x), impact_y(impact_y), score(score), is_x(is_x), actual_mv(actual_mv), actual_bc(actual_bc), wind_downrange(wind_downrange), wind_crossrange(wind_crossrange),
-      wind_vertical(wind_vertical), release_angle_h(release_angle_h), release_angle_v(release_angle_v), impact_velocity(impact_velocity)
+      wind_vertical(wind_vertical), release_angle_h(release_angle_h), release_angle_v(release_angle_v), impact_velocity(impact_velocity), scope_cant(scope_cant)
   {
   }
 
   Simulator::Simulator(const btk::ballistics::Bullet& bullet, float nominal_mv, const btk::match::Target& target, float target_range, const btk::physics::Atmosphere& atmosphere, float mv_sd,
-                       float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float timestep, float twist_rate)
+                       float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float scope_cant, float timestep, float twist_rate)
     : bullet_(bullet), nominal_mv_(nominal_mv), target_(target), target_range_(target_range), atmosphere_(atmosphere), mv_sd_(mv_sd), wind_speed_sd_(wind_speed_sd), headwind_sd_(headwind_sd),
-      updraft_sd_(updraft_sd), rifle_accuracy_(rifle_accuracy), timestep_(timestep), zeroed_bullet_(bullet)
+      updraft_sd_(updraft_sd), rifle_accuracy_(rifle_accuracy), scope_cant_(scope_cant), timestep_(timestep), zeroed_bullet_(bullet)
   {
     // Set up the simulator with bullet and atmosphere
     simulator_.setInitialBullet(bullet);
@@ -74,6 +74,20 @@ namespace btk::match
     // Create modified bullet with new velocity
     btk::ballistics::Bullet modified_bullet = btk::ballistics::Bullet(initial_bullet, initial_bullet.getPosition(), modified_velocity, initial_bullet.getSpinRate());
 
+    // Apply scope cant (random rotation about barrel axis / Z-axis)
+    // This converts some elevation dial into windage, simulating mechanical rifle tilt
+    const float cant_rad = btk::math::Random::uniform(-scope_cant_, scope_cant_);
+    float cant_cos = std::cos(cant_rad);
+    float cant_sin = std::sin(cant_rad);
+
+    // Rotation matrix about Z-axis: [cos -sin 0; sin cos 0; 0 0 1]
+    float vx_canted = modified_velocity.x * cant_cos - modified_velocity.y * cant_sin;
+    float vy_canted = modified_velocity.x * cant_sin + modified_velocity.y * cant_cos;
+    float vz_canted = modified_velocity.z;
+
+    btk::math::Vector3D canted_velocity(vx_canted, vy_canted, vz_canted);
+    btk::ballistics::Bullet canted_bullet = btk::ballistics::Bullet(modified_bullet, modified_bullet.getPosition(), canted_velocity, modified_bullet.getSpinRate());
+
     // Generate 3D wind components
     float crosswind_sd_mps = wind_speed_sd_;
     float crosswind_mps = clipToThreeSigma(btk::math::Random::normal(0.0f, crosswind_sd_mps), 0.0f, crosswind_sd_mps);
@@ -87,8 +101,8 @@ namespace btk::match
     // Create 3D wind vector (new coordinate system: X=crossrange, Y=up, Z=-downrange)
     btk::math::Vector3D varied_wind(crosswind_mps, updraft_mps, -headwind_mps);
 
-    // Set the modified bullet as initial and wind, then fire
-    simulator_.setInitialBullet(modified_bullet);
+    // Set the canted bullet as initial and wind, then fire
+    simulator_.setInitialBullet(canted_bullet);
     simulator_.setWind(varied_wind);
     simulator_.simulate(target_range_, timestep_);
     btk::ballistics::Trajectory& trajectory = simulator_.getTrajectory();
@@ -101,7 +115,7 @@ namespace btk::match
     {
       // Shouldn't happen, but handle gracefully
       SimulatedShot simulatedShot(btk::math::Conversions::inchesToMeters(999.0f), btk::math::Conversions::inchesToMeters(999.0f), 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps,
-                                  updraft_mps, release_angle_h, release_angle_v, 0.0f);
+                                  updraft_mps, release_angle_h, release_angle_v, 0.0f, cant_rad);
       shots_.push_back(simulatedShot);
       return simulatedShot;
     }
@@ -114,7 +128,8 @@ namespace btk::match
     // Score the shot and add to match
     const Hit& hit = match_.addHit(impact_x, impact_y, target_, bullet_.getDiameter());
 
-    SimulatedShot simulatedShot(impact_x, impact_y, hit.getScore(), hit.isX(), mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps, updraft_mps, release_angle_h, release_angle_v, impact_velocity);
+    SimulatedShot simulatedShot(impact_x, impact_y, hit.getScore(), hit.isX(), mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps, updraft_mps, release_angle_h, release_angle_v, impact_velocity,
+                                cant_rad);
 
     // Store shot result for diagnostics
     shots_.push_back(simulatedShot);

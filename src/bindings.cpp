@@ -232,7 +232,8 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .field("windVertical", &SimulatedShot::wind_vertical)
     .field("releaseAngleH", &SimulatedShot::release_angle_h)
     .field("releaseAngleV", &SimulatedShot::release_angle_v)
-    .field("impactVelocity", &SimulatedShot::impact_velocity);
+    .field("impactVelocity", &SimulatedShot::impact_velocity)
+    .field("scopeCant", &SimulatedShot::scope_cant);
 
   // Hit class - must use class_ because it has private members with getters
   class_<btk::match::Hit>("Hit")
@@ -260,7 +261,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
 
   // Match Simulator class (in match namespace)
   class_<btk::match::Simulator>("MatchSimulator")
-    .constructor<const btk::ballistics::Bullet&, float, const btk::match::Target&, float, const btk::physics::Atmosphere&, float, float, float, float, float, float, float>()
+    .constructor<const btk::ballistics::Bullet&, float, const btk::match::Target&, float, const btk::physics::Atmosphere&, float, float, float, float, float, float, float, float>()
     .function("fireShot", &btk::match::Simulator::fireShot)
     .function("getMatch", &btk::match::Simulator::getMatch)
     .function("clearShots", &btk::match::Simulator::clearShots)

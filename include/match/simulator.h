@@ -29,14 +29,15 @@ namespace btk::match
     float release_angle_h; // Horizontal release angle in rad
     float release_angle_v; // Vertical release angle in rad
     float impact_velocity; // Velocity at target impact in m/s
+    float scope_cant;      // Scope cant applied in rad
 
     SimulatedShot()
       : impact_x(0.0f), impact_y(0.0f), score(0), is_x(false), actual_mv(0.0f), actual_bc(0.0f), wind_downrange(0.0f), wind_crossrange(0.0f), wind_vertical(0.0f), release_angle_h(0.0f),
-        release_angle_v(0.0f), impact_velocity(0.0f)
+        release_angle_v(0.0f), impact_velocity(0.0f), scope_cant(0.0f)
     {
     }
     SimulatedShot(float impact_x, float impact_y, int score, bool is_x, float actual_mv, float actual_bc, float wind_downrange, float wind_crossrange, float wind_vertical, float release_angle_h,
-                  float release_angle_v, float impact_velocity);
+                  float release_angle_v, float impact_velocity, float scope_cant);
   };
 
   /**
@@ -63,11 +64,12 @@ namespace btk::match
      * @param headwind_sd Head/tail wind speed standard deviation in m/s
      * @param updraft_sd Up/down draft speed standard deviation in m/s
      * @param rifle_accuracy Rifle/shooter accuracy in rad (angular dispersion diameter)
+     * @param scope_cant Scope cant range in rad - random cant applied per shot (uniform between -scope_cant and +scope_cant)
      * @param timestep Simulation timestep in seconds
      * @param twist_rate Twist rate in m/turn (positive for RH, negative for LH). Default 0 (no spin).
      */
     Simulator(const btk::ballistics::Bullet& bullet, float nominal_mv, const btk::match::Target& target, float target_range, const btk::physics::Atmosphere& atmosphere, float mv_sd,
-              float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float timestep = 0.001f, float twist_rate = 0.0f);
+              float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float scope_cant, float timestep = 0.001f, float twist_rate = 0.0f);
 
     /**
      * @brief Fire a single shot with variability
@@ -132,6 +134,7 @@ namespace btk::match
     float headwind_sd_;    // m/s
     float updraft_sd_;     // m/s
     float rifle_accuracy_; // rad
+    float scope_cant_;     // rad
     float timestep_;       // s
 
     // Simulator for trajectory calculations
