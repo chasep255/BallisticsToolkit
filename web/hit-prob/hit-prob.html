@@ -75,6 +75,7 @@
             <div class="param-item"><label for="headwindSd" title="Head/tail wind SD in mph">H/T Wind &sigma; (mph)</label><input type="number" id="headwindSd" value="0.0" step="0.1" min="0" max="20"></div>
             <div class="param-item"><label for="updraftSd" title="Vertical wind SD in mph">Vert Wind &sigma; (mph)</label><input type="number" id="updraftSd" value="0.0" step="0.1" min="0" max="20"></div>
             <div class="param-item"><label for="rifleAccuracy" title="Rifle accuracy in MOA">Accuracy (MOA)</label><input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5"></div>
+            <div class="param-item"><label for="scopeCant" title="Scope Cant: simulates per-shot rifle tilt about the bore (Z) axis. A random angle is drawn uniformly from -value to +value degrees and the dialed velocity vector is rotated about Z. This converts some elevation hold into windage (and vice versa), modeling shooter hold-cant variability. Set 0 to disable. Typical: 0.5-2 deg.">Scope Cant (deg)</label><input type="number" id="scopeCant" value="0" step="0.1" min="0" max="90" title="Scope Cant: simulates per-shot rifle tilt about the bore (Z) axis. A random angle is drawn uniformly from -value to +value degrees and the dialed velocity vector is rotated about Z. This converts some elevation hold into windage (and vice versa), modeling shooter hold-cant variability. Set 0 to disable. Typical: 0.5-2 deg."></div>
             <div class="param-item"><label for="altitude" title="Altitude in feet above sea level">Alt (ft)</label><input type="number" id="altitude" value="0" step="100" min="0" max="15000"></div>
             <div class="param-item"><label for="temperature" title="Temperature in Fahrenheit">Temp (&deg;F)</label><input type="number" id="temperature" value="59" step="1" min="-50" max="130"></div>
             <div class="param-item"><label for="humidity" title="Relative humidity percentage">Humidity (%)</label><input type="number" id="humidity" value="50" step="1" min="0" max="100"></div>
@@ -94,13 +95,6 @@
             </div>
         </div>
 
-        <!-- Impact Canvas -->
-        <div class="target-panel">
-            <div class="canvas-container">
-                <canvas id="impactCanvas" width="600" height="600"></canvas>
-            </div>
-        </div>
-
         <!-- Results -->
         <div class="stats-panel" id="statsPanel">
             <table id="statsTable">
@@ -115,6 +109,13 @@
                     <tr><td class="stat-label">CEP (50%)</td><td id="statCEP" class="stat-value">--</td></tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Impact Canvas -->
+        <div class="target-panel">
+            <div class="canvas-container">
+                <canvas id="impactCanvas" width="600" height="600"></canvas>
+            </div>
         </div>
 
         <div class="sim-disclaimer">

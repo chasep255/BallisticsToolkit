@@ -89,13 +89,13 @@ body[data-page="target-sim"] .app-container {
     aspect-ratio: 1/1;
 }
 
-/* Stats (aligned with Hit Simulator) */
+/* Stats panel above canvas (aligned with Hit Simulator) */
 .stats-panel {
     background: white;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     padding: 16px 20px;
-    margin-top: 12px;
+    margin-bottom: 12px;
 }
 
 .stats-grid {

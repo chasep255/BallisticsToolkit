@@ -30,6 +30,7 @@ const DEFAULT_PARAMS = {
   headwindSd: '0.0',
   updraftSd: '0.0',
   rifleAccuracy: '0.25',
+  scopeCant: '0',
   altitude: '0',
   temperature: '59',
   humidity: '50'
@@ -221,7 +222,7 @@ class HitProbCalculator
     targetList.delete();
     this.dummyTarget = btk.Targets.getTarget(firstName);
 
-    const scopeCantRad = 0.0;
+    const scopeCantRad = btk.Conversions.degreesToRadians(parseFloat(document.getElementById('scopeCant').value));
     this.simulator = new btk.MatchSimulator(
       this.bullet, mv, this.dummyTarget, range, this.atmosphere,
       mvSd, windSd, headwindSd, updraftSd,
