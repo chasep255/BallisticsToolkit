@@ -28,6 +28,7 @@ export const DEFAULT_PARAMS = {
   opticalEffects: true,
   rangeFinder: true,
   bdc: true,
+  flyWithBullet: false,
   hogs: true,
   prairieDogs: true
 };

@@ -202,6 +202,11 @@ export class Scope
     this.mirageAdvectionVertical = 0.0; // Accumulated vertical heat rise advection (radians)
     this.mirageAdvectionTime = 0.0; // Accumulated time for noise animation (seconds)
 
+    // Fly-with-bullet camera state - when true, camera is positioned externally
+    // and normal yaw/pitch/recoil application is bypassed in render()
+    this.flyCamActive = false;
+    this.preFlyCamState = null; // Saved overlay/near/optical state to restore on exit
+
     // Recoil effect state
     this.recoilPreset = config.recoilPreset || 'None';
     // Recoil applies to the *aim* (yaw/pitch), so the reticle stays truthful.
@@ -995,10 +1000,12 @@ export class Scope
       // Create instanced mesh after collecting all line data
       this.createInstancedReticle();
 
-      // Create drop indicator (red circle showing predicted bullet drop) - only if BDC enabled
-      if (this.bdcEnabled)
+      // Create drop indicator (red circle showing predicted bullet drop)
+      // Always create when ballisticsTable is available; visibility honors bdcEnabled flag
+      this.createDropIndicator();
+      if (this.dropIndicatorMesh)
       {
-        this.createDropIndicator();
+        this.dropIndicatorMesh.visible = this.bdcEnabled;
       }
 
       // Apply initial FFP scaling (and map from [-0.5,0.5] reticle space to [-1,1] HUD space)
@@ -1041,10 +1048,12 @@ export class Scope
       this.updateReticleScale();
     }
 
-    // Create focal distance text display (for both rifle and spotting scopes) - only if range finder enabled
-    if (this.rangeFinderEnabled)
+    // Create focal distance text display (for both rifle and spotting scopes)
+    // Always create; visibility honors rangeFinderEnabled flag
+    this.createFocalDistanceText();
+    if (this.focalDistanceMesh)
     {
-      this.createFocalDistanceText();
+      this.focalDistanceMesh.visible = this.rangeFinderEnabled;
     }
 
     // Local lighting for metallic look on housing + reticle
@@ -1811,10 +1820,148 @@ export class Scope
   }
 
 
+  // ===== LIVE TOGGLE SETTERS =====
+
+  /**
+   * Enable/disable optical effects (mirage + depth-of-field blur) at runtime.
+   */
+  setOpticalEffectsEnabled(enabled)
+  {
+    this.opticalEffectsEnabled = enabled;
+  }
+
+  /**
+   * Enable/disable range finder readout at runtime.
+   */
+  setRangeFinderEnabled(enabled)
+  {
+    this.rangeFinderEnabled = enabled;
+    if (this.focalDistanceMesh && !this.flyCamActive)
+    {
+      this.focalDistanceMesh.visible = enabled;
+    }
+  }
+
+  /**
+   * Enable/disable BDC drop indicator at runtime.
+   * Only meaningful for the rifle scope (which has a ballistics table).
+   */
+  setBdcEnabled(enabled)
+  {
+    this.bdcEnabled = enabled;
+    if (this.dropIndicatorMesh && !this.flyCamActive)
+    {
+      this.dropIndicatorMesh.visible = enabled;
+      if (enabled)
+      {
+        this.updateDropIndicator();
+      }
+    }
+  }
+
+  // ===== FLY WITH BULLET =====
+
+  /**
+   * Enter fly-cam mode: hide reticle and overlays, suppress recoil, drop the
+   * camera near plane so the bullet glow remains visible up close, and
+   * temporarily disable optical effects (their depth-of-field shader uses a
+   * fixed near-plane uniform that would no longer match).
+   */
+  enterFlyCam()
+  {
+    if (this.flyCamActive) return;
+    this.flyCamActive = true;
+
+    this.preFlyCamState = {
+      reticleVisible: this.reticleGroup ? this.reticleGroup.visible : true,
+      cameraNear: this.camera ? this.camera.near : Config.CAMERA_NEAR_PLANE,
+      opticalEffectsEnabled: this.opticalEffectsEnabled
+    };
+
+    if (this.reticleGroup) this.reticleGroup.visible = false;
+    if (this.focalDistanceMesh) this.focalDistanceMesh.visible = false;
+    if (this.dropIndicatorMesh) this.dropIndicatorMesh.visible = false;
+
+    if (this.camera)
+    {
+      this.camera.near = 0.05; // 5 cm so the bullet glow trail renders
+      this.camera.updateProjectionMatrix();
+    }
+    this.opticalEffectsEnabled = false;
+
+    this.cancelRecoilTransition();
+  }
+
+  /**
+   * Exit fly-cam mode: restore overlay visibility, near plane, optical
+   * effects flag, and the camera pose (position + up + look-at) based on the
+   * scope's logical yaw/pitch/cameraPosition. setFlyCamPose() overwrote all
+   * three of those camera fields; updateCameraLookAt() alone only sets the
+   * look-at direction, so we must reset position and up here too.
+   */
+  exitFlyCam()
+  {
+    if (!this.flyCamActive) return;
+    this.flyCamActive = false;
+
+    const saved = this.preFlyCamState;
+
+    if (this.reticleGroup)
+    {
+      this.reticleGroup.visible = saved ? saved.reticleVisible : true;
+    }
+    if (this.focalDistanceMesh)
+    {
+      this.focalDistanceMesh.visible = this.rangeFinderEnabled;
+    }
+    if (this.dropIndicatorMesh)
+    {
+      this.dropIndicatorMesh.visible = this.bdcEnabled;
+    }
+
+    if (this.camera)
+    {
+      if (saved)
+      {
+        this.camera.near = saved.cameraNear;
+      }
+      this.camera.position.set(
+        this.cameraPosition.x,
+        this.cameraPosition.y,
+        this.cameraPosition.z
+      );
+      this.camera.up.set(0, 1, 0);
+      this.camera.updateProjectionMatrix();
+      this.updateCameraLookAt();
+    }
+    if (saved)
+    {
+      this.opticalEffectsEnabled = saved.opticalEffectsEnabled;
+    }
+    this.preFlyCamState = null;
+  }
+
+  /**
+   * Position the scope camera externally (used by fly-cam mode).
+   * @param {{x:number,y:number,z:number}} camPos - Camera position in meters
+   * @param {{x:number,y:number,z:number}} lookAt - World-space point to look at (meters)
+   */
+  setFlyCamPose(camPos, lookAt)
+  {
+    if (!this.camera) return;
+    this.camera.position.set(camPos.x, camPos.y, camPos.z);
+    this.camera.up.set(0, 1, 0);
+    this.camera.lookAt(lookAt.x, lookAt.y, lookAt.z);
+  }
+
   render(dt = 0)
   {
-    // Apply recoil boost -> settle transition (aim is updated directly)
-    this.applyRecoilTransition(dt);
+    // Apply recoil boost -> settle transition (aim is updated directly).
+    // Skipped during fly-cam so the external camera placement stays put.
+    if (!this.flyCamActive)
+    {
+      this.applyRecoilTransition(dt);
+    }
 
     // Lazy resize: update internal render target if output size changed
     const outputWidth = this.outputRenderTarget.width;
@@ -1865,8 +2012,12 @@ export class Scope
       }
     }
 
-    // Update camera look-at (applies recoil offsets if active)
-    this.updateCameraLookAt();
+    // Update camera look-at (applies recoil offsets if active).
+    // Skipped during fly-cam: camera pose is set externally each frame.
+    if (!this.flyCamActive)
+    {
+      this.updateCameraLookAt();
+    }
 
     // Step 1: Render 3D scene to internal render target
     this.renderer.setRenderTarget(this.sceneRenderTarget);

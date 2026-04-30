@@ -112,9 +112,12 @@ export class Shot
 
     const currentBullet = this.ballisticSimulator.getCurrentBullet();
     const posBtk = currentBullet.getPosition();
-    const pos = this.btkToThreeJsPosition(posBtk);
 
-    this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
+    // BTK and the steel-sim Three.js scene both use SI units (meters), so the
+    // bullet position is used directly with no unit conversion. (Mismatched
+    // conversion here previously stretched the rendered trajectory by ~9%,
+    // making bullets visually fly above their actual impact point.)
+    this.bulletGlowSprite.position.set(posBtk.x, posBtk.y, posBtk.z);
 
     posBtk.delete();
     currentBullet.delete();
@@ -134,32 +137,23 @@ export class Shot
       return;
     }
 
-    // Scale sprite to match bullet diameter
+    // Scale sprite to match bullet diameter (visually tuned with metersToYards
+    // factor; the scene is in meters so this is just a tuning multiplier).
     const glowSize = this.btk.Conversions.metersToYards(this.bulletParams.diameter) * 15.0;
     const baseSize = BulletGlowPool.BASE_SIZE_YARDS;
     const scale = glowSize / baseSize;
     this.bulletGlowSprite.scale.set(scale, scale, 1);
 
-    // Set initial position
-    const posBtk = this.initialPosition;
-    const pos = this.btkToThreeJsPosition(posBtk);
-    this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
+    // Set initial position - BTK position is in meters, scene is in meters
+    this.bulletGlowSprite.position.set(
+      this.initialPosition.x,
+      this.initialPosition.y,
+      this.initialPosition.z
+    );
     this.bulletGlowSprite.visible = true;
 
     // Store scale for cleanup
     this.bulletGlowScale = scale;
-  }
-
-  /**
-   * Convert BTK Vector3D to Three.js position (meters to yards)
-   */
-  btkToThreeJsPosition(btkVec)
-  {
-    return {
-      x: this.btk.Conversions.metersToYards(btkVec.x),
-      y: this.btk.Conversions.metersToYards(btkVec.y),
-      z: this.btk.Conversions.metersToYards(btkVec.z)
-    };
   }
 
   /**

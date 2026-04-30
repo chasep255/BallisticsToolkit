@@ -191,9 +191,10 @@ class SteelSimulator
       params.length_m === undefined || params.twist_mPerTurn === undefined || params.mvSd_mps === undefined ||
       params.rifleAccuracy_rad === undefined || params.bc === undefined || params.dragFunction === undefined ||
       params.windPreset === undefined || params.zeroDistance_m === undefined || params.scopeHeight_m === undefined ||
-      params.opticalEffectsEnabled === undefined || params.rangeFinderEnabled === undefined || params.bdcEnabled === undefined || params.scopeType === undefined || params.recoilPreset === undefined)
+      params.opticalEffectsEnabled === undefined || params.rangeFinderEnabled === undefined || params.bdcEnabled === undefined ||
+      params.flyWithBulletEnabled === undefined || params.scopeType === undefined || params.recoilPreset === undefined)
     {
-      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled, rangeFinderEnabled, bdcEnabled, scopeType, recoilPreset). Use getGameParams() to convert from frontend inputs.');
+      throw new Error('Constructor requires all SI unit parameters (mv_mps, diameter_m, weight_kg, length_m, twist_mPerTurn, mvSd_mps, rifleAccuracy_rad, bc, dragFunction, windPreset, zeroDistance_m, scopeHeight_m, opticalEffectsEnabled, rangeFinderEnabled, bdcEnabled, flyWithBulletEnabled, scopeType, recoilPreset). Use getGameParams() to convert from frontend inputs.');
     }
 
     // Store all params (all must be in SI units, no defaults)
@@ -212,8 +213,12 @@ class SteelSimulator
     this.opticalEffectsEnabled = params.opticalEffectsEnabled;
     this.rangeFinderEnabled = params.rangeFinderEnabled;
     this.bdcEnabled = params.bdcEnabled;
+    this.flyWithBulletEnabled = params.flyWithBulletEnabled;
     this.scopeType = params.scopeType;
     this.recoilPreset = params.recoilPreset;
+
+    this.flyCamShot = null;
+    this.flyCamHoldUntilMs = null; // After impact, hold cam for a moment before exiting
 
     // State
     this.isRunning = false;
@@ -353,6 +358,11 @@ class SteelSimulator
 
     // Stop any active dial repeat
     this.stopDialRepeat();
+
+    // Drop fly-cam reference; the underlying shot is owned by ShotFactory and
+    // will be disposed by ShotFactory.deleteAll() below.
+    this.flyCamShot = null;
+    this.flyCamHoldUntilMs = null;
 
     // Remove event listeners
     if (this.boundHandlers.onMouseWheel)
@@ -2189,6 +2199,12 @@ class SteelSimulator
       return;
     }
 
+    // Block firing while fly-with-bullet camera mode is still active for the previous shot.
+    if (this.flyCamShot)
+    {
+      return;
+    }
+
     // Play shot sound immediately
     if (this.audioManager)
     {
@@ -2260,7 +2276,7 @@ class SteelSimulator
     const spinRate = btk.Bullet.computeSpinRateFromTwist(actualMVMps, this.twist_mPerTurn);
 
     // Create shot from bore position (2" below scope)
-    ShotFactory.create(
+    const shot = ShotFactory.create(
     {
       initialPosition: borePos,
       initialVelocity: initialVelocity,
@@ -2281,6 +2297,92 @@ class SteelSimulator
     {
       this.scope.triggerRecoil();
     }
+
+    // If fly-with-bullet is enabled, take over the rifle scope camera until impact.
+    // Only the rifle scope is hijacked (spotting scope keeps observing normally).
+    // Skipped if a previous fly-cam shot is still in flight.
+    if (this.flyWithBulletEnabled && !this.flyCamShot && this.scope)
+    {
+      this.flyCamShot = shot;
+      this.scope.enterFlyCam();
+    }
+  }
+
+  /**
+   * Drive the fly-cam each frame: place the rifle scope camera ~4 m behind
+   * the bullet, looking along its velocity vector. After impact, hold the
+   * last camera pose for FLY_CAM_HOLD_MS so the player can see the result,
+   * then exit cleanly.
+   */
+  updateFlyCam()
+  {
+    if (!this.flyCamShot) return;
+
+    const FLY_CAM_HOLD_MS = 500;
+    const TRAIL_M = 10.0;
+
+    // Post-impact hold: keep the last setFlyCamPose() in place (flyCamActive
+    // is still true, so render() skips updateCameraLookAt and the pose persists).
+    if (this.flyCamHoldUntilMs !== null)
+    {
+      if (performance.now() >= this.flyCamHoldUntilMs)
+      {
+        this.endFlyCam();
+      }
+      return;
+    }
+
+    // Bullet died this frame (impact, ground, or otherwise). Start hold timer.
+    if (!this.flyCamShot.alive)
+    {
+      this.flyCamHoldUntilMs = performance.now() + FLY_CAM_HOLD_MS;
+      return;
+    }
+
+    const currentBullet = this.flyCamShot.getCurrentBullet();
+    if (!currentBullet)
+    {
+      this.flyCamHoldUntilMs = performance.now() + FLY_CAM_HOLD_MS;
+      return;
+    }
+
+    const posBtk = currentBullet.getPosition();
+    const velBtk = currentBullet.getVelocity();
+
+    const speed = Math.sqrt(velBtk.x * velBtk.x + velBtk.y * velBtk.y + velBtk.z * velBtk.z);
+    if (speed > 0)
+    {
+      const ux = velBtk.x / speed;
+      const uy = velBtk.y / speed;
+      const uz = velBtk.z / speed;
+
+      const camPos = {
+        x: posBtk.x - ux * TRAIL_M,
+        y: posBtk.y - uy * TRAIL_M,
+        z: posBtk.z - uz * TRAIL_M
+      };
+      const lookAt = {
+        x: posBtk.x + ux,
+        y: posBtk.y + uy,
+        z: posBtk.z + uz
+      };
+
+      if (this.scope) this.scope.setFlyCamPose(camPos, lookAt);
+    }
+
+    posBtk.delete();
+    velBtk.delete();
+    currentBullet.delete();
+  }
+
+  /**
+   * Tear down fly-cam state: restore the rifle scope and clear references.
+   */
+  endFlyCam()
+  {
+    if (this.scope) this.scope.exitFlyCam();
+    this.flyCamShot = null;
+    this.flyCamHoldUntilMs = null;
   }
 
   // ===== DUST CLOUD EFFECTS =====
@@ -2662,6 +2764,11 @@ class SteelSimulator
     ShotFactory.updateAll(dt);
     this.checkBulletTargetCollisions();
     this.checkBulletGroundCollisions();
+
+    // Fly-cam needs to read bullet pose BEFORE cleanupDeadShots disposes the shot.
+    // markDead() set shot.alive=false on impact; updateFlyCam() handles exit cleanly.
+    this.updateFlyCam();
+
     ShotFactory.cleanupDeadShots();
     ShotFactory.updateAnimations();
 
@@ -2762,6 +2869,8 @@ function getGameParams()
   const rangeFinderEnabled = rangeFinderCheckbox ? rangeFinderCheckbox.checked : true;
   const bdcCheckbox = document.getElementById('bdc');
   const bdcEnabled = bdcCheckbox ? bdcCheckbox.checked : true;
+  const flyWithBulletCheckbox = document.getElementById('flyWithBullet');
+  const flyWithBulletEnabled = flyWithBulletCheckbox ? flyWithBulletCheckbox.checked : false;
   const scopeTypeSelect = document.getElementById('scopeType');
   const scopeType = scopeTypeSelect ? scopeTypeSelect.value : 'mrad';
   const recoilPresetSelect = document.getElementById('recoilPreset');
@@ -2784,6 +2893,7 @@ function getGameParams()
     opticalEffectsEnabled: opticalEffectsEnabled,
     rangeFinderEnabled: rangeFinderEnabled,
     bdcEnabled: bdcEnabled,
+    flyWithBulletEnabled: flyWithBulletEnabled,
     scopeType: scopeType,
     recoilPreset: recoilPreset
   };
@@ -2957,6 +3067,75 @@ function setupUI()
         steelSimulator.scope.setRecoilPreset(newPreset);
         SettingsCookies.saveAll(); // Auto-save
       }
+    });
+  }
+
+  // Optical effects (mirage + DOF) - live toggle, no restart needed
+  const opticalEffectsCheckbox = document.getElementById('opticalEffects');
+  if (opticalEffectsCheckbox)
+  {
+    opticalEffectsCheckbox.addEventListener('change', () =>
+    {
+      const enabled = opticalEffectsCheckbox.checked;
+      if (steelSimulator)
+      {
+        steelSimulator.opticalEffectsEnabled = enabled;
+        if (steelSimulator.scope) steelSimulator.scope.setOpticalEffectsEnabled(enabled);
+        if (steelSimulator.spottingScope) steelSimulator.spottingScope.setOpticalEffectsEnabled(enabled);
+      }
+      SettingsCookies.saveAll();
+    });
+  }
+
+  // Range finder readout - live toggle
+  const rangeFinderCheckbox = document.getElementById('rangeFinder');
+  if (rangeFinderCheckbox)
+  {
+    rangeFinderCheckbox.addEventListener('change', () =>
+    {
+      const enabled = rangeFinderCheckbox.checked;
+      if (steelSimulator)
+      {
+        steelSimulator.rangeFinderEnabled = enabled;
+        if (steelSimulator.scope) steelSimulator.scope.setRangeFinderEnabled(enabled);
+        if (steelSimulator.spottingScope) steelSimulator.spottingScope.setRangeFinderEnabled(enabled);
+      }
+      SettingsCookies.saveAll();
+    });
+  }
+
+  // BDC drop indicator - live toggle (rifle scope only)
+  const bdcCheckbox = document.getElementById('bdc');
+  if (bdcCheckbox)
+  {
+    bdcCheckbox.addEventListener('change', () =>
+    {
+      const enabled = bdcCheckbox.checked;
+      if (steelSimulator)
+      {
+        steelSimulator.bdcEnabled = enabled;
+        if (steelSimulator.scope) steelSimulator.scope.setBdcEnabled(enabled);
+      }
+      SettingsCookies.saveAll();
+    });
+  }
+
+  // Fly-with-bullet - live toggle. Disabling mid-flight aborts cleanly.
+  const flyWithBulletCheckbox = document.getElementById('flyWithBullet');
+  if (flyWithBulletCheckbox)
+  {
+    flyWithBulletCheckbox.addEventListener('change', () =>
+    {
+      const enabled = flyWithBulletCheckbox.checked;
+      if (steelSimulator)
+      {
+        steelSimulator.flyWithBulletEnabled = enabled;
+        if (!enabled && steelSimulator.flyCamShot)
+        {
+          steelSimulator.endFlyCam();
+        }
+      }
+      SettingsCookies.saveAll();
     });
   }
 

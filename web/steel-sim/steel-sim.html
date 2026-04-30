@@ -145,6 +145,10 @@
         <input type="checkbox" id="bdc" checked>
       </div>
       <div class="param-item">
+        <label for="flyWithBullet" title="Camera follows the bullet from shot to impact">Fly With Bullet</label>
+        <input type="checkbox" id="flyWithBullet">
+      </div>
+      <div class="param-item">
         <label for="hogs" title="Enable wild boars on the range">Hogs</label>
         <input type="checkbox" id="hogs" checked>
       </div>
@@ -352,6 +356,12 @@
             - Uses ballistics table to calculate drop at current focal distance<br>
             - Like a real scope with a dope card, the BDC is an estimate; small errors are expected<br>
             - Disable for a more traditional shooting experience<br><br>
+
+            <strong>Fly With Bullet:</strong><br>
+            - Toggle via the checkbox in the settings bar (off by default)<br>
+            - When enabled, every shot fired from the rifle scope switches the scope view to follow the bullet about 10 m behind it along its velocity vector<br>
+            - After impact, the view holds on the impact point briefly, then returns to the normal rifle scope view<br>
+            - The reticle, BDC, and range finder readout are hidden while this mode is active<br><br>
             
             <strong>Hogs &amp; Prairie Dogs:</strong><br>
             - Toggle via separate checkboxes in the settings bar<br>
