@@ -1875,6 +1875,7 @@ export class Scope
     this.preFlyCamState = {
       reticleVisible: this.reticleGroup ? this.reticleGroup.visible : true,
       cameraNear: this.camera ? this.camera.near : Config.CAMERA_NEAR_PLANE,
+      cameraFov: this.camera ? this.camera.fov : this.currentFOV,
       opticalEffectsEnabled: this.opticalEffectsEnabled
     };
 
@@ -1885,6 +1886,7 @@ export class Scope
     if (this.camera)
     {
       this.camera.near = 0.05; // 5 cm so the bullet glow trail renders
+      this.camera.fov = 10; // Wide-ish chase view; reticle is hidden so zoom/FFP scaling does not matter
       this.camera.updateProjectionMatrix();
     }
     this.opticalEffectsEnabled = false;
@@ -1924,6 +1926,7 @@ export class Scope
       if (saved)
       {
         this.camera.near = saved.cameraNear;
+        this.camera.fov = saved.cameraFov;
       }
       this.camera.position.set(
         this.cameraPosition.x,

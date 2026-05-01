@@ -36,6 +36,7 @@ export class Shot
     // Shot state
     this.alive = true;
     this.lastCheckedCollisionTime = 0.0; // Track last collision check time
+    this.createdAtMs = performance.now(); // Wall-clock time at shot creation (for purge timeout)
 
     // Bullet animation state
     this.bulletGlowSprite = null;
@@ -101,6 +102,17 @@ export class Shot
       dt,
       this.windGenerator
     );
+
+    // Purge bullets that have been alive too long in real-time (e.g. shot
+    // way above the horizon and never coming down). We use wall-clock rather
+    // than trajectory.getTotalTime() because the BTK simulator early-exits
+    // once the bullet passes max_distance, after which trajectory time only
+    // advances by one integration step per frame -- effectively never reaching
+    // a flight-time threshold.
+    if (performance.now() - this.createdAtMs >= Config.MAX_BULLET_FLIGHT_TIME_S * 1000)
+    {
+      this.alive = false;
+    }
   }
 
   /**

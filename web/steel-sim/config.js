@@ -46,6 +46,7 @@ export function initConfig()
   Config.BULLET_SUBSTEP_S = 0.001; // 1ms BTK integration
   Config.TIME_MANAGER_MAX_DT_S = 0.2; // 500ms max frame time
   Config.TIME_MANAGER_MIN_DT_S = 0; // No minimum (clamp to 0)
+  Config.MAX_BULLET_FLIGHT_TIME_S = 10.0; // Purge bullets alive longer than this in real time (e.g. shot way above horizon)
 
   // ===== FPS TRACKING =====
   Config.FPS_LOG_INTERVAL_S = 1.0; // Log FPS every second

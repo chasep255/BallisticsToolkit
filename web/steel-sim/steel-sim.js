@@ -2318,7 +2318,7 @@ class SteelSimulator
   {
     if (!this.flyCamShot) return;
 
-    const FLY_CAM_HOLD_MS = 500;
+    const FLY_CAM_HOLD_MS = 1000;
     const TRAIL_M = 10.0;
 
     // Post-impact hold: keep the last setFlyCamPose() in place (flyCamActive
@@ -2609,17 +2609,23 @@ class SteelSimulator
           // Calculate distance from target to shooter
           const distance_m = impactPosThree.distanceTo(shooterPos);
 
+          // When flying with this bullet, the camera is at the impact point, so
+          // skip both the speed-of-sound delay and the distance-based volume
+          // attenuation (otherwise the impact would arrive late and quiet,
+          // well after the cam already returned to the shooter).
+          const isFlyCamShot = (this.flyCamShot === shot);
+
           const speedOfSound = this.rifleZero.atmosphere.getSpeedOfSound();
-          const delaySeconds = distance_m / speedOfSound;
+          const delaySeconds = isFlyCamShot ? 0 : distance_m / speedOfSound;
 
           // Volume attenuation: linear interpolation from 100% at 100 yards to 10% at max range distance
           const minDistance_m = btk.Conversions.yardsToMeters(100.0); // Full volume at 100 yards
           const maxDistance_m = Config.LANDSCAPE_CONFIG.groundLength; // Max range distance
 
           let volume;
-          if (distance_m <= minDistance_m)
+          if (isFlyCamShot || distance_m <= minDistance_m)
           {
-            volume = 1.0; // Full volume at or closer than 100 yards
+            volume = 1.0; // Full volume in bullet cam, or at/closer than 100 yards
           }
           else if (distance_m >= maxDistance_m)
           {
