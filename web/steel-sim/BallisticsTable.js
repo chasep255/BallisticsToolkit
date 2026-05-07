@@ -80,8 +80,8 @@ export class BallisticsTable
 
       const drop_m = position.y;
       const spinDrift_m = position.x; // Lateral displacement due to spin drift
-      const drop_mrad = range > 0 ? (drop_m / range) * 1000.0 : 0.0;
-      const spinDrift_mrad = range > 0 ? (spinDrift_m / range) * 1000.0 : 0.0;
+      const drop_mrad = range > 0 ? Math.atan(drop_m / range) * 1000.0 : 0.0;
+      const spinDrift_mrad = range > 0 ? Math.atan(spinDrift_m / range) * 1000.0 : 0.0;
 
       this.dropTable.push(
       {

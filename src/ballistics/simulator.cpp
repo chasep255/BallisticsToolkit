@@ -119,7 +119,7 @@ namespace btk::ballistics
 
     float density_ratio = atmosphere_.getAirDensity() / btk::physics::Constants::AIR_DENSITY_STANDARD;
     float ret_fps_s = a * std::pow(v_fps, m) * density_ratio / s.getBc();
-    return btk::math::Conversions::fpsToMps(ret_fps_s);
+    return btk::math::Conversions::fps2ToMps2(ret_fps_s);
   }
 
   // Helper function for safe normalization

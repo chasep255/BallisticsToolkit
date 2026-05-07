@@ -54,7 +54,7 @@ namespace btk::match
 
     btk::math::Vector3D zeroed_velocity = initial_bullet.getVelocity();
     float scale = (nominal_mv_ > 1e-6f) ? (mv_mps / nominal_mv_) : 1.0f;
-    btk::math::Vector3D scaled_velocity = btk::math::Vector3D(zeroed_velocity.x, zeroed_velocity.y * scale, zeroed_velocity.z * scale);
+    btk::math::Vector3D scaled_velocity = zeroed_velocity * scale;
 
     // Apply rifle accuracy (uniform distribution within circle of given diameter)
     float angle = btk::math::Random::uniform(0.0f, 2.0f * M_PI_F);
@@ -114,7 +114,7 @@ namespace btk::match
     if(!impact_point)
     {
       // Shouldn't happen, but handle gracefully
-      SimulatedShot simulatedShot(btk::math::Conversions::inchesToMeters(999.0f), btk::math::Conversions::inchesToMeters(999.0f), 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps,
+      SimulatedShot simulatedShot(999.0f, 999.0f, 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps,
                                   updraft_mps, release_angle_h, release_angle_v, 0.0f, cant_rad);
       shots_.push_back(simulatedShot);
       return simulatedShot;
