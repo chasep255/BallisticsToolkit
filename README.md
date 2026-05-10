@@ -1,6 +1,6 @@
 # Ballistics Toolkit
 
-Client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides trajectory calculations with atmospheric and wind compensation, spin effects, load comparison, Performance Matrix analysis, Monte Carlo target simulation, hit simulation, interactive steel target simulator, and an interactive F-Class match simulator with wind visualization.
+Client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides trajectory calculations with atmospheric and wind compensation, spin effects, load comparison, Performance Matrix analysis, Monte Carlo target simulation, hit simulation, interactive steel target simulator, an interactive F-Class match simulator with wind visualization, and a printable target generator.
 
 **Website:** https://www.ballisticstoolkit.com/  
 **Contact:** admin@ballisticstoolkit.com
@@ -30,7 +30,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 
 ### 🎯 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
-- **Target Library** - 12 competitive targets to choose from
+- **Target Library** - 14 competitive targets to choose from
 - **Realistic Variability** - Muzzle velocity, wind, and rifle accuracy modeling
 - **Spin Effects** - Crosswind jump included in analysis
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
@@ -69,6 +69,13 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Scope & HUD** - Dual scopes (rifle + spotting) with pointer lock: click either scope to enter, `Tab` to switch between scopes, move mouse to pan, wheel or `+`/`-` to zoom (rifle: 4×–40×, spotting: 4×–80×), click to fire (rifle scope only), `Esc` to exit. Active scope shows a dull red border. MRAD or MOA scope type selection with matching reticle ticks and dial units. HUD shows current dial settings.
 - **Mirage/Optical Effects** - Optional heat mirage simulation that moves with the wind, letting you read wind speed and direction through the shimmer. Includes depth-of-field blur based on focus distance. Refocus active scope with `F` key or right-click (desktop) or long-press (mobile).
 - **Audio Feedback** - Shot sounds play immediately; impact sounds (ping) play with distance-based delay and volume attenuation.
+
+### 🖨️ Target Generator
+- **Competition Presets** - 14 standard competition target configurations (SR, MR, LR, F-Class) with correct ring diameters
+- **Ring Editor** - Customize ring labels, diameters, fill colors, and line colors; add or remove rings for fully custom targets
+- **Tiling Layouts** - Print 1, 2, 4, or 6 targets per page with automatic centering and clipping
+- **Exact 1:1 Scale** - Rings print at their actual physical dimensions; uses browser print with 300 DPI rendering
+- **Print Options** - Paper size (Letter, Legal, Tabloid, A4, A3, custom), orientation, margins, ring labels, target info, label colors, ring line thickness
 
 ## Quick Start
 
@@ -140,6 +147,16 @@ Visit the [Steel Target Simulator](https://www.ballisticstoolkit.com/steel-sim/s
 4. **Targets** - Steel plates from 100 to 1760 yards with reactive physics and impact feedback
 
 Shoot reactive steel targets with physics-based ballistics, dust effects, and audio feedback. Optional hunting mode adds prairie dogs and boars.
+
+### 🖨️ Target Generator
+Visit the [Target Generator](https://www.ballisticstoolkit.com/target-gen/target-gen.html) to create printable targets:
+
+1. **Target Selection** - 14 competition target presets (SR, MR, LR, F-Class) or fully custom ring definitions
+2. **Ring Editor** - Edit ring diameters, fill colors, and line colors; add or remove rings
+3. **Print Settings** - Paper size (Letter, Legal, Tabloid, A4, A3, custom), orientation, margins, tiling layouts (1-up, 2-up, 4-up, 6-up)
+4. **Display Options** - Ring labels, target info text, label/info colors, ring line thickness, custom target label
+
+Generate targets at exact 1:1 physical scale using browser print. Targets larger than the paper are clipped at the page edge. Tiled layouts place multiple targets per page for smaller targets.
 
 ## Building from Source
 

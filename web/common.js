@@ -183,7 +183,8 @@ function setActiveNavLink()
     'hit-prob': 'hit-prob/hit-prob.html',
     'wind-sim': 'wind-sim/wind-sim.html',
     'steel-sim': 'steel-sim/steel-sim.html',
-    'fclass-sim': 'fclass-sim/fclass-sim.html'
+    'fclass-sim': 'fclass-sim/fclass-sim.html',
+    'target-gen': 'target-gen/target-gen.html'
   };
 
   navLinks.forEach(link =>
@@ -211,17 +212,10 @@ function generateNavigation(currentPageName)
   const isRootPage = currentPageName === 'index' || currentPageName === 'about';
   const pathPrefix = isRootPage ? '' : '../';
 
-  // Determine active states
-  const isHome = currentPageName === 'index';
-  const isBallisticCalc = currentPageName === 'ballistic-calc';
-  const isLoadComp = currentPageName === 'load-comp';
-  const isPerfMatrix = currentPageName === 'perf-matrix';
-  const isTargetSim = currentPageName === 'target-sim';
-  const isHitProb = currentPageName === 'hit-prob';
-  const isWindSim = currentPageName === 'wind-sim';
-  const isSteelSim = currentPageName === 'steel-sim';
-  const isWindGame = currentPageName === 'wind-game';
-  const isFClassSim = currentPageName === 'fclass-sim';
+  const act = (page) => currentPageName === page ? 'class="active"' : '';
+
+  const link = (href, page, short, full) =>
+    `<a href="${pathPrefix}${href}" ${act(page)}><span class="nav-short">${short}</span><span class="nav-full">${full}</span></a>`;
 
   const navHTML = `
         <div class="nav-content">
@@ -229,15 +223,17 @@ function generateNavigation(currentPageName)
                 <img src="${pathPrefix}ballistics-toolkit-icon.png" alt="BallisticsToolkit" class="nav-logo-img">
                 <span class="nav-logo-text">Ballistics Toolkit</span>
             </a>
+            <button class="nav-hamburger" aria-label="Menu">&#9776;</button>
             <div class="nav-links">
-                <a href="${pathPrefix}ballistic-calc/ballistic-calc.html" ${isBallisticCalc ? 'class="active"' : ''}>Ballistic Calc</a>
-                <a href="${pathPrefix}load-comp/load-comp.html" ${isLoadComp ? 'class="active"' : ''}>Load Comp</a>
-                <a href="${pathPrefix}perf-matrix/perf-matrix.html" ${isPerfMatrix ? 'class="active"' : ''}>Perf Matrix</a>
-                <a href="${pathPrefix}target-sim/target-sim.html" ${isTargetSim ? 'class="active"' : ''}>Target Sim</a>
-                <a href="${pathPrefix}hit-prob/hit-prob.html" ${isHitProb ? 'class="active"' : ''}>Hit Sim</a>
-                <a href="${pathPrefix}wind-sim/wind-sim.html" ${isWindSim ? 'class="active"' : ''}>Wind Sim</a>
-                <a href="${pathPrefix}steel-sim/steel-sim.html" ${isSteelSim ? 'class="active"' : ''}>Steel Sim</a>
-                <a href="${pathPrefix}fclass-sim/fclass-sim.html" ${isFClassSim ? 'class="active"' : ''}>F-Class Sim</a>
+                ${link('ballistic-calc/ballistic-calc.html', 'ballistic-calc', 'Ballistic Calc', 'Ballistic Calculator')}
+                ${link('load-comp/load-comp.html', 'load-comp', 'Load Comp', 'Load Comparison')}
+                ${link('perf-matrix/perf-matrix.html', 'perf-matrix', 'Perf Matrix', 'Performance Matrix')}
+                ${link('target-sim/target-sim.html', 'target-sim', 'Target Sim', 'Target Simulator')}
+                ${link('hit-prob/hit-prob.html', 'hit-prob', 'Hit Sim', 'Hit Simulator')}
+                ${link('wind-sim/wind-sim.html', 'wind-sim', 'Wind Sim', 'Wind Simulator')}
+                ${link('steel-sim/steel-sim.html', 'steel-sim', 'Steel Sim', 'Steel Simulator')}
+                ${link('fclass-sim/fclass-sim.html', 'fclass-sim', 'F-Class Sim', 'F-Class Simulator')}
+                ${link('target-gen/target-gen.html', 'target-gen', 'Target Gen', 'Target Generator')}
             </div>
         </div>
     `;
@@ -307,6 +303,17 @@ document.addEventListener('DOMContentLoaded', function()
   // Setup common page structure and navigation
   setupCommonPageStructure();
   setActiveNavLink();
+
+  // Hamburger menu toggle
+  const hamburger = document.querySelector('.nav-hamburger');
+  const navLinks = document.querySelector('.nav-links');
+  if (hamburger && navLinks)
+  {
+    hamburger.addEventListener('click', () =>
+    {
+      navLinks.classList.toggle('open');
+    });
+  }
 
   // Consent modal (first visit or when consent version changes)
   btkEnsureConsentModal();

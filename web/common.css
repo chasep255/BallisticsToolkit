@@ -87,20 +87,47 @@ body {
     color: #3498db;
 }
 
+/* Hamburger button - hidden on desktop */
+.nav-hamburger {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: background-color 0.2s;
+}
+
+.nav-hamburger:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
 .nav-links {
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 2px;
+    align-items: center;
 }
 
 .nav-links a {
     color: white;
     text-decoration: none;
-    padding: 8px 12px;
+    padding: 6px 9px;
     border-radius: 4px;
     transition: background-color 0.2s;
     font-weight: 500;
+    font-size: 15px;
     white-space: nowrap;
+}
+
+/* Desktop: show short labels, hide full labels */
+.nav-links .nav-full {
+    display: none;
+}
+.nav-links .nav-short {
+    display: inline;
 }
 
 .nav-links a:hover {
@@ -109,6 +136,49 @@ body {
 
 .nav-links a.active {
     background-color: #3498db;
+}
+
+/* Mobile: hamburger menu */
+@media (max-width: 768px) {
+    .nav-hamburger {
+        display: block;
+    }
+
+    .nav-links {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 0;
+        padding-top: 10px;
+    }
+
+    .nav-links.open {
+        display: flex;
+    }
+
+    .nav-content {
+        flex-wrap: wrap;
+    }
+
+    .nav-links a {
+        width: 100%;
+        padding: 10px 16px;
+        border-radius: 0;
+        font-size: 15px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Mobile: show full labels, hide short labels */
+    .nav-links .nav-short {
+        display: none;
+    }
+    .nav-links .nav-full {
+        display: inline;
+    }
+
+    .nav-links a:first-child {
+        border-top: none;
+    }
 }
 
 /* ==========================================================================
@@ -207,6 +277,16 @@ body {
     font-size: 11px;
     color: #555;
     margin-bottom: 3px;
+}
+
+.param-item input[type="color"] {
+    width: 40px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    background: none;
 }
 
 /* Input styling - consistent across both apps */
@@ -329,16 +409,6 @@ th {
    RESPONSIVE DESIGN
    ========================================================================== */
 @media (max-width: 768px) {
-    .nav-content {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .nav-links {
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-    
     .container {
         padding: 10px;
     }
