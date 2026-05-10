@@ -27,13 +27,13 @@ const RING_LABELS = ['5', '6', '7', '8', '9', '10', 'X'];
 // Standard ring colors
 function defaultRingColor(index)
 {
-  // index 0,1 = rings 5,6 (white fill, black line)
-  // index 2-6 = rings 7,8,9,10,X (black fill, white line)
+  // index 0,1 = rings 5,6 (white fill, black line, black labels)
+  // index 2-6 = rings 7,8,9,10,X (black fill, white line, white labels)
   if (index <= 1)
   {
-    return { fill: '#ffffff', line: '#000000' };
+    return { fill: '#ffffff', line: '#000000', label: '#000000' };
   }
-  return { fill: '#000000', line: '#ffffff' };
+  return { fill: '#000000', line: '#ffffff', label: '#ffffff' };
 }
 
 // Paper sizes in inches
@@ -54,7 +54,7 @@ const LAYOUT_GRIDS = {
 };
 
 // ── State ──
-let rings = []; // Array of { label, diameter, fillColor, lineColor }
+let rings = []; // Array of { label, diameter, fillColor, lineColor, labelColor }
 
 const RINGS_STORAGE_KEY = 'target_gen_rings';
 
@@ -100,7 +100,6 @@ const orientationSelect = document.getElementById('orientation');
 const marginsInput = document.getElementById('margins');
 const showLabelsCheck = document.getElementById('showLabels');
 const showInfoCheck = document.getElementById('showInfo');
-const labelColorInput = document.getElementById('labelColor');
 const infoColorInput = document.getElementById('infoColor');
 const ringThicknessInput = document.getElementById('ringThickness');
 const targetLabelInput = document.getElementById('targetLabel');
@@ -122,7 +121,6 @@ const DEFAULT_PARAMS = {
   margins: '0.25',
   showLabels: true,
   showInfo: true,
-  labelColor: '#ffffff',
   infoColor: '#666666',
   ringThickness: '0.02',
   targetLabel: '',
@@ -191,7 +189,8 @@ function loadPreset(key)
       label: RING_LABELS[i],
       diameter: diam,
       fillColor: colors.fill,
-      lineColor: colors.line
+      lineColor: colors.line,
+      labelColor: colors.label
     };
   });
   rebuildRingEditor();
@@ -217,6 +216,9 @@ function rebuildRingEditor()
       </td>
       <td>
         <input type="color" value="${ring.lineColor}" data-idx="${i}" data-field="lineColor">
+      </td>
+      <td>
+        <input type="color" value="${ring.labelColor}" data-idx="${i}" data-field="labelColor">
       </td>
       <td>
         <button class="btn-remove-ring" data-idx="${i}" title="Remove ring">&times;</button>
@@ -273,7 +275,8 @@ function addRing()
     label: String(rings.length + 1),
     diameter: 5,
     fillColor: colors.fill,
-    lineColor: colors.line
+    lineColor: colors.line,
+    labelColor: colors.label
   });
   presetSelect.value = 'Custom';
   rebuildRingEditor();
@@ -283,7 +286,7 @@ function addRing()
 
 // ── Target Drawing ──
 // Renders target(s) onto a canvas context at a given scale (pixels per inch).
-function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, labelColor, infoColor, targetLabel, ringThickness, presetKey, scale)
+function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, infoColor, targetLabel, ringThickness, presetKey, scale)
 {
   const [cols, rows] = layoutGrid;
   const usableW = paper.w - 2 * margin;
@@ -356,7 +359,7 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
       if (showLabels && labelFontSize >= 0.08)
       {
         const isCenter = (i === rings.length - 1);
-        targetCtx.fillStyle = labelColor;
+        targetCtx.fillStyle = ring.labelColor;
         targetCtx.font = `bold ${Math.max(labelFontSize * scale, 6)}px Arial`;
         targetCtx.textAlign = 'center';
         targetCtx.textBaseline = 'middle';
@@ -441,7 +444,7 @@ function updatePreview()
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawTarget(ctx, paper, margin, layoutGrid, showLabels, showInfo, labelColorInput.value, infoColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, presetSelect.value, scale);
+  drawTarget(ctx, paper, margin, layoutGrid, showLabels, showInfo, infoColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, presetSelect.value, scale);
 
   // Paper border
   ctx.strokeStyle = '#ccc';
@@ -472,7 +475,7 @@ function printTarget()
   offCtx.fillStyle = '#ffffff';
   offCtx.fillRect(0, 0, pw, ph);
 
-  drawTarget(offCtx, paper, margin, layoutGrid, showLabels, showInfo, labelColorInput.value, infoColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, presetSelect.value, dpi);
+  drawTarget(offCtx, paper, margin, layoutGrid, showLabels, showInfo, infoColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, presetSelect.value, dpi);
 
   const dataUrl = offscreen.toDataURL('image/png');
 
@@ -540,7 +543,6 @@ orientationSelect.addEventListener('change', () => { updatePreview(); SettingsCo
 marginsInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 showLabelsCheck.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
 showInfoCheck.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
-labelColorInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 infoColorInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 ringThicknessInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 targetLabelInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
