@@ -109,6 +109,19 @@ namespace btk::match
     targets_.emplace("LR-FCA", Target("LR-FCA", btk::math::Conversions::inchesToMeters(10.00f), btk::math::Conversions::inchesToMeters(20.00f), btk::math::Conversions::inchesToMeters(30.00f),
                                       btk::math::Conversions::inchesToMeters(44.00f), btk::math::Conversions::inchesToMeters(60.00f), btk::math::Conversions::inchesToMeters(72.00f),
                                       btk::math::Conversions::inchesToMeters(5.00f), "800/900/1000 yd F-Class repair center"));
+
+    // IBS Benchrest Hunter Rifle / Varmint For Score targets
+    targets_.emplace("IBS-100", Target("IBS-100", btk::math::Conversions::inchesToMeters(0.50f), btk::math::Conversions::inchesToMeters(1.00f), btk::math::Conversions::inchesToMeters(1.50f),
+                                       btk::math::Conversions::inchesToMeters(2.00f), btk::math::Conversions::inchesToMeters(2.50f), btk::math::Conversions::inchesToMeters(3.00f),
+                                       btk::math::Conversions::inchesToMeters(0.0625f), "100 yd benchrest score (IBS Hunter #1)"));
+
+    targets_.emplace("IBS-200", Target("IBS-200", btk::math::Conversions::inchesToMeters(1.00f), btk::math::Conversions::inchesToMeters(2.00f), btk::math::Conversions::inchesToMeters(3.00f),
+                                       btk::math::Conversions::inchesToMeters(4.00f), btk::math::Conversions::inchesToMeters(5.00f), btk::math::Conversions::inchesToMeters(6.00f),
+                                       btk::math::Conversions::inchesToMeters(0.125f), "200 yd benchrest score (IBS Hunter #2)"));
+
+    targets_.emplace("IBS-300", Target("IBS-300", btk::math::Conversions::inchesToMeters(1.50f), btk::math::Conversions::inchesToMeters(3.00f), btk::math::Conversions::inchesToMeters(4.50f),
+                                       btk::math::Conversions::inchesToMeters(6.00f), btk::math::Conversions::inchesToMeters(7.50f), btk::math::Conversions::inchesToMeters(9.00f),
+                                       btk::math::Conversions::inchesToMeters(0.25f), "300 yd benchrest score (IBS Hunter #3)"));
   }
 
 } // namespace btk::match

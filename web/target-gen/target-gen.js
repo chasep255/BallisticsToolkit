@@ -1,34 +1,34 @@
+import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 import { createSettingsCookies } from '../settings-cookies.js';
 
 const SettingsCookies = createSettingsCookies('target_gen_');
 
-// ── Target Preset Data ──
-// All diameters in inches: [5, 6, 7, 8, 9, 10, X]
-const TARGET_PRESETS = {
-  'SR':       { name: 'SR',       desc: '200 yd standing/rapid fire', rings: [37.00, 31.00, 25.00, 19.00, 13.00, 7.00, 3.00] },
-  'SR-3':     { name: 'SR-3',     desc: '300 yd rapid fire',         rings: [37.00, 31.00, 25.00, 19.00, 13.00, 7.00, 3.00] },
-  'SR-1':     { name: 'SR-1',     desc: '100 yd sim of 200 yd',      rings: [18.35, 15.35, 12.35,  9.35,  6.35, 3.35, 1.35] },
-  'SR-21':    { name: 'SR-21',    desc: '100 yd sim of 300 yd',      rings: [12.12, 10.12,  8.12,  6.12,  4.12, 2.12, 0.79] },
-  'MR-63':    { name: 'MR-63',    desc: '300 yd slow fire',          rings: [29.85, 23.85, 17.85, 11.85,  8.85, 5.85, 2.85] },
-  'MR-65':    { name: 'MR-65',    desc: '500 yd slow fire',          rings: [36.00, 30.00, 25.00, 20.00, 15.00, 10.00, 5.00] },
-  'MR-1':     { name: 'MR-1',     desc: '600 yd slow fire',          rings: [60.00, 48.00, 36.00, 24.00, 18.00, 12.00, 6.00] },
-  'MR-31':    { name: 'MR-31',    desc: '100 yd sim of 600 yd',      rings: [ 9.75,  7.75,  5.75,  3.75,  2.75,  1.75, 0.75] },
-  'MR-52':    { name: 'MR-52',    desc: '200 yd sim of 600 yd',      rings: [19.79, 15.79, 11.79,  7.79,  5.79,  3.79, 1.79] },
-  'MR-63FCA': { name: 'MR-63FCA', desc: '300 yd F-Class',            rings: [23.85, 17.85, 11.85,  8.85,  5.85,  2.85, 1.42] },
-  'MR-65FCA': { name: 'MR-65FCA', desc: '500 yd F-Class',            rings: [30.00, 25.00, 20.00, 15.00, 10.00,  5.00, 2.50] },
-  'MR-1FCA':  { name: 'MR-1FCA',  desc: '600 yd F-Class',            rings: [36.00, 30.00, 24.00, 18.00, 12.00,  6.00, 3.00] },
-  'LR':       { name: 'LR',       desc: '800/900/1000 yd',           rings: [72.00, 72.00, 60.00, 44.00, 30.00, 20.00, 10.00] },
-  'LR-FCA':   { name: 'LR-FCA',   desc: 'LR F-Class',               rings: [72.00, 60.00, 44.00, 30.00, 20.00, 10.00, 5.00] }
-};
+let btk = null;
 
-// Ring labels from outermost to innermost
+// Ring labels from outermost (index 0) to innermost X (index 6)
 const RING_LABELS = ['5', '6', '7', '8', '9', '10', 'X'];
 
-// Standard ring colors
-function defaultRingColor(index)
+// Targets that use the all-white benchrest color scheme.
+const BR_TARGETS = new Set(['IBS-100', 'IBS-200', 'IBS-300']);
+
+// Metadata for the currently selected preset, populated from C++.
+let currentPresetName = '';
+let currentPresetDesc = '';
+
+// Ring colors keyed by scheme
+function defaultRingColor(index, scheme = 'standard', isCenter = false)
 {
-  // index 0,1 = rings 5,6 (white fill, black line, black labels)
-  // index 2-6 = rings 7,8,9,10,X (black fill, white line, white labels)
+  if (scheme === 'br')
+  {
+    if (isCenter)
+    {
+      // X dot: filled black so it's visible against the white center
+      return { fill: '#000000', line: '#000000', label: '#ffffff' };
+    }
+    // Other rings: white fill with black ring line and labels
+    return { fill: '#ffffff', line: '#000000', label: '#000000' };
+  }
+  // Standard NRA-style: rings 5,6 white; rings 7-X black
   if (index <= 1)
   {
     return { fill: '#ffffff', line: '#000000', label: '#000000' };
@@ -56,7 +56,9 @@ const LAYOUT_GRIDS = {
 // ── State ──
 let rings = []; // Array of { label, diameter, fillColor, lineColor, labelColor }
 
-const RINGS_STORAGE_KEY = 'target_gen_rings';
+// Bump suffix when the default color scheme or ring shape changes so users
+// pick up fresh defaults instead of stale cached data.
+const RINGS_STORAGE_KEY = 'target_gen_rings_v2';
 
 function saveRings()
 {
@@ -100,9 +102,10 @@ const orientationSelect = document.getElementById('orientation');
 const marginsInput = document.getElementById('margins');
 const showLabelsCheck = document.getElementById('showLabels');
 const showInfoCheck = document.getElementById('showInfo');
-const infoColorInput = document.getElementById('infoColor');
+const targetLabelColorInput = document.getElementById('targetLabelColor');
 const ringThicknessInput = document.getElementById('ringThickness');
 const targetLabelInput = document.getElementById('targetLabel');
+const printScaleInput = document.getElementById('printScale');
 const customPaperW = document.getElementById('customPaperW');
 const customPaperH = document.getElementById('customPaperH');
 const customPaperFields = document.querySelectorAll('.custom-paper-field');
@@ -121,9 +124,10 @@ const DEFAULT_PARAMS = {
   margins: '0.25',
   showLabels: true,
   showInfo: true,
-  infoColor: '#666666',
+  targetLabelColor: '#666666',
   ringThickness: '0.02',
   targetLabel: '',
+  printScale: '100',
   customPaperW: '8.5',
   customPaperH: '11'
 };
@@ -178,13 +182,65 @@ function getMargins()
 }
 
 // ── Ring Editor ──
+function populateTargetDropdown()
+{
+  const availableTargets = btk.Targets.listTargets();
+  const names = [];
+  for (let i = 0; i < availableTargets.size(); i++)
+  {
+    names.push(availableTargets.get(i));
+  }
+  availableTargets.delete();
+
+  presetSelect.innerHTML = '';
+  for (const name of names)
+  {
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    presetSelect.appendChild(option);
+  }
+  const customOption = document.createElement('option');
+  customOption.value = 'Custom';
+  customOption.textContent = 'Custom';
+  presetSelect.appendChild(customOption);
+}
+
+// Pull ring diameters (in inches) and metadata for a target from the C++ module.
+// ring numbers 5-10 are scoring rings (5 outermost), 11 is the X ring.
+function fetchTargetData(key)
+{
+  const target = btk.Targets.getTarget(key);
+  if (!target) return null;
+  // Round to 4 decimals to drop float round-trip noise from the meter conversion
+  // (e.g. 18.35in -> meters -> 18.350006in). 4 decimals preserves the IBS X dot
+  // (0.0625in) and other fractional sizes.
+  const toIn = (m) => parseFloat(btk.Conversions.metersToInches(m).toFixed(4));
+  const diameters = [];
+  for (let r = 5; r <= 10; r++)
+  {
+    diameters.push(toIn(target.getRingInnerDiameter(r)));
+  }
+  diameters.push(toIn(target.getRingInnerDiameter(11)));
+  const data = { name: target.getName(), desc: target.getDescription(), diameters };
+  target.delete();
+  return data;
+}
+
 function loadPreset(key)
 {
-  const preset = TARGET_PRESETS[key];
-  if (!preset) return;
-  rings = preset.rings.map((diam, i) =>
+  if (!btk || key === 'Custom') return;
+  const data = fetchTargetData(key);
+  if (!data) return;
+
+  currentPresetName = data.name;
+  currentPresetDesc = data.desc;
+
+  const scheme = BR_TARGETS.has(key) ? 'br' : 'standard';
+  rings = data.diameters.map((diam, i) =>
   {
-    const colors = defaultRingColor(i);
+    const isCenter = (i === data.diameters.length - 1);
+    const colors = defaultRingColor(i, scheme, isCenter);
     return {
       label: RING_LABELS[i],
       diameter: diam,
@@ -258,11 +314,18 @@ function onRingFieldChange(e)
   updatePreview();
 }
 
+function setCustomMode()
+{
+  presetSelect.value = 'Custom';
+  currentPresetName = '';
+  currentPresetDesc = '';
+}
+
 function onRemoveRing(e)
 {
   const idx = parseInt(e.target.dataset.idx);
   rings.splice(idx, 1);
-  presetSelect.value = 'Custom';
+  setCustomMode();
   rebuildRingEditor();
   saveRings();
   updatePreview();
@@ -278,7 +341,7 @@ function addRing()
     lineColor: colors.line,
     labelColor: colors.label
   });
-  presetSelect.value = 'Custom';
+  setCustomMode();
   rebuildRingEditor();
   saveRings();
   updatePreview();
@@ -286,7 +349,7 @@ function addRing()
 
 // ── Target Drawing ──
 // Renders target(s) onto a canvas context at a given scale (pixels per inch).
-function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, infoColor, targetLabel, ringThickness, presetKey, scale)
+function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, targetLabelColor, targetLabel, ringThickness, printScale, scale)
 {
   const [cols, rows] = layoutGrid;
   const usableW = paper.w - 2 * margin;
@@ -310,33 +373,31 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
     targetCtx.rect(cellX * scale, cellY * scale, cellW * scale, cellH * scale);
     targetCtx.clip();
 
-    // Compute uniform label font size based on the smallest ring gap
+    // Compute uniform label font size from the smallest gap between scoring rings.
+    // The center ring's own radius isn't a constraint -- if it's too tiny for a
+    // label (e.g. IBS X dot), we just skip the center label below.
     let labelFontSize = 0;
     if (showLabels && rings.length > 0)
     {
       let minGap = Infinity;
-      for (let i = 0; i < rings.length; i++)
+      for (let i = 0; i < rings.length - 1; i++)
       {
-        const r = rings[i].diameter / 2;
-        if (i === rings.length - 1)
-        {
-          // Center ring: available space is its own radius
-          minGap = Math.min(minGap, r);
-        }
-        else
-        {
-          const innerR = rings[i + 1].diameter / 2;
-          minGap = Math.min(minGap, r - innerR);
-        }
+        const r = (rings[i].diameter * printScale) / 2;
+        const innerR = (rings[i + 1].diameter * printScale) / 2;
+        minGap = Math.min(minGap, r - innerR);
       }
-      labelFontSize = Math.min(minGap * 0.5, 0.5);
+      if (rings.length === 1)
+      {
+        minGap = (rings[0].diameter * printScale) / 2;
+      }
+      labelFontSize = Math.min(minGap * 0.5, 0.5 * printScale);
     }
 
     // Draw rings outermost to innermost
     for (let i = 0; i < rings.length; i++)
     {
       const ring = rings[i];
-      const r = ring.diameter / 2;
+      const r = (ring.diameter * printScale) / 2;
 
       targetCtx.beginPath();
       targetCtx.arc(cx * scale, cy * scale, r * scale, 0, Math.PI * 2);
@@ -344,7 +405,7 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
       targetCtx.fill();
 
       // Stroke inward: offset radius so outer edge stays at the specified diameter
-      const lw = Math.max(ringThickness * scale, 0.5);
+      const lw = Math.max(ringThickness * printScale * scale, 0.5);
       const strokeR = r * scale - lw / 2;
       if (strokeR > 0)
       {
@@ -366,8 +427,11 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
 
         if (isCenter)
         {
-          // Center ring: label once in the middle
-          targetCtx.fillText(ring.label, cx * scale, cy * scale);
+          // Only draw the center label if the ring is large enough to hold it
+          if (r >= labelFontSize)
+          {
+            targetCtx.fillText(ring.label, cx * scale, cy * scale);
+          }
         }
         else
         {
@@ -375,7 +439,7 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
           let labelR = r;
           if (i < rings.length - 1)
           {
-            const innerR = rings[i + 1].diameter / 2;
+            const innerR = (rings[i + 1].diameter * printScale) / 2;
             labelR = (r + innerR) / 2;
           }
           targetCtx.fillText(ring.label, (cx + labelR) * scale, cy * scale);
@@ -399,11 +463,10 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
     // Target info text
     if (showInfo)
     {
-      const preset = TARGET_PRESETS[presetKey];
-      const autoText = preset ? `${preset.name} - ${preset.desc}` : 'Custom Target';
+      const autoText = currentPresetName ? `${currentPresetName} - ${currentPresetDesc}` : 'Custom Target';
       const infoText = targetLabel || autoText;
       const infoY = cellY + cellH - 0.15;
-      targetCtx.fillStyle = infoColor;
+      targetCtx.fillStyle = targetLabelColor;
       targetCtx.font = `bold ${Math.max(0.12 * scale, 6)}px Arial`;
       targetCtx.textAlign = 'center';
       targetCtx.textBaseline = 'middle';
@@ -444,7 +507,8 @@ function updatePreview()
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawTarget(ctx, paper, margin, layoutGrid, showLabels, showInfo, infoColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, presetSelect.value, scale);
+  const printScale = (parseFloat(printScaleInput.value) || 100) / 100;
+  drawTarget(ctx, paper, margin, layoutGrid, showLabels, showInfo, targetLabelColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, printScale, scale);
 
   // Paper border
   ctx.strokeStyle = '#ccc';
@@ -475,13 +539,13 @@ function printTarget()
   offCtx.fillStyle = '#ffffff';
   offCtx.fillRect(0, 0, pw, ph);
 
-  drawTarget(offCtx, paper, margin, layoutGrid, showLabels, showInfo, infoColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, presetSelect.value, dpi);
+  const printScale = (parseFloat(printScaleInput.value) || 100) / 100;
+  drawTarget(offCtx, paper, margin, layoutGrid, showLabels, showInfo, targetLabelColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, printScale, dpi);
 
   const dataUrl = offscreen.toDataURL('image/png');
 
   const printWindow = window.open('', '_blank');
-  const preset = TARGET_PRESETS[presetSelect.value];
-  const title = preset ? `${preset.name} - ${preset.desc}` : 'Custom Target';
+  const title = currentPresetName ? `${currentPresetName} - ${currentPresetDesc}` : 'Custom Target';
 
   printWindow.document.write(`
     <html>
@@ -523,7 +587,13 @@ function printTarget()
 // ── Event Listeners ──
 presetSelect.addEventListener('change', () =>
 {
-  if (presetSelect.value !== 'Custom')
+  if (presetSelect.value === 'Custom')
+  {
+    currentPresetName = '';
+    currentPresetDesc = '';
+    updatePreview();
+  }
+  else
   {
     loadPreset(presetSelect.value);
   }
@@ -543,9 +613,10 @@ orientationSelect.addEventListener('change', () => { updatePreview(); SettingsCo
 marginsInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 showLabelsCheck.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
 showInfoCheck.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
-infoColorInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
+targetLabelColorInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 ringThicknessInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 targetLabelInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
+printScaleInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 customPaperW.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 customPaperH.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 addRingBtn.addEventListener('click', addRing);
@@ -554,12 +625,22 @@ printBtn.addEventListener('click', printTarget);
 window.addEventListener('resize', updatePreview);
 
 // ── Initialize ──
-document.addEventListener('DOMContentLoaded', () =>
+document.addEventListener('DOMContentLoaded', async () =>
 {
   Utils.setupHelpModal('helpBtn', 'helpModal');
 
   setDefaultValues();
+
+  btk = await BallisticsToolkit();
+  populateTargetDropdown();
+
   SettingsCookies.loadAll();
+  // Defensive: if browser autofill or a stale cookie restored the placeholder
+  // text into the input value, clear it so the auto fallback works.
+  if (targetLabelInput.value === targetLabelInput.placeholder)
+  {
+    targetLabelInput.value = '';
+  }
   SettingsCookies.attachAutoSave();
 
   // Show/hide custom paper fields
@@ -571,12 +652,22 @@ document.addEventListener('DOMContentLoaded', () =>
   if (restoredRings)
   {
     rebuildRingEditor();
+    // Sync preset metadata for the info text without overwriting saved rings
+    if (presetSelect.value && presetSelect.value !== 'Custom')
+    {
+      const data = fetchTargetData(presetSelect.value);
+      if (data)
+      {
+        currentPresetName = data.name;
+        currentPresetDesc = data.desc;
+      }
+    }
     updatePreview();
   }
   else
   {
-    const presetKey = presetSelect.value || 'SR-1';
-    loadPreset(presetKey !== 'Custom' ? presetKey : 'SR-1');
+    const presetKey = presetSelect.value && presetSelect.value !== 'Custom' ? presetSelect.value : 'SR-1';
+    loadPreset(presetKey);
   }
 
   document.getElementById('resetDefaults').addEventListener('click', (e) =>

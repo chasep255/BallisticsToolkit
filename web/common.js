@@ -229,11 +229,11 @@ function generateNavigation(currentPageName)
                 ${link('load-comp/load-comp.html', 'load-comp', 'Load Comp', 'Load Comparison')}
                 ${link('perf-matrix/perf-matrix.html', 'perf-matrix', 'Perf Matrix', 'Performance Matrix')}
                 ${link('target-sim/target-sim.html', 'target-sim', 'Target Sim', 'Target Simulator')}
+                ${link('target-gen/target-gen.html', 'target-gen', 'Target Gen', 'Target Generator')}
                 ${link('hit-prob/hit-prob.html', 'hit-prob', 'Hit Sim', 'Hit Simulator')}
                 ${link('wind-sim/wind-sim.html', 'wind-sim', 'Wind Sim', 'Wind Simulator')}
                 ${link('steel-sim/steel-sim.html', 'steel-sim', 'Steel Sim', 'Steel Simulator')}
                 ${link('fclass-sim/fclass-sim.html', 'fclass-sim', 'F-Class Sim', 'F-Class Simulator')}
-                ${link('target-gen/target-gen.html', 'target-gen', 'Target Gen', 'Target Generator')}
             </div>
         </div>
     `;

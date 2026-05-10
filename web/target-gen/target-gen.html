@@ -54,19 +54,19 @@
 
         <!-- Top Parameters Bar -->
         <div class="params-bar">
-            <div class="param-item"><label for="targetPreset">Target</label><select id="targetPreset"><option value="SR">SR</option><option value="SR-3">SR-3</option><option value="SR-1">SR-1</option><option value="SR-21">SR-21</option><option value="MR-63">MR-63</option><option value="MR-65">MR-65</option><option value="MR-1">MR-1</option><option value="MR-31">MR-31</option><option value="MR-52">MR-52</option><option value="MR-63FCA">MR-63FCA</option><option value="MR-65FCA">MR-65FCA</option><option value="MR-1FCA">MR-1FCA</option><option value="LR">LR</option><option value="LR-FCA">LR-FCA</option><option value="Custom">Custom</option></select></div>
+            <div class="param-item"><label for="targetPreset">Target</label><select id="targetPreset"></select></div>
             <div class="param-item"><label for="paperSize">Paper Size</label><select id="paperSize"><option value="letter">Letter (8.5 x 11)</option><option value="legal">Legal (8.5 x 14)</option><option value="tabloid">Tabloid (11 x 17)</option><option value="a4">A4 (210 x 297 mm)</option><option value="a3">A3 (297 x 420 mm)</option><option value="custom">Custom</option></select></div>
             <div class="param-item custom-paper-field" style="display: none;"><label for="customPaperW">Paper W (in)</label><input type="number" id="customPaperW" value="8.5" step="0.1" min="1"></div>
             <div class="param-item custom-paper-field" style="display: none;"><label for="customPaperH">Paper H (in)</label><input type="number" id="customPaperH" value="11" step="0.1" min="1"></div>
             <div class="param-item"><label for="layout">Layout</label><select id="layout"><option value="1">1-up (full page)</option><option value="2">2-up (1x2)</option><option value="4">4-up (2x2)</option><option value="6">6-up (2x3)</option></select></div>
             <div class="param-item"><label for="orientation">Orientation</label><select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div>
             <div class="param-item"><label for="margins">Margins (in)</label><input type="number" id="margins" value="0.25" step="0.05" min="0" max="2"></div>
+            <div class="param-item"><label for="printScale">Print Scale (%)</label><input type="number" id="printScale" value="100" step="0.1" min="1" title="Print, measure a known ring, then set scale = (expected / measured) × 100 to calibrate your printer. Also useful for making reduced-size targets (e.g. 50)."></div>
             <div class="param-item" style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="showLabels" checked style="width: auto; margin: 0;"><label for="showLabels" style="margin: 0; font-weight: normal;">Show Labels</label></div>
             <div class="param-item" style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="showInfo" checked style="width: auto; margin: 0;"><label for="showInfo" style="margin: 0; font-weight: normal;">Show Info</label></div>
-
-            <div class="param-item"><label for="infoColor">Info Color</label><input type="color" id="infoColor" value="#666666"></div>
             <div class="param-item"><label for="ringThickness">Ring Line (in)</label><input type="number" id="ringThickness" value="0.02" step="0.005" min="0.005" max="0.25"></div>
-            <div class="param-item"><label for="targetLabel">Target Label</label><input type="text" id="targetLabel" value="" placeholder="Auto"></div>
+            <div class="param-item"><label for="targetLabel">Target Label</label><input type="text" id="targetLabel" value="" placeholder="Auto" autocomplete="off"></div>
+            <div class="param-item"><label for="targetLabelColor">Target Label Color</label><input type="color" id="targetLabelColor" value="#666666"></div>
             <div class="param-item" style="display: flex; align-items: center;"><a href="#" id="resetDefaults" style="color: #007bff; text-decoration: none; font-size: 13px; cursor: pointer;" title="Reset all parameters to default values">Reset to Defaults</a></div>
         </div>
 
