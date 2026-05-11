@@ -195,9 +195,12 @@ function populateTargetDropdown()
   presetSelect.innerHTML = '';
   for (const name of names)
   {
+    const t = btk.Targets.getTarget(name);
+    const desc = t.getDescription();
+    t.delete();
     const option = document.createElement('option');
     option.value = name;
-    option.textContent = name;
+    option.textContent = `${name} — ${desc}`;
     presetSelect.appendChild(option);
   }
   const customOption = document.createElement('option');
@@ -484,8 +487,6 @@ function updatePreview()
   const showLabels = showLabelsCheck.checked;
   const showInfo = showInfoCheck.checked;
 
-  // Scale to fit in preview area, supersampled for sharp rendering
-  const dpr = window.devicePixelRatio || 1;
   const maxCanvasW = Math.min(window.innerWidth - 100, 800);
   const maxCanvasH = Math.min(window.innerHeight - 300, 900);
   const scaleW = maxCanvasW / paper.w;
@@ -495,13 +496,15 @@ function updatePreview()
   const cw = Math.round(paper.w * cssScale);
   const ch = Math.round(paper.h * cssScale);
 
-  // Set canvas backing store at higher resolution for antialiasing
-  canvas.width = cw * dpr;
-  canvas.height = ch * dpr;
+  // Render at ≥2× CSS pixels so the browser's downscaling acts as a box filter.
+  // On HiDPI screens dpr is already ≥2; on 1× screens we force 2× supersampling.
+  const pixelRatio = Math.max(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(cw * pixelRatio);
+  canvas.height = Math.round(ch * pixelRatio);
   canvas.style.width = cw + 'px';
   canvas.style.height = ch + 'px';
 
-  const scale = cssScale * dpr;
+  const scale = cssScale * pixelRatio;
 
   // White paper background
   ctx.fillStyle = '#ffffff';
@@ -512,7 +515,7 @@ function updatePreview()
 
   // Paper border
   ctx.strokeStyle = '#ccc';
-  ctx.lineWidth = dpr;
+  ctx.lineWidth = pixelRatio;
   ctx.strokeRect(0, 0, canvas.width, canvas.height);
 }
 
@@ -633,6 +636,7 @@ document.addEventListener('DOMContentLoaded', async () =>
 
   btk = await BallisticsToolkit();
   populateTargetDropdown();
+  presetSelect.value = DEFAULT_PARAMS.targetPreset; // apply default now that options exist
 
   SettingsCookies.loadAll();
   // Defensive: if browser autofill or a stale cookie restored the placeholder

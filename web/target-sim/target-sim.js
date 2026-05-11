@@ -191,9 +191,12 @@ class TargetSimulator
       const targetName = availableTargets.get(i);
       targetNames.push(targetName);
 
+      const t = btk.Targets.getTarget(targetName);
+      const desc = t.getDescription();
+      t.delete();
       const option = document.createElement('option');
       option.value = targetName;
-      option.textContent = targetName;
+      option.textContent = `${targetName} — ${desc}`;
       targetSelect.appendChild(option);
     }
 
