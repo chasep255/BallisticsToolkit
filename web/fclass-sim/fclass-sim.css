@@ -128,7 +128,7 @@
   gap: 12px;
 }
 
-.param-item {
+.match-params-grid .param-item {
   display: flex;
   align-items: center;
   gap: 8px;
