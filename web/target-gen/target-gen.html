@@ -58,7 +58,7 @@
             <div class="param-item"><label for="paperSize">Paper Size</label><select id="paperSize"><option value="letter">Letter (8.5 x 11)</option><option value="legal">Legal (8.5 x 14)</option><option value="tabloid">Tabloid (11 x 17)</option><option value="a4">A4 (210 x 297 mm)</option><option value="a3">A3 (297 x 420 mm)</option><option value="custom">Custom</option></select></div>
             <div class="param-item custom-paper-field" style="display: none;"><label for="customPaperW">Paper W (in)</label><input type="number" id="customPaperW" value="8.5" step="0.1" min="1"></div>
             <div class="param-item custom-paper-field" style="display: none;"><label for="customPaperH">Paper H (in)</label><input type="number" id="customPaperH" value="11" step="0.1" min="1"></div>
-            <div class="param-item"><label for="layout">Layout</label><select id="layout"><option value="1">1-up (full page)</option><option value="2">2-up (1x2)</option><option value="4">4-up (2x2)</option><option value="6">6-up (2x3)</option></select></div>
+            <div class="param-item"><label>Layout</label><div style="display:flex;align-items:center;gap:4px"><input type="number" id="layoutCols" value="1" min="1" max="20" step="1" style="width:3.5em" title="Columns"><span style="color:#666;font-size:13px">×</span><input type="number" id="layoutRows" value="1" min="1" max="20" step="1" style="width:3.5em" title="Rows"></div></div>
             <div class="param-item"><label for="orientation">Orientation</label><select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div>
             <div class="param-item"><label for="margins">Margins (in)</label><input type="number" id="margins" value="0.25" step="0.05" min="0" max="2"></div>
             <div class="param-item"><label for="printScale">Print Scale (%)</label><input type="number" id="printScale" value="100" step="0.1" min="1" title="Print, measure a known ring, then set scale = (expected / measured) × 100 to calibrate your printer. Also useful for making reduced-size targets (e.g. 50)."></div>
@@ -142,7 +142,7 @@
                     <h3>Print Settings</h3>
                     <div class="param-help">
                         <p><strong>Paper Size:</strong> Standard paper sizes or custom dimensions. All ring dimensions are printed at exact physical size (1:1 scale).</p>
-                        <p><strong>Layout:</strong> Tile multiple targets on one page. 2-up stacks two vertically, 4-up creates a 2x2 grid, 6-up creates a 2x3 grid. Each target is centered and clipped within its cell.</p>
+                        <p><strong>Cols / Rows:</strong> Number of columns and rows to tile on one page. Set both to 1 for a single full-page target; use e.g. 2 cols × 3 rows for six targets per page. Each target is centered and clipped within its cell.</p>
                         <p><strong>Margins:</strong> Page margins in inches. Applies to all edges.</p>
                         <p><strong>Show Ring Labels:</strong> Display ring numbers at the left and right of each ring boundary.</p>
                         <p><strong>Show Target Info:</strong> Display target name and description below each target.</p>

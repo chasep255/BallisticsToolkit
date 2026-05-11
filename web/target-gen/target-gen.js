@@ -45,13 +45,6 @@ const PAPER_SIZES = {
   a3:      { w: 11.692, h: 16.535 }
 };
 
-// Layout grid definitions: [cols, rows]
-const LAYOUT_GRIDS = {
-  '1': [1, 1],
-  '2': [1, 2],
-  '4': [2, 2],
-  '6': [2, 3]
-};
 
 // ── State ──
 let rings = []; // Array of { label, diameter, fillColor, lineColor, labelColor }
@@ -97,7 +90,8 @@ function loadRings()
 // ── DOM refs ──
 const presetSelect = document.getElementById('targetPreset');
 const paperSelect = document.getElementById('paperSize');
-const layoutSelect = document.getElementById('layout');
+const layoutColsInput = document.getElementById('layoutCols');
+const layoutRowsInput = document.getElementById('layoutRows');
 const orientationSelect = document.getElementById('orientation');
 const marginsInput = document.getElementById('margins');
 const showLabelsCheck = document.getElementById('showLabels');
@@ -119,7 +113,8 @@ const ctx = canvas.getContext('2d');
 const DEFAULT_PARAMS = {
   targetPreset: 'SR-1',
   paperSize: 'letter',
-  layout: '1',
+  layoutCols: '1',
+  layoutRows: '1',
   orientation: 'portrait',
   margins: '0.25',
   showLabels: true,
@@ -173,7 +168,9 @@ function getPaperSize()
 
 function getLayoutGrid()
 {
-  return LAYOUT_GRIDS[layoutSelect.value] || [1, 1];
+  const cols = Math.max(1, parseInt(layoutColsInput.value) || 1);
+  const rows = Math.max(1, parseInt(layoutRowsInput.value) || 1);
+  return [cols, rows];
 }
 
 function getMargins()
@@ -611,7 +608,8 @@ paperSelect.addEventListener('change', () =>
   SettingsCookies.saveAll();
 });
 
-layoutSelect.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
+layoutColsInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
+layoutRowsInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 orientationSelect.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
 marginsInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 showLabelsCheck.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
