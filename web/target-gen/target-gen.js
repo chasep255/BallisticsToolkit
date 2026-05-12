@@ -473,6 +473,13 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
       targetCtx.fillText(infoText, cx * scale, infoY * scale);
     }
   }
+
+  // Watermark — bottom-right corner of the page
+  targetCtx.fillStyle = '#aaaaaa';
+  targetCtx.font = `${Math.max(0.09 * scale, 5)}px Arial`;
+  targetCtx.textAlign = 'right';
+  targetCtx.textBaseline = 'bottom';
+  targetCtx.fillText('www.ballisticstoolkit.com', (paper.w - margin * 0.5) * scale, (paper.h - margin * 0.25) * scale);
 }
 
 // ── Canvas Preview ──
