@@ -47,6 +47,12 @@
     text-align: center;
 }
 
+.ring-editor-table td input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    cursor: pointer;
+}
+
 .ring-editor-table .ring-label-cell {
     font-weight: 600;
     min-width: 40px;

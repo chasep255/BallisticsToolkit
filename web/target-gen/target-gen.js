@@ -75,7 +75,7 @@ function loadRings()
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0)
       {
-        rings = parsed;
+        rings = parsed.map(r => ({ showLabel: true, ...r }));
         return true;
       }
     }
@@ -94,7 +94,6 @@ const layoutColsInput = document.getElementById('layoutCols');
 const layoutRowsInput = document.getElementById('layoutRows');
 const orientationSelect = document.getElementById('orientation');
 const marginsInput = document.getElementById('margins');
-const showLabelsCheck = document.getElementById('showLabels');
 const showInfoCheck = document.getElementById('showInfo');
 const targetLabelColorInput = document.getElementById('targetLabelColor');
 const ringThicknessInput = document.getElementById('ringThickness');
@@ -117,7 +116,6 @@ const DEFAULT_PARAMS = {
   layoutRows: '1',
   orientation: 'portrait',
   margins: '0.25',
-  showLabels: true,
   showInfo: true,
   targetLabelColor: '#666666',
   ringThickness: '0.02',
@@ -243,6 +241,7 @@ function loadPreset(key)
     const colors = defaultRingColor(i, scheme, isCenter);
     return {
       label: RING_LABELS[i],
+      showLabel: true,
       diameter: diam,
       fillColor: colors.fill,
       lineColor: colors.line,
@@ -262,6 +261,7 @@ function rebuildRingEditor()
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="ring-label-cell">
+        <input type="checkbox" ${ring.showLabel !== false ? 'checked' : ''} data-idx="${i}" data-field="showLabel" title="Show label on target">
         <input type="text" value="${ring.label}" data-idx="${i}" data-field="label">
       </td>
       <td>
@@ -286,7 +286,8 @@ function rebuildRingEditor()
   // Attach listeners
   ringEditorBody.querySelectorAll('input').forEach(inp =>
   {
-    inp.addEventListener('input', onRingFieldChange);
+    const evt = inp.type === 'checkbox' ? 'change' : 'input';
+    inp.addEventListener(evt, onRingFieldChange);
   });
   ringEditorBody.querySelectorAll('.btn-remove-ring').forEach(btn =>
   {
@@ -305,6 +306,10 @@ function onRingFieldChange(e)
   else if (field === 'label')
   {
     rings[idx].label = e.target.value;
+  }
+  else if (field === 'showLabel')
+  {
+    rings[idx].showLabel = e.target.checked;
   }
   else
   {
@@ -336,6 +341,7 @@ function addRing()
   const colors = defaultRingColor(rings.length);
   rings.push({
     label: String(rings.length + 1),
+    showLabel: true,
     diameter: 5,
     fillColor: colors.fill,
     lineColor: colors.line,
@@ -349,7 +355,7 @@ function addRing()
 
 // ── Target Drawing ──
 // Renders target(s) onto a canvas context at a given scale (pixels per inch).
-function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, targetLabelColor, targetLabel, ringThickness, printScale, scale)
+function drawTarget(targetCtx, paper, margin, layoutGrid, showInfo, targetLabelColor, targetLabel, ringThickness, printScale, scale)
 {
   const [cols, rows] = layoutGrid;
   const usableW = paper.w - 2 * margin;
@@ -377,7 +383,7 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
     // The center ring's own radius isn't a constraint -- if it's too tiny for a
     // label (e.g. IBS X dot), we just skip the center label below.
     let labelFontSize = 0;
-    if (showLabels && rings.length > 0)
+    if (rings.some(r => r.showLabel !== false) && rings.length > 0)
     {
       let minGap = Infinity;
       for (let i = 0; i < rings.length - 1; i++)
@@ -417,7 +423,7 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
       }
 
       // Ring labels (uniform size for all rings)
-      if (showLabels && labelFontSize >= 0.08)
+      if (ring.showLabel !== false && labelFontSize >= 0.08)
       {
         const isCenter = (i === rings.length - 1);
         targetCtx.fillStyle = ring.labelColor;
@@ -475,7 +481,7 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showLabels, showInfo, 
   }
 
   // Watermark — bottom-right corner of the page
-  targetCtx.fillStyle = '#aaaaaa';
+  targetCtx.fillStyle = '#888888';
   targetCtx.font = `${Math.max(0.09 * scale, 5)}px Arial`;
   targetCtx.textAlign = 'right';
   targetCtx.textBaseline = 'bottom';
@@ -488,7 +494,6 @@ function updatePreview()
   const paper = getPaperSize();
   const margin = getMargins();
   const layoutGrid = getLayoutGrid();
-  const showLabels = showLabelsCheck.checked;
   const showInfo = showInfoCheck.checked;
 
   const maxCanvasW = Math.min(window.innerWidth - 100, 800);
@@ -515,7 +520,7 @@ function updatePreview()
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const printScale = (parseFloat(printScaleInput.value) || 100) / 100;
-  drawTarget(ctx, paper, margin, layoutGrid, showLabels, showInfo, targetLabelColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, printScale, scale);
+  drawTarget(ctx, paper, margin, layoutGrid, showInfo, targetLabelColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, printScale, scale);
 
   // Paper border
   ctx.strokeStyle = '#ccc';
@@ -529,7 +534,6 @@ function printTarget()
   const paper = getPaperSize();
   const margin = getMargins();
   const layoutGrid = getLayoutGrid();
-  const showLabels = showLabelsCheck.checked;
   const showInfo = showInfoCheck.checked;
 
   // Render at 300 DPI for crisp print output
@@ -547,7 +551,7 @@ function printTarget()
   offCtx.fillRect(0, 0, pw, ph);
 
   const printScale = (parseFloat(printScaleInput.value) || 100) / 100;
-  drawTarget(offCtx, paper, margin, layoutGrid, showLabels, showInfo, targetLabelColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, printScale, dpi);
+  drawTarget(offCtx, paper, margin, layoutGrid, showInfo, targetLabelColorInput.value, targetLabelInput.value.trim(), parseFloat(ringThicknessInput.value) || 0.02, printScale, dpi);
 
   const dataUrl = offscreen.toDataURL('image/png');
 
@@ -619,7 +623,6 @@ layoutColsInput.addEventListener('input', () => { updatePreview(); SettingsCooki
 layoutRowsInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 orientationSelect.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
 marginsInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
-showLabelsCheck.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
 showInfoCheck.addEventListener('change', () => { updatePreview(); SettingsCookies.saveAll(); });
 targetLabelColorInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });
 ringThicknessInput.addEventListener('input', () => { updatePreview(); SettingsCookies.saveAll(); });

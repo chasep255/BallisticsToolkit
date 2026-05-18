@@ -62,9 +62,8 @@
             <div class="param-item"><label for="orientation">Orientation</label><select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div>
             <div class="param-item"><label for="margins">Margins (in)</label><input type="number" id="margins" value="0.25" step="0.05" min="0" max="2"></div>
             <div class="param-item"><label for="printScale">Print Scale (%)</label><input type="number" id="printScale" value="100" step="0.1" min="1" title="Print, measure a known ring, then set scale = (expected / measured) × 100 to calibrate your printer. Also useful for making reduced-size targets (e.g. 50)."></div>
-            <div class="param-item" style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="showLabels" checked style="width: auto; margin: 0;"><label for="showLabels" style="margin: 0; font-weight: normal;">Show Labels</label></div>
-            <div class="param-item" style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="showInfo" checked style="width: auto; margin: 0;"><label for="showInfo" style="margin: 0; font-weight: normal;">Show Info</label></div>
             <div class="param-item"><label for="ringThickness">Ring Line (in)</label><input type="number" id="ringThickness" value="0.02" step="0.005" min="0.005" max="0.25"></div>
+            <div class="param-item" style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="showInfo" checked style="width: auto; margin: 0;"><label for="showInfo" style="margin: 0; font-weight: normal;">Show Target Label</label></div>
             <div class="param-item"><label for="targetLabel">Target Label</label><input type="text" id="targetLabel" value="" placeholder="Auto" autocomplete="off"></div>
             <div class="param-item"><label for="targetLabelColor">Target Label Color</label><input type="color" id="targetLabelColor" value="#666666"></div>
             <div class="param-item" style="display: flex; align-items: center;"><a href="#" id="resetDefaults" style="color: #007bff; text-decoration: none; font-size: 13px; cursor: pointer;" title="Reset all parameters to default values">Reset to Defaults</a></div>
@@ -144,8 +143,8 @@
                         <p><strong>Paper Size:</strong> Standard paper sizes or custom dimensions. All ring dimensions are printed at exact physical size (1:1 scale).</p>
                         <p><strong>Cols / Rows:</strong> Number of columns and rows to tile on one page. Set both to 1 for a single full-page target; use e.g. 2 cols × 3 rows for six targets per page. Each target is centered and clipped within its cell.</p>
                         <p><strong>Margins:</strong> Page margins in inches. Applies to all edges.</p>
-                        <p><strong>Show Ring Labels:</strong> Display ring numbers at the left and right of each ring boundary.</p>
-                        <p><strong>Show Target Info:</strong> Display target name and description below each target.</p>
+                        <p><strong>Ring (Ring Editor):</strong> Checkbox to the left of each ring name controls whether that ring's label is shown on the target.</p>
+                        <p><strong>Show Target Label:</strong> Display the target name and description below each target.</p>
                     </div>
                 </div>
                 <div class="help-section">
