@@ -65,6 +65,13 @@
     <!-- Parameters -->
     <div class="params-bar">
       <div class="param-item"><label for="graphicsPreset" title="Graphics quality preset">Graphics</label><select id="graphicsPreset" title="Graphics quality preset"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
+      <div class="param-item"><label for="matchMode" title="Match format: Standard (relays) or Pair Fire (two players, alternating)">Mode</label><select id="matchMode" title="Match format"><option value="standard" selected>Standard</option><option value="pair">Pair Fire</option></select></div>
+      <div class="param-item standard-config"><label for="relays" title="Number of relays in a standard match">Relays</label><input type="number" id="relays" value="3" step="1" min="1" max="10" title="Number of relays"></div>
+      <div class="param-item standard-config"><label for="shotsPerRelay" title="Record shots per relay">Shots/Relay</label><input type="number" id="shotsPerRelay" value="20" step="1" min="1" max="100" title="Record shots per relay"></div>
+      <div class="param-item standard-config"><label for="minutesPerRelay" title="Time limit per relay in minutes">Time/Relay (min)</label><input type="number" id="minutesPerRelay" value="20" step="1" min="1" max="120" title="Minutes per relay"></div>
+      <div class="param-item pair-config"><label for="player1Name" title="Right shooter (fires first)">Player 1 (Right)</label><input type="text" id="player1Name" value="Player1" maxlength="16" title="Right shooter name"></div>
+      <div class="param-item pair-config"><label for="player2Name" title="Left shooter (fires second)">Player 2 (Left)</label><input type="text" id="player2Name" value="Player2" maxlength="16" title="Left shooter name"></div>
+      <div class="param-item pair-config"><label for="turnTime" title="Per-turn time limit (no global clock). Running out scores a zero.">Time/Turn</label><select id="turnTime" title="Per-turn time limit"><option value="unlimited" selected>Unlimited</option><option value="30">30s</option><option value="45">45s</option><option value="60">60s</option><option value="90">90s</option></select></div>
       <div class="param-item"><label for="fclassMode" title="Target distance and type">Range</label><select id="fclassMode" title="Target distance and type"><option value="fclass-300">300 yards</option><option value="fclass-500">500 yards</option><option value="fclass-600">600 yards</option><option value="fclass-800">800 yards</option><option value="fclass-900">900 yards</option><option value="fclass-1000" selected>1000 yards</option></select></div>
       <div class="param-item"><label for="windPreset" title="Wind conditions">Wind</label><select id="windPreset" title="Wind conditions"><!-- populated dynamically --></select></div>
       <div class="param-item"><label for="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom">Reticle</label><select id="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom"><option value="SFP" selected>SFP (Fixed)</option><option value="FFP">FFP (Scaling)</option></select></div>
@@ -88,6 +95,7 @@
       <button id="restartBtn" class="btn btn-secondary" style="display: none;">Restart</button>
       <button id="scorecardBtn" class="btn btn-secondary" style="display: none;">Scorecard</button>
       <button id="goForRecordBtn" class="btn btn-secondary" style="display: none;">Go For Record</button>
+      <button id="convertSighterBtn" class="btn btn-secondary" style="display: none;">Convert Sighter</button>
       <button id="windHUDBtn" class="btn btn-secondary" style="display: none;">Wind HUD</button>
       <button id="helpBtn" class="btn btn-secondary">Help</button>
     </div>
@@ -170,7 +178,8 @@
             - <strong>Pause/Resume:</strong> Pause/resume match timer and audio<br>
             - <strong>Restart:</strong> Restart match (with confirmation)<br>
             - <strong>Scorecard:</strong> View detailed per-relay scores and parameters<br>
-            - <strong>Go For Record:</strong> End sighters phase early in current relay<br>
+            - <strong>Go For Record:</strong> End sighters phase early<br>
+            - <strong>Convert Sighter:</strong> (Pair Fire) Count your last sighter as your first record shot<br>
             - <strong>Wind HUD:</strong> Toggle wind field visualization on/off
           </div>
         </div>
@@ -221,17 +230,26 @@
         <div class="help-section">
           <h3>Match Structure</h3>
           <div class="param-help">
-            <strong>Format:</strong><br>
-            - 3 relays, 20 minutes each<br>
-            - 20 record shots per relay (60 total)<br>
-            - Relay 1: unlimited sighters<br>
-            - Relays 2-3: 2 sighters each<br><br>
-            
-            <strong>Flow:</strong><br>
-            - Use "Go For Record" button to end sighters phase early<br>
-            - Relay ends at 20 record shots OR time expires<br>
-            - Acknowledge relay-complete dialog to proceed to next relay<br>
-            - Rifle disabled while target is down (changing/marking)<br>
+            <strong>Mode (parameter bar):</strong> choose <em>Standard</em> or <em>Pair Fire</em>.<br><br>
+
+            <strong>Standard:</strong><br>
+            - Configurable: number of relays, record shots per relay, and minutes per relay (defaults 3 / 20 / 20)<br>
+            - Relay 1: unlimited sighters; later relays: 2 sighters each<br>
+            - Use "Go For Record" to end the sighters phase early<br>
+            - A relay ends at the record-shot count OR when time expires<br>
+            - Acknowledge the relay-complete dialog to start the next relay<br><br>
+
+            <strong>Pair Fire (V2-Finale style):</strong><br>
+            - Two human players share one keyboard and one target<br>
+            - Player 1 (right) shoots first, then Player 2 (left), alternating<br>
+            - Each player: 2 convertible sighters, then 10 record shots<br>
+            - "Go For Record" ends sighters; "Convert Sighter" turns your last sighter into your first record shot<br>
+            - Time/Turn limits each shot (or Unlimited); running out scores a zero for that shot<br>
+            - The HUD shows whose turn it is and that player's clock<br>
+            - Tiebreak: highest total, then most Xs, then sudden death (an X beats a non-X 10)<br>
+            - Each player keeps their own scope dial / aim / zoom across turns<br><br>
+
+            <strong>Both modes:</strong> the rifle is disabled while the target is down (changing/marking).
           </div>
         </div>
         

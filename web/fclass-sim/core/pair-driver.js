@@ -1,0 +1,470 @@
+/**
+ * PairFireDriver - V2-Finale-style pair fire for two hot-seat human players.
+ *
+ * Both players share one target and alternate single shots. P1 ("right") shoots
+ * first, then P2 ("left"), back and forth. Each player gets up to 2 convertible
+ * sighters followed by 10 record shots. A per-turn timer (or unlimited) limits
+ * each shot; running out scores a zero for that shot.
+ *
+ * Tiebreak after both players finish their record shots:
+ *   1. Higher record total wins.
+ *   2. If tied, higher X-count wins.
+ *   3. If still tied, sudden death: one alternating shot each; higher score wins,
+ *      an X beats a non-X 10; otherwise repeat.
+ */
+import { MatchDriver } from './match-driver.js';
+
+const LOG_PREFIX = '[PairDriver]';
+
+export class PairFireDriver extends MatchDriver
+{
+  /**
+   * @param {Object} config
+   * @param {string} config.player1Name   default 'Player1'
+   * @param {string} config.player2Name   default 'Player2'
+   * @param {number|null} config.turnSeconds  per-turn time limit, or null for unlimited
+   * @param {number} config.recordShots    record shots per player (default 10)
+   * @param {number} config.sighters       convertible sighters per player (default 2)
+   */
+  constructor(config = {})
+  {
+    super();
+
+    this.recordShots = config.recordShots || 10;
+    this.sighterCap = config.sighters ?? 2;
+    this.turnSeconds = (config.turnSeconds === null || config.turnSeconds === undefined) ? null : config.turnSeconds;
+
+    this.players = {
+      p1: this.makePlayer(config.player1Name || 'Player1'),
+      p2: this.makePlayer(config.player2Name || 'Player2')
+    };
+
+    this.active = 'p1'; // P1 (right) shoots first
+    this.suddenDeath = false;
+    this.complete = false;
+    this.winner = null;
+
+    // Per-turn timer state
+    this.turnRemaining = this.turnSeconds;
+    this.turnStartTime = null;
+    this.turnTimerRunning = false;
+
+    // One-shot "animate a miss" signal for turn timeouts
+    this._timeoutPending = null;
+
+    console.log(`${LOG_PREFIX} ${this.players.p1.name} vs ${this.players.p2.name}, ` +
+      `${this.recordShots} record + ${this.sighterCap} sighters, ` +
+      `turn ${this.turnSeconds === null ? 'unlimited' : this.turnSeconds + 's'}`);
+  }
+
+  makePlayer(name)
+  {
+    return {
+      name: name,
+      phase: 'sighters', // 'sighters' | 'record'
+      sightersFired: 0,
+      recordShotsFired: 0
+    };
+  }
+
+  other(id)
+  {
+    return id === 'p1' ? 'p2' : 'p1';
+  }
+
+  // ===== Lifecycle =====
+
+  start(now)
+  {
+    // Timer starts via onTargetReady once the target is confirmed up.
+  }
+
+  onTargetReady(now)
+  {
+    if (this.complete)
+    {
+      this.turnTimerRunning = false;
+      return;
+    }
+
+    if (this.turnSeconds === null)
+    {
+      this.turnTimerRunning = false;
+      this.turnRemaining = null;
+      return;
+    }
+
+    this.turnStartTime = now;
+    this.turnRemaining = this.turnSeconds;
+    this.turnTimerRunning = true;
+  }
+
+  tick(now)
+  {
+    if (!this.turnTimerRunning || this.turnSeconds === null || this.complete)
+    {
+      return;
+    }
+
+    this.turnRemaining = Math.max(0, this.turnSeconds - (now - this.turnStartTime));
+    if (this.turnRemaining <= 0)
+    {
+      this.handleTimeout(now);
+    }
+  }
+
+  isRunning()
+  {
+    return !this.complete;
+  }
+
+  isComplete()
+  {
+    return this.complete;
+  }
+
+  // ===== Firing =====
+
+  canFire()
+  {
+    return !this.complete;
+  }
+
+  onShotFired(now)
+  {
+    // Stop the turn clock at trigger pull; it restarts when the target is ready again.
+    this.turnTimerRunning = false;
+  }
+
+  onShotScored(shotData, now)
+  {
+    this.logShot(this.active, shotData, false);
+    this.afterShot(now);
+  }
+
+  handleTimeout(now)
+  {
+    console.log(`${LOG_PREFIX} ${this.players[this.active].name} timed out - scoring zero`);
+    this.turnTimerRunning = false;
+
+    // Request a miss animation (kept separate from the completion event slot).
+    this._timeoutPending = { relativeX: 0, relativeY: 0 };
+
+    // A timeout scores a zero (miss) for the active shooter's current shot.
+    this.logShot(this.active, { score: 0, isX: false, mvFps: null, impactVelocityFps: null }, true);
+    this.afterShot(now);
+  }
+
+  consumeTimeout()
+  {
+    const timeout = this._timeoutPending;
+    this._timeoutPending = null;
+    return timeout;
+  }
+
+  /**
+   * Append a shot to the log with correct classification for the given player.
+   * @param {boolean} forceRecord true for timeout zeroes (always a record shot)
+   */
+  logShot(playerId, shotData, forceRecord)
+  {
+    const player = this.players[playerId];
+    let isSighter = false;
+    let suddenDeath = false;
+
+    if (this.suddenDeath)
+    {
+      suddenDeath = true;
+    }
+    else if (!forceRecord && player.phase === 'sighters' && player.sightersFired < this.sighterCap)
+    {
+      isSighter = true;
+    }
+
+    if (isSighter)
+    {
+      player.sightersFired++;
+    }
+    else if (!suddenDeath)
+    {
+      player.phase = 'record';
+      player.recordShotsFired++;
+    }
+
+    this.shotLog.push({
+      player: playerId,
+      relay: playerId === 'p1' ? 1 : 2, // map to scorecard sections (P1 -> 1, P2 -> 2)
+      isSighter: isSighter,
+      recordIndex: (!isSighter && !suddenDeath) ? player.recordShotsFired : null,
+      score: shotData.score,
+      isX: shotData.isX,
+      mvFps: shotData.mvFps,
+      impactVelocityFps: shotData.impactVelocityFps,
+      timeSec: 0,
+      suddenDeath: suddenDeath
+    });
+  }
+
+  /** Advance the turn (skipping a finished player) and evaluate completion. */
+  afterShot(now)
+  {
+    this.advanceTurn();
+    this.evaluateState(now);
+  }
+
+  /**
+   * Choose who shoots next. Players take their shots independently (sighters and
+   * conversions mean they may need a different number of turns to finish their
+   * record shots), so a player who has completed all record shots is skipped -
+   * the other player keeps shooting until they finish too.
+   */
+  advanceTurn()
+  {
+    if (this.suddenDeath)
+    {
+      this.active = this.other(this.active);
+      return;
+    }
+
+    const other = this.other(this.active);
+    const otherDone = this.players[other].recordShotsFired >= this.recordShots;
+    const selfDone = this.players[this.active].recordShotsFired >= this.recordShots;
+
+    if (!otherDone)
+    {
+      // Opponent still has record shots to fire: normal alternation.
+      this.active = other;
+    }
+    else if (selfDone)
+    {
+      // Both finished their record shots; evaluateState resolves the result.
+      this.active = other;
+    }
+    // Otherwise the opponent is finished but this player is not: shoot again.
+  }
+
+  // ===== Sighter controls =====
+
+  goForRecord()
+  {
+    const player = this.players[this.active];
+    if (player.phase === 'sighters')
+    {
+      player.phase = 'record';
+    }
+  }
+
+  convertSighter()
+  {
+    const player = this.players[this.active];
+    if (player.phase !== 'sighters')
+    {
+      return;
+    }
+
+    // Find the active player's most recent sighter and reclassify it as record shot #1.
+    for (let i = this.shotLog.length - 1; i >= 0; i--)
+    {
+      const shot = this.shotLog[i];
+      if (shot.player === this.active && shot.isSighter)
+      {
+        shot.isSighter = false;
+        player.phase = 'record';
+        player.recordShotsFired++;
+        shot.recordIndex = player.recordShotsFired;
+        console.log(`${LOG_PREFIX} ${player.name} converted a sighter (${shot.score}${shot.isX ? 'X' : ''}) to record`);
+        return;
+      }
+    }
+  }
+
+  // ===== Completion / tiebreak =====
+
+  recordShotsFor(playerId)
+  {
+    return this.shotLog.filter(s => s.player === playerId && !s.isSighter && !s.suddenDeath);
+  }
+
+  sdShotsFor(playerId)
+  {
+    return this.shotLog.filter(s => s.player === playerId && s.suddenDeath);
+  }
+
+  evaluateState(now)
+  {
+    if (this.complete)
+    {
+      return;
+    }
+
+    const p1Done = this.players.p1.recordShotsFired >= this.recordShots;
+    const p2Done = this.players.p2.recordShotsFired >= this.recordShots;
+
+    if (!this.suddenDeath)
+    {
+      if (p1Done && p2Done)
+      {
+        const result = this.compareRegular();
+        if (result !== 0)
+        {
+          this.finish(result);
+        }
+        else
+        {
+          console.log(`${LOG_PREFIX} Tied after record shots - entering sudden death`);
+          this.suddenDeath = true;
+        }
+      }
+      return;
+    }
+
+    // Sudden death: evaluate once both players have taken an equal number of SD shots.
+    const sd1 = this.sdShotsFor('p1').length;
+    const sd2 = this.sdShotsFor('p2').length;
+    if (sd1 === sd2 && sd1 >= 1)
+    {
+      const result = this.compareSuddenDeath();
+      if (result !== 0)
+      {
+        this.finish(result);
+      }
+    }
+  }
+
+  /** @returns {number} 1 if p1 wins, -1 if p2 wins, 0 if tied */
+  compareRegular()
+  {
+    const a = this.aggregate(this.recordShotsFor('p1'));
+    const b = this.aggregate(this.recordShotsFor('p2'));
+    if (a.total !== b.total) return a.total > b.total ? 1 : -1;
+    if (a.xCount !== b.xCount) return a.xCount > b.xCount ? 1 : -1;
+    return 0;
+  }
+
+  /** Compare the latest sudden-death shot pair. */
+  compareSuddenDeath()
+  {
+    const sd1 = this.sdShotsFor('p1');
+    const sd2 = this.sdShotsFor('p2');
+    const a = sd1[sd1.length - 1];
+    const b = sd2[sd2.length - 1];
+    if (a.score !== b.score) return a.score > b.score ? 1 : -1;
+    if (a.isX !== b.isX) return a.isX ? 1 : -1; // an X beats a non-X of equal score
+    return 0;
+  }
+
+  finish(result)
+  {
+    this.complete = true;
+    this.turnTimerRunning = false;
+    this.winner = result > 0 ? 'p1' : 'p2';
+    const w = this.players[this.winner];
+    const agg = this.aggregate(this.recordShotsFor(this.winner));
+    console.log(`${LOG_PREFIX} Match complete - winner ${w.name} (${agg.total}-${agg.xCount}X)`);
+    this.emitEvent({ type: 'matchComplete', winner: this.winner, winnerName: w.name });
+  }
+
+  // ===== Queries =====
+
+  getActivePlayerId()
+  {
+    return this.active;
+  }
+
+  getHudModel()
+  {
+    const player = this.players[this.active];
+    const records = this.recordShotsFor(this.active);
+    const { total, xCount } = this.aggregate(records);
+    const shotCount = records.length;
+
+    const model = {
+      primaryLabel: 'Turn:',
+      primaryValue: player.name,
+      timerLabel: 'Time:',
+      timerValue: this.turnSeconds === null ? '\u221E' : MatchDriver.formatTime(this.turnRemaining),
+      score: total,
+      xCount: xCount,
+      droppedPoints: shotCount * 10 - total,
+      droppedX: shotCount - xCount
+    };
+
+    if (this.suddenDeath)
+    {
+      model.shots = { mode: 'record', current: this.sdShotsFor(this.active).length, max: 0, complete: false, label: 'Sudden Death' };
+    }
+    else if (player.phase === 'sighters' && player.sightersFired < this.sighterCap)
+    {
+      model.shots = { mode: 'sighters', current: player.sightersFired, limit: this.sighterCap };
+    }
+    else
+    {
+      model.shots = { mode: 'record', current: player.recordShotsFired, max: this.recordShots, complete: player.recordShotsFired >= this.recordShots };
+    }
+
+    return model;
+  }
+
+  getControlsModel()
+  {
+    if (this.complete || this.suddenDeath)
+    {
+      return { goForRecord: false, goForRecordText: 'Go For Record', convertSighter: false };
+    }
+
+    const player = this.players[this.active];
+    const inSighters = player.phase === 'sighters';
+    return {
+      goForRecord: inSighters,
+      goForRecordText: `${player.name}: Go For Record`,
+      convertSighter: inSighters && player.sightersFired >= 1,
+      convertSighterText: `${player.name}: Convert Sighter`
+    };
+  }
+
+  buildSection(playerId)
+  {
+    const player = this.players[playerId];
+    const sighters = this.shotLog
+      .filter(s => s.player === playerId && s.isSighter)
+      .map(s => ({ score: s.score, isX: s.isX }));
+    const records = this.recordShotsFor(playerId).map(s => ({ score: s.score, isX: s.isX }));
+    const suddenDeath = this.sdShotsFor(playerId).map(s => ({ score: s.score, isX: s.isX }));
+    const { total, xCount } = this.aggregate(this.recordShotsFor(playerId));
+
+    return {
+      label: player.name,
+      sighters: sighters,
+      records: records,
+      suddenDeath: suddenDeath,
+      recordSlots: this.recordShots,
+      total: total,
+      xCount: xCount,
+      isWinner: this.winner === playerId
+    };
+  }
+
+  getScorecardModel()
+  {
+    let footerText;
+    if (this.complete)
+    {
+      const w = this.players[this.winner];
+      const agg = this.aggregate(this.recordShotsFor(this.winner));
+      footerText = `Winner: ${w.name} (${agg.total}-${agg.xCount}X)`;
+    }
+    else if (this.suddenDeath)
+    {
+      footerText = 'Sudden Death';
+    }
+    else
+    {
+      footerText = 'Match In Progress';
+    }
+
+    return {
+      sections: [this.buildSection('p1'), this.buildSection('p2')],
+      footer: { text: footerText }
+    };
+  }
+}

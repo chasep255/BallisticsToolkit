@@ -164,15 +164,15 @@ export class HudOverlay
     ctx.fillText(value, canvas.width - 8, canvas.height / 2);
   }
 
-  updateRelay(relayDisplay)
+  updateRelay(relayDisplay, label = 'Relay:')
   {
-    this.drawHudText(this.relayCanvas, 'Relay:', relayDisplay);
+    this.drawHudText(this.relayCanvas, label, relayDisplay);
     this.hudTextures[0].needsUpdate = true;
   }
 
-  updateTimer(timeDisplay)
+  updateTimer(timeDisplay, label = 'Timer:')
   {
-    this.drawHudText(this.timerCanvas, 'Timer:', timeDisplay);
+    this.drawHudText(this.timerCanvas, label, timeDisplay);
     this.hudTextures[1].needsUpdate = true;
   }
 
@@ -182,11 +182,11 @@ export class HudOverlay
     this.hudTextures[2].needsUpdate = true;
   }
 
-  updateShots(current, total, isComplete)
+  updateShots(current, total, isComplete, label = 'Shots:')
   {
-    const value = `${current}/${total}`;
+    const value = total ? `${current}/${total}` : `${current}`;
     const color = isComplete ? '#28a745' : '#ffffff';
-    this.drawHudText(this.shotsCanvas, 'Shots:', value, color);
+    this.drawHudText(this.shotsCanvas, label, value, color);
     this.hudTextures[3].needsUpdate = true;
   }
 

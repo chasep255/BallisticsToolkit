@@ -28,6 +28,13 @@ const SettingsCookies = createSettingsCookies('fclass_sim_');
 
 const DEFAULT_PARAMS = {
   graphicsPreset: 'Medium',
+  matchMode: 'standard',
+  relays: '3',
+  shotsPerRelay: '20',
+  minutesPerRelay: '20',
+  player1Name: 'Player1',
+  player2Name: 'Player2',
+  turnTime: 'unlimited',
   fclassMode: 'fclass-1000',
   windPreset: 'Moderate',
   focalPlane: 'SFP',
@@ -42,6 +49,24 @@ const DEFAULT_PARAMS = {
   twist: '8.0',
   enableSpinEffects: true
 };
+
+/**
+ * Show/hide the standard- and pair-mode config groups based on the selected mode.
+ */
+function updateModeVisibility()
+{
+  const modeEl = document.getElementById('matchMode');
+  if (!modeEl) return;
+  const isPair = modeEl.value === 'pair';
+  document.querySelectorAll('.standard-config').forEach(el =>
+  {
+    el.style.display = isPair ? 'none' : '';
+  });
+  document.querySelectorAll('.pair-config').forEach(el =>
+  {
+    el.style.display = isPair ? '' : 'none';
+  });
+}
 
 function setDefaultValues()
 {
@@ -97,9 +122,14 @@ import
 from './rendering/wind-field-hud.js';
 import
 {
-  MatchState
+  StandardMatchDriver
 }
-from './core/match.js';
+from './core/standard-driver.js';
+import
+{
+  PairFireDriver
+}
+from './core/pair-driver.js';
 import
 {
   Scorecard
@@ -242,13 +272,32 @@ function setupUI()
   // Go For Record button
   document.getElementById('goForRecordBtn').addEventListener('click', () =>
   {
-    if (webglGame && webglGame.matchState)
+    if (webglGame && webglGame.driver)
     {
-      webglGame.matchState.goForRecord();
-      webglGame.updateGoForRecordButton();
-      webglGame.updateHUD(); // Update HUD to show shots instead of sighters
+      webglGame.driver.goForRecord();
+      webglGame.updateControls();
+      webglGame.updateHUD();
     }
   });
+
+  // Convert Sighter button (pair fire)
+  document.getElementById('convertSighterBtn').addEventListener('click', () =>
+  {
+    if (webglGame && webglGame.driver)
+    {
+      webglGame.driver.convertSighter();
+      webglGame.scorecard.update(webglGame.driver.getScorecardModel());
+      webglGame.updateControls();
+      webglGame.updateHUD();
+    }
+  });
+
+  // Match mode selector toggles which config inputs are visible
+  const matchModeEl = document.getElementById('matchMode');
+  if (matchModeEl)
+  {
+    matchModeEl.addEventListener('change', updateModeVisibility);
+  }
 
   // Wind HUD toggle button
   document.getElementById('windHUDBtn').addEventListener('click', () =>
@@ -367,6 +416,8 @@ function getGameParams()
     throw new Error(`Invalid F-Class distance: ${distanceYards} yards. Valid distances are: 300, 500, 600, 800, 900, 1000`);
   }
 
+  const turnTimeValue = document.getElementById('turnTime').value;
+
   return {
     distance: distanceYards,
     target: targetType,
@@ -374,6 +425,14 @@ function getGameParams()
     graphicsPreset: document.getElementById('graphicsPreset').value,
     focalPlane: document.getElementById('focalPlane').value,
     fclassMode: fclassMode,
+    // Match format
+    mode: document.getElementById('matchMode').value,
+    relays: parseInt(document.getElementById('relays').value),
+    shotsPerRelay: parseInt(document.getElementById('shotsPerRelay').value),
+    minutesPerRelay: parseFloat(document.getElementById('minutesPerRelay').value),
+    player1Name: document.getElementById('player1Name').value || 'Player1',
+    player2Name: document.getElementById('player2Name').value || 'Player2',
+    turnSeconds: turnTimeValue === 'unlimited' ? null : parseInt(turnTimeValue),
     // Bullet parameters
     mv: parseFloat(document.getElementById('mv').value),
     bc: parseFloat(document.getElementById('bc').value),
@@ -480,9 +539,6 @@ class FClassSimulator
   static COLOR_LOW_SCORE = 0xff8800;
   static SCORE_THRESHOLD_RED = 9;
 
-  // === MATCH & SCORING ===
-  static FCLASS_MATCH_SHOTS = 60;
-
   // Spotting scope constants (WASD pan, EQ zoom)
   static SPOTTING_SCOPE_DIAMETER_FRACTION = 0.5; // Fraction of screen height
   static SPOTTING_SCOPE_PAN_SPEED = 0.1; // radians per second
@@ -530,15 +586,35 @@ class FClassSimulator
     const urlParams = new URLSearchParams(window.location.search);
     this.debugMode = urlParams.get('debug') === '1';
 
-    // Match state management
-    this.matchState = new MatchState(this.debugMode);
-    this.shotLog = []; // Array of all shots: { relay, isSighter, recordIndex, score, isX, mvFps, impactVelocityFps, timeSec }
+    // Match driver (format-specific rules + state + shot log + display models)
+    this.mode = params.mode === 'pair' ? 'pair' : 'standard';
+    if (this.mode === 'pair')
+    {
+      this.driver = new PairFireDriver({
+        player1Name: params.player1Name,
+        player2Name: params.player2Name,
+        turnSeconds: params.turnSeconds
+      });
+    }
+    else
+    {
+      this.driver = new StandardMatchDriver({
+        relays: params.relays,
+        shotsPerRelay: params.shotsPerRelay,
+        minutesPerRelay: params.minutesPerRelay,
+        debugMode: this.debugMode
+      });
+    }
+
+    // Per-player rifle scope state (pair fire only): { p1, p2 }
+    this.scopeStates = {};
+    this.activeScopePlayer = this.driver.getActivePlayerId();
 
     // Scorecard
     this.scorecard = new Scorecard();
 
-    // Pending relay end notification (waiting for target to be ready)
-    this.pendingRelayEndNotification = false;
+    // Pending segment-end event awaiting the target becoming ready
+    this.pendingSegmentEvent = null;
 
     // Render statistics tracking
     this.renderStats = new RenderStats();
@@ -927,44 +1003,39 @@ class FClassSimulator
     // Update target frame animations
     if (this.targets)
     {
-      // Only animate other targets when relay clock is running
-      const relayClockRunning = this.matchState.isRunning;
-      this.targets.updateAnimations(ResourceManager.time.getDeltaTime(), relayClockRunning);
+      // Only animate other targets while the match clock is running
+      this.targets.updateAnimations(ResourceManager.time.getDeltaTime(), this.driver.isRunning());
     }
 
     // Update wind noise volume based on current wind speed
     this.updateWindNoiseVolume();
 
-    // Update relay timer and check for relay end (uses game time, pauses when tab is hidden)
-    this.matchState.tick(ResourceManager.time.getElapsedTime());
-    if (this.matchState.justEnded())
+    // Advance the driver clock (uses game time, pauses when tab is hidden) and handle events
+    this.driver.tick(ResourceManager.time.getElapsedTime());
+
+    // A turn timeout needs a "miss" animation before any completion notification
+    const timeout = this.driver.consumeTimeout();
+    if (timeout)
     {
-      // Only show notification if target is ready (not animating)
-      if (this.targets.isTargetReady())
-      {
-        this.showRelayCompleteNotification();
-        this.pendingRelayEndNotification = false;
-      }
-      else
-      {
-        // Target is animating, wait for it to finish
-        this.pendingRelayEndNotification = true;
-      }
+      this.handleTurnTimeout(timeout);
     }
 
-    // Check for pending relay end notification when target becomes ready
-    if (this.pendingRelayEndNotification && this.targets.isTargetReady())
+    const event = this.driver.consumeEvent();
+    if (event)
     {
-      this.showRelayCompleteNotification();
-      this.pendingRelayEndNotification = false;
+      this.handleDriverEvent(event);
     }
 
-    // Update HUD with relay and timer
-    if (this.hud)
+    // Show a deferred segment-end notification once the target is ready
+    if (this.pendingSegmentEvent && this.targets.isTargetReady())
     {
-      this.hud.updateRelay(this.matchState.getRelayDisplay());
-      this.hud.updateTimer(this.matchState.getTimeFormatted());
+      const pending = this.pendingSegmentEvent;
+      this.pendingSegmentEvent = null;
+      this.showSegmentNotification(pending);
     }
+
+    // Refresh the HUD (keeps the per-turn / relay timer live)
+    this.updateHUD();
 
     // Update scope camera orientations
     this.updateSpottingScopeCamera();
@@ -1300,8 +1371,15 @@ class FClassSimulator
       length: this.length,
       twist: this.twist
     });
-    // Update scorecard with empty shot log to display parameters
-    this.scorecard.update(this.shotLog);
+    // Update scorecard to display parameters before any shots
+    this.scorecard.update(this.driver.getScorecardModel());
+
+    // Capture initial rifle scope state for both players (pair fire)
+    if (this.mode === 'pair' && this.rifleScope)
+    {
+      const initialState = this.rifleScope.getScopeState();
+      this.scopeStates = { p1: initialState, p2: { ...initialState } };
+    }
 
     // Start game clock from ResourceManager
     ResourceManager.time.start();
@@ -1317,8 +1395,8 @@ class FClassSimulator
     }
     this.updateHUD();
 
-    // Update Go For Record button visibility based on current relay state
-    this.updateGoForRecordButton();
+    // Update contextual buttons (Go For Record / Convert Sighter)
+    this.updateControls();
 
     this.isRunning = true;
     const gameLoop = () =>
@@ -1331,8 +1409,10 @@ class FClassSimulator
     };
     gameLoop();
 
-    // Start relay timer immediately (for relay 1, or when restarting)
-    this.matchState.startIfNeeded(ResourceManager.time.getElapsedTime());
+    // Start the match; the target begins raised and ready
+    const now = ResourceManager.time.getElapsedTime();
+    this.driver.start(now);
+    this.driver.onTargetReady(now);
   }
 
   pause()
@@ -1507,15 +1587,7 @@ class FClassSimulator
   {
     if (!this.hud) return;
 
-    // Get current relay shots only
-    const currentRelay = this.matchState.relayIndex;
-    const currentRelayShots = this.shotLog.filter(shot => shot.relay === currentRelay);
-    const recordShots = currentRelayShots.filter(shot => !shot.isSighter);
-    const sighterShots = currentRelayShots.filter(shot => shot.isSighter);
-
-    const shotCount = recordShots.length;
-    const totalScore = recordShots.reduce((sum, shot) => sum + shot.score, 0);
-    const xCount = recordShots.filter(shot => shot.isX).length;
+    const model = this.driver.getHudModel();
 
     // Update target number
     if (this.targets && this.targets.userTarget)
@@ -1523,33 +1595,22 @@ class FClassSimulator
       this.hud.updateTarget(this.targets.userTarget.targetNumber);
     }
 
-    // Update shot count/sighters based on phase
-    const maxShots = this.matchState.maxRecordShots;
-    const isComplete = shotCount >= maxShots;
+    this.hud.updateRelay(model.primaryValue, model.primaryLabel);
+    this.hud.updateTimer(model.timerValue, model.timerLabel);
 
-    if (this.matchState.isSightersPhase())
+    if (model.shots.mode === 'sighters')
     {
-      // Show sighters count during sighters phase
-      const sightersRemaining = this.matchState.getSightersRemaining();
-      const sightersLimit = sightersRemaining === Infinity ? '∞' : this.matchState.sightersAllowed[currentRelay];
-      this.hud.updateSighters(sighterShots.length, sightersLimit);
+      this.hud.updateSighters(model.shots.current, model.shots.limit);
     }
     else
     {
-      // Show record shots during record phase
-      this.hud.updateShots(shotCount, maxShots, isComplete);
+      const label = model.shots.label ? `${model.shots.label}:` : 'Shots:';
+      this.hud.updateShots(model.shots.current, model.shots.max, model.shots.complete, label);
     }
 
-    this.hud.updateScore(totalScore, xCount);
+    this.hud.updateScore(model.score, model.xCount);
+    this.hud.updateDropped(model.droppedPoints, model.droppedX);
 
-    // Calculate dropped points for current relay
-    const maxPossibleScore = shotCount * 10;
-    const maxPossibleX = shotCount;
-    const droppedPoints = maxPossibleScore - totalScore;
-    const droppedX = maxPossibleX - xCount;
-    this.hud.updateDropped(droppedPoints, droppedX);
-
-    // Update last shot data
     if (this.lastShotData)
     {
       this.hud.updateLastShot(
@@ -1566,9 +1627,87 @@ class FClassSimulator
   }
 
   /**
-   * Show relay completion notification
+   * Route a driver event. Turn timeouts run immediately; segment-end events are
+   * deferred until the target is ready (so they don't pop mid-animation).
    */
-  showRelayCompleteNotification()
+  handleDriverEvent(event)
+  {
+    // relayComplete / matchComplete - show once the target settles
+    if (this.targets.isTargetReady())
+    {
+      this.showSegmentNotification(event);
+    }
+    else
+    {
+      this.pendingSegmentEvent = event;
+    }
+  }
+
+  /**
+   * A pair-fire shooter ran out of time: the driver already logged a zero and
+   * switched turns. Show it as a miss on the shared target.
+   */
+  handleTurnTimeout(timeout)
+  {
+    ResourceManager.audio.playSound('scope_click');
+
+    this.lastShotData = { score: 0, isX: false, mvFps: null, impactVelocityFps: null };
+    this.scorecard.update(this.driver.getScorecardModel());
+
+    // Mark a miss low on the target (no bullet was fired)
+    this.targets.markShotWithAnimation(
+      timeout.relativeX,
+      timeout.relativeY - FClassSimulator.TARGET_SIZE,
+      this.distance,
+      0,
+      false,
+      () => this.onTargetAnimationComplete()
+    );
+  }
+
+  /**
+   * Swap rifle scope state when the active player changes (pair fire only).
+   */
+  swapScopeIfTurnChanged()
+  {
+    if (this.mode !== 'pair' || !this.rifleScope)
+    {
+      return;
+    }
+
+    const next = this.driver.getActivePlayerId();
+    if (next === this.activeScopePlayer)
+    {
+      return;
+    }
+
+    this.scopeStates[this.activeScopePlayer] = this.rifleScope.getScopeState();
+    if (this.scopeStates[next])
+    {
+      this.rifleScope.setScopeState(this.scopeStates[next]);
+    }
+    this.activeScopePlayer = next;
+  }
+
+  /**
+   * Show the segment-end notification for the current mode.
+   */
+  showSegmentNotification(event)
+  {
+    if (this.mode === 'pair')
+    {
+      this.showPairResultNotification(event);
+    }
+    else
+    {
+      this.showRelayNotification(event);
+    }
+  }
+
+  /**
+   * Standard mode: relay-complete (offer next relay) or match-complete.
+   */
+  showRelayNotification(event)
   {
     const notification = document.createElement('div');
     notification.className = 'relay-end-notification';
@@ -1589,55 +1728,37 @@ class FClassSimulator
       border: 2px solid #f57c00;
     `;
 
-    const relayNum = this.matchState.relayIndex;
-    const recordShots = this.matchState.recordShotsFired;
-
-    if (this.matchState.isMatchComplete())
+    if (event.type === 'matchComplete')
     {
-      // Match complete - show final results
       notification.innerHTML = `
         <div style="margin-bottom: 12px;">🎯 Match Complete!</div>
         <div style="font-size: 14px; margin-bottom: 16px;">
-          All 3 relays finished<br>
+          All ${event.numRelays} relays finished<br>
           Check scorecard for final results
         </div>
         <button id="viewScorecardBtn" style="
-          background: white;
-          color: #ff9800;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: bold;
+          background: white; color: #ff9800; border: none; padding: 8px 16px;
+          border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;
         ">View Scorecard</button>
       `;
     }
     else
     {
-      // Relay complete - offer next relay
       notification.innerHTML = `
-        <div style="margin-bottom: 12px;">⏱️ Relay ${relayNum} Complete!</div>
+        <div style="margin-bottom: 12px;">⏱️ Relay ${event.relayIndex} Complete!</div>
         <div style="font-size: 14px; margin-bottom: 16px;">
-          ${recordShots} record shots fired<br>
-          Ready for Relay ${relayNum + 1}
+          ${event.recordShots} record shots fired<br>
+          Ready for Relay ${event.relayIndex + 1}
         </div>
         <button id="nextRelayBtn" style="
-          background: white;
-          color: #ff9800;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: bold;
-        ">Start Relay ${relayNum + 1}</button>
+          background: white; color: #ff9800; border: none; padding: 8px 16px;
+          border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;
+        ">Start Relay ${event.relayIndex + 1}</button>
       `;
     }
 
     document.body.appendChild(notification);
 
-    // Add button handlers
     const nextRelayBtn = document.getElementById('nextRelayBtn');
     const viewScorecardBtn = document.getElementById('viewScorecardBtn');
 
@@ -1645,13 +1766,10 @@ class FClassSimulator
     {
       nextRelayBtn.addEventListener('click', () =>
       {
-        this.matchState.advanceRelay();
+        this.driver.advance(ResourceManager.time.getElapsedTime());
         notification.remove();
-        this.updateGoForRecordButton();
-        this.updateHUD(); // Update HUD to show sighters for new relay
-
-        // Start relay timer immediately when dialog is closed
-        this.matchState.startIfNeeded(ResourceManager.time.getElapsedTime());
+        this.updateControls();
+        this.updateHUD();
       });
     }
 
@@ -1666,24 +1784,12 @@ class FClassSimulator
   }
 
   /**
-   * Show match completion notification
+   * Pair fire: announce the winner.
    */
-  showMatchCompleteNotification()
+  showPairResultNotification(event)
   {
-    // Calculate stats from shot log (record shots only)
-    const recordShots = this.shotLog.filter(shot => !shot.isSighter);
-    const totalScore = recordShots.reduce((sum, shot) => sum + shot.score, 0);
-    const xCount = recordShots.filter(shot => shot.isX).length;
-    const shotCount = recordShots.length;
-    const maxPossibleScore = shotCount * 10;
-    const maxPossibleX = shotCount;
-    const droppedPoints = maxPossibleScore - totalScore;
-    const droppedX = maxPossibleX - xCount;
-
-    // Log match completion
-    console.log(`${LOG_PREFIX_GAME} Match Complete: Score=${totalScore}-${xCount}X, Dropped=${droppedPoints}-${droppedX}X`);
-
     const notification = document.createElement('div');
+    notification.className = 'relay-end-notification';
     notification.style.cssText = `
       position: fixed;
       top: 50%;
@@ -1702,32 +1808,25 @@ class FClassSimulator
     `;
 
     notification.innerHTML = `
-      <div style="font-size: 24px; margin-bottom: 10px;">🎯 Match Complete!</div>
-      <div>Final Score: ${totalScore}-${xCount}x</div>
-      <div>Dropped: ${droppedPoints}-${droppedX}x</div>
-      <div style="margin-top: 15px; font-size: 14px; opacity: 0.9;">View Scorecard for details or click Restart</div>
-      <button onclick="this.parentElement.remove()" style="
-        margin-top: 15px;
-        padding: 8px 16px;
-        background: #1e7e34;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-      ">Dismiss</button>
+      <div style="font-size: 24px; margin-bottom: 10px;">🏆 ${event.winnerName} Wins!</div>
+      <div style="font-size: 14px; margin-bottom: 16px;">Check scorecard for the full breakdown</div>
+      <button id="viewScorecardBtn" style="
+        background: white; color: #1e7e34; border: none; padding: 8px 16px;
+        border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;
+      ">View Scorecard</button>
     `;
 
     document.body.appendChild(notification);
 
-    // Auto-dismiss after 10 seconds
-    setTimeout(() =>
+    const viewScorecardBtn = document.getElementById('viewScorecardBtn');
+    if (viewScorecardBtn)
     {
-      if (notification.parentElement)
+      viewScorecardBtn.addEventListener('click', () =>
       {
+        this.scorecard.show();
         notification.remove();
-      }
-    }, 10000);
+      });
+    }
   }
 
   /**
@@ -1747,10 +1846,10 @@ class FClassSimulator
       return;
     }
 
-    // Check if relay is ended
-    if (this.matchState.isEnded())
+    // Check if firing is allowed by the match rules (e.g. relay/match ended)
+    if (!this.driver.canFire())
     {
-      console.log('Relay ended - wait for next relay');
+      console.log('Firing not allowed - match/relay ended');
       return;
     }
 
@@ -1761,16 +1860,8 @@ class FClassSimulator
       return;
     }
 
-    // Track sighters when shot is fired (not when scored)
-    const isSighter = this.matchState.isSightersPhase();
-    if (isSighter)
-    {
-      this.matchState.sightersFired++;
-
-      // Update HUD and Go For Record button immediately
-      this.updateHUD();
-      this.updateGoForRecordButton();
-    }
+    // Trigger-pull bookkeeping (e.g. stop the pair-fire turn clock)
+    this.driver.onShotFired(ResourceManager.time.getElapsedTime());
 
     // Get rifle scope aim
     const aim = this.rifleScope.getAim();
@@ -1790,43 +1881,18 @@ class FClassSimulator
    */
   onShotComplete(shotData)
   {
-    // Determine if this is a sighter or record shot
-    const isRecord = this.matchState.isRecordPhase();
-
-    // Log the shot
-    this.shotLog.push(
-    {
-      relay: this.matchState.relayIndex,
-      isSighter: !isRecord,
-      recordIndex: isRecord ? this.matchState.recordShotsFired + 1 : null,
-      score: shotData.score,
-      isX: shotData.isX,
-      mvFps: shotData.mvFps,
-      impactVelocityFps: shotData.impactVelocityFps,
-      timeSec: this.matchState.elapsed()
-    });
-
-    // Update relay manager with shot
-    this.matchState.onShot(isRecord);
-
-    // Auto-switch to record phase for relays 2 and 3 after 2 sighters are SCORED
-    if (!isRecord && this.matchState.relayIndex > 1 && this.matchState.sightersFired >= 2)
-    {
-      this.matchState.phase = 'record';
-      this.updateHUD();
-      this.updateGoForRecordButton();
-    }
+    // Classify and log the shot through the driver (handles phase/turn transitions)
+    this.driver.onShotScored(shotData, ResourceManager.time.getElapsedTime());
 
     // Update scorecard
-    this.scorecard.update(this.shotLog);
+    this.scorecard.update(this.driver.getScorecardModel());
 
     // Store shot data for when target animation completes
     this.lastShotData = {
       score: shotData.score,
       isX: shotData.isX,
       mvFps: shotData.mvFps,
-      impactVelocityFps: shotData.impactVelocityFps,
-      hitCount: shotData.hitCount
+      impactVelocityFps: shotData.impactVelocityFps
     };
 
     // Start match-style target animation with shot marker and scoring disc
@@ -1845,46 +1911,41 @@ class FClassSimulator
    */
   onTargetAnimationComplete()
   {
-    // Update HUD with shot data now that target is back up
+    // Swap rifle scope state if the turn changed (pair fire)
+    this.swapScopeIfTurnChanged();
+
+    // Tell the driver the target is ready again (starts the next per-turn clock)
+    this.driver.onTargetReady(ResourceManager.time.getElapsedTime());
+
     this.updateHUD();
-
-    // Update Go For Record button visibility
-    this.updateGoForRecordButton();
-
-    // Check if match is complete (60 shots for F-Class)
-    if (this.lastShotData && this.lastShotData.hitCount >= FClassSimulator.FCLASS_MATCH_SHOTS)
-    {
-      this.showMatchCompleteNotification();
-    }
+    this.updateControls();
   }
 
   /**
-   * Update Go For Record button visibility based on relay state
+   * Update contextual buttons (Go For Record / Convert Sighter) from the driver.
    */
-  updateGoForRecordButton()
+  updateControls()
   {
-    const btn = document.getElementById('goForRecordBtn');
-    if (!btn) return;
+    const controls = this.driver.getControlsModel();
 
-    // Show button only during sighters phase
-    if (this.matchState.isSightersPhase())
+    const goBtn = document.getElementById('goForRecordBtn');
+    if (goBtn)
     {
-      btn.style.display = 'inline-block';
-
-      // Update button text with sighters remaining
-      const remaining = this.matchState.getSightersRemaining();
-      if (remaining === Infinity)
+      goBtn.style.display = controls.goForRecord ? 'inline-block' : 'none';
+      if (controls.goForRecord)
       {
-        btn.textContent = 'Go For Record';
-      }
-      else
-      {
-        btn.textContent = `Go For Record (${remaining} sighters left)`;
+        goBtn.textContent = controls.goForRecordText;
       }
     }
-    else
+
+    const convertBtn = document.getElementById('convertSighterBtn');
+    if (convertBtn)
     {
-      btn.style.display = 'none';
+      convertBtn.style.display = controls.convertSighter ? 'inline-block' : 'none';
+      if (controls.convertSighter)
+      {
+        convertBtn.textContent = controls.convertSighterText || 'Convert Sighter';
+      }
     }
   }
 
@@ -2097,6 +2158,7 @@ async function initializeApp()
 
     SettingsCookies.loadAll();
     SettingsCookies.attachAutoSave();
+    updateModeVisibility();
 
     const resetBtn = document.getElementById('resetDefaults');
     if (resetBtn)
@@ -2106,6 +2168,7 @@ async function initializeApp()
         e.preventDefault();
         setDefaultValues();
         populateWindPresetDropdown();
+        updateModeVisibility();
         SettingsCookies.saveAll();
       });
     }

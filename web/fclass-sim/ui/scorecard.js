@@ -83,10 +83,10 @@ export class Scorecard
   }
 
   /**
-   * Update scorecard with current shot log
-   * @param {Array} shotLog - Array of shot entries
+   * Update scorecard from a driver-provided model.
+   * @param {Object} model { sections: [...], footer: { text } }
    */
-  update(shotLog)
+  update(model)
   {
     if (!this.modal)
     {
@@ -99,170 +99,123 @@ export class Scorecard
       return;
     }
 
-    // Group shots by relay
-    const relays = {
-      1: [],
-      2: [],
-      3: []
-    };
-    for (const shot of shotLog)
-    {
-      relays[shot.relay].push(shot);
-    }
-
-    // Build HTML
     let html = '<div class="scorecard-header">Scorecard</div>';
+    html += this.renderMatchParams();
 
-    // Add match parameters section if available
-    if (this.matchParams)
+    for (const section of model.sections)
     {
-      html += '<div class="match-params">';
-      html += '<div class="match-params-grid">';
-
-      // Range and target info
-      html += `<div class="param-item"><span class="param-label">Distance:</span> <span class="param-value">${this.matchParams.distance} yards</span></div>`;
-      html += `<div class="param-item"><span class="param-label">Target:</span> <span class="param-value">${this.matchParams.target}</span></div>`;
-      html += `<div class="param-item"><span class="param-label">Wind:</span> <span class="param-value">${this.matchParams.windPreset}</span></div>`;
-      html += `<div class="param-item"><span class="param-label">Focal Plane:</span> <span class="param-value">${this.matchParams.focalPlane}</span></div>`;
-
-      // Ballistics info
-      html += `<div class="param-item"><span class="param-label">BC:</span> <span class="param-value">${this.matchParams.bc} ${this.matchParams.dragFunction}</span></div>`;
-      html += `<div class="param-item"><span class="param-label">Muzzle Velocity:</span> <span class="param-value">${this.matchParams.mv} fps</span></div>`;
-      html += `<div class="param-item"><span class="param-label">MV SD:</span> <span class="param-value">${this.matchParams.mvSd} fps</span></div>`;
-      html += `<div class="param-item"><span class="param-label">Rifle Accuracy:</span> <span class="param-value">${this.matchParams.rifleAccuracy} MOA</span></div>`;
-
-      // Bullet specs
-      html += `<div class="param-item"><span class="param-label">Bullet:</span> <span class="param-value">${this.matchParams.diameter}" / ${this.matchParams.weight}gr / ${this.matchParams.length}"</span></div>`;
-
-      // Twist rate (only show if spin effects enabled)
-      if (this.matchParams.twist > 0)
-      {
-        html += `<div class="param-item"><span class="param-label">Twist:</span> <span class="param-value">1:${this.matchParams.twist}"</span></div>`;
-      }
-
-      html += '</div>';
-      html += '</div>';
+      html += this.renderSection(section);
     }
 
-    let matchTotal = 0;
-    let matchXCount = 0;
-
-    // Render each relay
-    for (let relayNum = 1; relayNum <= 3; relayNum++)
+    if (model.footer)
     {
-      const relayShots = relays[relayNum];
-      const sighters = relayShots.filter(s => s.isSighter);
-      const records = relayShots.filter(s => !s.isSighter);
+      html += `<div class="scorecard-footer">`;
+      html += `<div class="match-total">${model.footer.text}</div>`;
+      html += `</div>`;
+    }
 
-      // Calculate relay totals
-      let relayTotal = 0;
-      let relayXCount = 0;
-      for (const shot of records)
+    content.innerHTML = html;
+  }
+
+  renderMatchParams()
+  {
+    if (!this.matchParams)
+    {
+      return '';
+    }
+
+    let html = '<div class="match-params"><div class="match-params-grid">';
+    html += `<div class="param-item"><span class="param-label">Distance:</span> <span class="param-value">${this.matchParams.distance} yards</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Target:</span> <span class="param-value">${this.matchParams.target}</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Wind:</span> <span class="param-value">${this.matchParams.windPreset}</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Focal Plane:</span> <span class="param-value">${this.matchParams.focalPlane}</span></div>`;
+    html += `<div class="param-item"><span class="param-label">BC:</span> <span class="param-value">${this.matchParams.bc} ${this.matchParams.dragFunction}</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Muzzle Velocity:</span> <span class="param-value">${this.matchParams.mv} fps</span></div>`;
+    html += `<div class="param-item"><span class="param-label">MV SD:</span> <span class="param-value">${this.matchParams.mvSd} fps</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Rifle Accuracy:</span> <span class="param-value">${this.matchParams.rifleAccuracy} MOA</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Bullet:</span> <span class="param-value">${this.matchParams.diameter}" / ${this.matchParams.weight}gr / ${this.matchParams.length}"</span></div>`;
+    if (this.matchParams.twist > 0)
+    {
+      html += `<div class="param-item"><span class="param-label">Twist:</span> <span class="param-value">1:${this.matchParams.twist}"</span></div>`;
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  /**
+   * Render one scorecard section (a relay or a player).
+   * @param {Object} section { label, sighters, records, suddenDeath, recordSlots, total, xCount, isWinner }
+   */
+  renderSection(section)
+  {
+    const totalText = `${section.total}-${section.xCount}X`;
+    const winnerClass = section.isWinner ? ' winner' : '';
+
+    let html = `<div class="scorecard-relay${winnerClass}">`;
+    html += `<div class="relay-header">${section.label}${section.isWinner ? ' \u2605' : ''}</div>`;
+
+    // Sighters row
+    html += `<div class="scorecard-row"><div class="row-label">Sighters</div><div class="shot-cells">`;
+    if (section.sighters.length === 0)
+    {
+      html += `<div class="shot-cell empty">-</div>`;
+    }
+    else
+    {
+      for (const shot of section.sighters)
       {
-        relayTotal += shot.score;
-        if (shot.isX)
-        {
-          relayXCount++;
-        }
+        html += `<div class="shot-cell sighter">${shot.isX ? 'X' : shot.score}</div>`;
       }
+    }
+    html += `</div></div>`;
 
-      matchTotal += relayTotal;
-      matchXCount += relayXCount;
+    // Record shots, chunked into rows of 10, padded to recordSlots.
+    const slots = Math.max(section.recordSlots, section.records.length);
+    const perRow = 10;
+    const totalRows = Math.max(1, Math.ceil(slots / perRow));
 
-      html += `<div class="scorecard-relay">`;
-      html += `<div class="relay-header">Relay ${relayNum}</div>`;
-
-      // Sighters row
-      html += `<div class="scorecard-row">`;
-      html += `<div class="row-label">Sighters</div>`;
-      html += `<div class="shot-cells">`;
-
-      if (sighters.length === 0)
+    for (let row = 0; row < totalRows; row++)
+    {
+      html += `<div class="scorecard-row"><div class="shot-cells">`;
+      for (let i = row * perRow; i < (row + 1) * perRow && i < slots; i++)
       {
-        html += `<div class="shot-cell empty">-</div>`;
-      }
-      else
-      {
-        for (const shot of sighters)
+        if (i < section.records.length)
         {
-          const scoreText = shot.isX ? 'X' : shot.score.toString();
-          html += `<div class="shot-cell sighter">${scoreText}</div>`;
-        }
-      }
-
-      html += `</div></div>`; // Close shot-cells and scorecard-row
-
-      // Determine max shots per row (20 for normal, 3 for debug)
-      const maxShots = records.length > 0 ? Math.max(20, records.length) : 20;
-      const shotsPerRow = maxShots <= 10 ? maxShots : 10;
-
-      // Record shots - first row
-      html += `<div class="scorecard-row">`;
-      html += `<div class="shot-cells">`;
-
-      for (let i = 0; i < shotsPerRow; i++)
-      {
-        if (i < records.length)
-        {
-          const shot = records[i];
-          const scoreText = shot.isX ? 'X' : shot.score.toString();
-          html += `<div class="shot-cell record">${scoreText}</div>`;
+          const shot = section.records[i];
+          html += `<div class="shot-cell record">${shot.isX ? 'X' : shot.score}</div>`;
         }
         else
         {
           html += `<div class="shot-cell empty">-</div>`;
         }
       }
+      html += `</div>`;
 
-      html += `</div>`; // Close shot-cells
-
-      // Relay total (spans both rows)
-      if (maxShots > shotsPerRow)
+      // Section total appears on the last row; placeholder keeps earlier rows aligned.
+      if (row === totalRows - 1)
       {
-        html += `<div class="relay-total-placeholder"></div>`;
+        html += `<div class="relay-total">${totalText}</div>`;
       }
       else
       {
-        html += `<div class="relay-total">${relayTotal}-${relayXCount}X</div>`;
+        html += `<div class="relay-total-placeholder"></div>`;
       }
-      html += `</div>`; // Close scorecard-row
-
-      // Record shots - second row if needed
-      if (maxShots > shotsPerRow)
-      {
-        html += `<div class="scorecard-row">`;
-        html += `<div class="shot-cells">`;
-
-        for (let i = shotsPerRow; i < maxShots; i++)
-        {
-          if (i < records.length)
-          {
-            const shot = records[i];
-            const scoreText = shot.isX ? 'X' : shot.score.toString();
-            html += `<div class="shot-cell record">${scoreText}</div>`;
-          }
-          else
-          {
-            html += `<div class="shot-cell empty">-</div>`;
-          }
-        }
-
-        html += `</div>`; // Close shot-cells
-
-        // Relay total on second row
-        html += `<div class="relay-total">${relayTotal}-${relayXCount}X</div>`;
-        html += `</div>`; // Close scorecard-row
-      }
-
-      html += `</div>`; // Close scorecard-relay
+      html += `</div>`;
     }
 
-    // Match total
-    html += `<div class="scorecard-footer">`;
-    html += `<div class="match-total">Match Total: ${matchTotal}-${matchXCount}X</div>`;
-    html += `</div>`;
+    // Sudden-death row (pair fire only)
+    if (section.suddenDeath && section.suddenDeath.length > 0)
+    {
+      html += `<div class="scorecard-row"><div class="row-label">Sudden Death</div><div class="shot-cells">`;
+      for (const shot of section.suddenDeath)
+      {
+        html += `<div class="shot-cell record">${shot.isX ? 'X' : shot.score}</div>`;
+      }
+      html += `</div></div>`;
+    }
 
-    content.innerHTML = html;
+    html += `</div>`;
+    return html;
   }
 
   /**

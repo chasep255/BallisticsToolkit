@@ -897,6 +897,35 @@ export class Scope
   }
 
   /**
+   * Snapshot the shooter-specific scope state (aim, dial, zoom).
+   * Used to swap state between players in pair-fire mode.
+   */
+  getScopeState()
+  {
+    return {
+      yaw: this.yaw,
+      pitch: this.pitch,
+      zeroOffsetYaw: this.zeroOffsetYaw,
+      zeroOffsetPitch: this.zeroOffsetPitch,
+      currentFOV: this.currentFOV
+    };
+  }
+
+  /**
+   * Restore a previously captured scope state.
+   */
+  setScopeState(state)
+  {
+    this.yaw = state.yaw;
+    this.pitch = state.pitch;
+    this.zeroOffsetYaw = state.zeroOffsetYaw;
+    this.zeroOffsetPitch = state.zeroOffsetPitch;
+    this.currentFOV = state.currentFOV;
+    this.updateCamera();
+    this.updateScopeDialDisplay();
+  }
+
+  /**
    * Get current wind data (speed, angle, distance)
    */
   getWindData()
