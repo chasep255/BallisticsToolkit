@@ -1376,11 +1376,11 @@ class FClassSimulator
     // Update scorecard to display parameters before any shots
     this.scorecard.update(this.driver.getScorecardModel());
 
-    // Capture initial rifle scope state for both players (pair fire)
-    if (this.mode === 'pair' && this.rifleScope)
+    // Capture initial scope state (rifle + spotting) for both players (pair fire)
+    if (this.mode === 'pair')
     {
-      const initialState = this.rifleScope.getScopeState();
-      this.scopeStates = { p1: initialState, p2: { ...initialState } };
+      const initialState = this.captureScopeState();
+      this.scopeStates = { p1: initialState, p2: this.captureScopeState() };
     }
 
     // Start game clock from ResourceManager
@@ -1589,43 +1589,77 @@ class FClassSimulator
   {
     if (!this.hud) return;
 
-    const model = this.driver.getHudModel();
+    const panels = this.mode === 'pair' ? this.buildPairHudPanels() : this.buildStandardHudPanels();
+    this.hud.render(panels);
+  }
 
-    // Update target number
-    if (this.targets && this.targets.userTarget)
+  /**
+   * Format a shot-count row from a driver shots model (sighters vs record).
+   */
+  shotsRow(shots)
+  {
+    if (shots.mode === 'sighters')
     {
-      this.hud.updateTarget(this.targets.userTarget.targetNumber);
+      return { label: 'Sighters:', value: `${shots.current}/${shots.limit}` };
     }
 
-    this.hud.updateRelay(model.primaryValue, model.primaryLabel);
-    this.hud.updateTimer(model.timerValue, model.timerLabel);
+    const label = shots.label ? `${shots.label}:` : 'Shots:';
+    const value = shots.max ? `${shots.current}/${shots.max}` : `${shots.current}`;
+    return { label, value, color: shots.complete ? '#28a745' : '#ffffff' };
+  }
 
-    if (model.shots.mode === 'sighters')
-    {
-      this.hud.updateSighters(model.shots.current, model.shots.limit);
-    }
-    else
-    {
-      const label = model.shots.label ? `${model.shots.label}:` : 'Shots:';
-      this.hud.updateShots(model.shots.current, model.shots.max, model.shots.complete, label);
-    }
+  /**
+   * Single right-anchored panel for standard mode. Match data comes from the
+   * driver; target/last-shot diagnostics are owned by the simulator.
+   */
+  buildStandardHudPanels()
+  {
+    const m = this.driver.getHudModel();
+    const targetNumber = (this.targets && this.targets.userTarget) ? `#${this.targets.userTarget.targetNumber}` : '#--';
 
-    this.hud.updateScore(model.score, model.xCount);
-    this.hud.updateDropped(model.droppedPoints, model.droppedX);
+    const rows = [
+      { label: m.primaryLabel, value: m.primaryValue },
+      { label: m.timerLabel, value: m.timerValue },
+      { label: 'Target:', value: targetNumber },
+      this.shotsRow(m.shots),
+      { label: 'Score:', value: `${m.score}-${m.xCount}x` },
+      { label: 'Dropped:', value: `${m.droppedPoints}-${m.droppedX}x` }
+    ];
 
     if (this.lastShotData)
     {
-      this.hud.updateLastShot(
-        this.lastShotData.score,
-        this.lastShotData.isX,
-        this.lastShotData.mvFps,
-        this.lastShotData.impactVelocityFps
-      );
+      rows.push({ label: 'Last Shot:', value: `${this.lastShotData.score}${this.lastShotData.isX ? 'x' : ''}` });
+      rows.push({ label: 'MV:', value: `${Math.round(this.lastShotData.mvFps)} fps` });
+      rows.push({ label: 'Impact V:', value: `${Math.round(this.lastShotData.impactVelocityFps)} fps` });
     }
     else
     {
-      this.hud.updateLastShot('--', false, null, null);
+      rows.push({ label: 'Last Shot:', value: '--' });
+      rows.push({ label: 'MV:', value: '-- fps' });
+      rows.push({ label: 'Impact V:', value: '-- fps' });
     }
+
+    return [{ title: null, active: true, rows }];
+  }
+
+  /**
+   * One panel per shooter for pair fire; the active shooter's panel is
+   * highlighted. players[0] (the right shooter) is the right-most column.
+   */
+  buildPairHudPanels()
+  {
+    const m = this.driver.getHudModel();
+    return m.players.map(p => (
+    {
+      title: p.name,
+      active: p.active,
+      rows: [
+        { label: 'Time:', value: p.timerValue },
+        this.shotsRow(p.shots),
+        { label: 'Score:', value: `${p.score}-${p.xCount}x` },
+        { label: 'Last:', value: p.lastShot ? `${p.lastShot.score}${p.lastShot.isX ? 'x' : ''}` : '--' }
+      ]
+    }));
   }
 
   /**
@@ -1668,11 +1702,37 @@ class FClassSimulator
   }
 
   /**
-   * Swap rifle scope state when the active player changes (pair fire only).
+   * Snapshot the active shooter's rifle and spotting scope settings.
+   */
+  captureScopeState()
+  {
+    return {
+      rifle: this.rifleScope ? this.rifleScope.getScopeState() : null,
+      spotting: this.spottingScope ? this.spottingScope.getScopeState() : null
+    };
+  }
+
+  /**
+   * Restore a shooter's rifle and spotting scope settings.
+   */
+  applyScopeState(state)
+  {
+    if (state.rifle && this.rifleScope)
+    {
+      this.rifleScope.setScopeState(state.rifle);
+    }
+    if (state.spotting && this.spottingScope)
+    {
+      this.spottingScope.setScopeState(state.spotting);
+    }
+  }
+
+  /**
+   * Swap rifle + spotting scope state when the active player changes (pair fire only).
    */
   swapScopeIfTurnChanged()
   {
-    if (this.mode !== 'pair' || !this.rifleScope)
+    if (this.mode !== 'pair')
     {
       return;
     }
@@ -1683,10 +1743,10 @@ class FClassSimulator
       return;
     }
 
-    this.scopeStates[this.activeScopePlayer] = this.rifleScope.getScopeState();
+    this.scopeStates[this.activeScopePlayer] = this.captureScopeState();
     if (this.scopeStates[next])
     {
-      this.rifleScope.setScopeState(this.scopeStates[next]);
+      this.applyScopeState(this.scopeStates[next]);
     }
     this.activeScopePlayer = next;
   }

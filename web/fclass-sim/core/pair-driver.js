@@ -349,38 +349,69 @@ export class PairFireDriver extends MatchDriver
     return this.active;
   }
 
-  getHudModel()
+  lastScoredShotFor(playerId)
   {
-    const player = this.players[this.active];
-    const records = this.recordShotsFor(this.active);
-    const { total, xCount } = this.aggregate(records);
-    const shotCount = records.length;
-
-    const model = {
-      primaryLabel: 'Turn:',
-      primaryValue: player.name,
-      timerLabel: 'Time:',
-      timerValue: this.turnSeconds === null ? '\u221E' : MatchDriver.formatTime(this.turnRemaining),
-      score: total,
-      xCount: xCount,
-      droppedPoints: shotCount * 10 - total,
-      droppedX: shotCount - xCount
-    };
-
-    if (this.suddenDeath)
+    for (let i = this.shotLog.length - 1; i >= 0; i--)
     {
-      model.shots = { mode: 'record', current: this.sdShotsFor(this.active).length, max: 0, complete: false, label: 'Sudden Death' };
+      const shot = this.shotLog[i];
+      if (shot.player === playerId && !shot.isSighter)
+      {
+        return { score: shot.score, isX: shot.isX };
+      }
     }
-    else if (player.phase === 'sighters' && player.sightersFired < this.sighterCap)
+    return null;
+  }
+
+  buildHudPlayer(playerId)
+  {
+    const player = this.players[playerId];
+    const { total, xCount } = this.aggregate(this.recordShotsFor(playerId));
+    const isActive = !this.complete && playerId === this.active;
+
+    let timerValue;
+    if (!isActive)
     {
-      model.shots = { mode: 'sighters', current: player.sightersFired, limit: this.sighterCap };
+      timerValue = '--';
+    }
+    else if (this.turnSeconds === null)
+    {
+      timerValue = '\u221E';
     }
     else
     {
-      model.shots = { mode: 'record', current: player.recordShotsFired, max: this.recordShots, complete: player.recordShotsFired >= this.recordShots };
+      timerValue = MatchDriver.formatTime(this.turnRemaining);
     }
 
-    return model;
+    let shots;
+    if (this.suddenDeath)
+    {
+      shots = { mode: 'record', current: this.sdShotsFor(playerId).length, max: 0, complete: false, label: 'Sudden Death' };
+    }
+    else if (player.phase === 'sighters' && player.sightersFired < this.sighterCap)
+    {
+      shots = { mode: 'sighters', current: player.sightersFired, limit: this.sighterCap };
+    }
+    else
+    {
+      shots = { mode: 'record', current: player.recordShotsFired, max: this.recordShots, complete: player.recordShotsFired >= this.recordShots };
+    }
+
+    return {
+      id: playerId,
+      name: player.name,
+      active: isActive,
+      timerValue: timerValue,
+      shots: shots,
+      score: total,
+      xCount: xCount,
+      lastShot: this.lastScoredShotFor(playerId)
+    };
+  }
+
+  getHudModel()
+  {
+    // players[0] is the right-most HUD column (P1, the "right" shooter).
+    return { players: [this.buildHudPlayer('p1'), this.buildHudPlayer('p2')] };
   }
 
   getControlsModel()
