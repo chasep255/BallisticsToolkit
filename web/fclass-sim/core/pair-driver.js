@@ -2,9 +2,9 @@
  * PairFireDriver - V2-Finale-style pair fire for two hot-seat human players.
  *
  * Both players share one target and alternate single shots. P1 ("right") shoots
- * first, then P2 ("left"), back and forth. Each player gets up to 2 convertible
- * sighters followed by 10 record shots. A per-turn timer (or unlimited) limits
- * each shot; running out scores a zero for that shot.
+ * first, then P2 ("left"), back and forth. Each player gets up to 2 sighters
+ * followed by 10 record shots. A per-turn timer (or unlimited) limits each shot;
+ * running out scores a zero for that shot.
  *
  * Tiebreak after both players finish their record shots:
  *   1. Higher record total wins.
@@ -24,7 +24,7 @@ export class PairFireDriver extends MatchDriver
    * @param {string} config.player2Name   default 'Player2'
    * @param {number|null} config.turnSeconds  per-turn time limit, or null for unlimited
    * @param {number} config.recordShots    record shots per player (default 10)
-   * @param {number} config.sighters       convertible sighters per player (default 2)
+   * @param {number} config.sighters       sighters per player (default 2)
    */
   constructor(config = {})
   {
@@ -138,7 +138,7 @@ export class PairFireDriver extends MatchDriver
 
   onShotScored(shotData, now)
   {
-    this.logShot(this.active, shotData, false);
+    this.logShot(this.active, shotData);
     this.afterShot(now);
   }
 
@@ -150,8 +150,9 @@ export class PairFireDriver extends MatchDriver
     // Request a miss animation (kept separate from the completion event slot).
     this._timeoutPending = { relativeX: 0, relativeY: 0 };
 
-    // A timeout scores a zero (miss) for the active shooter's current shot.
-    this.logShot(this.active, { score: 0, isX: false, mvFps: null, impactVelocityFps: null }, true);
+    // A timeout scores a zero for the active shooter's current shot (a zeroed
+    // sighter while in the sighter phase, otherwise a zero record shot).
+    this.logShot(this.active, { score: 0, isX: false, mvFps: null, impactVelocityFps: null });
     this.afterShot(now);
   }
 
@@ -163,10 +164,11 @@ export class PairFireDriver extends MatchDriver
   }
 
   /**
-   * Append a shot to the log with correct classification for the given player.
-   * @param {boolean} forceRecord true for timeout zeroes (always a record shot)
+   * Append a shot to the log, classified by the player's current phase. A
+   * timeout zero is logged the same way: a zeroed sighter if the player is still
+   * in the sighter phase, otherwise a zero record shot.
    */
-  logShot(playerId, shotData, forceRecord)
+  logShot(playerId, shotData)
   {
     const player = this.players[playerId];
     let isSighter = false;
@@ -176,7 +178,7 @@ export class PairFireDriver extends MatchDriver
     {
       suddenDeath = true;
     }
-    else if (!forceRecord && player.phase === 'sighters' && player.sightersFired < this.sighterCap)
+    else if (player.phase === 'sighters' && player.sightersFired < this.sighterCap)
     {
       isSighter = true;
     }
@@ -213,10 +215,10 @@ export class PairFireDriver extends MatchDriver
   }
 
   /**
-   * Choose who shoots next. Players take their shots independently (sighters and
-   * conversions mean they may need a different number of turns to finish their
-   * record shots), so a player who has completed all record shots is skipped -
-   * the other player keeps shooting until they finish too.
+   * Choose who shoots next. Players take their shots independently (skipping
+   * sighters early means they may need a different number of turns to finish
+   * their record shots), so a player who has completed all record shots is
+   * skipped - the other player keeps shooting until they finish too.
    */
   advanceTurn()
   {
@@ -251,30 +253,6 @@ export class PairFireDriver extends MatchDriver
     if (player.phase === 'sighters')
     {
       player.phase = 'record';
-    }
-  }
-
-  convertSighter()
-  {
-    const player = this.players[this.active];
-    if (player.phase !== 'sighters')
-    {
-      return;
-    }
-
-    // Find the active player's most recent sighter and reclassify it as record shot #1.
-    for (let i = this.shotLog.length - 1; i >= 0; i--)
-    {
-      const shot = this.shotLog[i];
-      if (shot.player === this.active && shot.isSighter)
-      {
-        shot.isSighter = false;
-        player.phase = 'record';
-        player.recordShotsFired++;
-        shot.recordIndex = player.recordShotsFired;
-        console.log(`${LOG_PREFIX} ${player.name} converted a sighter (${shot.score}${shot.isX ? 'X' : ''}) to record`);
-        return;
-      }
     }
   }
 
@@ -409,16 +387,16 @@ export class PairFireDriver extends MatchDriver
   {
     if (this.complete || this.suddenDeath)
     {
-      return { goForRecord: false, goForRecordText: 'Go For Record', convertSighter: false };
+      return { goForRecord: false, goForRecordText: 'Go For Record' };
     }
 
+    // Only offer "Go For Record" while the player still has sighters left to skip;
+    // once both sighters are used the next shot is automatically a record shot.
     const player = this.players[this.active];
-    const inSighters = player.phase === 'sighters';
+    const canSkip = player.phase === 'sighters' && player.sightersFired < this.sighterCap;
     return {
-      goForRecord: inSighters,
-      goForRecordText: `${player.name}: Go For Record`,
-      convertSighter: inSighters && player.sightersFired >= 1,
-      convertSighterText: `${player.name}: Convert Sighter`
+      goForRecord: canSkip,
+      goForRecordText: `${player.name}: Go For Record`
     };
   }
 

@@ -61,9 +61,6 @@ export class MatchDriver
   /** End the sighter phase early and go to record. */
   goForRecord() {}
 
-  /** Convert the active shooter's most recent sighter into a record shot. */
-  convertSighter() {}
-
   // ===== Progression (optional) =====
 
   /** Proceed past a completed segment (e.g. start the next relay). @param {number} now seconds */
@@ -83,7 +80,7 @@ export class MatchDriver
   /** @returns {Object} which contextual buttons to show */
   getControlsModel()
   {
-    return { goForRecord: false, goForRecordText: 'Go For Record', convertSighter: false };
+    return { goForRecord: false, goForRecordText: 'Go For Record' };
   }
 
   // ===== Events =====

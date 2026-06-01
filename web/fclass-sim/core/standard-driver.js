@@ -238,12 +238,12 @@ export class StandardMatchDriver extends MatchDriver
   {
     if (this.phase !== 'sighters')
     {
-      return { goForRecord: false, goForRecordText: 'Go For Record', convertSighter: false };
+      return { goForRecord: false, goForRecordText: 'Go For Record' };
     }
 
     const remaining = this.getSightersRemaining();
     const text = remaining === Infinity ? 'Go For Record' : `Go For Record (${remaining} sighters left)`;
-    return { goForRecord: true, goForRecordText: text, convertSighter: false };
+    return { goForRecord: true, goForRecordText: text };
   }
 
   getScorecardModel()

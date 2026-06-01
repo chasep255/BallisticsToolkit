@@ -51,6 +51,18 @@ const DEFAULT_PARAMS = {
 };
 
 /**
+ * Whether a key event originated from a text field / form control, in which case
+ * gameplay key handlers (scope controls, fire) should ignore it so the user can type.
+ */
+function isEditableTarget(event)
+{
+  const el = event.target;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+}
+
+/**
  * Show/hide the standard- and pair-mode config groups based on the selected mode.
  */
 function updateModeVisibility()
@@ -275,18 +287,6 @@ function setupUI()
     if (webglGame && webglGame.driver)
     {
       webglGame.driver.goForRecord();
-      webglGame.updateControls();
-      webglGame.updateHUD();
-    }
-  });
-
-  // Convert Sighter button (pair fire)
-  document.getElementById('convertSighterBtn').addEventListener('click', () =>
-  {
-    if (webglGame && webglGame.driver)
-    {
-      webglGame.driver.convertSighter();
-      webglGame.scorecard.update(webglGame.driver.getScorecardModel());
       webglGame.updateControls();
       webglGame.updateHUD();
     }
@@ -831,6 +831,7 @@ class FClassSimulator
     // Unified key handler for spotting scope
     this.spottingScopeKeyHandler = (event) =>
     {
+      if (isEditableTarget(event)) return;
       if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
       const isKeyDown = (event.type === 'keydown');
       const key = event.key.toLowerCase();
@@ -858,6 +859,7 @@ class FClassSimulator
     // Unified key handler for rifle scope
     this.rifleScopeKeyHandler = (event) =>
     {
+      if (isEditableTarget(event)) return;
       if (event.ctrlKey || event.altKey || event.metaKey) return;
       const isKeyDown = (event.type === 'keydown');
 
@@ -1395,7 +1397,7 @@ class FClassSimulator
     }
     this.updateHUD();
 
-    // Update contextual buttons (Go For Record / Convert Sighter)
+    // Update contextual buttons (Go For Record)
     this.updateControls();
 
     this.isRunning = true;
@@ -1922,7 +1924,7 @@ class FClassSimulator
   }
 
   /**
-   * Update contextual buttons (Go For Record / Convert Sighter) from the driver.
+   * Update contextual buttons (Go For Record) from the driver.
    */
   updateControls()
   {
@@ -1937,16 +1939,6 @@ class FClassSimulator
         goBtn.textContent = controls.goForRecordText;
       }
     }
-
-    const convertBtn = document.getElementById('convertSighterBtn');
-    if (convertBtn)
-    {
-      convertBtn.style.display = controls.convertSighter ? 'inline-block' : 'none';
-      if (controls.convertSighter)
-      {
-        convertBtn.textContent = controls.convertSighterText || 'Convert Sighter';
-      }
-    }
   }
 
   /**
@@ -1956,6 +1948,7 @@ class FClassSimulator
   {
     this.shotFiringHandler = (event) =>
     {
+      if (isEditableTarget(event)) return;
       if (event.code === 'Space')
       {
         if (this.ballistics && this.ballistics.isBulletAnimating())
