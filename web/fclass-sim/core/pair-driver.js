@@ -49,6 +49,11 @@ export class PairFireDriver extends MatchDriver
     this.turnStartTime = null;
     this.turnTimerRunning = false;
 
+    // A shot has been scored but the turn has not yet switched. The switch is
+    // deferred until the target is back up (so the shooter sees their impact);
+    // firing is blocked until then.
+    this.turnAdvancePending = false;
+
     // One-shot "animate a miss" signal for turn timeouts
     this._timeoutPending = null;
 
@@ -81,6 +86,13 @@ export class PairFireDriver extends MatchDriver
 
   onTargetReady(now)
   {
+    // Perform the deferred turn switch now that the target is back up.
+    if (this.turnAdvancePending && !this.complete)
+    {
+      this.advanceTurn();
+      this.turnAdvancePending = false;
+    }
+
     if (this.complete)
     {
       this.turnTimerRunning = false;
@@ -127,7 +139,9 @@ export class PairFireDriver extends MatchDriver
 
   canFire()
   {
-    return !this.complete;
+    // No firing while a turn switch is pending (waiting for the target to come
+    // back up and the active shooter to change).
+    return !this.complete && !this.turnAdvancePending;
   }
 
   onShotFired(now)
@@ -207,11 +221,17 @@ export class PairFireDriver extends MatchDriver
     });
   }
 
-  /** Advance the turn (skipping a finished player) and evaluate completion. */
+  /**
+   * Evaluate completion and flag the turn to advance. The actual turn switch is
+   * deferred to onTargetReady() so the shooter can see their impact first.
+   */
   afterShot(now)
   {
-    this.advanceTurn();
     this.evaluateState(now);
+    if (!this.complete)
+    {
+      this.turnAdvancePending = true;
+    }
   }
 
   /**

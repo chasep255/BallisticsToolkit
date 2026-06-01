@@ -34,6 +34,7 @@ const DEFAULT_PARAMS = {
   minutesPerRelay: '20',
   player1Name: 'Player1',
   player2Name: 'Player2',
+  pairShots: '10',
   turnTime: 'unlimited',
   fclassMode: 'fclass-1000',
   windPreset: 'Moderate',
@@ -432,6 +433,7 @@ function getGameParams()
     minutesPerRelay: parseFloat(document.getElementById('minutesPerRelay').value),
     player1Name: document.getElementById('player1Name').value || 'Player1',
     player2Name: document.getElementById('player2Name').value || 'Player2',
+    pairShots: parseInt(document.getElementById('pairShots').value),
     turnSeconds: turnTimeValue === 'unlimited' ? null : parseInt(turnTimeValue),
     // Bullet parameters
     mv: parseFloat(document.getElementById('mv').value),
@@ -514,6 +516,10 @@ class FClassSimulator
   static TARGET_CENTER_HEIGHT = FClassSimulator.PITS_HEIGHT + FClassSimulator.TARGET_GAP_ABOVE_PITS + FClassSimulator.TARGET_SIZE / 2; // Target center height when raised
   static TARGET_ANIMATION_SPEED = 0.75; // yards per second
 
+  // Pair fire: pause after the target is back up before switching shooters,
+  // so the shooter who just fired can see their impact.
+  static TURN_SWITCH_DELAY_MS = 3000;
+
   // Ground/scenery
   static GROUND_EXTENSION_BEYOND_TARGETS = 2500; // yards (extends to mountains)
 
@@ -593,6 +599,7 @@ class FClassSimulator
       this.driver = new PairFireDriver({
         player1Name: params.player1Name,
         player2Name: params.player2Name,
+        recordShots: params.pairShots,
         turnSeconds: params.turnSeconds
       });
     }
@@ -606,9 +613,12 @@ class FClassSimulator
       });
     }
 
-    // Per-player rifle scope state (pair fire only): { p1, p2 }
+    // Per-player scope state (pair fire only): { p1, p2 }
     this.scopeStates = {};
     this.activeScopePlayer = this.driver.getActivePlayerId();
+
+    // Pending pair-fire turn-switch timer (impact-viewing delay)
+    this.turnSwitchTimeout = null;
 
     // Scorecard
     this.scorecard = new Scorecard();
@@ -1456,6 +1466,13 @@ class FClassSimulator
       this.animationId = null;
     }
 
+    // Cancel any pending pair-fire turn switch
+    if (this.turnSwitchTimeout)
+    {
+      clearTimeout(this.turnSwitchTimeout);
+      this.turnSwitchTimeout = null;
+    }
+
     // Stop ambient audio loops
     ResourceManager.audio.stopLoop('background_noise');
     ResourceManager.audio.stopLoop('wind');
@@ -1969,15 +1986,41 @@ class FClassSimulator
   }
 
   /**
-   * Handle target animation completion (called when target finishes raising)
+   * Handle target animation completion (called when target finishes raising).
+   *
+   * In pair fire the turn switch (HUD + scope swap) is held back briefly so the
+   * shooter who just fired can see their impact on the raised target. Firing
+   * stays blocked (driver.canFire() is false while the switch is pending) until
+   * the switch completes.
    */
   onTargetAnimationComplete()
   {
-    // Swap rifle scope state if the turn changed (pair fire)
-    this.swapScopeIfTurnChanged();
+    if (this.mode === 'pair')
+    {
+      this.turnSwitchTimeout = setTimeout(() => this.completeTurnSwitch(), FClassSimulator.TURN_SWITCH_DELAY_MS);
+      return;
+    }
 
-    // Tell the driver the target is ready again (starts the next per-turn clock)
     this.driver.onTargetReady(ResourceManager.time.getElapsedTime());
+    this.updateHUD();
+    this.updateControls();
+  }
+
+  /**
+   * Pair fire: advance the turn, swap to the new shooter's scopes, and refresh
+   * the HUD/controls. Runs after the impact-viewing delay.
+   */
+  completeTurnSwitch()
+  {
+    this.turnSwitchTimeout = null;
+    if (!this.isRunning)
+    {
+      return;
+    }
+
+    // Advance the driver's turn first, then mirror the new active shooter's scopes.
+    this.driver.onTargetReady(ResourceManager.time.getElapsedTime());
+    this.swapScopeIfTurnChanged();
 
     this.updateHUD();
     this.updateControls();
