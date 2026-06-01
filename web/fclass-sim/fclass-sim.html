@@ -239,14 +239,15 @@
             - Acknowledge the relay-complete dialog to start the next relay<br><br>
 
             <strong>Pair Fire (V2-Finale style):</strong><br>
-            - Two human players share one keyboard and one target<br>
-            - Player 1 (right) shoots first, then Player 2 (left), alternating<br>
+            - Two human players share one rifle, one keyboard, and one target<br>
+            - Player 1 (left) shoots first, then Player 2 (right), alternating<br>
             - Each player: 2 sighters, then record shots (configurable, default 10)<br>
             - "Go For Record" skips your remaining sighters and starts record shots<br>
             - Time/Turn limits each shot (or Unlimited); running out scores a zero for that shot<br>
-            - The HUD shows whose turn it is and that player's clock<br>
-            - Tiebreak: highest total, then most Xs, then sudden death (an X beats a non-X 10)<br>
-            - Each player keeps their own scope dial / aim / zoom across turns<br><br>
+            - After a shot, the target drops and comes back up with the score, then hands off to the next shooter after a short pause; you can't fire out of turn during the switch<br>
+            - A HUD per shooter shows each player's clock, shots, and score, with the active shooter highlighted<br>
+            - Each player keeps their own rifle and spotting scope (aim / dial / zoom) across turns<br>
+            - Tiebreak: highest total, then most Xs, then sudden death (one alternating shot each; an X beats a non-X 10; repeats until broken)<br><br>
 
             <strong>Both modes:</strong> the rifle is disabled while the target is down (changing/marking).
           </div>
@@ -279,16 +280,18 @@
         <div class="help-section">
           <h3>HUD Display (Top-Right)</h3>
           <div class="param-help">
-            - <strong>Relay:</strong> Current relay (1/3, 2/3, 3/3)<br>
+            <strong>Standard mode</strong> shows a single panel:<br>
+            - <strong>Relay:</strong> Current relay (e.g. 1/3)<br>
             - <strong>Timer:</strong> Remaining time (minutes:seconds)<br>
             - <strong>Target:</strong> Your target number<br>
-            - <strong>Sighters:</strong> Count N/∞ (Relay 1) or N/2 (Relays 2-3), only shown during sighters<br>
-            - <strong>Shots:</strong> Record shots N/20 (turns green at 20/20)<br>
+            - <strong>Sighters:</strong> Count N/∞ (Relay 1) or N/2 (later relays), only shown during sighters<br>
+            - <strong>Shots:</strong> Record shots fired / total (turns green when complete)<br>
             - <strong>Score:</strong> Total score and X-count for current relay<br>
             - <strong>Dropped:</strong> Points and X-count dropped in current relay<br>
             - <strong>Last Shot:</strong> Score value (e.g., "10x" or "9")<br>
             - <strong>MV:</strong> Muzzle velocity for last shot (fps)<br>
-            - <strong>Impact V:</strong> Impact velocity for last shot (fps)
+            - <strong>Impact V:</strong> Impact velocity for last shot (fps)<br><br>
+            <strong>Pair Fire mode</strong> shows one compact panel per shooter (Player 1 left, Player 2 right) with their turn clock, shot count, score, and last shot. The active shooter's panel is highlighted.
           </div>
         </div>
 
@@ -297,8 +300,9 @@
           <div class="param-help">
             - Click "Scorecard" button to view detailed match information<br>
             - Shows all match parameters (distance, target, wind, ballistics, rifle specs)<br>
-            - Per-relay breakdown with sighters and two rows of 10 record shots<br>
-            - Relay totals and overall match total<br>
+            - Standard: breakdown per relay (sighters + record shots) with relay and match totals<br>
+            - Pair Fire: split per shooter with each player's sighters, record shots, total, and X-count; the winner is highlighted<br>
+            - Each section has an expandable "Target" diagram showing the impacts on a scaled target (yellow = sighters, red = record shots)<br>
             - Available anytime (shows parameters even before first shot)
           </div>
         </div>
