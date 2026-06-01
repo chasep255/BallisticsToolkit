@@ -50,7 +50,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Adjustable Time Speed** - Speed up or slow down simulation time to observe wind patterns
 
 ### 🎮 F-Class Simulator
-- **Two Match Modes** - Standard (configurable matches, shots per match, and minutes per match; defaults 3 × 20 shots × 20 min aggregate) and Pair Fire (V2-Finale style: two hot-seat players alternating on one rifle/target)
+- **Two Match Modes** - Standard (configurable matches, shots per match, and minutes per match; defaults 3 × 20 shots × 20 min aggregate) and Pair Fire (two players alternating on one rifle/target)
 - **Pair Fire** - Per-turn timer (or unlimited), per-player sighters and configurable record shots, per-shooter scope persistence, dual HUD with active-shooter highlight, and X-count → sudden-death tiebreak
 - **Dual Scopes** - Spotting scope for wind reading, rifle scope for aiming
 - **Wind Reading** - Heat mirage effect responds to wind speed and direction; reactive 3D wind flags at multiple distances

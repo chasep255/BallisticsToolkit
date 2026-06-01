@@ -1,5 +1,5 @@
 /**
- * PairFireDriver - V2-Finale-style pair fire for two hot-seat human players.
+ * PairFireDriver - Pair fire for two players.
  *
  * Both players share one target and alternate single shots. P1 ("left") shoots
  * first, then P2 ("right"), back and forth. Each player gets up to 2 sighters

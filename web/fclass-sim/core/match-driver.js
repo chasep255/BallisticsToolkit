@@ -8,7 +8,7 @@
  *
  * Concrete drivers:
  *   - StandardMatchDriver: N matches x M record shots, T minutes per match.
- *   - PairFireDriver: two hot-seat players alternating shots.
+ *   - PairFireDriver: two players alternating shots.
  *
  * Subclasses MUST override the methods marked abstract below.
  */
