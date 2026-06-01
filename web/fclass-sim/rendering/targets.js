@@ -486,6 +486,24 @@ export class TargetRenderer
     return this.btkTarget;
   }
 
+  /**
+   * Scoring-ring geometry for the current target, used to draw the scorecard
+   * grouping diagram. Radii are in yards from target center.
+   * @returns {{rings: Array<{ring:number, radiusYards:number}>, xRadiusYards:number}}
+   */
+  getScoringRings()
+  {
+    const btk = getBTK();
+    const rings = [];
+    for (let ring = 5; ring <= 10; ring++)
+    {
+      const diameterMeters = this.btkTarget.getRingInnerDiameter(ring);
+      rings.push({ ring: ring, radiusYards: btk.Conversions.metersToYards(diameterMeters) / 2 });
+    }
+    const xRadiusYards = btk.Conversions.metersToYards(this.btkTarget.getXRingDiameter()) / 2;
+    return { rings, xRadiusYards };
+  }
+
   raiseTarget(targetNumber)
   {
     if (targetNumber < 1 || targetNumber > this.targetFrames.length)

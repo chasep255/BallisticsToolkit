@@ -153,6 +153,36 @@
   padding: 16px;
 }
 
+.group-details {
+  margin-top: 12px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 10px;
+}
+
+.group-details > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  color: #2c5aa0;
+  user-select: none;
+  list-style: revert;
+}
+
+.group-details > summary:hover {
+  text-decoration: underline;
+}
+
+.group-diagram {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.group-svg {
+  display: inline-block;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
 .relay-header {
   font-size: 18px;
   font-weight: bold;

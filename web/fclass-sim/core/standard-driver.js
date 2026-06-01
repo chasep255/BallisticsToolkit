@@ -114,6 +114,8 @@ export class StandardMatchDriver extends MatchDriver
       isX: shotData.isX,
       mvFps: shotData.mvFps,
       impactVelocityFps: shotData.impactVelocityFps,
+      relativeX: shotData.relativeX ?? null,
+      relativeY: shotData.relativeY ?? null,
       timeSec: this.timerDuration - this.timeRemaining,
       suddenDeath: false
     });
@@ -268,6 +270,7 @@ export class StandardMatchDriver extends MatchDriver
         records: records.map(s => ({ score: s.score, isX: s.isX })),
         suddenDeath: [],
         recordSlots: this.maxRecordShots,
+        group: MatchDriver.buildGroup(relayShots),
         total: total,
         xCount: xCount,
         isWinner: false

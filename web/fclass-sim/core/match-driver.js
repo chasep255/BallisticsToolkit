@@ -131,4 +131,16 @@ export class MatchDriver
     }
     return { total, xCount, count: shots.length };
   }
+
+  /**
+   * Build a grouping point list (impact positions in yards from target center)
+   * for the scorecard diagram. Shots without a recorded position (e.g. turn
+   * timeouts) are skipped.
+   */
+  static buildGroup(shots)
+  {
+    return shots
+      .filter(s => s.relativeX !== null && s.relativeX !== undefined && s.relativeY !== null && s.relativeY !== undefined)
+      .map(s => ({ x: s.relativeX, y: s.relativeY, isX: s.isX, isSighter: s.isSighter }));
+  }
 }

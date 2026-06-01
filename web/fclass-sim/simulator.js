@@ -518,7 +518,7 @@ class FClassSimulator
 
   // Pair fire: pause after the target is back up before switching shooters,
   // so the shooter who just fired can see their impact.
-  static TURN_SWITCH_DELAY_MS = 3000;
+  static TURN_SWITCH_DELAY_MS = 1500;
 
   // Ground/scenery
   static GROUND_EXTENSION_BEYOND_TARGETS = 2500; // yards (extends to mountains)
@@ -1383,6 +1383,7 @@ class FClassSimulator
       length: this.length,
       twist: this.twist
     });
+    this.scorecard.setTargetSpec(this.targets.getScoringRings());
     // Update scorecard to display parameters before any shots
     this.scorecard.update(this.driver.getScorecardModel());
 
@@ -1661,12 +1662,14 @@ class FClassSimulator
 
   /**
    * One panel per shooter for pair fire; the active shooter's panel is
-   * highlighted. players[0] (the right shooter) is the right-most column.
+   * highlighted. HUD columns fill from the right edge leftwards, so the logical
+   * [P1, P2] order is reversed to render P1 (left shooter) on the left and P2
+   * (right shooter) on the right, matching the config form and the labels.
    */
   buildPairHudPanels()
   {
     const m = this.driver.getHudModel();
-    return m.players.map(p => (
+    return m.players.slice().reverse().map(p => (
     {
       title: p.name,
       active: p.active,

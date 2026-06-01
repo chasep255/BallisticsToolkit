@@ -1,8 +1,8 @@
 /**
  * PairFireDriver - V2-Finale-style pair fire for two hot-seat human players.
  *
- * Both players share one target and alternate single shots. P1 ("right") shoots
- * first, then P2 ("left"), back and forth. Each player gets up to 2 sighters
+ * Both players share one target and alternate single shots. P1 ("left") shoots
+ * first, then P2 ("right"), back and forth. Each player gets up to 2 sighters
  * followed by 10 record shots. A per-turn timer (or unlimited) limits each shot;
  * running out scores a zero for that shot.
  *
@@ -216,6 +216,8 @@ export class PairFireDriver extends MatchDriver
       isX: shotData.isX,
       mvFps: shotData.mvFps,
       impactVelocityFps: shotData.impactVelocityFps,
+      relativeX: shotData.relativeX ?? null,
+      relativeY: shotData.relativeY ?? null,
       timeSec: 0,
       suddenDeath: suddenDeath
     });
@@ -430,7 +432,7 @@ export class PairFireDriver extends MatchDriver
 
   getHudModel()
   {
-    // players[0] is the right-most HUD column (P1, the "right" shooter).
+    // Logical order [P1, P2]; the view places P1 (left shooter) on the left.
     return { players: [this.buildHudPlayer('p1'), this.buildHudPlayer('p2')] };
   }
 
@@ -454,12 +456,12 @@ export class PairFireDriver extends MatchDriver
   buildSection(playerId)
   {
     const player = this.players[playerId];
-    const sighters = this.shotLog
-      .filter(s => s.player === playerId && s.isSighter)
-      .map(s => ({ score: s.score, isX: s.isX }));
-    const records = this.recordShotsFor(playerId).map(s => ({ score: s.score, isX: s.isX }));
+    const sighterShots = this.shotLog.filter(s => s.player === playerId && s.isSighter);
+    const recordShots = this.recordShotsFor(playerId);
+    const sighters = sighterShots.map(s => ({ score: s.score, isX: s.isX }));
+    const records = recordShots.map(s => ({ score: s.score, isX: s.isX }));
     const suddenDeath = this.sdShotsFor(playerId).map(s => ({ score: s.score, isX: s.isX }));
-    const { total, xCount } = this.aggregate(this.recordShotsFor(playerId));
+    const { total, xCount } = this.aggregate(recordShots);
 
     return {
       label: player.name,
@@ -467,6 +469,7 @@ export class PairFireDriver extends MatchDriver
       records: records,
       suddenDeath: suddenDeath,
       recordSlots: this.recordShots,
+      group: MatchDriver.buildGroup([...sighterShots, ...recordShots]),
       total: total,
       xCount: xCount,
       isWinner: this.winner === playerId
