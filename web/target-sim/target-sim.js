@@ -17,7 +17,7 @@ const DEFAULT_PARAMS = {
   length: '1.4',
   twistRate: '8',
   enableSpinEffects: true,
-  target: 'MR-1FCA',
+  target: 'MR-1FCA', // 600 yd F-Class repair center
   range: '600',
   shots: '60',
   matches: '100',
@@ -36,6 +36,11 @@ function setDefaultValues()
 {
   for (const [key, value] of Object.entries(DEFAULT_PARAMS))
   {
+    if (key === 'target')
+    {
+      continue; // target select is populated separately once WASM targets are loaded
+    }
+
     const element = document.getElementById(key);
     if (element)
     {
@@ -43,6 +48,108 @@ function setDefaultValues()
       else element.value = value;
     }
   }
+}
+
+function applyDefaultTargetSelection()
+{
+  const targetSelect = document.getElementById('target');
+  const hasDefault = [...targetSelect.options].some(option => option.value === DEFAULT_PARAMS.target);
+  if (hasDefault)
+  {
+    targetSelect.value = DEFAULT_PARAMS.target;
+  }
+}
+
+function resetToDefaults()
+{
+  if (window.targetSimulator?.isRunning)
+  {
+    window.targetSimulator.stopSimulation();
+  }
+
+  setDefaultValues();
+  applyDefaultTargetSelection();
+  SettingsCookies.saveAll();
+
+  if (window.targetSimulator)
+  {
+    window.targetSimulator.clearResults();
+  }
+}
+
+function normalizeTargetName(value, targetNames)
+{
+  if (!value)
+  {
+    return null;
+  }
+
+  if (targetNames.includes(value))
+  {
+    return value;
+  }
+
+  // Accept legacy cookies that accidentally stored the display label.
+  const stripped = value.split(' — ')[0];
+  if (targetNames.includes(stripped))
+  {
+    return stripped;
+  }
+
+  return null;
+}
+
+function populateTargetDropdown(preferDefaults = false)
+{
+  const targetSelect = document.getElementById('target');
+
+  // Clear existing options
+  targetSelect.innerHTML = '';
+
+  // Get available targets from C++
+  const availableTargets = btk.Targets.listTargets();
+
+  // Add each target as an option directly from C++ vector
+  const targetNames = [];
+  for (let i = 0; i < availableTargets.size(); i++)
+  {
+    const targetName = availableTargets.get(i);
+    targetNames.push(targetName);
+
+    const t = btk.Targets.getTarget(targetName);
+    const desc = t.getDescription();
+    t.delete();
+    const option = document.createElement('option');
+    option.value = targetName; // value is the C++ target key only
+    option.textContent = `${targetName} — ${desc}`; // description is display-only
+    targetSelect.appendChild(option);
+  }
+
+  let selectedTarget = null;
+  if (!preferDefaults)
+  {
+    const savedValue = normalizeTargetName(SettingsCookies.get('target_sim_target'), targetNames);
+    if (savedValue)
+    {
+      selectedTarget = savedValue;
+    }
+  }
+  else
+  {
+    selectedTarget = targetNames.includes(DEFAULT_PARAMS.target) ? DEFAULT_PARAMS.target : null;
+  }
+
+  if (!selectedTarget)
+  {
+    selectedTarget = targetNames.includes(DEFAULT_PARAMS.target) ? DEFAULT_PARAMS.target : targetNames[0];
+  }
+
+  if (selectedTarget)
+  {
+    targetSelect.value = selectedTarget;
+  }
+
+  availableTargets.delete();
 }
 
 let btk = null;
@@ -116,9 +223,6 @@ class TargetSimulator
     window.addEventListener('resize', () => this.resizeCanvas());
 
     this.clearStats();
-
-    // Populate target dropdown from C++
-    this.populateTargetDropdown();
   }
 
   resizeCanvas()
@@ -173,46 +277,6 @@ class TargetSimulator
     this.canvas.addEventListener('pointercancel', (e) => this.onPointerUp(e));
   }
 
-
-  populateTargetDropdown()
-  {
-    const targetSelect = document.getElementById('target');
-
-    // Clear existing options
-    targetSelect.innerHTML = '';
-
-    // Get available targets from C++
-    const availableTargets = btk.Targets.listTargets();
-
-    // Add each target as an option directly from C++ vector
-    const targetNames = [];
-    for (let i = 0; i < availableTargets.size(); i++)
-    {
-      const targetName = availableTargets.get(i);
-      targetNames.push(targetName);
-
-      const t = btk.Targets.getTarget(targetName);
-      const desc = t.getDescription();
-      t.delete();
-      const option = document.createElement('option');
-      option.value = targetName;
-      option.textContent = `${targetName} — ${desc}`;
-      targetSelect.appendChild(option);
-    }
-
-    const savedValue = SettingsCookies.get('target_sim_target');
-    if (savedValue && targetNames.includes(savedValue))
-    {
-      targetSelect.value = savedValue;
-    }
-    else
-    {
-      const defaultTarget = targetNames.includes('MR-1FCA') ? 'MR-1FCA' : targetNames[0];
-      if (defaultTarget) targetSelect.value = defaultTarget;
-    }
-
-    availableTargets.delete();
-  }
 
   validateInputs()
   {
@@ -958,17 +1022,17 @@ document.addEventListener('DOMContentLoaded', async () =>
     btk = await BallisticsToolkit();
     console.log('BallisticsToolkit WASM module ready');
 
-    window.targetSimulator = new TargetSimulator();
-
     SettingsCookies.loadAll();
+
+    window.targetSimulator = new TargetSimulator();
+    populateTargetDropdown();
+
     SettingsCookies.attachAutoSave();
 
     document.getElementById('resetDefaults').addEventListener('click', (e) =>
     {
       e.preventDefault();
-      setDefaultValues();
-      window.targetSimulator.populateTargetDropdown();
-      SettingsCookies.saveAll();
+      resetToDefaults();
     });
   }
   catch (error)
