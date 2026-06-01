@@ -29,9 +29,9 @@ const SettingsCookies = createSettingsCookies('fclass_sim_');
 const DEFAULT_PARAMS = {
   graphicsPreset: 'Medium',
   matchMode: 'standard',
-  relays: '3',
-  shotsPerRelay: '20',
-  minutesPerRelay: '20',
+  matches: '3',
+  shotsPerMatch: '20',
+  minutesPerMatch: '20',
   player1Name: 'Player1',
   player2Name: 'Player2',
   pairShots: '10',
@@ -367,8 +367,8 @@ function restartGame()
 {
   try
   {
-    // Remove any relay end notifications
-    const notifications = document.querySelectorAll('.relay-end-notification');
+    // Remove any match end notifications
+    const notifications = document.querySelectorAll('.match-end-notification');
     notifications.forEach(notification => notification.remove());
 
     // Get current parameters
@@ -428,9 +428,9 @@ function getGameParams()
     fclassMode: fclassMode,
     // Match format
     mode: document.getElementById('matchMode').value,
-    relays: parseInt(document.getElementById('relays').value),
-    shotsPerRelay: parseInt(document.getElementById('shotsPerRelay').value),
-    minutesPerRelay: parseFloat(document.getElementById('minutesPerRelay').value),
+    matches: parseInt(document.getElementById('matches').value),
+    shotsPerMatch: parseInt(document.getElementById('shotsPerMatch').value),
+    minutesPerMatch: parseFloat(document.getElementById('minutesPerMatch').value),
     player1Name: document.getElementById('player1Name').value || 'Player1',
     player2Name: document.getElementById('player2Name').value || 'Player2',
     pairShots: parseInt(document.getElementById('pairShots').value),
@@ -518,7 +518,7 @@ class FClassSimulator
 
   // Pair fire: pause after the target is back up before switching shooters,
   // so the shooter who just fired can see their impact.
-  static TURN_SWITCH_DELAY_MS = 1500;
+  static TURN_SWITCH_DELAY_MS = 500;
 
   // Ground/scenery
   static GROUND_EXTENSION_BEYOND_TARGETS = 2500; // yards (extends to mountains)
@@ -606,9 +606,9 @@ class FClassSimulator
     else
     {
       this.driver = new StandardMatchDriver({
-        relays: params.relays,
-        shotsPerRelay: params.shotsPerRelay,
-        minutesPerRelay: params.minutesPerRelay,
+        matches: params.matches,
+        shotsPerMatch: params.shotsPerMatch,
+        minutesPerMatch: params.minutesPerMatch,
         debugMode: this.debugMode
       });
     }
@@ -1046,7 +1046,7 @@ class FClassSimulator
       this.showSegmentNotification(pending);
     }
 
-    // Refresh the HUD (keeps the per-turn / relay timer live)
+    // Refresh the HUD (keeps the per-turn / match timer live)
     this.updateHUD();
 
     // Update scope camera orientations
@@ -1644,11 +1644,11 @@ class FClassSimulator
       { label: 'Dropped:', value: `${m.droppedPoints}-${m.droppedX}x` }
     ];
 
-    if (this.lastShotData)
+    if (m.lastShot)
     {
-      rows.push({ label: 'Last Shot:', value: `${this.lastShotData.score}${this.lastShotData.isX ? 'x' : ''}` });
-      rows.push({ label: 'MV:', value: `${Math.round(this.lastShotData.mvFps)} fps` });
-      rows.push({ label: 'Impact V:', value: `${Math.round(this.lastShotData.impactVelocityFps)} fps` });
+      rows.push({ label: 'Last Shot:', value: `${m.lastShot.score}${m.lastShot.isX ? 'x' : ''}` });
+      rows.push({ label: 'MV:', value: `${Math.round(m.lastShot.mvFps)} fps` });
+      rows.push({ label: 'Impact V:', value: `${Math.round(m.lastShot.impactVelocityFps)} fps` });
     }
     else
     {
@@ -1688,7 +1688,7 @@ class FClassSimulator
    */
   handleDriverEvent(event)
   {
-    // relayComplete / matchComplete - show once the target settles
+    // matchComplete / aggregateComplete - show once the target settles
     if (this.targets.isTargetReady())
     {
       this.showSegmentNotification(event);
@@ -1707,7 +1707,6 @@ class FClassSimulator
   {
     ResourceManager.audio.playSound('scope_click');
 
-    this.lastShotData = { score: 0, isX: false, mvFps: null, impactVelocityFps: null };
     this.scorecard.update(this.driver.getScorecardModel());
 
     // Mark a miss low on the target (no bullet was fired)
@@ -1782,17 +1781,17 @@ class FClassSimulator
     }
     else
     {
-      this.showRelayNotification(event);
+      this.showStandardNotification(event);
     }
   }
 
   /**
-   * Standard mode: relay-complete (offer next relay) or match-complete.
+   * Standard mode: match-complete (offer next match) or aggregate-complete.
    */
-  showRelayNotification(event)
+  showStandardNotification(event)
   {
     const notification = document.createElement('div');
-    notification.className = 'relay-end-notification';
+    notification.className = 'match-end-notification';
     notification.style.cssText = `
       position: fixed;
       top: 50%;
@@ -1810,12 +1809,12 @@ class FClassSimulator
       border: 2px solid #f57c00;
     `;
 
-    if (event.type === 'matchComplete')
+    if (event.type === 'aggregateComplete')
     {
       notification.innerHTML = `
-        <div style="margin-bottom: 12px;">🎯 Match Complete!</div>
+        <div style="margin-bottom: 12px;">🎯 Aggregate Complete!</div>
         <div style="font-size: 14px; margin-bottom: 16px;">
-          All ${event.numRelays} relays finished<br>
+          All ${event.numMatches} matches finished<br>
           Check scorecard for final results
         </div>
         <button id="viewScorecardBtn" style="
@@ -1827,26 +1826,26 @@ class FClassSimulator
     else
     {
       notification.innerHTML = `
-        <div style="margin-bottom: 12px;">⏱️ Relay ${event.relayIndex} Complete!</div>
+        <div style="margin-bottom: 12px;">⏱️ Match ${event.matchIndex} Complete!</div>
         <div style="font-size: 14px; margin-bottom: 16px;">
           ${event.recordShots} record shots fired<br>
-          Ready for Relay ${event.relayIndex + 1}
+          Ready for Match ${event.matchIndex + 1}
         </div>
-        <button id="nextRelayBtn" style="
+        <button id="nextMatchBtn" style="
           background: white; color: #ff9800; border: none; padding: 8px 16px;
           border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;
-        ">Start Relay ${event.relayIndex + 1}</button>
+        ">Start Match ${event.matchIndex + 1}</button>
       `;
     }
 
     document.body.appendChild(notification);
 
-    const nextRelayBtn = document.getElementById('nextRelayBtn');
+    const nextMatchBtn = document.getElementById('nextMatchBtn');
     const viewScorecardBtn = document.getElementById('viewScorecardBtn');
 
-    if (nextRelayBtn)
+    if (nextMatchBtn)
     {
-      nextRelayBtn.addEventListener('click', () =>
+      nextMatchBtn.addEventListener('click', () =>
       {
         this.driver.advance(ResourceManager.time.getElapsedTime());
         notification.remove();
@@ -1871,7 +1870,7 @@ class FClassSimulator
   showPairResultNotification(event)
   {
     const notification = document.createElement('div');
-    notification.className = 'relay-end-notification';
+    notification.className = 'match-end-notification';
     notification.style.cssText = `
       position: fixed;
       top: 50%;
@@ -1928,10 +1927,10 @@ class FClassSimulator
       return;
     }
 
-    // Check if firing is allowed by the match rules (e.g. relay/match ended)
+    // Check if firing is allowed by the match rules (e.g. match/aggregate ended)
     if (!this.driver.canFire())
     {
-      console.log('Firing not allowed - match/relay ended');
+      console.log('Firing not allowed - match/aggregate ended');
       return;
     }
 
@@ -1968,14 +1967,6 @@ class FClassSimulator
 
     // Update scorecard
     this.scorecard.update(this.driver.getScorecardModel());
-
-    // Store shot data for when target animation completes
-    this.lastShotData = {
-      score: shotData.score,
-      isX: shotData.isX,
-      mvFps: shotData.mvFps,
-      impactVelocityFps: shotData.impactVelocityFps
-    };
 
     // Start match-style target animation with shot marker and scoring disc
     this.targets.markShotWithAnimation(

@@ -209,7 +209,7 @@ export class PairFireDriver extends MatchDriver
 
     this.shotLog.push({
       player: playerId,
-      relay: playerId === 'p1' ? 1 : 2, // map to scorecard sections (P1 -> 1, P2 -> 2)
+      section: playerId === 'p1' ? 1 : 2, // map to scorecard sections (P1 -> 1, P2 -> 2)
       isSighter: isSighter,
       recordIndex: (!isSighter && !suddenDeath) ? player.recordShotsFired : null,
       score: shotData.score,
@@ -371,12 +371,12 @@ export class PairFireDriver extends MatchDriver
     return this.active;
   }
 
-  lastScoredShotFor(playerId)
+  lastShotFor(playerId)
   {
     for (let i = this.shotLog.length - 1; i >= 0; i--)
     {
       const shot = this.shotLog[i];
-      if (shot.player === playerId && !shot.isSighter)
+      if (shot.player === playerId)
       {
         return { score: shot.score, isX: shot.isX };
       }
@@ -426,7 +426,7 @@ export class PairFireDriver extends MatchDriver
       shots: shots,
       score: total,
       xCount: xCount,
-      lastShot: this.lastScoredShotFor(playerId)
+      lastShot: this.lastShotFor(playerId)
     };
   }
 

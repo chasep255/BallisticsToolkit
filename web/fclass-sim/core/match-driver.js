@@ -7,7 +7,7 @@
  * interface, never to format-specific state.
  *
  * Concrete drivers:
- *   - StandardMatchDriver: N relays x M record shots, T minutes per relay.
+ *   - StandardMatchDriver: N matches x M record shots, T minutes per match.
  *   - PairFireDriver: two hot-seat players alternating shots.
  *
  * Subclasses MUST override the methods marked abstract below.
@@ -17,7 +17,7 @@ export class MatchDriver
   constructor()
   {
     // All shots fired this match. Entry shape:
-    //   { player, relay, isSighter, recordIndex, score, isX, mvFps, impactVelocityFps, timeSec, suddenDeath }
+    //   { player, section, isSighter, recordIndex, score, isX, mvFps, impactVelocityFps, relativeX, relativeY, timeSec, suddenDeath }
     this.shotLog = [];
 
     // Single pending event for the simulator to consume (null when none).
@@ -63,7 +63,7 @@ export class MatchDriver
 
   // ===== Progression (optional) =====
 
-  /** Proceed past a completed segment (e.g. start the next relay). @param {number} now seconds */
+  /** Proceed past a completed segment (e.g. start the next match). @param {number} now seconds */
   advance(now) {}
 
   // ===== Queries (abstract / optional) =====

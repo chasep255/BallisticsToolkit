@@ -145,7 +145,7 @@
   font-size: 13px;
 }
 
-.scorecard-relay {
+.scorecard-section {
   margin-bottom: 24px;
   background: white;
   border: 2px solid #2c5aa0;
@@ -183,7 +183,7 @@
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
-.relay-header {
+.section-header {
   font-size: 18px;
   font-weight: bold;
   color: #2c5aa0;
@@ -191,13 +191,13 @@
   text-align: center;
 }
 
-.scorecard-relay.winner {
+.scorecard-section.winner {
   border-color: #2e7d32;
   background: #eafaf0;
   box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.25);
 }
 
-.scorecard-relay.winner .relay-header {
+.scorecard-section.winner .section-header {
   color: #2e7d32;
 }
 
@@ -250,7 +250,7 @@
   border-color: #ccc;
 }
 
-.relay-total {
+.section-total {
   font-weight: bold;
   font-size: 16px;
   color: #2c5aa0;
@@ -259,7 +259,7 @@
   padding-left: 12px;
 }
 
-.relay-total-placeholder {
+.section-total-placeholder {
   min-width: 100px;
   padding-left: 12px;
 }

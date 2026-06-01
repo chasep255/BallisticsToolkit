@@ -592,9 +592,9 @@ export class TargetRenderer
   /**
    * Update target animations
    * @param {number} deltaTime - Time since last frame in seconds
-   * @param {boolean} relayClockRunning - Whether the relay clock is running
+   * @param {boolean} matchClockRunning - Whether the match clock is running
    */
-  updateAnimations(deltaTime, relayClockRunning = true)
+  updateAnimations(deltaTime, matchClockRunning = true)
   {
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
@@ -752,8 +752,8 @@ export class TargetRenderer
       this.updateSpotterPosition();
     }
 
-    // Handle other targets (non-user targets) - only if relay clock is running
-    if (relayClockRunning)
+    // Handle other targets (non-user targets) - only if match clock is running
+    if (matchClockRunning)
     {
       for (let i = 0; i < this.targetFrames.length; i++)
       {

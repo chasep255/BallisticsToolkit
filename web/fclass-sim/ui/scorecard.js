@@ -161,7 +161,7 @@ export class Scorecard
   }
 
   /**
-   * Render one scorecard section (a relay or a player).
+   * Render one scorecard section (a match or a player).
    * @param {Object} section { label, sighters, records, suddenDeath, recordSlots, total, xCount, isWinner }
    */
   renderSection(section, key)
@@ -169,8 +169,8 @@ export class Scorecard
     const totalText = `${section.total}-${section.xCount}X`;
     const winnerClass = section.isWinner ? ' winner' : '';
 
-    let html = `<div class="scorecard-relay${winnerClass}">`;
-    html += `<div class="relay-header">${section.label}${section.isWinner ? ' \u2605' : ''}</div>`;
+    let html = `<div class="scorecard-section${winnerClass}">`;
+    html += `<div class="section-header">${section.label}${section.isWinner ? ' \u2605' : ''}</div>`;
 
     // Sighters row
     html += `<div class="scorecard-row"><div class="row-label">Sighters</div><div class="shot-cells">`;
@@ -212,11 +212,11 @@ export class Scorecard
       // Section total appears on the last row; placeholder keeps earlier rows aligned.
       if (row === totalRows - 1)
       {
-        html += `<div class="relay-total">${totalText}</div>`;
+        html += `<div class="section-total">${totalText}</div>`;
       }
       else
       {
-        html += `<div class="relay-total-placeholder"></div>`;
+        html += `<div class="section-total-placeholder"></div>`;
       }
       html += `</div>`;
     }

@@ -1,10 +1,10 @@
 /**
- * StandardMatchDriver - Classic F-Class relay format, now configurable.
+ * StandardMatchDriver - Classic F-Class course of fire, now configurable.
  *
- * Format: `numRelays` relays, each `maxRecordShots` record shots and
- * `timerDuration` seconds. Relay 1 has unlimited sighters; later relays get
- * `laterRelaySighters` (default 2). A relay ends when time expires or the
- * record-shot count is reached.
+ * Format: `numMatches` matches, each `maxRecordShots` record shots and
+ * `timerDuration` seconds. Match 1 has unlimited sighters; later matches get
+ * `laterMatchSighters` (default 2). A match ends when time expires or the
+ * record-shot count is reached. The combined score is the aggregate.
  */
 import { MatchDriver } from './match-driver.js';
 
@@ -14,10 +14,10 @@ export class StandardMatchDriver extends MatchDriver
 {
   /**
    * @param {Object} config
-   * @param {number} config.relays            number of relays (default 3)
-   * @param {number} config.shotsPerRelay     record shots per relay (default 20)
-   * @param {number} config.minutesPerRelay   minutes per relay (default 20)
-   * @param {boolean} config.debugMode        1-min relays, 2 shots when true
+   * @param {number} config.matches           number of matches (default 3)
+   * @param {number} config.shotsPerMatch     record shots per match (default 20)
+   * @param {number} config.minutesPerMatch   minutes per match (default 20)
+   * @param {boolean} config.debugMode        1-min matches, 2 shots when true
    */
   constructor(config = {})
   {
@@ -26,12 +26,12 @@ export class StandardMatchDriver extends MatchDriver
     const debugMode = config.debugMode || false;
     this.debugMode = debugMode;
 
-    this.numRelays = config.relays || 3;
-    this.maxRecordShots = debugMode ? 2 : (config.shotsPerRelay || 20);
-    this.timerDuration = debugMode ? 60 : (config.minutesPerRelay || 20) * 60;
-    this.laterRelaySighters = 2;
+    this.numMatches = config.matches || 3;
+    this.maxRecordShots = debugMode ? 2 : (config.shotsPerMatch || 20);
+    this.timerDuration = debugMode ? 60 : (config.minutesPerMatch || 20) * 60;
+    this.laterMatchSighters = 2;
 
-    this.relayIndex = 1;
+    this.matchIndex = 1;
     this.phase = 'sighters'; // 'sighters' | 'record' | 'ended'
 
     this.timeRemaining = this.timerDuration;
@@ -40,7 +40,7 @@ export class StandardMatchDriver extends MatchDriver
     this.sightersFired = 0;
     this.isTimerRunning = false;
 
-    console.log(`${LOG_PREFIX} ${this.numRelays} relays, ${this.maxRecordShots} shots, ${this.timerDuration}s each`);
+    console.log(`${LOG_PREFIX} ${this.numMatches} matches, ${this.maxRecordShots} shots, ${this.timerDuration}s each`);
   }
 
   // ===== Lifecycle =====
@@ -71,7 +71,7 @@ export class StandardMatchDriver extends MatchDriver
 
     if (this.timeRemaining <= 0)
     {
-      this.endRelay();
+      this.endMatch();
     }
   }
 
@@ -82,7 +82,7 @@ export class StandardMatchDriver extends MatchDriver
 
   isComplete()
   {
-    return this.relayIndex >= this.numRelays && this.phase === 'ended';
+    return this.matchIndex >= this.numMatches && this.phase === 'ended';
   }
 
   // ===== Firing =====
@@ -107,7 +107,7 @@ export class StandardMatchDriver extends MatchDriver
 
     this.shotLog.push({
       player: null,
-      relay: this.relayIndex,
+      section: this.matchIndex,
       isSighter: !isRecord,
       recordIndex: isRecord ? this.recordShotsFired : null,
       score: shotData.score,
@@ -120,16 +120,16 @@ export class StandardMatchDriver extends MatchDriver
       suddenDeath: false
     });
 
-    // Auto-switch to record on relays after the first once the sighter cap is met.
-    if (!isRecord && this.relayIndex > 1 && this.sightersFired >= this.laterRelaySighters)
+    // Auto-switch to record on matches after the first once the sighter cap is met.
+    if (!isRecord && this.matchIndex > 1 && this.sightersFired >= this.laterMatchSighters)
     {
       this.phase = 'record';
     }
 
-    // End the relay when the record-shot count is reached.
+    // End the match when the record-shot count is reached.
     if (isRecord && this.recordShotsFired >= this.maxRecordShots)
     {
-      this.endRelay();
+      this.endMatch();
     }
   }
 
@@ -143,32 +143,32 @@ export class StandardMatchDriver extends MatchDriver
 
   // ===== Progression =====
 
-  endRelay()
+  endMatch()
   {
     if (this.phase === 'ended')
     {
       return;
     }
 
-    console.log(`${LOG_PREFIX} Relay ${this.relayIndex} ended (${this.recordShotsFired} record, ${this.sightersFired} sighters)`);
+    console.log(`${LOG_PREFIX} Match ${this.matchIndex} ended (${this.recordShotsFired} record, ${this.sightersFired} sighters)`);
     this.phase = 'ended';
     this.isTimerRunning = false;
 
     if (this.isComplete())
     {
-      this.emitEvent({ type: 'matchComplete', relayIndex: this.relayIndex, numRelays: this.numRelays, recordShots: this.recordShotsFired });
+      this.emitEvent({ type: 'aggregateComplete', matchIndex: this.matchIndex, numMatches: this.numMatches, recordShots: this.recordShotsFired });
     }
     else
     {
-      this.emitEvent({ type: 'relayComplete', relayIndex: this.relayIndex, numRelays: this.numRelays, recordShots: this.recordShotsFired });
+      this.emitEvent({ type: 'matchComplete', matchIndex: this.matchIndex, numMatches: this.numMatches, recordShots: this.recordShotsFired });
     }
   }
 
   advance(now)
   {
-    if (this.relayIndex < this.numRelays)
+    if (this.matchIndex < this.numMatches)
     {
-      this.relayIndex++;
+      this.matchIndex++;
       this.phase = 'sighters';
       this.timeRemaining = this.timerDuration;
       this.timerStartTime = null;
@@ -188,24 +188,24 @@ export class StandardMatchDriver extends MatchDriver
 
   getSightersRemaining()
   {
-    if (this.relayIndex === 1)
+    if (this.matchIndex === 1)
     {
       return Infinity;
     }
-    return Math.max(0, this.laterRelaySighters - this.sightersFired);
+    return Math.max(0, this.laterMatchSighters - this.sightersFired);
   }
 
   getHudModel()
   {
-    const relayShots = this.shotLog.filter(s => s.relay === this.relayIndex);
-    const records = relayShots.filter(s => !s.isSighter);
-    const sighters = relayShots.filter(s => s.isSighter);
+    const matchShots = this.shotLog.filter(s => s.section === this.matchIndex);
+    const records = matchShots.filter(s => !s.isSighter);
+    const sighters = matchShots.filter(s => s.isSighter);
     const { total, xCount } = this.aggregate(records);
     const shotCount = records.length;
 
     const model = {
-      primaryLabel: 'Relay:',
-      primaryValue: `${this.relayIndex}/${this.numRelays}`,
+      primaryLabel: 'Match:',
+      primaryValue: `${this.matchIndex}/${this.numMatches}`,
       timerLabel: 'Timer:',
       timerValue: MatchDriver.formatTime(this.timeRemaining),
       score: total,
@@ -220,7 +220,7 @@ export class StandardMatchDriver extends MatchDriver
       model.shots = {
         mode: 'sighters',
         current: sighters.length,
-        limit: remaining === Infinity ? '\u221E' : this.laterRelaySighters
+        limit: remaining === Infinity ? '\u221E' : this.laterMatchSighters
       };
     }
     else
@@ -232,6 +232,11 @@ export class StandardMatchDriver extends MatchDriver
         complete: shotCount >= this.maxRecordShots
       };
     }
+
+    const last = matchShots.length > 0 ? matchShots[matchShots.length - 1] : null;
+    model.lastShot = last
+      ? { score: last.score, isX: last.isX, mvFps: last.mvFps, impactVelocityFps: last.impactVelocityFps }
+      : null;
 
     return model;
   }
@@ -251,26 +256,26 @@ export class StandardMatchDriver extends MatchDriver
   getScorecardModel()
   {
     const sections = [];
-    let matchTotal = 0;
-    let matchX = 0;
+    let aggregateTotal = 0;
+    let aggregateX = 0;
 
-    for (let relay = 1; relay <= this.numRelays; relay++)
+    for (let m = 1; m <= this.numMatches; m++)
     {
-      const relayShots = this.shotLog.filter(s => s.relay === relay);
-      const sighters = relayShots.filter(s => s.isSighter).map(s => ({ score: s.score, isX: s.isX }));
-      const records = relayShots.filter(s => !s.isSighter);
+      const matchShots = this.shotLog.filter(s => s.section === m);
+      const sighters = matchShots.filter(s => s.isSighter).map(s => ({ score: s.score, isX: s.isX }));
+      const records = matchShots.filter(s => !s.isSighter);
       const { total, xCount } = this.aggregate(records);
 
-      matchTotal += total;
-      matchX += xCount;
+      aggregateTotal += total;
+      aggregateX += xCount;
 
       sections.push({
-        label: `Relay ${relay}`,
+        label: `Match ${m}`,
         sighters: sighters,
         records: records.map(s => ({ score: s.score, isX: s.isX })),
         suddenDeath: [],
         recordSlots: this.maxRecordShots,
-        group: MatchDriver.buildGroup(relayShots),
+        group: MatchDriver.buildGroup(matchShots),
         total: total,
         xCount: xCount,
         isWinner: false
@@ -279,7 +284,7 @@ export class StandardMatchDriver extends MatchDriver
 
     return {
       sections: sections,
-      footer: { text: `Match Total: ${matchTotal}-${matchX}X` }
+      footer: { text: `Aggregate Total: ${aggregateTotal}-${aggregateX}X` }
     };
   }
 }
