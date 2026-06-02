@@ -216,7 +216,7 @@ export class EnvironmentRenderer
 
     // Directional light (sun) for depth and shadows
     this.sun = new THREE.DirectionalLight(0xffffff, 2.0);
-    this.sun.position.set(300, 600, 0); // Higher above and in front of shooter for cloud shadows on range
+    this.sun.position.set(800, 300, 0); // 3-o'clock side lighting for flag direction readability
     this.sun.castShadow = this.cfg.shadowsEnabled;
 
     // Aim the light toward the middle of the range
