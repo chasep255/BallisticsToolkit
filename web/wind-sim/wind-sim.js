@@ -620,7 +620,6 @@ function updateWindStatsTable()
         const crossrangeYd = btk.Conversions.metersToYards(crossrange);
         const strengthMph = btk.Conversions.mpsToMph(str);
         const rmsMph = btk.Conversions.mpsToMph(rmsValue);
-        const sigmoidMph = btk.Conversions.mpsToMph(sigmoid); // Convert threshold to mph
 
         strength = strengthMph.toFixed(1);
         downrangeScale = downrangeYd.toFixed(0);
@@ -628,7 +627,8 @@ function updateWindStatsTable()
         // Convert temporal scale to minutes (it's stored in seconds)
         temporalScale = (temporal / 60).toFixed(1);
         exponent = exp.toFixed(2);
-        sigmoidThreshold = sigmoidMph.toFixed(1);
+        // Sigmoid threshold is a dimensionless ratio of strength.
+        sigmoidThreshold = sigmoid.toFixed(2);
         rms = rmsMph.toExponential(2);
 
       }

@@ -269,13 +269,12 @@ namespace btk::physics
     // Convert final normalized magnitude back to original scale
     float final_magnitude = exp_magnitude * component.strength;
 
-    // Apply optional self-gating sigmoid to final magnitude (relative to strength)
+    // Apply optional self-gating sigmoid to final magnitude.
     if(component.sigmoid_threshold > 0.0f)
     {
-      // Self-gating: final magnitude gates itself through sigmoid
-      // Higher magnitude -> more gate opens -> more output
-      // threshold relative to strength
-      float threshold = component.sigmoid_threshold * component.strength;
+      // sigmoid_threshold is a dimensionless ratio of strength: the gate is
+      // half-open at final_magnitude = sigmoid_threshold * strength.
+      const float threshold = component.sigmoid_threshold * component.strength;
       // Sharper gating: increase slope of the logistic
       const float slope = 4.0f;
       final_magnitude = final_magnitude / (1.0f + std::exp(-slope * (final_magnitude - threshold)));
@@ -325,12 +324,15 @@ namespace btk::physics
       return w;
     };
 
+    // Gate threshold values are dimensionless ratios of strength. Values
+    // preserve the prior numerical behavior from when the threshold was
+    // mistakenly written using the _mph literal (= mph * 0.44704).
     presets_["Dead"] = []()
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(0.5_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);         // steady base
-      w.addComponent(0.25_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f, 0.25_mph); // gusty component with gate
+      w.addComponent(0.5_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);          // steady base
+      w.addComponent(0.25_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f);  // gusty component with gate
 
       return w;
     };
@@ -339,8 +341,8 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(1.0_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);       // steady base
-      w.addComponent(0.5_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f, 0.5_mph); // gusty component with gate
+      w.addComponent(1.0_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);          // steady base
+      w.addComponent(0.5_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f);   // gusty component with gate
 
       return w;
     };
@@ -349,9 +351,9 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);       // steady base
-      w.addComponent(1.5_mph, 2000.0_yd, 2000.0_yd, 5.0_min, 0.5f);          // local variations
-      w.addComponent(6.0_mph, 1000.0_yd, 1000.0_yd, 0.5_min, 0.5f, 3.0_mph); // gusts
+      w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);          // steady base
+      w.addComponent(1.5_mph, 2000.0_yd, 2000.0_yd, 5.0_min, 0.5f);             // local variations
+      w.addComponent(6.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.5f, 1.2f);   // gusts
       return w;
     };
 
@@ -359,8 +361,8 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(7.0_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);        // steady base
-      w.addComponent(10.0_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f, 8.0_mph); // gusty component with gate
+      w.addComponent(7.0_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);          // steady base
+      w.addComponent(10.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.5f, 1.2f);  // gusty component with gate
 
       return w;
     };
@@ -369,8 +371,8 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(12.0_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);        // steady base
-      w.addComponent(15.0_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f, 10.0_mph); // gusty component with gate
+      w.addComponent(12.0_mph, 10000.0_yd, 10000.0_yd, 15.0_min, 0.5f);         // steady base
+      w.addComponent(15.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.5f, 1.2f);  // gusty component with gate
 
       return w;
     };

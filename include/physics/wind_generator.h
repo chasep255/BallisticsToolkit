@@ -100,22 +100,26 @@ namespace btk::physics
      * @param downrange_scale Spatial scale in downrange direction (larger = slower spatial variation)
      * @param crossrange_scale Spatial scale in crossrange direction (larger = slower spatial variation)
      * @param temporal_scale Temporal scale (larger = slower temporal variation)
-     * @param exponent Exponent for reshaping magnitude. < 1.0 = gustier (near strength), > 1.0 = steadier
-     * @param sigmoid_threshold Sigmoid threshold in m/s. 0 = no sigmoid, > 0 = wind speed where gate opens
+     * @param exponent Exponent applied to the RMS-normalized magnitude. < 1.0 compresses the
+     *        distribution around the mean (steadier); > 1.0 stretches it (more calm/gust contrast).
+     * @param sigmoid_threshold Sigmoid gate threshold as a dimensionless ratio of strength.
+     *        0 = no gating; > 0 = gate is half-open when final magnitude reaches
+     *        sigmoid_threshold * strength. Note that final magnitude is clipped at 2*strength,
+     *        so values >= 2 effectively never let the gate fully open.
      */
     void addComponent(float strength, float downrange_scale, float crossrange_scale, float temporal_scale, float exponent = 1.0f, float sigmoid_threshold = 0.0f);
 
     /**
      * @brief Get the number of active wind components
      *
-     * @return Number of active components (0 to NUM_OCTAVES)
+     * @return Number of active components added via addComponent()
      */
     int getNumActiveComponents() const;
 
     /**
      * @brief Get component strength
      *
-     * @param index Component index (0 to NUM_OCTAVES-1)
+     * @param index Component index (0 to getNumActiveComponents()-1)
      * @return Component strength (wind speed multiplier)
      */
     float getComponentStrength(int index) const;
@@ -123,7 +127,7 @@ namespace btk::physics
     /**
      * @brief Get component downrange scale
      *
-     * @param index Component index (0 to NUM_OCTAVES-1)
+     * @param index Component index (0 to getNumActiveComponents()-1)
      * @return Component downrange scale
      */
     float getComponentDownrangeScale(int index) const;
@@ -131,7 +135,7 @@ namespace btk::physics
     /**
      * @brief Get component crossrange scale
      *
-     * @param index Component index (0 to NUM_OCTAVES-1)
+     * @param index Component index (0 to getNumActiveComponents()-1)
      * @return Component crossrange scale
      */
     float getComponentCrossrangeScale(int index) const;
@@ -139,7 +143,7 @@ namespace btk::physics
     /**
      * @brief Get component temporal scale
      *
-     * @param index Component index (0 to NUM_OCTAVES-1)
+     * @param index Component index (0 to getNumActiveComponents()-1)
      * @return Component temporal scale
      */
     float getComponentTemporalScale(int index) const;
@@ -147,23 +151,24 @@ namespace btk::physics
     /**
      * @brief Get component exponent
      *
-     * @param index Component index (0 to NUM_OCTAVES-1)
-     * @return Component exponent for reshaping magnitude. < 1.0 = gustier (near strength), > 1.0 = steadier
+     * @param index Component index (0 to getNumActiveComponents()-1)
+     * @return Component exponent. < 1.0 = steadier (distribution compressed around mean),
+     *         > 1.0 = more calm/gust contrast.
      */
     float getComponentExponent(int index) const;
 
     /**
-     * @brief Get component sigmoid gate threshold (m/s)
+     * @brief Get component sigmoid gate threshold (dimensionless ratio of strength)
      *
-     * @param index Component index (0 to NUM_OCTAVES-1)
-     * @return Gate threshold in m/s. 0 = no gating (disabled)
+     * @param index Component index (0 to getNumActiveComponents()-1)
+     * @return Gate threshold as a ratio of strength. 0 = no gating (disabled)
      */
     float getComponentSigmoidThreshold(int index) const;
 
     /**
      * @brief Get component RMS value
      *
-     * @param index Component index (0 to NUM_OCTAVES-1)
+     * @param index Component index (0 to getNumActiveComponents()-1)
      * @return Component RMS value for normalization
      */
     float getComponentRMS(int index) const;
@@ -192,7 +197,7 @@ namespace btk::physics
     /**
      * @brief Sample wind from a specific component
      *
-     * @param octave_index Component index (0 to NUM_OCTAVES-1)
+     * @param octave_index Component index (0 to getNumActiveComponents()-1)
      * @param position Position to sample at (x, y, z)
      * @return Wind vector from this component only
      */
@@ -207,12 +212,12 @@ namespace btk::physics
 
     struct WindComponent
     {
-      float strength = 0.0f;          // wind strength multiplier (scales tanh-activated curl field)
+      float strength = 0.0f;          // wind strength multiplier (scales the post-processed curl magnitude)
       float downrange_scale = 0.0f;   // spatial scale in downrange direction (larger = slower spatial variation)
       float crossrange_scale = 0.0f;  // spatial scale in crossrange direction (larger = slower spatial variation)
       float temporal_scale = 0.0f;    // temporal scale (larger = slower time variation)
-      float exponent = 1.0f;          // exponent for reshaping magnitude. < 1.0 = gustier (near strength), > 1.0 = steadier
-      float sigmoid_threshold = 0.0f; // gate threshold in m/s (0 = disabled)
+      float exponent = 1.0f;          // exponent on RMS-normalized magnitude. < 1.0 = steadier, > 1.0 = more calm/gust contrast
+      float sigmoid_threshold = 0.0f; // gate threshold as a ratio of strength (0 = disabled)
       float magnitude_rms_ = 0.0f;    // RMS of magnitude for normalization (set during initialization)
       math::SimplexNoise noise;       // each component gets its own noise instance
 
@@ -239,7 +244,7 @@ namespace btk::physics
     /**
      * @brief Get a specific wind preset by name
      *
-     * @param name Preset name (e.g., "Calm", "SwitchyLight", "StrongSteady")
+     * @param name Preset name (e.g., "Zero", "Dead", "Calm", "Moderate", "Strong", "Extra Strong")
      * @return WindGenerator object
      * @throws std::invalid_argument if preset not found
      */
