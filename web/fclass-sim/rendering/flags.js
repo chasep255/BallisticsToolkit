@@ -507,8 +507,8 @@ export class FlagRenderer
       const span = this.cfg.flagMaxAngle - this.cfg.flagMinAngle;
       const targetAngleDeg = this.cfg.flagMinAngle + span * (1 - Math.exp(-this.cfg.flagAngleResponseK * windHoriz_mph * windHoriz_mph));
 
-      // Wind direction in ground plane
-      const targetDirection = windHoriz_mph > 1e-6 ? Math.atan2(windZ_mph, windX_mph) : flag.currentDirection;
+      // Wind direction in ground plane (-windZ because Three.js negative Z = downrange)
+      const targetDirection = windHoriz_mph > 1e-6 ? Math.atan2(-windZ_mph, windX_mph) : flag.currentDirection;
 
       // Smooth interpolate current angle toward target
       const angleDiff = targetAngleDeg - flag.currentAngle;
