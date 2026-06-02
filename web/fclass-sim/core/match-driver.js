@@ -7,7 +7,7 @@
  * interface, never to format-specific state.
  *
  * Concrete drivers:
- *   - StandardMatchDriver: N matches x M record shots, T minutes per match.
+ *   - StringFireMatchDriver: N matches x M record shots, T minutes per match.
  *   - PairFireDriver: two players alternating shots.
  *
  * Subclasses MUST override the methods marked abstract below.

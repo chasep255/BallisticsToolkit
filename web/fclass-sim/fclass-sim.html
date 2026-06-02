@@ -65,10 +65,10 @@
     <!-- Parameters -->
     <div class="params-bar">
       <div class="param-item"><label for="graphicsPreset" title="Graphics quality preset">Graphics</label><select id="graphicsPreset" title="Graphics quality preset"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
-      <div class="param-item"><label for="matchMode" title="Match format: Standard (matches) or Pair Fire (two players, alternating)">Mode</label><select id="matchMode" title="Match format"><option value="standard" selected>Standard</option><option value="pair">Pair Fire</option></select></div>
-      <div class="param-item standard-config"><label for="matches" title="Number of matches in the aggregate">Matches</label><input type="number" id="matches" value="3" step="1" min="1" max="10" title="Number of matches"></div>
-      <div class="param-item standard-config"><label for="shotsPerMatch" title="Record shots per match">Shots/Match</label><input type="number" id="shotsPerMatch" value="20" step="1" min="1" max="100" title="Record shots per match"></div>
-      <div class="param-item standard-config"><label for="minutesPerMatch" title="Time limit per match in minutes">Time/Match (min)</label><input type="number" id="minutesPerMatch" value="20" step="1" min="1" max="120" title="Minutes per match"></div>
+      <div class="param-item"><label for="matchMode" title="Match format: String Fire (matches) or Pair Fire (two players, alternating)">Mode</label><select id="matchMode" title="Match format"><option value="string" selected>String Fire</option><option value="pair">Pair Fire</option></select></div>
+      <div class="param-item string-config"><label for="matches" title="Number of matches in the aggregate">Matches</label><input type="number" id="matches" value="3" step="1" min="1" max="10" title="Number of matches"></div>
+      <div class="param-item string-config"><label for="shotsPerMatch" title="Record shots per match">Shots/Match</label><input type="number" id="shotsPerMatch" value="20" step="1" min="1" max="100" title="Record shots per match"></div>
+      <div class="param-item string-config"><label for="minutesPerMatch" title="Time limit per match in minutes">Time/Match (min)</label><input type="number" id="minutesPerMatch" value="20" step="1" min="1" max="120" title="Minutes per match"></div>
       <div class="param-item pair-config"><label for="player1Name" title="Left shooter (fires first)">Player 1 (Left)</label><input type="text" id="player1Name" value="Player1" maxlength="16" title="Left shooter name"></div>
       <div class="param-item pair-config"><label for="player2Name" title="Right shooter (fires second)">Player 2 (Right)</label><input type="text" id="player2Name" value="Player2" maxlength="16" title="Right shooter name"></div>
       <div class="param-item pair-config"><label for="pairShots" title="Record shots per shooter">Shots</label><input type="number" id="pairShots" value="10" step="1" min="1" max="100" title="Record shots per shooter"></div>
@@ -231,9 +231,9 @@
         <div class="help-section">
           <h3>Match Structure</h3>
           <div class="param-help">
-            <strong>Mode (parameter bar):</strong> choose <em>Standard</em> or <em>Pair Fire</em>.<br><br>
+            <strong>Mode (parameter bar):</strong> choose <em>String Fire</em> or <em>Pair Fire</em>.<br><br>
 
-            <strong>Standard:</strong><br>
+            <strong>String Fire:</strong><br>
             - Configurable: number of matches, record shots per match, and minutes per match (defaults 3 / 20 / 20)<br>
             - Match 1: unlimited sighters; later matches: 2 sighters each<br>
             - Use "Go For Record" to end the sighters phase early<br>
@@ -283,14 +283,13 @@
         <div class="help-section">
           <h3>HUD Display (Top-Right)</h3>
           <div class="param-help">
-            <strong>Standard mode</strong> shows a single panel:<br>
+            <strong>String fire mode</strong> shows a single panel:<br>
             - <strong>Match:</strong> Current match (e.g. 1/3)<br>
             - <strong>Timer:</strong> Remaining time (minutes:seconds)<br>
             - <strong>Target:</strong> Your target number<br>
             - <strong>Sighters:</strong> Count N/∞ (Match 1) or N/2 (later matches), only shown during sighters<br>
             - <strong>Shots:</strong> Record shots fired / total (turns green when complete)<br>
             - <strong>Score:</strong> Total score and X-count for current match<br>
-            - <strong>Dropped:</strong> Points and X-count dropped in current match<br>
             - <strong>Last Shot:</strong> Score value (e.g., "10x" or "9")<br>
             - <strong>MV:</strong> Muzzle velocity for last shot (fps)<br>
             - <strong>Impact V:</strong> Impact velocity for last shot (fps)<br><br>
@@ -303,7 +302,7 @@
           <div class="param-help">
             - Click "Scorecard" button to view detailed match information<br>
             - Shows all match parameters (distance, target, wind, ballistics, rifle specs)<br>
-            - Standard: breakdown per match (sighters + record shots) with per-match and aggregate totals<br>
+            - String Fire: breakdown per match (sighters + record shots) with per-match and aggregate totals<br>
             - Pair Fire: split per shooter with each player's sighters, record shots, total, and X-count; the winner is highlighted<br>
             - Each section has an expandable "Target" diagram showing the impacts on a scaled target (yellow = sighters, red = record shots)<br>
             - Available anytime (shows parameters even before first shot)

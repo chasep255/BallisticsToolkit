@@ -1,5 +1,5 @@
 /**
- * StandardMatchDriver - Classic F-Class course of fire, now configurable.
+ * StringFireMatchDriver - Classic F-Class course of fire, now configurable.
  *
  * Format: `numMatches` matches, each `maxRecordShots` record shots and
  * `timerDuration` seconds. Match 1 has unlimited sighters; later matches get
@@ -8,9 +8,9 @@
  */
 import { MatchDriver } from './match-driver.js';
 
-const LOG_PREFIX = '[StandardDriver]';
+const LOG_PREFIX = '[StringFireDriver]';
 
-export class StandardMatchDriver extends MatchDriver
+export class StringFireMatchDriver extends MatchDriver
 {
   /**
    * @param {Object} config
@@ -209,9 +209,7 @@ export class StandardMatchDriver extends MatchDriver
       timerLabel: 'Timer:',
       timerValue: MatchDriver.formatTime(this.timeRemaining),
       score: total,
-      xCount: xCount,
-      droppedPoints: shotCount * 10 - total,
-      droppedX: shotCount - xCount
+      xCount: xCount
     };
 
     if (this.phase === 'sighters')

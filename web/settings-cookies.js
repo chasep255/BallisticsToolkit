@@ -53,6 +53,18 @@ export function createSettingsCookies(prefix)
       {
         element.checked = value === 'true';
       }
+      else if (element.tagName === 'SELECT')
+      {
+        // Reject cookie values that aren't one of the current options (e.g. an
+        // option was renamed or removed since the cookie was saved). Leaving
+        // the HTML-declared default in place is better than clearing the
+        // select to a blank state.
+        const validValues = Array.from(element.options).map(o => o.value);
+        if (validValues.includes(value))
+        {
+          element.value = value;
+        }
+      }
       else
       {
         element.value = value;

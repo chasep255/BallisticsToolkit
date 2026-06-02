@@ -28,7 +28,7 @@ const SettingsCookies = createSettingsCookies('fclass_sim_');
 
 const DEFAULT_PARAMS = {
   graphicsPreset: 'Medium',
-  matchMode: 'standard',
+  matchMode: 'string',
   matches: '3',
   shotsPerMatch: '20',
   minutesPerMatch: '20',
@@ -64,14 +64,14 @@ function isEditableTarget(event)
 }
 
 /**
- * Show/hide the standard- and pair-mode config groups based on the selected mode.
+ * Show/hide the string-fire- and pair-mode config groups based on the selected mode.
  */
 function updateModeVisibility()
 {
   const modeEl = document.getElementById('matchMode');
   if (!modeEl) return;
   const isPair = modeEl.value === 'pair';
-  document.querySelectorAll('.standard-config').forEach(el =>
+  document.querySelectorAll('.string-config').forEach(el =>
   {
     el.style.display = isPair ? 'none' : '';
   });
@@ -135,9 +135,9 @@ import
 from './rendering/wind-field-hud.js';
 import
 {
-  StandardMatchDriver
+  StringFireMatchDriver
 }
-from './core/standard-driver.js';
+from './core/string-fire-driver.js';
 import
 {
   PairFireDriver
@@ -593,7 +593,7 @@ class FClassSimulator
     this.debugMode = urlParams.get('debug') === '1';
 
     // Match driver (format-specific rules + state + shot log + display models)
-    this.mode = params.mode === 'pair' ? 'pair' : 'standard';
+    this.mode = params.mode === 'pair' ? 'pair' : 'string';
     if (this.mode === 'pair')
     {
       this.driver = new PairFireDriver({
@@ -605,7 +605,7 @@ class FClassSimulator
     }
     else
     {
-      this.driver = new StandardMatchDriver({
+      this.driver = new StringFireMatchDriver({
         matches: params.matches,
         shotsPerMatch: params.shotsPerMatch,
         minutesPerMatch: params.minutesPerMatch,
@@ -1607,8 +1607,69 @@ class FClassSimulator
   {
     if (!this.hud) return;
 
-    const panels = this.mode === 'pair' ? this.buildPairHudPanels() : this.buildStandardHudPanels();
+    const panels = this.mode === 'pair' ? this.buildPairHudPanels() : this.buildStringHudPanels();
     this.hud.render(panels);
+    this.updateBottomBar();
+  }
+
+  /**
+   * Bottom-of-screen bar between the two scopes: the countdown timer (match
+   * timer in string fire, active player's turn timer in pair fire) on top,
+   * with the two shooter-name chips stacked under it in pair fire mode.
+   */
+  updateBottomBar()
+  {
+    const maxScopeSize = Math.min(VC.WIDTH - VC.MARGIN_SMALL * 2, VC.HEIGHT - VC.MARGIN_SMALL * 2);
+    const spottingDiameter = maxScopeSize * FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION;
+    const rifleDiameter = maxScopeSize * FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION;
+    const innerLeft = VC.fromLeft(VC.MARGIN_SMALL + spottingDiameter);
+    const innerRight = VC.fromRight(VC.MARGIN_SMALL + rifleDiameter);
+    const centerX = (innerLeft + innerRight) / 2;
+
+    const rows = [];
+
+    if (this.mode === 'pair' && this.driver && this.driver.getHudModel)
+    {
+      const model = this.driver.getHudModel();
+      const p1 = model.players.find(p => p.id === 'p1');
+      const p2 = model.players.find(p => p.id === 'p2');
+      const active = model.players.find(p => p.active);
+      const timerText = active ? active.timerValue : '--';
+
+      const chipWidth = 24;
+      const chipGap = 1.5;
+      const clockWidth = chipWidth * 2 + chipGap;
+
+      rows.push({
+        cells: [{ text: timerText, active: false, dispWidth: clockWidth }],
+        height: 9.5,
+        fontPx: 52
+      });
+      rows.push({
+        cells: [
+          { text: p1 ? p1.name : '--', active: !!(p1 && p1.active), dispWidth: chipWidth },
+          { text: p2 ? p2.name : '--', active: !!(p2 && p2.active), dispWidth: chipWidth }
+        ],
+        height: 6.0,
+        cellGap: chipGap,
+        fontPx: 36
+      });
+    }
+    else
+    {
+      const model = this.driver && this.driver.getHudModel ? this.driver.getHudModel() : null;
+      const timerText = model && model.timerValue ? model.timerValue : '--';
+      rows.push({
+        cells: [{ text: timerText, active: false, dispWidth: 30 }],
+        height: 9.5,
+        fontPx: 52
+      });
+    }
+
+    const totalHeight = rows.reduce((sum, r) => sum + r.height, 0) + Math.max(0, rows.length - 1) * 1.0;
+    const centerY = VC.fromBottom(VC.MARGIN_SMALL + totalHeight / 2);
+
+    this.hud.renderBottomBar(rows, centerX, centerY, 1.0);
   }
 
   /**
@@ -1627,10 +1688,10 @@ class FClassSimulator
   }
 
   /**
-   * Single right-anchored panel for standard mode. Match data comes from the
+   * Single right-anchored panel for string fire mode. Match data comes from the
    * driver; target/last-shot diagnostics are owned by the simulator.
    */
-  buildStandardHudPanels()
+  buildStringHudPanels()
   {
     const m = this.driver.getHudModel();
     const targetNumber = (this.targets && this.targets.userTarget) ? `#${this.targets.userTarget.targetNumber}` : '#--';
@@ -1640,8 +1701,7 @@ class FClassSimulator
       { label: m.timerLabel, value: m.timerValue },
       { label: 'Target:', value: targetNumber },
       this.shotsRow(m.shots),
-      { label: 'Score:', value: `${m.score}-${m.xCount}x` },
-      { label: 'Dropped:', value: `${m.droppedPoints}-${m.droppedX}x` }
+      { label: 'Score:', value: `${m.score}-${m.xCount}x` }
     ];
 
     if (m.lastShot)
@@ -1781,14 +1841,14 @@ class FClassSimulator
     }
     else
     {
-      this.showStandardNotification(event);
+      this.showStringNotification(event);
     }
   }
 
   /**
-   * Standard mode: match-complete (offer next match) or aggregate-complete.
+   * String fire mode: match-complete (offer next match) or aggregate-complete.
    */
-  showStandardNotification(event)
+  showStringNotification(event)
   {
     const notification = document.createElement('div');
     notification.className = 'match-end-notification';
