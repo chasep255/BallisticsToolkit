@@ -50,7 +50,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Adjustable Time Speed** - Speed up or slow down simulation time to observe wind patterns
 
 ### 🎮 F-Class Simulator
-- **Two Match Modes** - Standard (configurable matches, shots per match, and minutes per match; defaults 3 × 20 shots × 20 min aggregate) and Pair Fire (two players alternating on one rifle/target)
+- **Two Match Modes** - String Fire (configurable matches, shots per match, and minutes per match; defaults 3 × 20 shots × 20 min aggregate) and Pair Fire (two players alternating on one rifle/target)
 - **Pair Fire** - Per-turn timer (or unlimited), per-player sighters and configurable record shots, per-shooter scope persistence, dual HUD with active-shooter highlight, and X-count → sudden-death tiebreak
 - **Dual Scopes** - Spotting scope for wind reading, rifle scope for aiming
 - **Wind Reading** - Heat mirage effect responds to wind speed and direction; reactive 3D wind flags at multiple distances
@@ -135,8 +135,8 @@ Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclas
 1. **Match Setup** - Select distance (300–1000 yds) and wind preset
 2. **Bullet Parameters** - BC (G7 recommended), muzzle velocity, diameter (inches), weight (grains), length (inches), twist rate (inches per turn), rifle accuracy
 3. **Controls** - Spotting scope: WASD/EQ keys; rifle scope: arrow keys/±; shoot with spacebar
-4. **Match Mode** - Standard or Pair Fire (set in the parameter bar)
-5. **Standard Format** - Configurable matches / shots / minutes (default three 20-minute matches, 20 shots each, scored as an aggregate); Match 1: unlimited sighters until "Go For Record"; later matches: 2 sighters each
+4. **Match Mode** - String Fire or Pair Fire (set in the parameter bar)
+5. **String Fire Format** - Configurable matches / shots / minutes (default three 20-minute matches, 20 shots each, scored as an aggregate); Match 1: unlimited sighters until "Go For Record"; later matches: 2 sighters each
 6. **Pair Fire Format** - Two players alternate on one rifle/target; each gets 2 sighters then configurable record shots (default 10) under a per-turn timer (or unlimited); ties broken by X-count then sudden death
 
 Experience authentic F-Class matches with wind reading (heat mirage and reactive flags), realistic wind simulation, and detailed scoring. Spin drift and crosswind jump are automatically included in trajectory calculations. Use mirage and flags together—mirage leans with crosswind and increases with zoom.
