@@ -87,6 +87,7 @@
       <div class="param-item"><label for="length" title="Bullet length in inches">Len (in)</label><input type="number" id="length" value="1.4" step="0.01" min="0.1" max="5.0" title="Bullet length in inches"></div>
       <div class="param-item"><label for="twist" title="Barrel twist rate in inches per turn">Twist (in/turn)</label><input type="number" id="twist" value="8.0" step="0.1" min="1" max="20" title="Barrel twist rate in inches per turn"></div>
       <div class="param-item" style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="enableSpinEffects" checked style="width: auto; margin: 0;"><label for="enableSpinEffects" style="margin: 0; font-weight: normal;" title="Enable spin drift and crosswind jump effects.">Enable Spin Effects</label></div>
+      <div class="param-item" data-no-persist style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="remotePlayEnable" style="width: auto; margin: 0;"><label for="remotePlayEnable" style="margin: 0; font-weight: normal;" title="Stream this sim to another person who plays it remotely. Set up the connection before starting so the match clock doesn't run during setup.">Host Remote Play <span style="color:#b06000;">(Beta)</span></label></div>
       <div class="param-item" style="display: flex; align-items: center;"><a href="#" id="resetDefaults" style="color: #007bff; text-decoration: none; font-size: 13px; cursor: pointer;" title="Reset all parameters to default values">Reset to Defaults</a></div>
     </div>
 
@@ -99,6 +100,25 @@
       <button id="goForRecordBtn" class="btn btn-secondary" style="display: none;">Go For Record</button>
       <button id="windHUDBtn" class="btn btn-secondary" style="display: none;">Wind HUD</button>
       <button id="helpBtn" class="btn btn-secondary">Help</button>
+    </div>
+
+    <!-- Remote Play host panel: copy/paste WebRTC handshake, no backend -->
+    <div id="remotePlayPanel" data-no-persist style="display: none; max-width: 640px; margin: 0 auto 15px; padding: 14px 16px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; text-align: left;">
+      <strong>Host Remote Play <span style="color:#b06000;">(Beta)</span></strong>
+      <p style="font-size: 13px; color:#555; margin: 8px 0;">Set this up <em>before</em> pressing Start so the match clock doesn't run during setup. Uncheck <em>Host Remote Play</em> to cancel.</p>
+      <label style="font-size:12px; font-weight:bold;">1. Send this invite link to the other player</label>
+      <div style="display:flex; gap:6px; align-items:center; margin:4px 0 10px;">
+        <input id="remoteInviteLink" readonly style="flex:1; font-family:monospace; font-size:11px; padding:5px; box-sizing:border-box;" placeholder="Generating link...">
+        <button id="remoteCopyOfferBtn" class="btn btn-secondary" style="white-space:nowrap;">Copy Link</button>
+      </div>
+      <p style="font-size:12px; color:#777; margin:0 0 8px;">They open it, then send you back an <em>answer code</em>.</p>
+      <label style="font-size:12px; font-weight:bold;">2. Paste the answer code they send back</label>
+      <textarea id="remoteAnswerToken" placeholder="Paste the viewer's answer code here..." style="width:100%; height:70px; font-family:monospace; font-size:11px; box-sizing:border-box;"></textarea>
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <button id="remoteConnectBtn" class="btn btn-primary">Connect</button>
+        <button id="remoteNewInviteBtn" class="btn btn-secondary" title="Generate a fresh invite link to (re)connect a viewer. Your match keeps running.">New invite link</button>
+      </div>
+      <div id="remoteStatus" style="margin-top:8px; font-size:13px; font-weight:bold; color:#333;"></div>
     </div>
 
     <div id="error" class="error" style="display: none;"></div>
@@ -183,7 +203,23 @@
             - <strong>Wind HUD:</strong> Toggle wind field visualization on/off
           </div>
         </div>
-        
+
+        <div class="help-section">
+          <h3>Remote Play <span style="color:#b06000;">(Beta)</span></h3>
+          <div class="param-help">
+            Stream the running sim to someone on another computer who can play it &mdash; useful for letting a friend take a turn, or playing pair fire across the internet. Your PC does all the rendering; they see a live video and their keystrokes control your sim (with slight input lag).<br><br>
+            <strong>To host:</strong><br>
+            - Check <strong>Host Remote Play</strong> in the config bar <em>before</em> starting (so the match clock doesn't run during setup)<br>
+            - Send the <em>invite token</em> to the other player<br>
+            - They open the <strong>Remote Play Viewer</strong> (<code>remote.html</code>), paste it, and send back an <em>answer token</em><br>
+            - Paste their answer token and click <strong>Connect</strong>, then press <strong>Start Game</strong><br><br>
+            No account or server is required &mdash; the connection is peer-to-peer. The viewer can open the Scorecard on their end.<br><br>
+            <strong>Reconnecting:</strong> if the viewer drops, your match keeps running &mdash; click <em>New invite link</em>, resend it, and they're back. (Each connection needs a fresh link.)<br><br>
+            <strong>Pair Fire:</strong> the host plays Player 1 (left) and the viewer plays Player 2 (right). Controls are active only for whoever's turn it is, and the viewer gets their own <em>Go For Record</em> button on their turn.<br><br>
+            <strong>Audio &amp; quality:</strong> game audio (gunshots, wind, scope clicks) streams too &mdash; the viewer clicks <em>Enable sound</em> to hear it (browsers block autoplay audio until then). Video sharpness depends on the host's render resolution (window size + graphics preset) and the connection bandwidth.
+          </div>
+        </div>
+
         <div class="help-section">
           <h3>Graphics Quality</h3>
           <div class="param-help">

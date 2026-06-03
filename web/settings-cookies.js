@@ -34,6 +34,9 @@ export function createSettingsCookies(prefix)
       return inputs.filter(el =>
       {
         const type = el.type?.toLowerCase();
+        // Allow fields (or their containers) to opt out of persistence via
+        // data-no-persist — e.g. transient/session-only controls.
+        if (el.closest('[data-no-persist]')) return false;
         return type !== 'button' && type !== 'submit' && type !== 'reset' && el.id;
       });
     },

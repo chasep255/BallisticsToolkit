@@ -97,8 +97,30 @@ export class AudioManager
     {
       this.audioContext = new(window.AudioContext || window.webkitAudioContext)();
       console.log(`${LOG_PREFIX} Audio context created (sample rate: ${this.audioContext.sampleRate}Hz)`);
+      // All sounds connect to this master node, which feeds the speakers and
+      // (when Remote Play is hosting) a capture stream — see getCaptureStream().
+      this.masterGain = this.audioContext.createGain();
+      this.masterGain.connect(this.audioContext.destination);
     }
     return this.audioContext;
+  }
+
+  /**
+   * Tap the master output as a MediaStream for streaming to a remote viewer.
+   * Lazily attaches a capture node to the master (in addition to the speakers),
+   * so the host keeps hearing audio normally.
+   * @returns {?MediaStream} an audio MediaStream, or null if unavailable
+   */
+  getCaptureStream()
+  {
+    const context = this.initializeContext();
+    if (!context || typeof context.createMediaStreamDestination !== 'function') return null;
+    if (!this.streamDestination)
+    {
+      this.streamDestination = context.createMediaStreamDestination();
+      this.masterGain.connect(this.streamDestination);
+    }
+    return this.streamDestination.stream;
   }
 
   /**
@@ -180,11 +202,11 @@ export class AudioManager
         const gainNode = context.createGain();
         gainNode.gain.value = options.volume;
         source.connect(gainNode);
-        gainNode.connect(context.destination);
+        gainNode.connect(this.masterGain);
       }
       else
       {
-        source.connect(context.destination);
+        source.connect(this.masterGain);
       }
 
       // Track active source
@@ -245,7 +267,7 @@ export class AudioManager
       gainNode.gain.value = initialVolume;
 
       source.connect(gainNode);
-      gainNode.connect(context.destination);
+      gainNode.connect(this.masterGain);
 
       source.start(0);
 

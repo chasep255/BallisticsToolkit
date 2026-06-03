@@ -136,6 +136,11 @@ import
 from './ui/hud.js';
 import
 {
+  RemoteHost
+}
+from './core/remote-host.js';
+import
+{
   WindFieldHUD
 }
 from './rendering/wind-field-hud.js';
@@ -174,6 +179,49 @@ const FCLASS_DISTANCE_TO_TARGET = {
 
 // WebGL game instance
 let webglGame = null;
+
+// Remote Play host, set up from the config checkbox BEFORE the match starts so
+// the handshake doesn't run down the match clock. Lives at module scope because
+// it is created before any FClassSimulator exists; the simulator attaches to it
+// at game start.
+let remoteHost = null;
+
+// Re-dispatch a keystroke forwarded by the remote viewer as a synthetic
+// KeyboardEvent. The sim's input handlers are attached to `document` and read
+// key/code/shiftKey, so they pick it up unchanged. No turn gating in V1. Before
+// the game starts there are no handlers, so stray keys are harmless.
+function applyRemoteInput(input)
+{
+  const type = input.isDown ? 'keydown' : 'keyup';
+  const event = new KeyboardEvent(type, {
+    key: input.key,
+    code: input.code,
+    shiftKey: !!input.shiftKey,
+    bubbles: true,
+    cancelable: true
+  });
+  // Tag so the turn gate can distinguish the remote player (p2) from the
+  // host's local keyboard (p1) in pair fire.
+  event.btkRemote = true;
+  document.dispatchEvent(event);
+}
+
+// Key codes the sim uses for aiming/firing/spotting — the only ones the pair-fire
+// turn gate blocks (so browser shortcuts still work for the spectating player).
+const GAME_KEY_CODES = new Set([
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyQ', 'KeyR',
+  'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract'
+]);
+
+// Capture the live canvas as a video track (only meaningful once rendering).
+function canvasVideoTrack()
+{
+  const canvas = document.getElementById('gameCanvas');
+  if (!canvas || typeof canvas.captureStream !== 'function') return null;
+  const tracks = canvas.captureStream(30).getVideoTracks();
+  return tracks[0] || null;
+}
 
 // Lock canvas size once on page load
 function lockCanvasSize()
@@ -265,6 +313,108 @@ function showWarning(title, message)
   document.body.insertBefore(warning, document.body.firstChild);
 }
 
+// Wire the "Host Remote Play" config checkbox: when checked, begin hosting and
+// reveal the copy/paste token panel; when unchecked, tear it down. Set up before
+// pressing Start so the handshake doesn't run down the match clock. The canvas
+// video track is attached later (at game start, or immediately if already
+// running) via attachRemoteHost(). Mode-agnostic.
+function setupRemotePlayUI()
+{
+  const enable = document.getElementById('remotePlayEnable');
+  if (!enable) return;
+
+  const panel = document.getElementById('remotePlayPanel');
+  const linkEl = document.getElementById('remoteInviteLink');
+  const answerEl = document.getElementById('remoteAnswerToken');
+  const statusEl = document.getElementById('remoteStatus');
+  const connectBtn = document.getElementById('remoteConnectBtn');
+  const copyBtn = document.getElementById('remoteCopyOfferBtn');
+  const newInviteBtn = document.getElementById('remoteNewInviteBtn');
+
+  const setStatus = (text) => { if (statusEl) statusEl.textContent = text; };
+
+  // Build a clickable viewer link with the offer token embedded in the URL
+  // fragment (fragments never reach a server, so the token stays local).
+  const inviteLinkFor = (offer) =>
+    new URL('remote.html', window.location.href).href + '#o=' + encodeURIComponent(offer);
+
+  // Create a fresh host + invite link. Used both to start hosting and to
+  // reconnect after a viewer drops — the running match is never disturbed
+  // (a WebRTC offer is single-use, so each connection needs a new one).
+  async function beginHosting()
+  {
+    if (remoteHost) { remoteHost.onClose = null; remoteHost.close(); }
+    if (webglGame) webglGame.remoteHost = null;
+    if (answerEl) answerEl.value = '';
+    if (connectBtn) connectBtn.disabled = false;
+    setStatus('Preparing invite link (gathering connection info)...');
+    try
+    {
+      remoteHost = new RemoteHost();
+      remoteHost.onInput = applyRemoteInput;
+      remoteHost.onGoForRecord = () => { if (webglGame) webglGame.requestGoForRecord('remote'); };
+      remoteHost.onStatus = (t) => setStatus(t);
+      remoteHost.onOpen = () =>
+      {
+        setStatus('✓ Viewer connected.');
+        if (webglGame) { webglGame.pushScorecardNow(); webglGame.pushControlsNow(); }
+      };
+      remoteHost.onClose = () =>
+        setStatus('Viewer disconnected. Click "New invite link" and resend it to reconnect — your match keeps running.');
+
+      const offer = await remoteHost.start();
+      if (linkEl) linkEl.value = inviteLinkFor(offer);
+
+      // If a match is already running, attach the live video + state now.
+      if (webglGame) webglGame.attachRemoteHost(remoteHost);
+
+      setStatus('Invite link ready — send it to the other player.');
+    }
+    catch (e)
+    {
+      setStatus(e.message || String(e));
+    }
+  }
+
+  enable.addEventListener('change', () =>
+  {
+    if (!enable.checked)
+    {
+      if (remoteHost) { remoteHost.onClose = null; remoteHost.close(); remoteHost = null; }
+      if (webglGame) webglGame.remoteHost = null;
+      if (panel) panel.style.display = 'none';
+      return;
+    }
+    if (panel) panel.style.display = 'block';
+    beginHosting();
+  });
+
+  if (newInviteBtn) newInviteBtn.addEventListener('click', () => beginHosting());
+
+  if (connectBtn) connectBtn.addEventListener('click', async () =>
+  {
+    const answer = (answerEl && answerEl.value || '').trim();
+    if (!answer || !remoteHost) return;
+    connectBtn.disabled = true;
+    setStatus('Connecting...');
+    try
+    {
+      await remoteHost.connect(answer);
+      setStatus('Connecting... waiting for the link to open.');
+    }
+    catch (e)
+    {
+      setStatus(e.message || String(e));
+      connectBtn.disabled = false;
+    }
+  });
+
+  if (copyBtn) copyBtn.addEventListener('click', () =>
+  {
+    if (linkEl && linkEl.value) navigator.clipboard.writeText(linkEl.value);
+  });
+}
+
 function setupUI()
 {
   // Start button
@@ -288,14 +438,15 @@ function setupUI()
     }
   });
 
+  // ===== Remote Play (host) =====
+  setupRemotePlayUI();
+
   // Go For Record button
   document.getElementById('goForRecordBtn').addEventListener('click', () =>
   {
     if (webglGame && webglGame.driver)
     {
-      webglGame.driver.goForRecord();
-      webglGame.updateControls();
-      webglGame.updateHUD();
+      webglGame.requestGoForRecord('local');
     }
   });
 
@@ -353,6 +504,10 @@ function startGame()
     webglGame = new FClassSimulator(canvas, params);
     webglGame.start();
 
+    // If Remote Play was set up before starting, attach the now-live sim
+    // (video track + scorecard) so the clock and stream begin together.
+    if (remoteHost) webglGame.attachRemoteHost(remoteHost);
+
     // Update UI
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('pauseBtn').style.display = 'inline-block';
@@ -396,6 +551,9 @@ function restartGame()
     const canvas = document.getElementById('gameCanvas');
     webglGame = new FClassSimulator(canvas, params);
     webglGame.start();
+
+    // Re-attach the persistent Remote Play host to the new sim instance.
+    if (remoteHost) webglGame.attachRemoteHost(remoteHost);
 
     // Reset button states
     document.getElementById('pauseBtn').textContent = 'Pause';
@@ -630,6 +788,9 @@ class FClassSimulator
 
     // Scorecard
     this.scorecard = new Scorecard();
+
+    // Remote Play host (null unless the user starts streaming to a remote viewer)
+    this.remoteHost = null;
 
     // Pending segment-end event awaiting the target becoming ready
     this.pendingSegmentEvent = null;
@@ -1344,6 +1505,7 @@ class FClassSimulator
     this.setupSpottingScopeControls();
     this.setupRifleScopeControls();
     this.setupShotFiringControls();
+    this.setupInputGate();
 
     // Create targets (requires BTK to be loaded)
     try
@@ -1398,7 +1560,7 @@ class FClassSimulator
     });
     this.scorecard.setTargetSpec(this.targets.getScoringRings());
     // Update scorecard to display parameters before any shots
-    this.scorecard.update(this.driver.getScorecardModel());
+    this.refreshScorecard();
 
     // Capture initial scope state (rifle + spotting) for both players (pair fire)
     if (this.mode === 'pair')
@@ -1780,7 +1942,7 @@ class FClassSimulator
   {
     ResourceManager.audio.playSound('scope_click');
 
-    this.scorecard.update(this.driver.getScorecardModel());
+    this.refreshScorecard();
 
     // Mark a miss low on the target (no bullet was fired)
     this.targets.markShotWithAnimation(
@@ -2039,7 +2201,7 @@ class FClassSimulator
     this.driver.onShotScored(shotData, ResourceManager.time.getElapsedTime());
 
     // Update scorecard
-    this.scorecard.update(this.driver.getScorecardModel());
+    this.refreshScorecard();
 
     // Start match-style target animation with shot marker and scoring disc
     this.targets.markShotWithAnimation(
@@ -2094,21 +2256,116 @@ class FClassSimulator
   }
 
   /**
-   * Update contextual buttons (Go For Record) from the driver.
+   * Turn gate for pair fire over Remote Play: the host plays player 1, the
+   * remote viewer plays player 2. Block keydowns from the source whose turn it
+   * isn't (capture phase, before the scope/fire handlers). Keyups always pass so
+   * a held key can't get stuck when the turn flips.
+   */
+  setupInputGate()
+  {
+    this.inputGateHandler = (event) =>
+    {
+      if (event.type !== 'keydown') return;
+      if (this.mode !== 'pair' || !this.remoteHost) return;
+      if (!GAME_KEY_CODES.has(event.code)) return; // leave browser shortcuts alone
+      const allowed = event.btkRemote ? 'p2' : 'p1';
+      if (this.driver.getActivePlayerId() !== allowed)
+      {
+        event.stopImmediatePropagation();
+        if (event.cancelable) event.preventDefault();
+      }
+    };
+    document.addEventListener('keydown', this.inputGateHandler, true);
+  }
+
+  /**
+   * Apply a "Go For Record" request, honoring turn ownership in pair fire over
+   * Remote Play (host = p1, viewer = p2).
+   * @param {'local'|'remote'} source
+   */
+  requestGoForRecord(source)
+  {
+    if (this.mode === 'pair' && this.remoteHost)
+    {
+      const allowed = source === 'remote' ? 'p2' : 'p1';
+      if (this.driver.getActivePlayerId() !== allowed) return;
+    }
+    this.driver.goForRecord();
+    this.updateControls();
+    this.updateHUD();
+  }
+
+  /**
+   * Update contextual buttons (Go For Record) from the driver, and mirror the
+   * controls model to a remote viewer (which shows its own button on p2's turn).
    */
   updateControls()
   {
     const controls = this.driver.getControlsModel();
+    const activePlayer = this.driver.getActivePlayerId ? this.driver.getActivePlayerId() : null;
+
+    // When a remote viewer is playing p2, the host's own button only applies on
+    // p1's turn; the viewer gets its own button for p2's turn.
+    const hostMayGoForRecord = !(this.mode === 'pair' && this.remoteHost) || activePlayer === 'p1';
 
     const goBtn = document.getElementById('goForRecordBtn');
     if (goBtn)
     {
-      goBtn.style.display = controls.goForRecord ? 'inline-block' : 'none';
-      if (controls.goForRecord)
-      {
-        goBtn.textContent = controls.goForRecordText;
-      }
+      const show = controls.goForRecord && hostMayGoForRecord;
+      goBtn.style.display = show ? 'inline-block' : 'none';
+      if (show) goBtn.textContent = controls.goForRecordText;
     }
+
+    if (this.remoteHost) this.remoteHost.pushControls(controls, activePlayer);
+  }
+
+  // ===== Remote Play (host side) =====
+
+  /**
+   * Update the local scorecard and mirror it to a connected remote viewer.
+   * The HUD is captured by the video stream, so only the scorecard (a DOM
+   * modal) needs to be pushed.
+   */
+  refreshScorecard()
+  {
+    const model = this.driver.getScorecardModel();
+    this.scorecard.update(model);
+    if (this.remoteHost) this.remoteHost.pushScorecard(model);
+  }
+
+  /**
+   * Attach an already-hosting RemoteHost (created from the config checkbox
+   * before the match started) to this running sim: feed it the live canvas
+   * video track, the match metadata, and the current scorecard.
+   * @param {RemoteHost} host
+   */
+  attachRemoteHost(host)
+  {
+    this.remoteHost = host;
+    host.onGoForRecord = () => this.requestGoForRecord('remote');
+    const track = canvasVideoTrack();
+    if (track) host.setVideoTrack(track);
+    // Stream the game audio too (gunshots, wind, scope clicks).
+    const audio = ResourceManager.audio.getCaptureStream && ResourceManager.audio.getCaptureStream();
+    const audioTrack = audio && audio.getAudioTracks()[0];
+    if (audioTrack) host.setAudioTrack(audioTrack);
+    host.setMeta(this.scorecard.matchParams, this.scorecard.targetSpec);
+    host.pushScorecard(this.driver.getScorecardModel());
+    this.pushControlsNow();
+  }
+
+  /** Push the current scorecard to the viewer (e.g. right after it connects). */
+  pushScorecardNow()
+  {
+    if (this.remoteHost) this.remoteHost.pushScorecard(this.driver.getScorecardModel());
+  }
+
+  /** Push the current controls model + active player to the viewer. */
+  pushControlsNow()
+  {
+    if (!this.remoteHost) return;
+    const activePlayer = this.driver.getActivePlayerId ? this.driver.getActivePlayerId() : null;
+    this.remoteHost.pushControls(this.driver.getControlsModel(), activePlayer);
   }
 
   /**
@@ -2144,6 +2401,15 @@ class FClassSimulator
   destroy()
   {
     this.stop();
+
+    // Detach from the Remote Play host (its lifecycle is owned by the config
+    // checkbox at module scope, so the connection survives restarts).
+    this.remoteHost = null;
+
+    if (this.inputGateHandler)
+    {
+      document.removeEventListener('keydown', this.inputGateHandler, true);
+    }
 
     // Remove event listeners first (before nulling references)
     if (this.spottingScopeKeyHandler)

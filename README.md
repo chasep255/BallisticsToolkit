@@ -57,6 +57,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Advanced Wind Simulation** - Multi‑octave curl noise with advection and multiple presets (see Wind Simulator)
 - **Spin Effects** - Spin drift and crosswind jump included in trajectory calculations and trace visualizations
 - **Match-Style Scoring** - Authentic target animation, detailed scorecard with per-section impact (grouping) diagrams
+- **Remote Play (Beta)** - Host a match and stream the live view to another person who plays it remotely over a peer-to-peer WebRTC connection (no account or server). In Pair Fire the host plays Player 1 and the remote player plays Player 2, with turn-gated controls
 - **Immersive Environment** - Procedural terrain, dynamic audio, comprehensive HUD
 - **Debug Mode** - Add `?debug=1` to URL for rapid testing (1-min matches, 2 shots)
 
@@ -138,6 +139,7 @@ Visit the [F-Class Simulator](https://www.ballisticstoolkit.com/fclass-sim/fclas
 4. **Match Mode** - String Fire or Pair Fire (set in the parameter bar)
 5. **String Fire Format** - Configurable matches / shots / minutes (default three 20-minute matches, 20 shots each, scored as an aggregate); Match 1: unlimited sighters until "Go For Record"; later matches: 2 sighters each
 6. **Pair Fire Format** - Two players alternate on one rifle/target; each gets 2 sighters then configurable record shots (default 10) under a per-turn timer (or unlimited); ties broken by X-count then sudden death
+7. **Remote Play (Beta)** - Check **Host Remote Play** before starting to stream the match to another player. Send them the invite link; they open the Remote Play Viewer and send back an answer code to connect. No account or server required (peer-to-peer WebRTC). In Pair Fire the host plays Player 1 and the remote player Player 2, with controls limited to whoever's turn it is
 
 Experience authentic F-Class matches with wind reading (heat mirage and reactive flags), realistic wind simulation, and detailed scoring. Spin drift and crosswind jump are automatically included in trajectory calculations. Use mirage and flags together—mirage leans with crosswind and increases with zoom.
 

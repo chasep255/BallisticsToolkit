@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Remote Play Viewer — F-Class Simulator</title>
+  <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
+  <link rel="stylesheet" href="../common.css">
+  <link rel="stylesheet" href="fclass-sim.css">
+  <style>
+    .rp-wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+    .rp-connect { max-width: 640px; margin: 0 auto; padding: 14px 16px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; }
+    .rp-connect textarea { width: 100%; height: 70px; font-family: monospace; font-size: 11px; box-sizing: border-box; }
+    .rp-connect label { font-size: 12px; font-weight: bold; display:block; margin-top:8px; }
+    .rp-stage { display: none; position: relative; }
+    .rp-stage.active { display: block; }
+    #remoteVideo { width: 100%; background: #000; border-radius: 6px; display: block; }
+    .rp-status { margin-top: 8px; font-size: 13px; font-weight: bold; color: #333; }
+    .rp-bar { display:flex; gap:10px; align-items:center; justify-content:center; margin: 10px 0; }
+    .rp-hint { color:#666; font-size: 12px; text-align:center; }
+    .rp-overlay { position: absolute; inset: 0; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,0.7); color:#fff; font-size: 18px; border-radius:6px; text-align:center; padding: 20px; }
+    .rp-overlay.show { display: flex; }
+  </style>
+</head>
+<body data-page="remote">
+  <div class="rp-wrap">
+    <h1 style="text-align:center; font-size: 1.3rem;">Remote Play Viewer <span style="color:#b06000;">(Beta)</span></h1>
+
+    <!-- Connection stage -->
+    <div id="connectStage" class="rp-stage active">
+      <div class="rp-connect">
+        <p class="rp-hint" style="text-align:left;">Open the host's invite link and an <strong>answer code</strong> is generated below &mdash; send it back to the host. They connect you and the live view appears here.</p>
+
+        <!-- Manual offer paste: only needed if the link wasn't used -->
+        <div id="manualOffer">
+          <label>1. Invite token (paste from host)</label>
+          <textarea id="offerIn" placeholder="Paste the host's invite token here..."></textarea>
+          <button id="genAnswerBtn" class="btn btn-primary" style="margin-top:6px;">Generate answer code</button>
+        </div>
+
+        <label>Answer code (send back to host)</label>
+        <textarea id="answerOut" readonly placeholder="Your answer code will appear here..."></textarea>
+        <button id="copyAnswerBtn" class="btn btn-primary" style="margin-top:6px;">Copy answer code</button>
+        <div id="connectStatus" class="rp-status">Waiting for invite...</div>
+      </div>
+    </div>
+
+    <!-- Play stage -->
+    <div id="playStage" class="rp-stage">
+      <div class="rp-bar">
+        <button id="rpScorecardBtn" class="btn btn-secondary">Scorecard</button>
+        <button id="rpGoForRecordBtn" class="btn btn-primary" style="display:none;">Go For Record</button>
+        <button id="rpSoundBtn" class="btn btn-secondary">🔊 Enable sound</button>
+        <span class="rp-hint">Your keys (arrows, Shift+arrows to dial, Space to fire, WASD/E/Q spotting scope) control the host. Expect slight input lag.</span>
+      </div>
+      <div style="position: relative;">
+        <video id="remoteVideo" autoplay playsinline muted></video>
+        <div id="dcOverlay" class="rp-overlay">
+          <div>
+            Disconnected.<br>
+            <span style="font-size:14px;">Open the new invite link your host sends, or reconnect manually below.</span><br>
+            <button id="reconnectBtn" class="btn btn-primary" style="margin-top:12px;">Reconnect</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reused scorecard modal (rendered by ui/scorecard.js from pushed models) -->
+  <div id="scorecardModal" class="scorecard-modal" style="display: none;">
+    <div class="scorecard-content"></div>
+  </div>
+
+  <script type="module">
+    import { ManualPeerLink } from './core/netlink.js';
+    import { Scorecard } from './ui/scorecard.js';
+
+    const link = new ManualPeerLink();
+    const scorecard = new Scorecard();
+    scorecard.initialize();
+
+    const $ = (id) => document.getElementById(id);
+    const setConnStatus = (t) => { $('connectStatus').textContent = t; };
+
+    // Opening a new invite link in the same tab only changes the URL fragment,
+    // which does NOT reload the page — so the old, spent connection would linger
+    // and re-show a stale answer. Force a fresh page when the invite changes.
+    window.addEventListener('hashchange', () => window.location.reload());
+
+    // ---- Inbound media + messages ----
+    link.onStream = (stream) => { $('remoteVideo').srcObject = stream; };
+
+    link.onOpen = () =>
+    {
+      $('connectStage').classList.remove('active');
+      $('playStage').classList.add('active');
+    };
+    link.onClose = () => { $('dcOverlay').classList.add('show'); };
+
+    link.onMessage = (msg) =>
+    {
+      if (!msg) return;
+      if (msg.type === 'meta')
+      {
+        if (msg.matchParams) scorecard.setMatchParams(msg.matchParams);
+        if (msg.targetSpec) scorecard.setTargetSpec(msg.targetSpec);
+      }
+      else if (msg.type === 'scorecard')
+      {
+        scorecard.update(msg.model);
+      }
+      else if (msg.type === 'controls')
+      {
+        // Show our Go For Record button only on our turn (p2), or in single-
+        // player string fire (no active player id).
+        const btn = $('rpGoForRecordBtn');
+        const show = msg.model && msg.model.goForRecord
+          && (msg.activePlayer === 'p2' || msg.activePlayer == null);
+        btn.style.display = show ? 'inline-block' : 'none';
+        if (show && msg.model.goForRecordText) btn.textContent = msg.model.goForRecordText;
+      }
+      else if (msg.type === 'bye')
+      {
+        $('dcOverlay').classList.add('show');
+      }
+    };
+
+    // ---- Handshake (guest) ----
+    let answering = false;
+    async function generateAnswer(offer)
+    {
+      if (answering || !offer) return;
+      answering = true;
+      setConnStatus('Generating answer code (gathering connection info)...');
+      try
+      {
+        $('answerOut').value = await link.acceptOffer(offer);
+        // Try to put it on the clipboard automatically for convenience.
+        try { await navigator.clipboard.writeText($('answerOut').value); } catch { /* needs gesture */ }
+        setConnStatus('✓ Answer code ready (copied) — send it back to the host, then wait.');
+      }
+      catch (e) { setConnStatus(e.message || String(e)); answering = false; }
+    }
+
+    $('genAnswerBtn').addEventListener('click', () =>
+      generateAnswer(($('offerIn').value || '').trim()));
+    $('copyAnswerBtn').addEventListener('click', () =>
+    {
+      if ($('answerOut').value) navigator.clipboard.writeText($('answerOut').value);
+    });
+
+    // If opened via the host's invite link (remote.html#o=<offer>), auto-generate
+    // the answer so the player only has to send the code back.
+    (function consumeInviteLink()
+    {
+      const hash = window.location.hash || '';
+      if (!hash.startsWith('#o=')) return;
+      const offer = decodeURIComponent(hash.slice(3));
+      $('manualOffer').style.display = 'none'; // link supplied the offer
+      generateAnswer(offer);
+    })();
+
+    // ---- Local scorecard toggle (the modal is a DOM overlay, not in the video) ----
+    $('rpScorecardBtn').addEventListener('click', () => scorecard.toggle());
+
+    // ---- Enable sound (browsers block unmuted autoplay without a gesture) ----
+    $('rpSoundBtn').addEventListener('click', () =>
+    {
+      const v = $('remoteVideo');
+      v.muted = false;
+      v.play().catch(() => {});
+      $('rpSoundBtn').style.display = 'none';
+    });
+
+    // ---- Go For Record (end sighters early) — sent to the host ----
+    $('rpGoForRecordBtn').addEventListener('click', () =>
+    {
+      if (link.isOpen) link.send({ type: 'goForRecord' });
+    });
+
+    // ---- Reconnect: reload to a clean viewer ready for a fresh invite ----
+    $('reconnectBtn').addEventListener('click', () =>
+    {
+      // Drop the spent invite in the URL so we land on the paste screen.
+      window.location.href = 'remote.html';
+    });
+
+    // ---- Forward keystrokes to the host ----
+    const GAME_KEYS = new Set([
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyQ', 'KeyR',
+      'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract'
+    ]);
+
+    function isEditable(el)
+    {
+      return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+    }
+
+    function forwardKey(event)
+    {
+      if (!link.isOpen) return;
+      if (isEditable(document.activeElement)) return; // typing in a token box
+      // Prevent page scroll/zoom for keys the game uses.
+      if (GAME_KEYS.has(event.code)) event.preventDefault();
+      link.send({
+        type: 'input',
+        key: event.key,
+        code: event.code,
+        shiftKey: event.shiftKey,
+        isDown: event.type === 'keydown'
+      });
+    }
+    document.addEventListener('keydown', forwardKey);
+    document.addEventListener('keyup', forwardKey);
+  </script>
+</body>
+</html>

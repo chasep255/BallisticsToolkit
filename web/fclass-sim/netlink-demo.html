@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Peer Link Demo (manual signaling)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; color: #222; }
+    h1 { font-size: 1.3rem; }
+    .role-pick button { font-size: 1rem; padding: 10px 18px; margin-right: 8px; cursor: pointer; }
+    .panel { border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin-top: 16px; display: none; }
+    .panel.active { display: block; }
+    .step { margin: 14px 0; }
+    .step h3 { margin: 0 0 6px; font-size: 0.95rem; }
+    textarea { width: 100%; height: 90px; font-family: monospace; font-size: 11px; box-sizing: border-box; }
+    button { cursor: pointer; padding: 6px 12px; }
+    input[type=text] { padding: 6px; width: 70%; }
+    #status { font-weight: bold; }
+    .ok { color: #137333; } .wait { color: #b06000; } .err { color: #c5221f; }
+    #chat { display: none; margin-top: 16px; }
+    #log { border: 1px solid #ddd; border-radius: 6px; height: 160px; overflow-y: auto; padding: 8px; font-family: monospace; font-size: 12px; background: #fafafa; }
+    .me { color: #1a73e8; } .them { color: #137333; } .sys { color: #888; }
+    .hint { color: #666; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>Peer Link Demo &mdash; copy/paste WebRTC, no backend</h1>
+  <p class="hint">Open this page in two browsers (or two devices). One is the Host, one is the Guest.
+  Pass the tokens between them however you like (chat, SMS). Then send messages directly peer-to-peer.</p>
+
+  <p>Status: <span id="status" class="wait">choose a role</span></p>
+
+  <div class="role-pick">
+    <button id="btnHost">Host a game</button>
+    <button id="btnGuest">Join a game</button>
+  </div>
+
+  <!-- HOST -->
+  <div class="panel" id="hostPanel">
+    <div class="step">
+      <h3>1. Create your invite token and send it to the other player</h3>
+      <button id="hostCreate">Create offer token</button>
+      <textarea id="hostOffer" readonly placeholder="Offer token will appear here..."></textarea>
+      <button id="hostCopyOffer">Copy</button>
+    </div>
+    <div class="step">
+      <h3>2. Paste the answer token they send back, then connect</h3>
+      <textarea id="hostAnswer" placeholder="Paste the guest's answer token here..."></textarea>
+      <button id="hostConnect">Connect</button>
+    </div>
+  </div>
+
+  <!-- GUEST -->
+  <div class="panel" id="guestPanel">
+    <div class="step">
+      <h3>1. Paste the host's invite token and generate your answer</h3>
+      <textarea id="guestOffer" placeholder="Paste the host's offer token here..."></textarea>
+      <button id="guestAnswer">Generate answer token</button>
+    </div>
+    <div class="step">
+      <h3>2. Send this answer token back to the host</h3>
+      <textarea id="guestAnswerOut" readonly placeholder="Answer token will appear here..."></textarea>
+      <button id="guestCopyAnswer">Copy</button>
+    </div>
+  </div>
+
+  <!-- CHAT (proves the channel works) -->
+  <div id="chat">
+    <h3>Connected! Messages flow directly peer-to-peer:</h3>
+    <div id="log"></div>
+    <div style="margin-top:8px;">
+      <input type="text" id="msg" placeholder="Type a message and hit Enter...">
+      <button id="send">Send</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { ManualPeerLink } from './core/netlink.js';
+
+    const statusEl = document.getElementById('status');
+    const setStatus = (text, cls) => { statusEl.textContent = text; statusEl.className = cls || ''; };
+
+    let link = null;
+
+    function wireLink()
+    {
+      link.onStateChange = (s) => setStatus('connection: ' + s, s === 'connected' ? 'ok' : 'wait');
+      link.onOpen = () =>
+      {
+        setStatus('connected — channel open', 'ok');
+        document.getElementById('chat').style.display = 'block';
+        logLine('sys', 'Channel open. Say hello.');
+      };
+      link.onClose = () => logLine('sys', 'Connection closed.');
+      link.onError = (e) => logLine('sys', 'Error: ' + (e && e.message ? e.message : e));
+      link.onMessage = (value) => logLine('them', value && value.text ? value.text : JSON.stringify(value));
+    }
+
+    function logLine(who, text)
+    {
+      const log = document.getElementById('log');
+      const div = document.createElement('div');
+      div.className = who;
+      const tag = who === 'me' ? 'you' : who === 'them' ? 'peer' : '—';
+      div.textContent = `[${tag}] ${text}`;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function showPanel(id)
+    {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // ----- Role selection -----
+    document.getElementById('btnHost').onclick = () =>
+    {
+      link = new ManualPeerLink(); wireLink(); showPanel('hostPanel');
+      setStatus('hosting — create a token', 'wait');
+    };
+    document.getElementById('btnGuest').onclick = () =>
+    {
+      link = new ManualPeerLink(); wireLink(); showPanel('guestPanel');
+      setStatus('joining — paste the host token', 'wait');
+    };
+
+    // ----- Host flow -----
+    document.getElementById('hostCreate').onclick = async () =>
+    {
+      setStatus('gathering connection info...', 'wait');
+      document.getElementById('hostOffer').value = await link.createOffer();
+      setStatus('offer ready — send it to the guest', 'wait');
+    };
+    document.getElementById('hostConnect').onclick = async () =>
+    {
+      try { await link.acceptAnswer(document.getElementById('hostAnswer').value); setStatus('connecting...', 'wait'); }
+      catch (e) { setStatus(e.message, 'err'); }
+    };
+    document.getElementById('hostCopyOffer').onclick = () =>
+      navigator.clipboard.writeText(document.getElementById('hostOffer').value);
+
+    // ----- Guest flow -----
+    document.getElementById('guestAnswer').onclick = async () =>
+    {
+      try
+      {
+        setStatus('gathering connection info...', 'wait');
+        document.getElementById('guestAnswerOut').value =
+          await link.acceptOffer(document.getElementById('guestOffer').value);
+        setStatus('answer ready — send it back to the host', 'wait');
+      }
+      catch (e) { setStatus(e.message, 'err'); }
+    };
+    document.getElementById('guestCopyAnswer').onclick = () =>
+      navigator.clipboard.writeText(document.getElementById('guestAnswerOut').value);
+
+    // ----- Chat -----
+    function sendMsg()
+    {
+      const input = document.getElementById('msg');
+      const text = input.value.trim();
+      if (!text || !link.isOpen) return;
+      link.send({ text });
+      logLine('me', text);
+      input.value = '';
+    }
+    document.getElementById('send').onclick = sendMsg;
+    document.getElementById('msg').addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
+  </script>
+</body>
+</html>
