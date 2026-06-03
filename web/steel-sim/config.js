@@ -25,6 +25,7 @@ export const DEFAULT_PARAMS = {
   scopeHeight: '2.0',
   scopeType: 'mrad',
   recoilPreset: 'Light',
+  windMarker: 'socks',
   opticalEffects: true,
   rangeFinder: true,
   bdc: true,
@@ -207,7 +208,34 @@ export function initConfig()
     flagFlapFrequencyBase: 0.5, // Hz
     flagFlapFrequencyScale: 0.25, // Hz/mph
     flagFlapAmplitude: btk.Conversions.yardsToMeters(0.15), // 0.15 yards
-    flagWaveLength: 1.5
+    flagWaveLength: 1.5,
+    // Furl: roll the cloth about its length axis so it reads as a 3D form
+    // (helps judge the head/tail wind component), scaled by wind strength.
+    flagFurlBase: 0.75, // radians of steady roll root->tip (~43deg)
+    flagFurlWave: 0.55 // travelling furl flutter layered on top
+  };
+
+  // ===== WIND SOCK CONFIGURATION =====
+  // Alternative downrange wind marker: a tapered open-ended tube that hangs from
+  // the pole on two strings. More 3D structure than a flag (easier head/tail
+  // read). Shares the flag pole and the same angle response.
+  Config.WIND_SOCK_CONFIG = {
+    poleHeight: btk.Conversions.yardsToMeters(3.0), // matches the flag pole
+    poleThickness: btk.Conversions.inchesToMeters(2.0),
+    sockLength: btk.Conversions.yardsToMeters(1.1),
+    sockMouthRadius: btk.Conversions.yardsToMeters(0.19), // wide intake end
+    sockTailRadius: btk.Conversions.yardsToMeters(0.085), // narrow trailing end
+    stringLength: btk.Conversions.yardsToMeters(0.14), // pole-top swivel -> mouth
+    radialSegments: 16,
+    lengthSegments: 8,
+    sockMinAngle: 2.0, // degrees from vertical (slight droop when calm)
+    sockMaxAngle: 90.0, // degrees from vertical (horizontal in strong wind)
+    sockAngleResponseK: 0.0205,
+    sockAngleInterpolationSpeed: 30.0, // deg/s
+    sockDirectionInterpolationSpeed: 1.0, // rad/s
+    swayFrequencyBase: 0.4, // Hz at 0 mph
+    swayFrequencyScale: 0.12, // additional Hz per mph
+    swayAmplitude: 7.0 // degrees of swing at full strength
   };
 
   // ===== WIND FLAG PLACEMENTS =====

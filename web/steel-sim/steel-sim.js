@@ -37,6 +37,11 @@ import
 from './WindFlag.js';
 import
 {
+  WindSockFactory
+}
+from './WindSock.js';
+import
+{
   RangeSignFactory
 }
 from './RangeSign.js';
@@ -216,6 +221,10 @@ class SteelSimulator
     this.flyWithBulletEnabled = params.flyWithBulletEnabled;
     this.scopeType = params.scopeType;
     this.recoilPreset = params.recoilPreset;
+
+    // Downrange wind markers: classic flags or more-3D wind socks
+    this.windMarker = params.windMarker || 'socks';
+    this.markerFactory = this.windMarker === 'socks' ? WindSockFactory : WindFlagFactory;
 
     this.flyCamShot = null;
     this.flyCamHoldUntilMs = null; // After impact, hold cam for a moment before exiting
@@ -426,7 +435,8 @@ class SteelSimulator
     TargetRackFactory.deleteAll();
     DustCloudFactory.dispose(); // Full dispose to allow re-initialization
     BulletGlowPool.dispose(); // Full dispose to allow re-initialization
-    WindFlagFactory.deleteAll();
+    WindFlagFactory.deleteAll(); // clear both marker types regardless of selection
+    WindSockFactory.deleteAll();
     RangeSignFactory.deleteAll();
     BermFactory.deleteAll();
     ImpactMarkFactory.dispose();
@@ -1258,8 +1268,8 @@ class SteelSimulator
       z: flagConfig.z
     }));
 
-    // Create all instanced flags at once
-    WindFlagFactory.createFlagsAtPositions(this.scene, positions);
+    // Create all instanced markers (flags or socks) at once
+    this.markerFactory.createFlagsAtPositions(this.scene, positions);
   }
 
   setupImpactDetector()
@@ -1325,8 +1335,8 @@ class SteelSimulator
       rack.registerWithImpactDetector(this.impactDetector);
     }
 
-    // Register wind flag poles
-    WindFlagFactory.registerWithImpactDetector(this.impactDetector);
+    // Register wind marker poles
+    this.markerFactory.registerWithImpactDetector(this.impactDetector);
 
     // Register prairie dog hunting targets
     const prairieDogs = PrairieDogFactory.getAll();
@@ -1380,7 +1390,7 @@ class SteelSimulator
     }
 
     const signs = RangeSignFactory.getAll();
-    const flags = WindFlagFactory.getAll();
+    const flags = this.markerFactory.getAll();
     console.log(`[SteelSim] ImpactDetector initialized with ${targets.length} steel targets, ${racks.length} racks, ${signs.length} signs, ${flags.length} flags, ${prairieDogs.length} prairie dogs`);
     console.log('[SteelSim] ImpactDetector stats:', this.impactDetector.getStats());
   }
@@ -2782,7 +2792,7 @@ class SteelSimulator
     SteelTargetFactory.updateDisplay();
 
     DustCloudFactory.updateAll(dt);
-    WindFlagFactory.updateAll(this.windGenerator, dt);
+    this.markerFactory.updateAll(this.windGenerator, dt);
 
     // Update hunting targets only if enabled
     if (this.prairieDogsEnabled)
@@ -2881,6 +2891,8 @@ function getGameParams()
   const scopeType = scopeTypeSelect ? scopeTypeSelect.value : 'mrad';
   const recoilPresetSelect = document.getElementById('recoilPreset');
   const recoilPreset = recoilPresetSelect ? recoilPresetSelect.value : 'None';
+  const windMarkerSelect = document.getElementById('windMarker');
+  const windMarker = windMarkerSelect ? windMarkerSelect.value : 'socks';
 
   // Convert to SI units (all parameters required, no defaults)
   return {
@@ -2901,7 +2913,8 @@ function getGameParams()
     bdcEnabled: bdcEnabled,
     flyWithBulletEnabled: flyWithBulletEnabled,
     scopeType: scopeType,
-    recoilPreset: recoilPreset
+    recoilPreset: recoilPreset,
+    windMarker: windMarker
   };
 }
 

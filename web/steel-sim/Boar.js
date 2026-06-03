@@ -12,6 +12,11 @@ import
 from './WindFlag.js';
 import
 {
+  WindSockFactory
+}
+from './WindSock.js';
+import
+{
   TargetRackFactory
 }
 from './TargetRack.js';
@@ -838,8 +843,8 @@ export class BoarFactory
     const bermPadding = 2.0; // Padding for berms behind targets
     const polePadding = 0.5; // Padding around flag poles
 
-    // Get obstacles
-    const flags = WindFlagFactory.getAll();
+    // Get obstacles - marker poles (only the active factory is populated)
+    const flags = [...WindFlagFactory.getAll(), ...WindSockFactory.getAll()];
     const racks = TargetRackFactory.getAll();
 
     // Helper function to check if ray intersects a circle (pole)

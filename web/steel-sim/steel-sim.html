@@ -109,6 +109,13 @@
         </select>
       </div>
       <div class="param-item">
+        <label for="windMarker" title="Downrange wind indicators">Wind Markers</label>
+        <select id="windMarker" title="Downrange wind indicators">
+          <option value="flags">Flags</option>
+          <option value="socks" selected>Socks</option>
+        </select>
+      </div>
+      <div class="param-item">
         <label for="zeroDistance" title="Zero distance in yards">Zero (yd)</label>
         <input type="number" id="zeroDistance" value="100" step="10" min="25" max="1000" title="Zero distance in yards">
       </div>
@@ -213,7 +220,7 @@
         <!-- Overview -->
         <div class="help-section">
           <h3>Overview</h3>
-          <p>Steel Target Simulator is an interactive steel range with ballistics simulation and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and simulation-oriented target responses. Features dual scopes (rifle + spotting), MRAD/MOA dial adjustments, optional heat mirage effects, wind flags, dust/metal effects, and a HUD.</p>
+          <p>Steel Target Simulator is an interactive steel range with ballistics simulation and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and simulation-oriented target responses. Features dual scopes (rifle + spotting), MRAD/MOA dial adjustments, optional heat mirage effects, wind markers (wind socks or flags), dust/metal effects, and a HUD.</p>
         </div>
         
         <!-- Quick Start -->
@@ -382,7 +389,7 @@
           <h3>Tips for Success</h3>
           <div class="param-help">
             - Start with the 100-yard rack to confirm your zero<br>
-            - Use wind flags at multiple distances to read wind gradients<br>
+            - Use wind markers (wind socks or flags, selectable in settings) at multiple distances to read wind gradients<br>
             - Watch target movement after impacts to understand hit location<br>
             - Make small dial adjustments for precise corrections<br>
             - Use <kbd>Shift</kbd>+<kbd>Arrow</kbd> for larger adjustments (1.0 MRAD in MRAD mode, 1.0 MOA in MOA mode)<br>

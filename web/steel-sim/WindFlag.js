@@ -594,6 +594,8 @@ export class WindFlagFactory
       flagFlapFrequencyScale: config.flagFlapFrequencyScale ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyScale,
       flagFlapAmplitude: config.flagFlapAmplitude ?? Config.WIND_FLAG_CONFIG.flagFlapAmplitude,
       flagWaveLength: config.flagWaveLength ?? Config.WIND_FLAG_CONFIG.flagWaveLength,
+      flagFurlBase: config.flagFurlBase ?? Config.WIND_FLAG_CONFIG.flagFurlBase,
+      flagFurlWave: config.flagFurlWave ?? Config.WIND_FLAG_CONFIG.flagFurlWave,
       poleHeight: Config.WIND_FLAG_CONFIG.poleHeight,
       poleThickness: Config.WIND_FLAG_CONFIG.poleThickness
     };
@@ -851,6 +853,12 @@ export class WindFlagFactory
       shader.uniforms.uWaveLength = {
         value: cfg.flagWaveLength
       };
+      shader.uniforms.uFurlBase = {
+        value: cfg.flagFurlBase
+      };
+      shader.uniforms.uFurlWave = {
+        value: cfg.flagFurlWave
+      };
 
       // Vertex shader: add attributes, uniforms, and helper function
       shader.vertexShader = shader.vertexShader.replace(
@@ -868,7 +876,9 @@ export class WindFlagFactory
         uniform float uAngleResponseK;
         uniform float uFlapAmplitude;
         uniform float uWaveLength;
-        
+        uniform float uFurlBase;   // steady roll root->tip (radians)
+        uniform float uFurlWave;   // travelling furl flutter (radians)
+
         // Helper function to compute deformed position at given local coordinates
         vec3 computeDeformedPosition(float localX, float localY, float localZ, float t) {
           // Extract wind parameters
@@ -876,35 +886,47 @@ export class WindFlagFactory
           float windZ = -instanceWindVector.z;
           float windSpeed = sqrt(windX * windX + windZ * windZ);
           float windSpeedMph = windSpeed * 2.237;
-          
+
           float windDir = windSpeed > 0.001 ? atan(windZ, windX) : 0.0;
-          
+
           float angleSpan = uMaxAngle - uMinAngle;
           float angleDeg = uMinAngle + angleSpan * (1.0 - exp(-uAngleResponseK * windSpeedMph * windSpeedMph));
           float angleRad = angleDeg * 0.01745329;
-          
+
           float cosDir = cos(windDir);
           float sinDir = sin(windDir);
           float cosPitch = cos(angleRad);
           float sinPitch = sin(angleRad);
-          
+
           // Quadratic bending: more curvature toward tip
           float xNorm = localX / uFlagLength;
           float bend = xNorm * xNorm;  // Quadratic curvature
-          
+
           // Wave/flapping animation
           float waveArg = instanceWavePhase + t * uWaveLength * 6.28318;
           float waveOffset = sin(waveArg) * uFlapAmplitude * t;
-          
+
+          // Furl: roll the cross-section (width localY, thickness localZ) about
+          // the length axis, accumulating root->tip with a travelling flutter,
+          // scaled by wind strength so the flag hangs flat when calm and furls
+          // into a 3D form when blowing. Width -> vertical (W), out-of-plane ->
+          // horizontal perpendicular to the wind (N).
+          float windFactor = clamp(angleDeg / 60.0, 0.0, 1.0);
+          float furl = (uFurlBase * t + uFurlWave * sin(waveArg) * t) * windFactor;
+          float cf = cos(furl);
+          float sf = sin(furl);
+          float widthCoord = localY * cf - localZ * sf;
+          float outOfPlane = localY * sf + localZ * cf + waveOffset;
+
           // Apply quadratic pitch
           float pitchedX = bend * uFlagLength * sinPitch;
           float pitchedY = bend * uFlagLength * -cosPitch;
-          
-          // Rotate into wind direction and add wave
-          float rotatedX = pitchedX * cosDir + waveOffset * sinDir;
-          float rotatedY = pitchedY + localY;
-          float rotatedZ = -pitchedX * sinDir + waveOffset * cosDir + localZ;
-          
+
+          // Rotate into wind direction; place furled cross-section on the frame
+          float rotatedX = pitchedX * cosDir + outOfPlane * sinDir;
+          float rotatedY = pitchedY + widthCoord;
+          float rotatedZ = -pitchedX * sinDir + outOfPlane * cosDir;
+
           return vec3(rotatedX, rotatedY, rotatedZ);
         }
         `
