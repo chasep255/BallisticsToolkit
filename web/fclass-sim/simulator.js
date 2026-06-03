@@ -28,7 +28,7 @@ const SettingsCookies = createSettingsCookies('fclass_sim_');
 
 const DEFAULT_PARAMS = {
   graphicsPreset: 'Medium',
-  windMarker: 'socks',
+  windMarker: 'flags',
   matchMode: 'string',
   matches: '3',
   shotsPerMatch: '20',
@@ -582,7 +582,7 @@ class FClassSimulator
     this.windPreset = params.windPreset;
     this.graphicsPreset = params.graphicsPreset || 'Medium';
     this.graphicsConfig = GraphicsPresets.getPreset(this.graphicsPreset);
-    this.windMarker = params.windMarker || 'socks';
+    this.windMarker = params.windMarker || 'flags';
     this.focalPlane = params.focalPlane || 'SFP';
 
     // Bullet parameters

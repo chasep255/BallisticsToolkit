@@ -53,7 +53,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Two Match Modes** - String Fire (configurable matches, shots per match, and minutes per match; defaults 3 × 20 shots × 20 min aggregate) and Pair Fire (two players alternating on one rifle/target)
 - **Pair Fire** - Per-turn timer (or unlimited), per-player sighters and configurable record shots, per-shooter scope persistence, dual HUD with active-shooter highlight, and X-count → sudden-death tiebreak
 - **Dual Scopes** - Spotting scope for wind reading, rifle scope for aiming
-- **Wind Reading** - Heat mirage effect responds to wind speed and direction; reactive 3D wind flags at multiple distances
+- **Wind Reading** - Heat mirage effect responds to wind speed and direction; reactive 3D wind markers (selectable wind flags or wind socks) at multiple distances
 - **Advanced Wind Simulation** - Multi‑octave curl noise with advection and multiple presets (see Wind Simulator)
 - **Spin Effects** - Spin drift and crosswind jump included in trajectory calculations and trace visualizations
 - **Match-Style Scoring** - Authentic target animation, detailed scorecard with per-section impact (grouping) diagrams

@@ -75,7 +75,7 @@
       <div class="param-item pair-config"><label for="turnTime" title="Per-turn time limit (no global clock). Running out scores a zero.">Time/Turn</label><select id="turnTime" title="Per-turn time limit"><option value="unlimited" selected>Unlimited</option><option value="30">30s</option><option value="45">45s</option><option value="60">60s</option><option value="90">90s</option></select></div>
       <div class="param-item"><label for="fclassMode" title="Target distance and type">Range</label><select id="fclassMode" title="Target distance and type"><option value="fclass-300">300 yards</option><option value="fclass-500">500 yards</option><option value="fclass-600">600 yards</option><option value="fclass-800">800 yards</option><option value="fclass-900">900 yards</option><option value="fclass-1000" selected>1000 yards</option></select></div>
       <div class="param-item"><label for="windPreset" title="Wind conditions">Wind</label><select id="windPreset" title="Wind conditions"><!-- populated dynamically --></select></div>
-      <div class="param-item"><label for="windMarker" title="Downrange wind indicators">Markers</label><select id="windMarker" title="Downrange wind indicators"><option value="socks" selected>Wind Socks</option><option value="flags">Flags</option></select></div>
+      <div class="param-item"><label for="windMarker" title="Downrange wind indicators">Wind Markers</label><select id="windMarker" title="Downrange wind indicators"><option value="socks">Socks</option><option value="flags" selected>Flags</option></select></div>
       <div class="param-item"><label for="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom">Reticle</label><select id="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom"><option value="SFP" selected>SFP (Fixed)</option><option value="FFP">FFP (Scaling)</option></select></div>
       <div class="param-item"><label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label><input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps"></div>
       <div class="param-item"><label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label><input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)"></div>
@@ -205,9 +205,10 @@
         <div class="help-section">
           <h3>Wind Reading</h3>
           <div class="param-help">
-            <strong>Wind Flags:</strong><br>
-            - Read flag angle and flap intensity<br>
-            - Flag tip (pointed end) shows wind direction<br>
+            <strong>Wind Markers (Flags or Socks):</strong><br>
+            - Choose flags or wind socks with the Wind Markers setting<br>
+            - Read marker angle/lift for wind strength: higher = stronger wind<br>
+            - Flag tip (pointed end) / sock tail shows wind direction<br>
             - Sun is positioned at 3 o'clock (right side) so lit face vs. shadow face also indicates direction<br>
             - Watch multiple distances for wind shear and gradients<br><br>
 
