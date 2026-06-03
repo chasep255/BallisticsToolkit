@@ -99,6 +99,12 @@ export class RemoteHost
     if (this.isOpen) this.link.send({ type: 'paused', paused });
   }
 
+  /** Push the wind-HUD state so the viewer's Wind HUD button label stays in sync. */
+  pushWindHud(visible)
+  {
+    if (this.isOpen) this.link.send({ type: 'windHudState', visible });
+  }
+
   close()
   {
     if (this.isOpen)

@@ -41,7 +41,7 @@
         <button id="rpPauseBtn" class="btn btn-secondary">Pause</button>
         <button id="rpScorecardBtn" class="btn btn-secondary">Scorecard</button>
         <button id="rpGoForRecordBtn" class="btn btn-primary" style="display:none;">Go For Record</button>
-        <button id="rpWindHudBtn" class="btn btn-secondary">Wind HUD</button>
+        <button id="rpWindHudBtn" class="btn btn-secondary">Show Wind HUD</button>
         <button id="rpSoundBtn" class="btn btn-secondary">🔊 Enable sound</button>
       </div>
       <div class="canvas-wrap">
@@ -126,6 +126,10 @@
       else if (msg.type === 'paused')
       {
         $('rpPauseBtn').textContent = msg.paused ? 'Resume' : 'Pause';
+      }
+      else if (msg.type === 'windHudState')
+      {
+        $('rpWindHudBtn').textContent = msg.visible ? 'Hide Wind HUD' : 'Show Wind HUD';
       }
       else if (msg.type === 'bye')
       {

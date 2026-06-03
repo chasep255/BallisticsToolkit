@@ -360,7 +360,7 @@ function setupRemotePlayUI()
       remoteHost.onOpen = () =>
       {
         setStatus('✓ Player connected.');
-        if (webglGame) { webglGame.pushScorecardNow(); webglGame.pushControlsNow(); }
+        if (webglGame) { webglGame.pushScorecardNow(); webglGame.pushControlsNow(); webglGame.pushWindHudNow(); }
       };
       remoteHost.onClose = () =>
         setStatus('Player disconnected — they can reopen the same link to rejoin. Your match keeps running.');
@@ -1602,6 +1602,13 @@ class FClassSimulator
     this.windFieldHUD.setVisible(this.windFieldHUDVisible);
     const btn = document.getElementById('windHUDBtn');
     if (btn) btn.textContent = this.windFieldHUDVisible ? 'Hide Wind HUD' : 'Show Wind HUD';
+    if (this.remoteHost) this.remoteHost.pushWindHud(this.windFieldHUDVisible);
+  }
+
+  /** Push the current wind-HUD state to the viewer (label sync). */
+  pushWindHudNow()
+  {
+    if (this.remoteHost) this.remoteHost.pushWindHud(!!this.windFieldHUDVisible);
   }
 
   pause()
@@ -2366,6 +2373,7 @@ class FClassSimulator
 
     host.pushScorecard(this.driver.getScorecardModel(), this.scorecard.matchParams, this.scorecard.targetSpec);
     host.pushPaused(this.isPaused);
+    host.pushWindHud(!!this.windFieldHUDVisible);
     this.pushControlsNow();
   }
 
