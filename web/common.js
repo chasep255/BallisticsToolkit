@@ -174,26 +174,8 @@ function btkUpdateAnalyticsConsent(granted)
   }
 }
 
-// Cloudflare Web Analytics: cookieless, no personal data, so no consent required.
-// Provides aggregate visitor counts and country-level geography.
-function btkLoadCloudflareAnalytics()
-{
-  if (!btkIsProductionDomain()) return;
-  if (window.__btkCfAnalyticsLoaded) return;
-  window.__btkCfAnalyticsLoaded = true;
-
-  const beacon = document.createElement('script');
-  beacon.defer = true;
-  beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
-  beacon.setAttribute('data-cf-beacon', '{"token": "e80a3eacb55048a7b2e72771e8d93fba"}');
-  document.head.appendChild(beacon);
-}
-
 // Try to load GA early if already consented (non-blocking)
 btkLoadGoogleAnalytics();
-
-// Load Cloudflare Web Analytics (cookieless, no consent gating)
-btkLoadCloudflareAnalytics();
 
 /**
  * Common JavaScript functionality for BallisticsToolkit
@@ -583,7 +565,7 @@ function btkEnsureConsentModal()
         </div>
 
         <div class="btk-consent-footnote">
-          Basic anonymous analytics (page views, general traffic) are collected without cookies using Google Analytics Consent Mode and Cloudflare Web Analytics.
+          Basic anonymous analytics (page views, general traffic) are collected without cookies using Google Analytics Consent Mode.
           You can change your cookie preferences later by clearing site data. Consent version: ${BTK_CONSENT_VERSION}.
         </div>
       </div>
