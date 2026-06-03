@@ -1,63 +1,57 @@
 /**
  * RemoteHost - host side of "Remote Play".
  *
- * Wraps a ManualPeerLink to: stream the host's rendered canvas to a remote
- * viewer, receive the viewer's forwarded keystrokes, and push UI state (the
- * scorecard model + match metadata) that lives in DOM overlays rather than in
- * the captured canvas. The host stays the single source of truth for the game;
+ * Wraps a PeerJSLink to: stream the host's rendered canvas + game audio to a
+ * remote viewer, receive the viewer's forwarded keystrokes / button presses,
+ * and push UI state (scorecard, controls, pause) that lives in DOM overlays
+ * rather than in the captured canvas. The host stays the single source of truth;
  * the viewer is just a screen + keyboard.
  *
- * Mode-agnostic: knows nothing about String vs Pair fire. The HUD is rendered
- * as in-scene canvas textures (ui/hud.js) and is therefore already captured by
- * the video stream, so only the scorecard modal needs to be pushed.
+ * Mode-agnostic: knows nothing about String vs Pair fire.
  *
  * Usage (host):
  *   const host = new RemoteHost();
  *   host.onInput = (input) => simulator.applyRemoteInput(input);
- *   host.onStatus = (text) => ...;
- *   const offer = await host.start(canvas.captureStream(30));   // -> send offer
- *   await host.connect(answerTokenFromViewer);                  // opens link
- *   // then, whenever the scorecard changes:
- *   host.pushScorecard(driver.getScorecardModel());
+ *   host.onOpen = () => ...;
+ *   await host.host(roomId);            // register the room; share remote.html?room=roomId
+ *   host.setMediaStream(canvas+ audio); // (re)sent automatically on each connect
+ *   host.pushScorecard(model, matchParams, targetSpec);
  */
 
-import { ManualPeerLink } from './netlink.js';
+import { PeerJSLink } from './peer-link.js';
 
 export class RemoteHost
 {
   constructor()
   {
-    this.link = new ManualPeerLink();
-    this.meta = null; // { matchParams, targetSpec } sent once on open
+    this.link = new PeerJSLink();
+    this.mediaStream = null;  // re-attached on each connect
 
     // User-assignable callbacks.
     this.onInput = null;        // (input: {key, code, shiftKey, isDown}) => void
-    this.onGoForRecord = null;  // () => void  (viewer pressed Go For Record)
-    this.onPause = null;        // () => void  (viewer pressed Pause/Resume)
-    this.onStatus = null;       // (text: string) => void
+    this.onGoForRecord = null;  // () => void
+    this.onPause = null;        // () => void
+    this.onWindHud = null;      // () => void
     this.onOpen = null;         // () => void
     this.onClose = null;        // () => void
+    this.onError = null;        // (err) => void
 
-    this.link.onStateChange = (state) =>
-    {
-      if (this.onStatus) this.onStatus('connection: ' + state);
-    };
     this.link.onOpen = () =>
     {
-      // Send metadata + current scorecard so the viewer can render immediately.
-      if (this.meta) this.link.send({ type: 'meta', ...this.meta });
+      // (Re)send the media the moment a viewer connects; the lobby's onOpen
+      // pushes the full scorecard (which carries match params + target spec).
+      if (this.mediaStream) this.link.setMediaStream(this.mediaStream);
       if (this.onOpen) this.onOpen();
     };
-    this.link.onClose = () =>
-    {
-      if (this.onClose) this.onClose();
-    };
+    this.link.onClose = () => { if (this.onClose) this.onClose(); };
+    this.link.onError = (err) => { if (this.onError) this.onError(err); };
     this.link.onMessage = (msg) =>
     {
       if (!msg) return;
       if (msg.type === 'input' && this.onInput) this.onInput(msg);
       else if (msg.type === 'goForRecord' && this.onGoForRecord) this.onGoForRecord();
       else if (msg.type === 'pause' && this.onPause) this.onPause();
+      else if (msg.type === 'windHud' && this.onWindHud) this.onWindHud();
     };
   }
 
@@ -66,67 +60,40 @@ export class RemoteHost
     return this.link.isOpen;
   }
 
-  /**
-   * Reserve the video slot and produce the offer token for the viewer. The
-   * actual canvas track is attached later via setVideoTrack(), so hosting can
-   * be set up BEFORE the match (and its clock) starts.
-   * @returns {Promise<string>} offer token
-   */
-  async start()
+  /** Register the room and accept connections. Resolves once joinable. */
+  async host(roomId)
   {
-    this.link.reserveVideo();
-    this.link.reserveAudio();
-    return this.link.createOffer();
-  }
-
-  /** Attach/swap the outbound canvas video track (once it is rendering). */
-  setVideoTrack(track)
-  {
-    this.link.setVideoTrack(track);
-  }
-
-  /** Attach/swap the outbound game-audio track. */
-  setAudioTrack(track)
-  {
-    this.link.setAudioTrack(track);
-  }
-
-  /** Complete the handshake with the viewer's answer token. */
-  async connect(answerToken)
-  {
-    await this.link.acceptAnswer(answerToken);
+    await this.link.host(roomId);
   }
 
   /**
-   * Stash match metadata (sent once when the link opens, and immediately if the
-   * link is already open).
-   * @param {Object} matchParams scorecard.setMatchParams() shape
-   * @param {Object} targetSpec scorecard.setTargetSpec() shape (scoring rings)
+   * Stream canvas video + game audio to the viewer. Stored and re-sent whenever
+   * a viewer (re)connects, so it works regardless of connect order.
+   * @param {MediaStream} stream
    */
-  setMeta(matchParams, targetSpec)
+  setMediaStream(stream)
   {
-    this.meta = { matchParams, targetSpec };
-    if (this.isOpen) this.link.send({ type: 'meta', ...this.meta });
-  }
-
-  /** Push the latest scorecard model to the viewer. */
-  pushScorecard(model)
-  {
-    if (this.isOpen) this.link.send({ type: 'scorecard', model });
+    this.mediaStream = stream;
+    if (this.isOpen) this.link.setMediaStream(stream);
   }
 
   /**
-   * Push the contextual controls model + active player so the viewer can show
-   * its own Go For Record button on its turn.
-   * @param {Object} model getControlsModel() output
-   * @param {?string} activePlayer 'p1' | 'p2' | null
+   * Push the latest scorecard to the viewer, bundled with the match params and
+   * target geometry so the viewer renders the full card (params block + target
+   * grouping diagrams) identically — no separate metadata message to race.
    */
+  pushScorecard(model, matchParams, targetSpec)
+  {
+    if (this.isOpen) this.link.send({ type: 'scorecard', model, matchParams, targetSpec });
+  }
+
+  /** Push the controls model + active player (viewer shows its own buttons). */
   pushControls(model, activePlayer)
   {
     if (this.isOpen) this.link.send({ type: 'controls', model, activePlayer });
   }
 
-  /** Push the current pause state so the viewer's Pause button label stays in sync. */
+  /** Push the pause state so the viewer's Pause button label stays in sync. */
   pushPaused(paused)
   {
     if (this.isOpen) this.link.send({ type: 'paused', paused });

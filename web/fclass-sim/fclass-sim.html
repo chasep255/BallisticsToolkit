@@ -95,17 +95,10 @@
     <div id="remotePlayPanel" data-no-persist style="display: none; max-width: 640px; margin: 20px auto; padding: 14px 16px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; text-align: left;">
       <strong>Host Remote Play <span style="color:#b06000;">(Beta)</span></strong>
       <p style="font-size: 13px; color:#555; margin: 8px 0;">Set this up <em>before</em> pressing Start so the match clock doesn't run during setup. Uncheck <em>Host Remote Play</em> to cancel.</p>
-      <label style="font-size:12px; font-weight:bold;">1. Send this invite link to the other player</label>
+      <label style="font-size:12px; font-weight:bold;">Send this link to the other player &mdash; they open it and start playing.</label>
       <div style="display:flex; gap:6px; align-items:center; margin:4px 0 10px;">
-        <input id="remoteInviteLink" readonly style="flex:1; font-family:monospace; font-size:11px; padding:5px; box-sizing:border-box;" placeholder="Generating link...">
+        <input id="remoteInviteLink" readonly style="flex:1; font-family:monospace; font-size:11px; padding:5px; box-sizing:border-box;" placeholder="Creating link...">
         <button id="remoteCopyOfferBtn" class="btn btn-secondary" style="white-space:nowrap;">Copy Link</button>
-      </div>
-      <p style="font-size:12px; color:#777; margin:0 0 8px;">They open it, then send you back an <em>answer code</em>.</p>
-      <label style="font-size:12px; font-weight:bold;">2. Paste the answer code they send back</label>
-      <textarea id="remoteAnswerToken" placeholder="Paste the viewer's answer code here..." style="width:100%; height:70px; font-family:monospace; font-size:11px; box-sizing:border-box;"></textarea>
-      <div style="display:flex; gap:8px; margin-top:4px;">
-        <button id="remoteConnectBtn" class="btn btn-primary">Connect</button>
-        <button id="remoteNewInviteBtn" class="btn btn-secondary" title="Generate a fresh invite link to (re)connect a viewer. Your match keeps running.">New invite link</button>
       </div>
       <div id="remoteStatus" style="margin-top:8px; font-size:13px; font-weight:bold; color:#333;"></div>
     </div>
@@ -127,24 +120,9 @@
       <canvas id="gameCanvas" width="800" height="600"></canvas>
       
       <!-- Quick Key Guide -->
-      <div class="quick-keys">
-        <div class="quick-keys-section">
-          <strong>Spotting Scope:</strong><br>
-          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Pan • <kbd>E</kbd><kbd>Q</kbd> Zoom
-        </div>
-        <div class="quick-keys-section">
-          <strong>Rifle Scope:</strong><br>
-          <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Aim<br>
-          <kbd>Shift</kbd>+<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Dial<br>
-          <kbd>+</kbd><kbd>-</kbd> Zoom • <kbd>R</kbd> Reset
-        </div>
-        <div class="quick-keys-section">
-          <strong>Fire:</strong> <kbd>Space</kbd>
-        </div>
-        <div class="quick-keys-disclaimer">
-          Entertainment / educational simulation. Wind, mirage, and ballistics are simplified and may differ from real-world shooting. Do not use this to generate real-world firing solutions.
-        </div>
-      </div>
+      <!-- Key legend + simulation disclaimer injected from ui/key-legend.js
+           (shared with the Remote Play viewer). -->
+      <div class="quick-keys" id="keyLegend"></div>
     </div>
   </div>
 
@@ -210,15 +188,13 @@
             Stream the running sim to someone on another computer who can play it &mdash; useful for letting a friend take a turn, or playing pair fire across the internet. Your PC does all the rendering; they see a live video and their keystrokes control your sim (with slight input lag).<br><br>
             <strong>To host:</strong><br>
             - Check <strong>Host Remote Play</strong> in the config bar <em>before</em> starting (so the match clock doesn't run during setup)<br>
-            - Send the <em>invite token</em> to the other player<br>
-            - They open the <strong>Remote Play Viewer</strong> (<code>remote.html</code>), paste it, and send back an <em>answer token</em><br>
-            - Paste their answer token and click <strong>Connect</strong>, then press <strong>Start Game</strong><br><br>
-            No account or server is required &mdash; the connection is peer-to-peer. The viewer can open the Scorecard on their end.<br><br>
-            <strong>Reconnecting:</strong> if the viewer drops, your match keeps running &mdash; click <em>New invite link</em>, resend it, and they're back. (Each connection needs a fresh link.)<br><br>
+            - Copy the <em>invite link</em> it generates and send it to the other player<br>
+            - They open the link &mdash; it connects automatically and they start playing. Press <strong>Start Game</strong> when ready.<br><br>
+            No copy/paste codes &mdash; the link is all they need. (Connections are brokered by the free PeerJS service; the audio/video itself is peer-to-peer.) The viewer can open the Scorecard on their end.<br><br>
+            <strong>Reconnecting:</strong> if the player drops, your match keeps running &mdash; they just reopen the same link to rejoin.<br><br>
             <strong>Pair Fire:</strong> the host plays Player 1 (left) and the viewer plays Player 2 (right). Controls are active only for whoever's turn it is, and the viewer gets their own <em>Go For Record</em> button on their turn.<br><br>
             <strong>Audio &amp; quality:</strong> game audio (gunshots, wind, scope clicks) streams too &mdash; the viewer clicks <em>Enable sound</em> to hear it (browsers block autoplay audio until then). Video sharpness depends on the host's render resolution (window size + graphics preset) and the connection bandwidth.<br><br>
-            <strong>Connection limits:</strong> the connection is direct peer-to-peer, which works best when both players are on ordinary home/office networks. It may fail to connect over <strong>cellular/mobile data</strong> or through a <strong>VPN</strong>, because those networks block the direct connection WebRTC needs. If it won't connect, have the other player turn off their VPN or switch from cellular to Wi-Fi.<br><br>
-            <strong>If the viewer disconnects:</strong> just click <em>New invite link</em> and send them the new link &mdash; your match keeps running.
+            <strong>Connection limits:</strong> the audio/video is direct peer-to-peer, which works best when both players are on ordinary home/office networks. It may fail to connect over <strong>cellular/mobile data</strong> or through a <strong>VPN</strong>, because those networks block the direct connection WebRTC needs. If it won't connect, have the other player turn off their VPN or switch from cellular to Wi-Fi.
           </div>
         </div>
 

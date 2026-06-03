@@ -139,6 +139,7 @@ import
   RemoteHost
 }
 from './core/remote-host.js';
+import { KEY_LEGEND_HTML, SIM_DISCLAIMER_HTML } from './ui/key-legend.js';
 import
 {
   WindFieldHUD
@@ -325,55 +326,59 @@ function setupRemotePlayUI()
 
   const panel = document.getElementById('remotePlayPanel');
   const linkEl = document.getElementById('remoteInviteLink');
-  const answerEl = document.getElementById('remoteAnswerToken');
   const statusEl = document.getElementById('remoteStatus');
-  const connectBtn = document.getElementById('remoteConnectBtn');
   const copyBtn = document.getElementById('remoteCopyOfferBtn');
-  const newInviteBtn = document.getElementById('remoteNewInviteBtn');
 
   const setStatus = (text) => { if (statusEl) statusEl.textContent = text; };
 
-  // Build a clickable viewer link with the offer token embedded in the URL
-  // fragment (fragments never reach a server, so the token stays local).
-  const inviteLinkFor = (offer) =>
-    new URL('remote.html', window.location.href).href + '#o=' + encodeURIComponent(offer);
+  // remote.html?room=<id> — one link the host sends; the client opens it and
+  // connects automatically via the PeerJS broker. The same link reconnects.
+  const inviteLinkFor = (roomId) =>
+    new URL('remote.html', window.location.href).href + '?room=' + encodeURIComponent(roomId);
 
-  // Create a fresh host + invite link. Used both to start hosting and to
-  // reconnect after a viewer drops — the running match is never disturbed
-  // (a WebRTC offer is single-use, so each connection needs a new one).
+  // Short, reasonably-unique room id (no Date/Math.random needed).
+  const newRoomId = () =>
+  {
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    let s = 'btk';
+    for (const b of bytes) s += (b % 36).toString(36);
+    return s;
+  };
+
   async function beginHosting()
   {
     if (remoteHost) { remoteHost.onClose = null; remoteHost.close(); }
     if (webglGame) webglGame.remoteHost = null;
-    if (answerEl) answerEl.value = '';
-    if (connectBtn) connectBtn.disabled = false;
-    setStatus('Preparing invite link (gathering connection info)...');
+    setStatus('Creating your room link...');
     try
     {
       remoteHost = new RemoteHost();
       remoteHost.onInput = applyRemoteInput;
       remoteHost.onGoForRecord = () => { if (webglGame) webglGame.requestGoForRecord('remote'); };
       remoteHost.onPause = () => { if (webglGame) webglGame.togglePause(); };
-      remoteHost.onStatus = (t) => setStatus(t);
+      remoteHost.onWindHud = () => { if (webglGame) webglGame.toggleWindHUD(); };
       remoteHost.onOpen = () =>
       {
-        setStatus('✓ Viewer connected.');
+        setStatus('✓ Player connected.');
         if (webglGame) { webglGame.pushScorecardNow(); webglGame.pushControlsNow(); }
       };
       remoteHost.onClose = () =>
-        setStatus('Viewer disconnected. Click "New invite link" and resend it to reconnect — your match keeps running.');
+        setStatus('Player disconnected — they can reopen the same link to rejoin. Your match keeps running.');
+      remoteHost.onError = (err) =>
+        setStatus('Connection error: ' + (err && err.type ? err.type : err && err.message || err));
 
-      const offer = await remoteHost.start();
-      if (linkEl) linkEl.value = inviteLinkFor(offer);
+      const roomId = newRoomId();
+      await remoteHost.host(roomId);
+      if (linkEl) linkEl.value = inviteLinkFor(roomId);
 
       // If a match is already running, attach the live video + state now.
       if (webglGame) webglGame.attachRemoteHost(remoteHost);
 
-      setStatus('Invite link ready — send it to the other player.');
+      setStatus('Link ready — send it to the other player. They open it and start playing.');
     }
     catch (e)
     {
-      setStatus(e.message || String(e));
+      setStatus('Could not create room: ' + (e && e.type ? e.type : e && e.message || e));
     }
   }
 
@@ -388,26 +393,6 @@ function setupRemotePlayUI()
     }
     if (panel) panel.style.display = 'block';
     beginHosting();
-  });
-
-  if (newInviteBtn) newInviteBtn.addEventListener('click', () => beginHosting());
-
-  if (connectBtn) connectBtn.addEventListener('click', async () =>
-  {
-    const answer = (answerEl && answerEl.value || '').trim();
-    if (!answer || !remoteHost) return;
-    connectBtn.disabled = true;
-    setStatus('Connecting...');
-    try
-    {
-      await remoteHost.connect(answer);
-      setStatus('Connecting... waiting for the link to open.');
-    }
-    catch (e)
-    {
-      setStatus(e.message || String(e));
-      connectBtn.disabled = false;
-    }
   });
 
   if (copyBtn) copyBtn.addEventListener('click', () =>
@@ -439,6 +424,10 @@ function setupUI()
     }
   });
 
+  // Inject the shared keyboard legend + disclaimer (also used by the viewer).
+  const keyLegend = document.getElementById('keyLegend');
+  if (keyLegend) keyLegend.innerHTML = KEY_LEGEND_HTML + SIM_DISCLAIMER_HTML;
+
   // ===== Remote Play (host) =====
   setupRemotePlayUI();
 
@@ -461,13 +450,7 @@ function setupUI()
   // Wind HUD toggle button
   document.getElementById('windHUDBtn').addEventListener('click', () =>
   {
-    if (webglGame && webglGame.windFieldHUD)
-    {
-      webglGame.windFieldHUDVisible = !webglGame.windFieldHUDVisible;
-      webglGame.windFieldHUD.setVisible(webglGame.windFieldHUDVisible);
-      const btn = document.getElementById('windHUDBtn');
-      btn.textContent = webglGame.windFieldHUDVisible ? 'Hide Wind HUD' : 'Show Wind HUD';
-    }
+    if (webglGame) webglGame.toggleWindHUD();
   });
 
   // Pause/Resume button
@@ -1611,6 +1594,16 @@ class FClassSimulator
     else this.pause();
   }
 
+  /** Toggle the wind-field HUD (used by the local button and the remote viewer). */
+  toggleWindHUD()
+  {
+    if (!this.windFieldHUD) return;
+    this.windFieldHUDVisible = !this.windFieldHUDVisible;
+    this.windFieldHUD.setVisible(this.windFieldHUDVisible);
+    const btn = document.getElementById('windHUDBtn');
+    if (btn) btn.textContent = this.windFieldHUDVisible ? 'Hide Wind HUD' : 'Show Wind HUD';
+  }
+
   pause()
   {
     if (!this.isRunning || this.isPaused) return;
@@ -2341,7 +2334,7 @@ class FClassSimulator
   {
     const model = this.driver.getScorecardModel();
     this.scorecard.update(model);
-    if (this.remoteHost) this.remoteHost.pushScorecard(model);
+    if (this.remoteHost) this.remoteHost.pushScorecard(model, this.scorecard.matchParams, this.scorecard.targetSpec);
   }
 
   /**
@@ -2355,14 +2348,23 @@ class FClassSimulator
     this.remoteHost = host;
     host.onGoForRecord = () => this.requestGoForRecord('remote');
     host.onPause = () => this.togglePause();
-    const track = canvasVideoTrack();
-    if (track) host.setVideoTrack(track);
-    // Stream the game audio too (gunshots, wind, scope clicks).
-    const audio = ResourceManager.audio.getCaptureStream && ResourceManager.audio.getCaptureStream();
-    const audioTrack = audio && audio.getAudioTracks()[0];
-    if (audioTrack) host.setAudioTrack(audioTrack);
-    host.setMeta(this.scorecard.matchParams, this.scorecard.targetSpec);
-    host.pushScorecard(this.driver.getScorecardModel());
+    host.onWindHud = () => this.toggleWindHUD();
+
+    // Combine canvas video + game audio (gunshots, wind, scope clicks) into one
+    // outbound stream. contentHint=detail keeps the reticle/target sharp.
+    const stream = new MediaStream();
+    const videoTrack = canvasVideoTrack();
+    if (videoTrack)
+    {
+      try { videoTrack.contentHint = 'detail'; } catch { /* unsupported */ }
+      stream.addTrack(videoTrack);
+    }
+    const audioStream = ResourceManager.audio.getCaptureStream && ResourceManager.audio.getCaptureStream();
+    const audioTrack = audioStream && audioStream.getAudioTracks()[0];
+    if (audioTrack) stream.addTrack(audioTrack);
+    if (stream.getTracks().length) host.setMediaStream(stream);
+
+    host.pushScorecard(this.driver.getScorecardModel(), this.scorecard.matchParams, this.scorecard.targetSpec);
     host.pushPaused(this.isPaused);
     this.pushControlsNow();
   }
@@ -2370,7 +2372,7 @@ class FClassSimulator
   /** Push the current scorecard to the viewer (e.g. right after it connects). */
   pushScorecardNow()
   {
-    if (this.remoteHost) this.remoteHost.pushScorecard(this.driver.getScorecardModel());
+    if (this.remoteHost) this.remoteHost.pushScorecard(this.driver.getScorecardModel(), this.scorecard.matchParams, this.scorecard.targetSpec);
   }
 
   /** Push the current controls model + active player to the viewer. */

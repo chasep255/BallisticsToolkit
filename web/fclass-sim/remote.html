@@ -8,59 +8,53 @@
   <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
   <link rel="stylesheet" href="../common.css">
   <link rel="stylesheet" href="fclass-sim.css">
+  <!-- Site chrome: nav header, footer + safety notice, consent (same as other pages) -->
+  <script src="../common.js"></script>
   <style>
-    .rp-wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
-    .rp-connect { max-width: 640px; margin: 0 auto; padding: 14px 16px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; }
-    .rp-connect textarea { width: 100%; height: 70px; font-family: monospace; font-size: 11px; box-sizing: border-box; }
-    .rp-connect label { font-size: 12px; font-weight: bold; display:block; margin-top:8px; }
+    .rp-connect { max-width: 640px; margin: 12px auto; padding: 14px 16px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; text-align: center; }
     .rp-stage { display: none; position: relative; }
     .rp-stage.active { display: block; }
-    #remoteVideo { width: 100%; background: #000; border-radius: 6px; display: block; }
-    .rp-status { margin-top: 8px; font-size: 13px; font-weight: bold; color: #333; }
-    .rp-bar { display:flex; gap:10px; align-items:center; justify-content:center; margin: 10px 0; }
+    /* Show at the host's captured resolution (centered); only scale down to fit
+       the viewport — don't stretch to fill the window. */
+    #remoteVideo { display: inline-block; max-width: 100%; max-height: calc(100vh - 150px); background: #000; border-radius: 6px; }
+    .rp-status { font-size: 14px; font-weight: bold; color: #333; }
+    .rp-bar { display:flex; gap:10px; align-items:center; justify-content:center; margin: 10px 0; flex-wrap: wrap; }
     .rp-hint { color:#666; font-size: 12px; text-align:center; }
   </style>
 </head>
 <body data-page="remote">
-  <div class="rp-wrap">
-    <h1 style="text-align:center; font-size: 1.3rem;">Remote Play Viewer <span style="color:#b06000;">(Beta)</span></h1>
+  <div class="nav-header"></div>
+  <div class="app-container">
+    <h1>🎮 F-Class Simulator</h1>
+    <p style="text-align:center; margin-top:-12px; color:#666;">Remote Play <span style="color:#b06000;">(Beta)</span></p>
 
     <!-- Connection stage -->
     <div id="connectStage" class="rp-stage active">
       <div class="rp-connect">
-        <p class="rp-hint" style="text-align:left;">Open the host's invite link and an <strong>answer code</strong> is generated below &mdash; send it back to the host. They connect you and the live view appears here.</p>
-
-        <!-- Manual offer paste: only needed if the link wasn't used -->
-        <div id="manualOffer">
-          <label>1. Invite token (paste from host)</label>
-          <textarea id="offerIn" placeholder="Paste the host's invite token here..."></textarea>
-          <button id="genAnswerBtn" class="btn btn-primary" style="margin-top:6px;">Generate answer code</button>
-        </div>
-
-        <label>Answer code (send back to host)</label>
-        <textarea id="answerOut" readonly placeholder="Your answer code will appear here..."></textarea>
-        <button id="copyAnswerBtn" class="btn btn-primary" style="margin-top:6px;">Copy answer code</button>
-        <div id="connectStatus" class="rp-status">Waiting for invite...</div>
+        <div id="connectStatus" class="rp-status">Connecting to host&hellip;</div>
       </div>
     </div>
 
     <!-- Play stage -->
     <div id="playStage" class="rp-stage">
       <div class="rp-bar">
-        <button id="rpScorecardBtn" class="btn btn-secondary">Scorecard</button>
         <button id="rpPauseBtn" class="btn btn-secondary">Pause</button>
+        <button id="rpScorecardBtn" class="btn btn-secondary">Scorecard</button>
         <button id="rpGoForRecordBtn" class="btn btn-primary" style="display:none;">Go For Record</button>
+        <button id="rpWindHudBtn" class="btn btn-secondary">Wind HUD</button>
         <button id="rpSoundBtn" class="btn btn-secondary">🔊 Enable sound</button>
-        <span class="rp-hint">Your keys (arrows, Shift+arrows to dial, Space to fire, WASD/E/Q spotting scope) control the host. Expect slight input lag.</span>
       </div>
-      <div style="position: relative;">
-        <video id="remoteVideo" autoplay playsinline muted></video>
-        <!-- Slim, non-darkening notice. No reconnect here: if the link drops the
-             host sends a fresh invite link, which reloads this page when opened. -->
-        <div id="dcBanner" style="display:none; position:absolute; top:0; left:0; right:0; background:rgba(176,96,0,0.92); color:#fff; padding:8px 12px; font-size:14px; text-align:center; border-radius:6px 6px 0 0;">
-          Connection interrupted — if it doesn't recover, your host will send a new invite link.
+      <div class="canvas-wrap">
+        <div style="position: relative;">
+          <video id="remoteVideo" autoplay playsinline muted></video>
+          <!-- Slim, non-darkening notice. The same invite link reconnects you. -->
+          <div id="dcBanner" style="display:none; position:absolute; top:0; left:0; right:0; background:rgba(176,96,0,0.92); color:#fff; padding:8px 12px; font-size:14px; text-align:center; border-radius:6px 6px 0 0;">
+            Connection lost — reopen your invite link to rejoin.
+          </div>
         </div>
       </div>
+      <!-- Keyboard legend + simulation disclaimer below the view, like the host -->
+      <div class="quick-keys" id="keyLegend"></div>
     </div>
   </div>
 
@@ -70,20 +64,19 @@
   </div>
 
   <script type="module">
-    import { ManualPeerLink } from './core/netlink.js';
+    import { PeerJSLink } from './core/peer-link.js';
     import { Scorecard } from './ui/scorecard.js';
+    import { KEY_LEGEND_HTML, SIM_DISCLAIMER_HTML } from './ui/key-legend.js';
 
-    const link = new ManualPeerLink();
+    const link = new PeerJSLink();
     const scorecard = new Scorecard();
     scorecard.initialize();
 
+    // Shared keyboard legend + simulation disclaimer (same source as the host).
+    document.getElementById('keyLegend').innerHTML = KEY_LEGEND_HTML + SIM_DISCLAIMER_HTML;
+
     const $ = (id) => document.getElementById(id);
     const setConnStatus = (t) => { $('connectStatus').textContent = t; };
-
-    // Opening a new invite link in the same tab only changes the URL fragment,
-    // which does NOT reload the page — so the old, spent connection would linger
-    // and re-show a stale answer. Force a fresh page when the invite changes.
-    window.addEventListener('hashchange', () => window.location.reload());
 
     // ---- Inbound media + messages ----
     link.onStream = (stream) => { $('remoteVideo').srcObject = stream; };
@@ -92,20 +85,31 @@
     {
       $('connectStage').classList.remove('active');
       $('playStage').classList.add('active');
-      $('dcBanner').style.display = 'none'; // clear any stale interruption notice
+      $('dcBanner').style.display = 'none';
     };
     link.onClose = () => { $('dcBanner').style.display = 'block'; };
+    link.onError = (err) =>
+    {
+      const type = err && err.type;
+      if (type === 'peer-unavailable')
+      {
+        setConnStatus('Host not found. Make sure they have "Host Remote Play" enabled, then reopen the link they sent.');
+      }
+      else
+      {
+        setConnStatus('Connection error: ' + (type || (err && err.message) || err));
+      }
+    };
 
     link.onMessage = (msg) =>
     {
       if (!msg) return;
-      if (msg.type === 'meta')
+      if (msg.type === 'scorecard')
       {
+        // Params + target geometry ride with the scorecard so the full card
+        // (params block + grouping diagrams) renders identically to the host.
         if (msg.matchParams) scorecard.setMatchParams(msg.matchParams);
         if (msg.targetSpec) scorecard.setTargetSpec(msg.targetSpec);
-      }
-      else if (msg.type === 'scorecard')
-      {
         scorecard.update(msg.model);
       }
       else if (msg.type === 'controls')
@@ -129,51 +133,22 @@
       }
     };
 
-    // ---- Handshake (guest) ----
-    let answering = false;
-    async function generateAnswer(offer)
-    {
-      if (answering || !offer) return;
-      answering = true;
-      setConnStatus('Generating answer code (gathering connection info)...');
-      try
-      {
-        $('answerOut').value = await link.acceptOffer(offer);
-        // Try to put it on the clipboard automatically for convenience.
-        try { await navigator.clipboard.writeText($('answerOut').value); } catch { /* needs gesture */ }
-        setConnStatus('✓ Answer code ready (copied) — send it back to the host, then wait.');
-      }
-      catch (e) { setConnStatus(e.message || String(e)); answering = false; }
-    }
-
-    $('genAnswerBtn').addEventListener('click', () =>
-      generateAnswer(($('offerIn').value || '').trim()));
-    $('copyAnswerBtn').addEventListener('click', () =>
-    {
-      if ($('answerOut').value) navigator.clipboard.writeText($('answerOut').value);
-    });
-
-    // If opened via the host's invite link (remote.html#o=<offer>), auto-generate
-    // the answer so the player only has to send the code back.
-    (function consumeInviteLink()
-    {
-      const hash = window.location.hash || '';
-      if (!hash.startsWith('#o=')) return;
-      const offer = decodeURIComponent(hash.slice(3));
-      $('manualOffer').style.display = 'none'; // link supplied the offer
-      generateAnswer(offer);
-    })();
-
     // ---- Local scorecard toggle (the modal is a DOM overlay, not in the video) ----
     $('rpScorecardBtn').addEventListener('click', () => scorecard.toggle());
 
-    // ---- Enable sound (browsers block unmuted autoplay without a gesture) ----
+    // ---- Sound toggle (starts muted: browsers block unmuted autoplay) ----
     $('rpSoundBtn').addEventListener('click', () =>
     {
       const v = $('remoteVideo');
-      v.muted = false;
-      v.play().catch(() => {});
-      $('rpSoundBtn').style.display = 'none';
+      v.muted = !v.muted;
+      if (!v.muted) v.play().catch(() => {});
+      $('rpSoundBtn').textContent = v.muted ? '🔊 Enable sound' : '🔇 Mute';
+    });
+
+    // ---- Wind HUD — toggled on the host (its overlay shows in the stream) ----
+    $('rpWindHudBtn').addEventListener('click', () =>
+    {
+      if (link.isOpen) link.send({ type: 'windHud' });
     });
 
     // ---- Go For Record (end sighters early) — sent to the host ----
@@ -188,7 +163,6 @@
       if (link.isOpen) link.send({ type: 'pause' });
     });
 
-
     // ---- Forward keystrokes to the host ----
     const GAME_KEYS = new Set([
       'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
@@ -196,17 +170,10 @@
       'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract'
     ]);
 
-    function isEditable(el)
-    {
-      return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-    }
-
     function forwardKey(event)
     {
       if (!link.isOpen) return;
-      if (isEditable(document.activeElement)) return; // typing in a token box
-      // Prevent page scroll/zoom for keys the game uses.
-      if (GAME_KEYS.has(event.code)) event.preventDefault();
+      if (GAME_KEYS.has(event.code)) event.preventDefault(); // stop page scroll/zoom
       link.send({
         type: 'input',
         key: event.key,
@@ -217,6 +184,19 @@
     }
     document.addEventListener('keydown', forwardKey);
     document.addEventListener('keyup', forwardKey);
+
+    // ---- Join the host's room from ?room=<id> ----
+    const roomId = new URLSearchParams(window.location.search).get('room');
+    if (!roomId)
+    {
+      setConnStatus('Open this page using the invite link your host sent you.');
+    }
+    else
+    {
+      setConnStatus('Connecting to host…');
+      link.join(roomId).catch((err) =>
+        setConnStatus('Could not connect: ' + ((err && err.type) || (err && err.message) || err)));
+    }
   </script>
 </body>
 </html>
