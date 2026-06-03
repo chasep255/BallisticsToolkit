@@ -28,6 +28,7 @@ const SettingsCookies = createSettingsCookies('fclass_sim_');
 
 const DEFAULT_PARAMS = {
   graphicsPreset: 'Medium',
+  windMarker: 'socks',
   matchMode: 'string',
   matches: '3',
   shotsPerMatch: '20',
@@ -103,6 +104,11 @@ import
   FlagRenderer
 }
 from './rendering/flags.js';
+import
+{
+  WindSockRenderer
+}
+from './rendering/windsocks.js';
 import
 {
   TargetRenderer
@@ -424,6 +430,7 @@ function getGameParams()
     target: targetType,
     windPreset: document.getElementById('windPreset').value,
     graphicsPreset: document.getElementById('graphicsPreset').value,
+    windMarker: document.getElementById('windMarker').value,
     focalPlane: document.getElementById('focalPlane').value,
     fclassMode: fclassMode,
     // Match format
@@ -575,6 +582,7 @@ class FClassSimulator
     this.windPreset = params.windPreset;
     this.graphicsPreset = params.graphicsPreset || 'Medium';
     this.graphicsConfig = GraphicsPresets.getPreset(this.graphicsPreset);
+    this.windMarker = params.windMarker || 'socks';
     this.focalPlane = params.focalPlane || 'SFP';
 
     // Bullet parameters
@@ -1190,13 +1198,15 @@ class FClassSimulator
     minCorner.delete();
     maxCorner.delete();
 
-    this.flags = new FlagRenderer(
+    // Wind markers: classic flags or more-visible wind socks (user-selectable)
+    const MarkerRenderer = this.windMarker === 'flags' ? FlagRenderer : WindSockRenderer;
+    this.flags = new MarkerRenderer(
     {
       scene: this.scene,
       renderer: this.renderer,
       shadowsEnabled: this.graphicsConfig.shadowsEnabled,
       flagSegments: this.graphicsConfig.flagSegments
-      // Uses FlagRenderer defaults for all flag parameters
+      // Uses renderer defaults for all other parameters
     });
     this.createWindFlags();
 
