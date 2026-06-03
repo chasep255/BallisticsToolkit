@@ -19,8 +19,6 @@
     .rp-status { margin-top: 8px; font-size: 13px; font-weight: bold; color: #333; }
     .rp-bar { display:flex; gap:10px; align-items:center; justify-content:center; margin: 10px 0; }
     .rp-hint { color:#666; font-size: 12px; text-align:center; }
-    .rp-overlay { position: absolute; inset: 0; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,0.7); color:#fff; font-size: 18px; border-radius:6px; text-align:center; padding: 20px; }
-    .rp-overlay.show { display: flex; }
   </style>
 </head>
 <body data-page="remote">
@@ -56,12 +54,10 @@
       </div>
       <div style="position: relative;">
         <video id="remoteVideo" autoplay playsinline muted></video>
-        <div id="dcOverlay" class="rp-overlay">
-          <div>
-            Disconnected.<br>
-            <span style="font-size:14px;">Open the new invite link your host sends, or reconnect manually below.</span><br>
-            <button id="reconnectBtn" class="btn btn-primary" style="margin-top:12px;">Reconnect</button>
-          </div>
+        <!-- Slim, non-darkening notice. No reconnect here: if the link drops the
+             host sends a fresh invite link, which reloads this page when opened. -->
+        <div id="dcBanner" style="display:none; position:absolute; top:0; left:0; right:0; background:rgba(176,96,0,0.92); color:#fff; padding:8px 12px; font-size:14px; text-align:center; border-radius:6px 6px 0 0;">
+          Connection interrupted — if it doesn't recover, your host will send a new invite link.
         </div>
       </div>
     </div>
@@ -95,8 +91,9 @@
     {
       $('connectStage').classList.remove('active');
       $('playStage').classList.add('active');
+      $('dcBanner').style.display = 'none'; // clear any stale interruption notice
     };
-    link.onClose = () => { $('dcOverlay').classList.add('show'); };
+    link.onClose = () => { $('dcBanner').style.display = 'block'; };
 
     link.onMessage = (msg) =>
     {
@@ -122,7 +119,7 @@
       }
       else if (msg.type === 'bye')
       {
-        $('dcOverlay').classList.add('show');
+        $('dcBanner').style.display = 'block';
       }
     };
 
@@ -179,12 +176,6 @@
       if (link.isOpen) link.send({ type: 'goForRecord' });
     });
 
-    // ---- Reconnect: reload to a clean viewer ready for a fresh invite ----
-    $('reconnectBtn').addEventListener('click', () =>
-    {
-      // Drop the spent invite in the URL so we land on the paste screen.
-      window.location.href = 'remote.html';
-    });
 
     // ---- Forward keystrokes to the host ----
     const GAME_KEYS = new Set([
