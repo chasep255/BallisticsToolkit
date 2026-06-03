@@ -93,8 +93,25 @@ function btkClearConsent()
   expire('btk_consent_analytics');
 }
 
+// Global Privacy Control: a browser/extension opt-out signal that several US
+// state privacy laws (e.g. California CPRA) require us to honor. When present,
+// treat the user as having opted out of analytics cookies, overriding any
+// stored choice. Cookieless analytics are unaffected (they store nothing).
+function btkGlobalPrivacyControlEnabled()
+{
+  try
+  {
+    return navigator.globalPrivacyControl === true;
+  }
+  catch
+  {
+    return false;
+  }
+}
+
 function btkHasAnalyticsConsent()
 {
+  if (btkGlobalPrivacyControlEnabled()) return false;
   const stored = btkGetStoredConsent();
   if (stored) return !!stored.analyticsCookiesAccepted;
   // Fallback to cookie in case localStorage is blocked
@@ -157,8 +174,26 @@ function btkUpdateAnalyticsConsent(granted)
   }
 }
 
+// Cloudflare Web Analytics: cookieless, no personal data, so no consent required.
+// Provides aggregate visitor counts and country-level geography.
+function btkLoadCloudflareAnalytics()
+{
+  if (!btkIsProductionDomain()) return;
+  if (window.__btkCfAnalyticsLoaded) return;
+  window.__btkCfAnalyticsLoaded = true;
+
+  const beacon = document.createElement('script');
+  beacon.defer = true;
+  beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+  beacon.setAttribute('data-cf-beacon', '{"token": "e80a3eacb55048a7b2e72771e8d93fba"}');
+  document.head.appendChild(beacon);
+}
+
 // Try to load GA early if already consented (non-blocking)
 btkLoadGoogleAnalytics();
+
+// Load Cloudflare Web Analytics (cookieless, no consent gating)
+btkLoadCloudflareAnalytics();
 
 /**
  * Common JavaScript functionality for BallisticsToolkit
@@ -548,7 +583,7 @@ function btkEnsureConsentModal()
         </div>
 
         <div class="btk-consent-footnote">
-          Basic anonymous analytics (page views, general traffic) are collected without cookies using Google Analytics Consent Mode.
+          Basic anonymous analytics (page views, general traffic) are collected without cookies using Google Analytics Consent Mode and Cloudflare Web Analytics.
           You can change your cookie preferences later by clearing site data. Consent version: ${BTK_CONSENT_VERSION}.
         </div>
       </div>
@@ -564,6 +599,25 @@ function btkEnsureConsentModal()
   const acceptBtn = overlay.querySelector('#btkConsentAccept');
   const declineBtn = overlay.querySelector('#btkConsentDecline');
 
+  // Respect Global Privacy Control: if the browser signals opt-out, lock the
+  // analytics-cookies option off so it can't be enabled.
+  if (btkGlobalPrivacyControlEnabled())
+  {
+    analytics.checked = false;
+    analytics.disabled = true;
+    const analyticsLabel = analytics.closest('.btk-consent-check');
+    if (analyticsLabel)
+    {
+      const note = document.createElement('span');
+      note.className = 'btk-consent-gpc-note';
+      note.style.display = 'block';
+      note.style.opacity = '0.8';
+      note.style.fontSize = '0.85em';
+      note.textContent = 'Disabled: your browser is sending a Global Privacy Control (opt-out) signal, which we honor.';
+      analyticsLabel.appendChild(note);
+    }
+  }
+
   // Require Age, Terms+Privacy, and Essential cookies to proceed.
   function updateAcceptEnabled()
   {
@@ -576,7 +630,7 @@ function btkEnsureConsentModal()
 
   acceptBtn.addEventListener('click', () =>
   {
-    const analyticsAccepted = !!analytics.checked;
+    const analyticsAccepted = !!analytics.checked && !btkGlobalPrivacyControlEnabled();
     btkStoreConsent({
       ageVerified: true,
       termsAccepted: true,
