@@ -13,6 +13,7 @@ export class TimeManager
   {
     this.clock = null;
     this.paused = false;
+    this.autoPaused = false; // true only when paused by tab-hidden, not the user
     this.visibilityHandler = null;
     this.lastDeltaTime = 0;
     this.lastElapsedTime = 0;
@@ -128,12 +129,20 @@ export class TimeManager
     {
       if (document.hidden)
       {
-        console.log(`${LOG_PREFIX} Tab hidden - pausing`);
-        this.pause();
+        // Auto-pause only if not already paused, so we don't clobber a manual
+        // pause (and know not to auto-resume it later).
+        if (!this.paused)
+        {
+          console.log(`${LOG_PREFIX} Tab hidden - pausing`);
+          this.autoPaused = true;
+          this.pause();
+        }
       }
-      else
+      else if (this.autoPaused)
       {
+        // Only resume what WE auto-paused; never override a manual pause.
         console.log(`${LOG_PREFIX} Tab visible - resuming`);
+        this.autoPaused = false;
         this.resume();
       }
     };

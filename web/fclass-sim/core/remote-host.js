@@ -33,6 +33,7 @@ export class RemoteHost
     // User-assignable callbacks.
     this.onInput = null;        // (input: {key, code, shiftKey, isDown}) => void
     this.onGoForRecord = null;  // () => void  (viewer pressed Go For Record)
+    this.onPause = null;        // () => void  (viewer pressed Pause/Resume)
     this.onStatus = null;       // (text: string) => void
     this.onOpen = null;         // () => void
     this.onClose = null;        // () => void
@@ -56,6 +57,7 @@ export class RemoteHost
       if (!msg) return;
       if (msg.type === 'input' && this.onInput) this.onInput(msg);
       else if (msg.type === 'goForRecord' && this.onGoForRecord) this.onGoForRecord();
+      else if (msg.type === 'pause' && this.onPause) this.onPause();
     };
   }
 
@@ -122,6 +124,12 @@ export class RemoteHost
   pushControls(model, activePlayer)
   {
     if (this.isOpen) this.link.send({ type: 'controls', model, activePlayer });
+  }
+
+  /** Push the current pause state so the viewer's Pause button label stays in sync. */
+  pushPaused(paused)
+  {
+    if (this.isOpen) this.link.send({ type: 'paused', paused });
   }
 
   close()

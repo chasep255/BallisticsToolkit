@@ -353,6 +353,7 @@ function setupRemotePlayUI()
       remoteHost = new RemoteHost();
       remoteHost.onInput = applyRemoteInput;
       remoteHost.onGoForRecord = () => { if (webglGame) webglGame.requestGoForRecord('remote'); };
+      remoteHost.onPause = () => { if (webglGame) webglGame.togglePause(); };
       remoteHost.onStatus = (t) => setStatus(t);
       remoteHost.onOpen = () =>
       {
@@ -1603,6 +1604,13 @@ class FClassSimulator
     this.driver.onTargetReady(now);
   }
 
+  /** Toggle pause/resume (used by the local button and the remote viewer). */
+  togglePause()
+  {
+    if (this.isPaused) this.resume();
+    else this.pause();
+  }
+
   pause()
   {
     if (!this.isRunning || this.isPaused) return;
@@ -1615,6 +1623,7 @@ class FClassSimulator
     const btn = document.getElementById('pauseBtn');
     if (btn) btn.textContent = 'Resume';
 
+    if (this.remoteHost) this.remoteHost.pushPaused(true);
     console.log('[Game] Paused');
   }
 
@@ -1630,6 +1639,7 @@ class FClassSimulator
     const btn = document.getElementById('pauseBtn');
     if (btn) btn.textContent = 'Pause';
 
+    if (this.remoteHost) this.remoteHost.pushPaused(false);
     console.log('[Game] Resumed');
   }
 
@@ -2304,8 +2314,9 @@ class FClassSimulator
     const controls = this.driver.getControlsModel();
     const activePlayer = this.driver.getActivePlayerId ? this.driver.getActivePlayerId() : null;
 
-    // When a remote viewer is playing p2, the host's own button only applies on
-    // p1's turn; the viewer gets its own button for p2's turn.
+    // Each screen only shows its own player's Go For Record. With a remote viewer
+    // playing p2, the host's button applies only on p1's turn (the viewer shows
+    // p2's own). In local hotseat the one screen serves the active shooter.
     const hostMayGoForRecord = !(this.mode === 'pair' && this.remoteHost) || activePlayer === 'p1';
 
     const goBtn = document.getElementById('goForRecordBtn');
@@ -2343,6 +2354,7 @@ class FClassSimulator
   {
     this.remoteHost = host;
     host.onGoForRecord = () => this.requestGoForRecord('remote');
+    host.onPause = () => this.togglePause();
     const track = canvasVideoTrack();
     if (track) host.setVideoTrack(track);
     // Stream the game audio too (gunshots, wind, scope clicks).
@@ -2351,6 +2363,7 @@ class FClassSimulator
     if (audioTrack) host.setAudioTrack(audioTrack);
     host.setMeta(this.scorecard.matchParams, this.scorecard.targetSpec);
     host.pushScorecard(this.driver.getScorecardModel());
+    host.pushPaused(this.isPaused);
     this.pushControlsNow();
   }
 

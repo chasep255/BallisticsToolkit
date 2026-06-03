@@ -91,17 +91,6 @@
       <div class="param-item" style="display: flex; align-items: center;"><a href="#" id="resetDefaults" style="color: #007bff; text-decoration: none; font-size: 13px; cursor: pointer;" title="Reset all parameters to default values">Reset to Defaults</a></div>
     </div>
 
-    <!-- Control Buttons -->
-    <div style="display: flex; align-items: center; gap: 10px; justify-content: center; margin: 15px 0;">
-      <button id="startBtn" class="btn btn-primary">Start Game</button>
-      <button id="pauseBtn" class="btn btn-secondary" style="display: none;">Pause</button>
-      <button id="restartBtn" class="btn btn-secondary" style="display: none;">Restart</button>
-      <button id="scorecardBtn" class="btn btn-secondary" style="display: none;">Scorecard</button>
-      <button id="goForRecordBtn" class="btn btn-secondary" style="display: none;">Go For Record</button>
-      <button id="windHUDBtn" class="btn btn-secondary" style="display: none;">Wind HUD</button>
-      <button id="helpBtn" class="btn btn-secondary">Help</button>
-    </div>
-
     <!-- Remote Play host panel: copy/paste WebRTC handshake, no backend -->
     <div id="remotePlayPanel" data-no-persist style="display: none; max-width: 640px; margin: 0 auto 15px; padding: 14px 16px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; text-align: left;">
       <strong>Host Remote Play <span style="color:#b06000;">(Beta)</span></strong>
@@ -119,6 +108,17 @@
         <button id="remoteNewInviteBtn" class="btn btn-secondary" title="Generate a fresh invite link to (re)connect a viewer. Your match keeps running.">New invite link</button>
       </div>
       <div id="remoteStatus" style="margin-top:8px; font-size:13px; font-weight:bold; color:#333;"></div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div style="display: flex; align-items: center; gap: 10px; justify-content: center; margin: 15px 0;">
+      <button id="startBtn" class="btn btn-primary">Start Game</button>
+      <button id="pauseBtn" class="btn btn-secondary" style="display: none;">Pause</button>
+      <button id="restartBtn" class="btn btn-secondary" style="display: none;">Restart</button>
+      <button id="scorecardBtn" class="btn btn-secondary" style="display: none;">Scorecard</button>
+      <button id="goForRecordBtn" class="btn btn-secondary" style="display: none;">Go For Record</button>
+      <button id="windHUDBtn" class="btn btn-secondary" style="display: none;">Wind HUD</button>
+      <button id="helpBtn" class="btn btn-secondary">Help</button>
     </div>
 
     <div id="error" class="error" style="display: none;"></div>

@@ -48,6 +48,7 @@
     <div id="playStage" class="rp-stage">
       <div class="rp-bar">
         <button id="rpScorecardBtn" class="btn btn-secondary">Scorecard</button>
+        <button id="rpPauseBtn" class="btn btn-secondary">Pause</button>
         <button id="rpGoForRecordBtn" class="btn btn-primary" style="display:none;">Go For Record</button>
         <button id="rpSoundBtn" class="btn btn-secondary">🔊 Enable sound</button>
         <span class="rp-hint">Your keys (arrows, Shift+arrows to dial, Space to fire, WASD/E/Q spotting scope) control the host. Expect slight input lag.</span>
@@ -109,13 +110,18 @@
       }
       else if (msg.type === 'controls')
       {
-        // Show our Go For Record button only on our turn (p2), or in single-
-        // player string fire (no active player id).
+        // Show the viewer's Go For Record only on the viewer's own turn (p2)
+        // while it still has sighters to skip — so it shows that player's button
+        // and hides once pressed. (String fire has no active player id.)
         const btn = $('rpGoForRecordBtn');
         const show = msg.model && msg.model.goForRecord
           && (msg.activePlayer === 'p2' || msg.activePlayer == null);
         btn.style.display = show ? 'inline-block' : 'none';
         if (show && msg.model.goForRecordText) btn.textContent = msg.model.goForRecordText;
+      }
+      else if (msg.type === 'paused')
+      {
+        $('rpPauseBtn').textContent = msg.paused ? 'Resume' : 'Pause';
       }
       else if (msg.type === 'bye')
       {
@@ -174,6 +180,12 @@
     $('rpGoForRecordBtn').addEventListener('click', () =>
     {
       if (link.isOpen) link.send({ type: 'goForRecord' });
+    });
+
+    // ---- Pause/Resume — toggled on the host (label syncs via 'paused') ----
+    $('rpPauseBtn').addEventListener('click', () =>
+    {
+      if (link.isOpen) link.send({ type: 'pause' });
     });
 
 
