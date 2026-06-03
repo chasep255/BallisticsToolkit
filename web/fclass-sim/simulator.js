@@ -1128,7 +1128,10 @@ class FClassSimulator
     // Renderer setup
     this.canvasWidth = parseInt(this.canvas.dataset.lockedWidth) || this.canvas.clientWidth;
     this.canvasHeight = parseInt(this.canvas.dataset.lockedHeight) || this.canvas.clientHeight;
-    // IMPORTANT: disable logarithmicDepthBuffer; it breaks shadow maps in Three.js
+    // logarithmicDepthBuffer is ON to keep depth precision across the very large
+    // view distance (near 0.5yd, far 2500yd). NOTE: any custom ShaderMaterial in
+    // the scene must include the <logdepthbuf_*> chunks or it will depth-fight
+    // against the rest of the scene (clouds in environment.js do this).
     this.renderer = new THREE.WebGLRenderer(
     {
       canvas: this.canvas,

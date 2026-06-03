@@ -20,7 +20,12 @@ export class EnvironmentRenderer
   static CLOUD_COUNT = 60;
   static CLOUD_HEIGHT_MIN = 80; // yards
   static CLOUD_HEIGHT_MAX = 330; // yards
-  static CLOUD_SPAWN_RANGE = 2000; // yards
+  static CLOUD_FIELD_HALF_WIDTH = 850; // yards - half-width of the cloud field in X
+  static CLOUD_FIELD_MARGIN = 700; // yards of cloud field beyond the targets
+  static CLOUD_BASE_SIZE = 150; // yards - base billboard width (height = 0.6x)
+  static CLOUD_SCALE_MIN = 0.85; // smallest cloud scale multiplier
+  static CLOUD_SCALE_MAX = 2.0; // largest cloud scale multiplier
+  static CLOUD_FADE_MARGIN = 220; // yards - clouds fade over this band at the field edges
 
   static TREE_SIDE_MIN_DISTANCE = 30; // yards from center
   static TREE_SIDE_MAX_DISTANCE = 110; // yards from center
@@ -55,7 +60,12 @@ export class EnvironmentRenderer
       cloudCount: config.cloudCount ?? EnvironmentRenderer.CLOUD_COUNT,
       cloudHeightMin: config.cloudHeightMin ?? EnvironmentRenderer.CLOUD_HEIGHT_MIN,
       cloudHeightMax: config.cloudHeightMax ?? EnvironmentRenderer.CLOUD_HEIGHT_MAX,
-      cloudSpawnRange: config.cloudSpawnRange ?? EnvironmentRenderer.CLOUD_SPAWN_RANGE,
+      cloudFieldHalfWidth: config.cloudFieldHalfWidth ?? EnvironmentRenderer.CLOUD_FIELD_HALF_WIDTH,
+      cloudFieldMargin: config.cloudFieldMargin ?? EnvironmentRenderer.CLOUD_FIELD_MARGIN,
+      cloudBaseSize: config.cloudBaseSize ?? EnvironmentRenderer.CLOUD_BASE_SIZE,
+      cloudScaleMin: config.cloudScaleMin ?? EnvironmentRenderer.CLOUD_SCALE_MIN,
+      cloudScaleMax: config.cloudScaleMax ?? EnvironmentRenderer.CLOUD_SCALE_MAX,
+      cloudFadeMargin: config.cloudFadeMargin ?? EnvironmentRenderer.CLOUD_FADE_MARGIN,
 
       treeSideMinDistance: config.treeSideMinDistance ?? EnvironmentRenderer.TREE_SIDE_MIN_DISTANCE,
       treeSideMaxDistance: config.treeSideMaxDistance ?? EnvironmentRenderer.TREE_SIDE_MAX_DISTANCE,
@@ -76,7 +86,10 @@ export class EnvironmentRenderer
 
     // Environment objects
     this.clouds = [];
-    this.cloudInstancedMesh = null;
+    this.cloudMesh = null; // single instanced mesh of procedural clouds
+    this.cloudGeometry = null; // shared billboard geometry
+    this.cloudMaterial = null; // procedural cloud shader material
+    this.cloudOpacityAttr = null; // per-instance edge-fade opacity
     this.mountainInstancedMesh = null;
     this.mountainData = [];
     this.treeTrunkInstances = [];
@@ -96,13 +109,14 @@ export class EnvironmentRenderer
 
   dispose()
   {
-    // Remove instanced meshes
-    if (this.cloudInstancedMesh)
+    // Remove instanced clouds
+    if (this.cloudMesh)
     {
-      this.scene.remove(this.cloudInstancedMesh);
-      this.cloudInstancedMesh.geometry.dispose();
-      this.cloudInstancedMesh.material.dispose();
+      this.scene.remove(this.cloudMesh);
+      if (this.cloudMesh.customDepthMaterial) this.cloudMesh.customDepthMaterial.dispose();
     }
+    if (this.cloudMaterial) this.cloudMaterial.dispose();
+    if (this.cloudGeometry) this.cloudGeometry.dispose();
 
     if (this.mountainInstancedMesh)
     {
@@ -192,6 +206,10 @@ export class EnvironmentRenderer
 
     // Clear arrays
     this.clouds = [];
+    this.cloudMesh = null;
+    this.cloudGeometry = null;
+    this.cloudMaterial = null;
+    this.cloudOpacityAttr = null;
     this.mountainData = [];
     this.cloudTextures = [];
     this.treeTrunkInstances = [];
@@ -320,105 +338,174 @@ export class EnvironmentRenderer
     // Create clouds at various positions with varied shapes using instanced rendering
     this.clouds = [];
 
-    // Create multiple cloud textures for variation (use first texture for all instances)
-    const cloudTextures = [];
-    for (let i = 0; i < 8; i++)
+    this.cloudTextures = []; // procedural clouds use no canvas textures
+
+    // Cloud field: a rectangle over the range that the clouds tile within.
+    // Clouds drift with the wind and wrap inside this rectangle, so the sky
+    // stays uniformly populated and nothing permanently blows out of view.
+    const zNear = 200; // a little behind the shooter
+    const zFar = -(this.rangeDistance + this.cfg.cloudFieldMargin); // beyond targets
+    this.cloudField = {
+      centerX: 0,
+      halfWidth: this.cfg.cloudFieldHalfWidth,
+      centerZ: (zNear + zFar) / 2,
+      halfLength: (zNear - zFar) / 2
+    };
+
+    // Big puffy billboard. The shape is generated procedurally in the shader
+    // from a per-instance seed, so every cloud is unique while still drawing in
+    // a single instanced pass.
+    const baseScale = this.cfg.cloudBaseSize;
+    this.cloudGeometry = new THREE.PlaneGeometry(baseScale, baseScale * 0.6);
+
+    const count = this.cfg.cloudCount;
+    const seeds = new Float32Array(count);
+    const opacities = new Float32Array(count);
+
+    for (let i = 0; i < count; i++)
     {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-
-      ctx.clearRect(0, 0, 512, 256);
-
-      const numCircles = 5 + Math.floor(Math.random() * 4);
-      const cloudCircles = [];
-
-      for (let j = 0; j < numCircles; j++)
-      {
-        const t = j / (numCircles - 1);
-        cloudCircles.push(
-        {
-          x: 100 + t * 312 + (Math.random() - 0.5) * 60,
-          y: 128 + (Math.random() - 0.5) * 80,
-          r: 40 + Math.random() * 40
-        });
-      }
-
-      cloudCircles.forEach(circle =>
-      {
-        const gradient = ctx.createRadialGradient(circle.x, circle.y, 0, circle.x, circle.y, circle.r);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-        gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.7)');
-        gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.3)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      cloudTextures.push(new THREE.CanvasTexture(canvas));
-    }
-
-    this.cloudTextures = cloudTextures;
-
-    // Use first texture for all cloud instances (they're already varied)
-    const baseScale = 90; // Average cloud size
-    const cloudGeometry = new THREE.PlaneGeometry(baseScale, baseScale / 2);
-    const cloudMaterial = new THREE.MeshStandardMaterial(
-    {
-      map: cloudTextures[0],
-      transparent: true,
-      opacity: 0.85,
-      alphaTest: 0.01,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      roughness: 1.0,
-      metalness: 0.0,
-      emissive: new THREE.Color(0.95, 0.95, 0.95),
-      emissiveIntensity: 0.3
-    });
-
-    this.cloudInstancedMesh = new THREE.InstancedMesh(cloudGeometry, cloudMaterial, this.cfg.cloudCount);
-    this.cloudInstancedMesh.castShadow = this.cfg.shadowsEnabled;
-    this.cloudInstancedMesh.receiveShadow = false;
-
-    // Set up instance transforms
-    const matrix = new THREE.Matrix4();
-    for (let i = 0; i < this.cfg.cloudCount; i++)
-    {
-      const x = (Math.random() - 0.5) * 600;
+      const x = this.cloudField.centerX + (Math.random() - 0.5) * 2 * this.cloudField.halfWidth;
+      const z = this.cloudField.centerZ + (Math.random() - 0.5) * 2 * this.cloudField.halfLength;
       const y = this.cfg.cloudHeightMin + Math.random() * (this.cfg.cloudHeightMax - this.cfg.cloudHeightMin);
-      const z = 200 - Math.random() * (this.rangeDistance + 500 + 200);
 
-      const distanceFactor = Math.abs(z) / 500;
-      const scale = 0.5 + distanceFactor * 0.5;
+      const scale = this.cfg.cloudScaleMin + Math.random() * (this.cfg.cloudScaleMax - this.cfg.cloudScaleMin);
+      const flip = Math.random() < 0.5 ? -1 : 1; // mirror half of them for variety
+      const aspect = 0.8 + Math.random() * 0.4; // height variation
 
-      const randomnessFactor = 0.8 + Math.random() * 0.4;
+      seeds[i] = Math.random() * 1000.0; // unique procedural shape per cloud
+      opacities[i] = EnvironmentRenderer.cloudEdgeOpacity(x, z, this.cloudField, this.cfg.cloudFadeMargin);
 
       this.clouds.push(
       {
-        instanceId: i,
-        randomnessFactor: randomnessFactor,
-        initialY: y,
-        initialZ: z,
-        baseScale: baseScale,
+        localId: i,
+        randomnessFactor: 0.8 + Math.random() * 0.4,
         position: new THREE.Vector3(x, y, z),
-        scale: new THREE.Vector3(scale, scale, 1)
+        scale: new THREE.Vector3(scale * flip, scale * aspect, 1)
       });
-
-      matrix.compose(
-        new THREE.Vector3(x, y, z),
-        new THREE.Quaternion(),
-        new THREE.Vector3(scale, scale, 1)
-      );
-      this.cloudInstancedMesh.setMatrixAt(i, matrix);
     }
 
-    this.cloudInstancedMesh.instanceMatrix.needsUpdate = true;
-    this.scene.add(this.cloudInstancedMesh);
+    this.cloudGeometry.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
+    this.cloudOpacityAttr = new THREE.InstancedBufferAttribute(opacities, 1);
+    this.cloudOpacityAttr.setUsage(THREE.DynamicDrawUsage);
+    this.cloudGeometry.setAttribute('aOpacity', this.cloudOpacityAttr);
+
+    // Procedural puffy-white cloud, shared by the visible material and the
+    // depth material so the cast shadow matches the silhouette.
+    const noiseGLSL = `
+      float cloudHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+      float cloudNoise(vec2 p){
+        vec2 i = floor(p); vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        float a = cloudHash(i);
+        float b = cloudHash(i + vec2(1.0, 0.0));
+        float c = cloudHash(i + vec2(0.0, 1.0));
+        float d = cloudHash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+      }
+      float cloudFbm(vec2 p){
+        float v = 0.0; float a = 0.5;
+        for (int k = 0; k < 5; k++){ v += a * cloudNoise(p); p = p * 2.0 + 7.3; a *= 0.5; }
+        return v;
+      }
+      // Puffy cloud coverage in [0,1] over uv in [0,1], unique per seed.
+      float cloudAlpha(vec2 uv, float seed){
+        vec2 so = vec2(seed * 13.7, seed * 7.1);
+        float n = cloudFbm(uv * 4.5 + so);
+        vec2 c = uv - 0.5;
+        c.y *= 1.7; // clouds are wider than tall
+        float radial = 1.0 - smoothstep(0.16, 0.5, length(c));
+        float density = radial * (0.45 + n);
+        return smoothstep(0.32, 0.66, density); // softer edges
+      }
+    `;
+
+    // Note: position/uv/projectionMatrix/modelViewMatrix and (for InstancedMesh)
+    // instanceMatrix are auto-declared by ShaderMaterial; only aSeed is custom.
+    const cloudVertex = `
+      #include <common>
+      #include <logdepthbuf_pars_vertex>
+      attribute float aSeed;
+      attribute float aOpacity;
+      varying vec2 vUv;
+      varying float vSeed;
+      varying float vOpacity;
+      void main(){
+        vUv = uv;
+        vSeed = aSeed;
+        vOpacity = aOpacity;
+        gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        #include <logdepthbuf_vertex>
+      }
+    `;
+
+    this.cloudMaterial = new THREE.ShaderMaterial(
+    {
+      uniforms: { uOpacity: { value: 0.82 } },
+      vertexShader: cloudVertex,
+      fragmentShader: `
+        #include <common>
+        #include <logdepthbuf_pars_fragment>
+        varying vec2 vUv;
+        varying float vSeed;
+        varying float vOpacity;
+        uniform float uOpacity;
+        ${noiseGLSL}
+        void main(){
+          #include <logdepthbuf_fragment>
+          float a = cloudAlpha(vUv, vSeed);
+          if (a <= 0.001) discard;
+          // Soft white with subtle bright-range variation so it isn't a flat,
+          // blown-out fill (stays light - no dark shading).
+          float shade = cloudFbm(vUv * 3.0 + vec2(vSeed * 7.1, vSeed * 13.7));
+          vec3 col = vec3(0.88 + 0.12 * shade);
+          gl_FragColor = vec4(col, a * uOpacity * vOpacity);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+
+    this.cloudMesh = new THREE.InstancedMesh(this.cloudGeometry, this.cloudMaterial, count);
+    this.cloudMesh.castShadow = this.cfg.shadowsEnabled;
+    this.cloudMesh.receiveShadow = false;
+    // Clouds drift and wrap far from their initial bounds, so disable frustum
+    // culling - otherwise the stale bounding volume makes whole batches pop out
+    // of existence (the flicker / random disappearing).
+    this.cloudMesh.frustumCulled = false;
+
+    // Custom depth material so the cloud casts a shadow shaped like its silhouette
+    this.cloudMesh.customDepthMaterial = new THREE.ShaderMaterial(
+    {
+      vertexShader: cloudVertex,
+      fragmentShader: `
+        #include <common>
+        #include <packing>
+        #include <logdepthbuf_pars_fragment>
+        varying vec2 vUv;
+        varying float vSeed;
+        varying float vOpacity;
+        ${noiseGLSL}
+        void main(){
+          #include <logdepthbuf_fragment>
+          float a = cloudAlpha(vUv, vSeed) * vOpacity;
+          if (a < 0.5) discard;
+          gl_FragColor = packDepthToRGBA(gl_FragCoord.z);
+        }
+      `
+    });
+
+    // Place instances
+    const matrix = new THREE.Matrix4();
+    const quaternion = new THREE.Quaternion();
+    for (let i = 0; i < count; i++)
+    {
+      matrix.compose(this.clouds[i].position, quaternion, this.clouds[i].scale);
+      this.cloudMesh.setMatrixAt(i, matrix);
+    }
+    this.cloudMesh.instanceMatrix.needsUpdate = true;
+
+    this.scene.add(this.cloudMesh);
   }
 
   createTrees()
@@ -642,9 +729,8 @@ export class EnvironmentRenderer
   {
     // Update each cloud's position based on wind
     const matrix = new THREE.Matrix4();
-    const position = new THREE.Vector3();
     const quaternion = new THREE.Quaternion();
-    const scale = new THREE.Vector3();
+    const field = this.cloudField;
 
     for (const cloud of this.clouds)
     {
@@ -657,23 +743,44 @@ export class EnvironmentRenderer
       cloud.position.x += velX_yds * deltaTime * cloud.randomnessFactor;
       cloud.position.z += velZ_yds * deltaTime * cloud.randomnessFactor;
 
-      // Respawn clouds that have moved too far
-      const distanceFromCenter = Math.sqrt(cloud.position.x * cloud.position.x + cloud.position.z * cloud.position.z);
-      if (distanceFromCenter > this.cfg.cloudSpawnRange * 1.5)
-      {
-        const angle = Math.random() * Math.PI * 2;
-        const spawnDistance = this.cfg.cloudSpawnRange * 0.8;
-        cloud.position.x = Math.cos(angle) * spawnDistance;
-        cloud.position.z = Math.sin(angle) * spawnDistance;
-        cloud.position.y = this.cfg.cloudHeightMin + Math.random() * (this.cfg.cloudHeightMax - this.cfg.cloudHeightMin);
-      }
+      // Wrap within the cloud field so density stays uniform and clouds never
+      // permanently leave the sky (a cloud exiting one edge re-enters the other).
+      cloud.position.x = EnvironmentRenderer.wrapToField(cloud.position.x, field.centerX, field.halfWidth);
+      cloud.position.z = EnvironmentRenderer.wrapToField(cloud.position.z, field.centerZ, field.halfLength);
+
+      // Fade near the field edges so wrapping clouds ease out/in instead of popping
+      this.cloudOpacityAttr.array[cloud.localId] = EnvironmentRenderer.cloudEdgeOpacity(
+        cloud.position.x, cloud.position.z, field, this.cfg.cloudFadeMargin);
 
       // Update instance matrix
       matrix.compose(cloud.position, quaternion, cloud.scale);
-      this.cloudInstancedMesh.setMatrixAt(cloud.instanceId, matrix);
+      this.cloudMesh.setMatrixAt(cloud.localId, matrix);
     }
 
-    this.cloudInstancedMesh.instanceMatrix.needsUpdate = true;
+    this.cloudOpacityAttr.needsUpdate = true;
+
+    this.cloudMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // Wrap a coordinate into [center - half, center + half] (toroidal field)
+  static wrapToField(value, center, half)
+  {
+    const min = center - half;
+    const span = 2 * half;
+    let d = value - min;
+    d = ((d % span) + span) % span;
+    return d + min;
+  }
+
+  // Opacity [0,1] that fades to 0 within `margin` yards of the field edges, so
+  // clouds ease out before wrapping and ease back in on the opposite side.
+  static cloudEdgeOpacity(x, z, field, margin)
+  {
+    const dx = field.halfWidth - Math.abs(x - field.centerX);
+    const dz = field.halfLength - Math.abs(z - field.centerZ);
+    const ox = Math.min(1, Math.max(0, dx / margin));
+    const oz = Math.min(1, Math.max(0, dz / margin));
+    return ox * oz;
   }
 
   createRangeObjects()
