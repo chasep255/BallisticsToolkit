@@ -30,6 +30,11 @@ export class FlagRenderer
   static FLAG_FLAP_AMPLITUDE = 0.3; // Max ripple amplitude in yards
   static FLAG_WAVE_LENGTH = 1.5; // Wavelength along flag length
   static FLAG_PHASE_DRIFT_RANGE = Math.PI * 2; // Random phase offset range
+  // Furl: the cloth rolls about its own length axis so it presents a 3D form
+  // instead of a flat ribbon (helps read the head/tail wind component). Radians
+  // of roll accumulated from root to tip; scaled by wind strength in the shader.
+  static FLAG_FURL_BASE = 0.75; // steady roll toward the tip (~43°) - gives 3D belly
+  static FLAG_FURL_WAVE = 0.55; // travelling furl flutter layered on top
 
   constructor(config)
   {
@@ -56,7 +61,9 @@ export class FlagRenderer
       flagFlapFrequencyScale: config.flagFlapFrequencyScale ?? FlagRenderer.FLAG_FLAP_FREQUENCY_SCALE,
       flagFlapAmplitude: config.flagFlapAmplitude ?? FlagRenderer.FLAG_FLAP_AMPLITUDE,
       flagWaveLength: config.flagWaveLength ?? FlagRenderer.FLAG_WAVE_LENGTH,
-      flagPhaseDriftRange: config.flagPhaseDriftRange ?? FlagRenderer.FLAG_PHASE_DRIFT_RANGE
+      flagPhaseDriftRange: config.flagPhaseDriftRange ?? FlagRenderer.FLAG_PHASE_DRIFT_RANGE,
+      flagFurlBase: config.flagFurlBase ?? FlagRenderer.FLAG_FURL_BASE,
+      flagFurlWave: config.flagFurlWave ?? FlagRenderer.FLAG_FURL_WAVE
     };
 
     this.flagMeshes = [];
@@ -181,7 +188,9 @@ export class FlagRenderer
       uWavePhase: { value: 0 }, // Accumulated wave phase
       uFlagLength: { value: this.cfg.flagLength },
       uFlapAmplitude: { value: this.cfg.flagFlapAmplitude },
-      uWaveLength: { value: this.cfg.flagWaveLength }
+      uWaveLength: { value: this.cfg.flagWaveLength },
+      uFurlBase: { value: this.cfg.flagFurlBase },
+      uFurlWave: { value: this.cfg.flagFurlWave }
     };
 
     material.onBeforeCompile = (shader) =>
@@ -193,6 +202,8 @@ export class FlagRenderer
       shader.uniforms.uFlagLength = uniforms.uFlagLength;
       shader.uniforms.uFlapAmplitude = uniforms.uFlapAmplitude;
       shader.uniforms.uWaveLength = uniforms.uWaveLength;
+      shader.uniforms.uFurlBase = uniforms.uFurlBase;
+      shader.uniforms.uFurlWave = uniforms.uFurlWave;
 
       // Vertex shader: add attribute and uniforms
       shader.vertexShader = shader.vertexShader.replace(
@@ -208,6 +219,8 @@ export class FlagRenderer
         uniform float uFlagLength;
         uniform float uFlapAmplitude;
         uniform float uWaveLength;
+        uniform float uFurlBase;   // steady roll root->tip (radians)
+        uniform float uFurlWave;   // travelling furl flutter (radians)
 
         // Helper function to compute deformed position
         vec3 computeDeformedPosition(float localX, float localY, float localZ, float t) {
@@ -223,17 +236,31 @@ export class FlagRenderer
           float waveArg = uWavePhase + t * uWaveLength * 6.28318;
           float waveOffset = sin(waveArg) * uFlapAmplitude * t;
 
-          // Position after pitch rotation (flag tilts based on wind)
-          // localX is position along flag (0 to flagLength)
-          float pitchedX = localX * sinPitch;  // Horizontal extension in wind direction
-          float pitchedY = -localX * cosPitch; // Vertical droop (negative = down)
+          // Centerline: pitched up into the wind and drooping (extends from the
+          // pole along uDirection). This is the flag's local length axis in world.
+          vec3 center = vec3(localX * sinPitch * cosDir,
+                             -localX * cosPitch,
+                             -localX * sinPitch * sinDir);
 
-          // Rotate into wind direction (around Y axis) and add wave
-          float rotatedX = pitchedX * cosDir + waveOffset * sinDir;
-          float rotatedY = pitchedY + localY; // Add width offset
-          float rotatedZ = -pitchedX * sinDir + waveOffset * cosDir + localZ;
+          // Cross-section frame: width is vertical (W), the out-of-plane / wave
+          // direction is horizontal and perpendicular to the wind (N).
+          vec3 W = vec3(0.0, 1.0, 0.0);
+          vec3 N = vec3(sinDir, 0.0, cosDir);
 
-          return vec3(rotatedX, rotatedY, rotatedZ);
+          // Furl: roll the cross-section about the length axis, accumulating from
+          // root to tip with a travelling flutter. Scaled by wind strength so the
+          // flag hangs flat/limp when calm and furls into a 3D form when blowing.
+          float windFactor = clamp(uAngle / 60.0, 0.0, 1.0);
+          float furl = (uFurlBase * t + uFurlWave * sin(waveArg) * t) * windFactor;
+          float cf = cos(furl);
+          float sf = sin(furl);
+
+          // Roll (localY, localZ) about the length axis, then place on the frame
+          float widthCoord = localY * cf - localZ * sf;
+          float outOfPlane = localY * sf + localZ * cf + waveOffset;
+
+          vec3 pos = center + W * widthCoord + N * outOfPlane;
+          return pos;
         }
         `
       );
