@@ -343,6 +343,8 @@ namespace btk::physics
       w.setAdvectionGain(5.0);
       w.addComponent(1.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
       w.addComponent(1.0_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f);
+      w.addComponent(0.3_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
+
 
       return w;
     };
@@ -353,6 +355,7 @@ namespace btk::physics
       w.setAdvectionGain(5.0);
       w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
       w.addComponent(3.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.75f, 1.0f);
+      w.addComponent(1.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
       return w;
     };
 
@@ -362,6 +365,7 @@ namespace btk::physics
       w.setAdvectionGain(5.0);
       w.addComponent(6.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
       w.addComponent(6.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.75f, 1.0f);
+      w.addComponent(1.5_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
       return w;
     };
 
@@ -371,6 +375,7 @@ namespace btk::physics
       w.setAdvectionGain(5.0);
       w.addComponent(10.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
       w.addComponent(10.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.75f, 1.0f);
+      w.addComponent(2.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
 
       return w;
     };
@@ -380,6 +385,8 @@ namespace btk::physics
       WindGenerator w;
       w.setAdvectionGain(5.0);
       w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 2.5_min, 0.5f);
+      w.addComponent(1.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
+
       return w;
     };
 
@@ -390,6 +397,8 @@ namespace btk::physics
       w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 5.0_min, 1.0f);
       w.addComponent(3.0_mph, 300.0_yd, 300.0_yd, 1.0_min, 1.0f);
       w.addComponent(2.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
+      w.addComponent(2.0_mph, 50.0_yd, 50.0_yd, 0.5_min, 1.2f);
+
 
       return w;
     };
@@ -398,7 +407,9 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(4.0_mph, 1000.0_yd, 1000.0_yd, 10.0_min, 0.75);
+      w.addComponent(2.0_mph, 10000.0_yd, 10000.0_yd, 20.0_min, 0.5f);       // steady base
+      w.addComponent(4.0_mph, 500.0_yd, 2000.0_yd, 5.0_min, 0.5f);            // downrange shear (tight along-range, broad crossrange)
+      w.addComponent(0.5_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);           // fine turbulence
       return w;
     };
 
@@ -407,9 +418,10 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 5.0_min, 0.5f, 1.0f);
+      w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 5.0_min, 0.5f);
       w.addComponent(3.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 1.0f, 1.0f);
       w.addComponent(3.0_mph, 500.0_yd, 500.0_yd, 0.5_min, 1.0f, 1.0f);
+      w.addComponent(1.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
       return w;
     };
   }
