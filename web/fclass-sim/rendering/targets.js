@@ -7,6 +7,7 @@ import
   getBTK
 }
 from '../core/btk.js';
+import * as Range from '../core/range-constants.js';
 
 const LOG_PREFIX_SCORING = '[Scoring]';
 const LOG_PREFIX_TARGET = '[Target]';
@@ -14,8 +15,8 @@ const LOG_PREFIX_TARGET = '[Target]';
 export class TargetRenderer
 {
   // Default target configuration
-  static TARGET_SIZE = 2; // yards - size of target frames
-  static TARGET_GAP_ABOVE_PITS = 0.2; // Gap between target bottom and pit top when raised
+  static TARGET_SIZE = Range.TARGET_SIZE; // yards - size of target frames
+  static TARGET_GAP_ABOVE_PITS = Range.TARGET_GAP_ABOVE_PITS; // Gap between target bottom and pit top when raised
   static TARGET_MAX_HEIGHT = 0; // No additional height when raised
   static TARGET_HALF_MAST = -(TargetRenderer.TARGET_SIZE + TargetRenderer.TARGET_GAP_ABOVE_PITS) / 2;
   static TARGET_MIN_HEIGHT = -(TargetRenderer.TARGET_SIZE + TargetRenderer.TARGET_GAP_ABOVE_PITS);

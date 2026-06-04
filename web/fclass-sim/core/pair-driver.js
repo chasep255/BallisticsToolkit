@@ -269,13 +269,31 @@ export class PairFireDriver extends MatchDriver
 
   // ===== Sighter controls =====
 
-  goForRecord()
+  // A player may end their sighters early at any time — including while the
+  // other player is shooting — so this targets a specific player, defaulting to
+  // whoever is active (local hotseat / single-screen use).
+  goForRecord(playerId = this.active)
   {
-    const player = this.players[this.active];
-    if (player.phase === 'sighters')
+    const player = this.players[playerId];
+    if (player && player.phase === 'sighters')
     {
       player.phase = 'record';
     }
+  }
+
+  /** Whether the given player still has sighters left to skip. */
+  canGoForRecord(playerId)
+  {
+    if (this.complete || this.suddenDeath) return false;
+    const player = this.players[playerId];
+    return !!player && player.phase === 'sighters' && player.sightersFired < this.sighterCap;
+  }
+
+  /** Button label for the given player's "Go For Record". */
+  goForRecordTextFor(playerId)
+  {
+    const player = this.players[playerId];
+    return player ? `${player.name}: Go For Record` : 'Go For Record';
   }
 
   // ===== Completion / tiebreak =====
@@ -288,6 +306,17 @@ export class PairFireDriver extends MatchDriver
   sdShotsFor(playerId)
   {
     return this.shotLog.filter(s => s.player === playerId && s.suddenDeath);
+  }
+
+  /**
+   * Shots that count toward the displayed score and appear on the target:
+   * record shots plus any sudden-death shots (they're real shots on paper, not
+   * just a tiebreak). Sighters excluded. The suddenDeath flag is kept on each
+   * shot only to drive the tiebreak comparison (see compareSuddenDeath).
+   */
+  scoringShotsFor(playerId)
+  {
+    return this.shotLog.filter(s => s.player === playerId && !s.isSighter);
   }
 
   evaluateState(now)
@@ -359,7 +388,7 @@ export class PairFireDriver extends MatchDriver
     this.turnTimerRunning = false;
     this.winner = result > 0 ? 'p1' : 'p2';
     const w = this.players[this.winner];
-    const agg = this.aggregate(this.recordShotsFor(this.winner));
+    const agg = this.aggregate(this.scoringShotsFor(this.winner));
     console.log(`${LOG_PREFIX} Match complete - winner ${w.name} (${agg.total}-${agg.xCount}X)`);
     this.emitEvent({ type: 'matchComplete', winner: this.winner, winnerName: w.name });
   }
@@ -387,7 +416,7 @@ export class PairFireDriver extends MatchDriver
   buildHudPlayer(playerId)
   {
     const player = this.players[playerId];
-    const { total, xCount } = this.aggregate(this.recordShotsFor(playerId));
+    const { total, xCount } = this.aggregate(this.scoringShotsFor(playerId));
     const isActive = !this.complete && playerId === this.active;
 
     let timerValue;
@@ -457,19 +486,19 @@ export class PairFireDriver extends MatchDriver
   {
     const player = this.players[playerId];
     const sighterShots = this.shotLog.filter(s => s.player === playerId && s.isSighter);
-    const recordShots = this.recordShotsFor(playerId);
+    // Record + sudden-death shots both count and plot on the target.
+    const scoringShots = this.scoringShotsFor(playerId);
     const sighters = sighterShots.map(s => ({ score: s.score, isX: s.isX }));
-    const records = recordShots.map(s => ({ score: s.score, isX: s.isX }));
-    const suddenDeath = this.sdShotsFor(playerId).map(s => ({ score: s.score, isX: s.isX }));
-    const { total, xCount } = this.aggregate(recordShots);
+    const records = scoringShots.map(s => ({ score: s.score, isX: s.isX }));
+    const { total, xCount } = this.aggregate(scoringShots);
 
     return {
       label: player.name,
       sighters: sighters,
       records: records,
-      suddenDeath: suddenDeath,
+      suddenDeath: [], // SD shots are folded into records above
       recordSlots: this.recordShots,
-      group: MatchDriver.buildGroup([...sighterShots, ...recordShots]),
+      group: MatchDriver.buildGroup([...sighterShots, ...scoringShots]),
       total: total,
       xCount: xCount,
       isWinner: this.winner === playerId
@@ -482,7 +511,7 @@ export class PairFireDriver extends MatchDriver
     if (this.complete)
     {
       const w = this.players[this.winner];
-      const agg = this.aggregate(this.recordShotsFor(this.winner));
+      const agg = this.aggregate(this.scoringShotsFor(this.winner));
       footerText = `Winner: ${w.name} (${agg.total}-${agg.xCount}X)`;
     }
     else if (this.suddenDeath)

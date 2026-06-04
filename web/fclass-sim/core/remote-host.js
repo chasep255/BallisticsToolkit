@@ -32,6 +32,7 @@ export class RemoteHost
     this.onGoForRecord = null;  // () => void
     this.onPause = null;        // () => void
     this.onWindHud = null;      // () => void
+    this.onAdvanceMatch = null; // () => void  (viewer pressed "Start next match")
     this.onOpen = null;         // () => void
     this.onClose = null;        // () => void
     this.onError = null;        // (err) => void
@@ -52,6 +53,7 @@ export class RemoteHost
       else if (msg.type === 'goForRecord' && this.onGoForRecord) this.onGoForRecord();
       else if (msg.type === 'pause' && this.onPause) this.onPause();
       else if (msg.type === 'windHud' && this.onWindHud) this.onWindHud();
+      else if (msg.type === 'advanceMatch' && this.onAdvanceMatch) this.onAdvanceMatch();
     };
   }
 
@@ -103,6 +105,22 @@ export class RemoteHost
   pushWindHud(visible)
   {
     if (this.isOpen) this.link.send({ type: 'windHudState', visible });
+  }
+
+  /**
+   * Push a match-end popup (match complete / aggregate complete / pair winner)
+   * so the viewer can render the same overlay — these live in the DOM, not the
+   * captured canvas, so they aren't in the video stream.
+   */
+  pushNotification(notif)
+  {
+    if (this.isOpen) this.link.send({ type: 'notification', notif });
+  }
+
+  /** Tell the viewer to clear any match-end popup (e.g. after advancing/restart). */
+  pushNotificationDismiss()
+  {
+    if (this.isOpen) this.link.send({ type: 'notificationDismiss' });
   }
 
   close()

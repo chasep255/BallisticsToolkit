@@ -7,12 +7,14 @@ import
   sampleWindAtThreeJsPosition
 }
 from '../core/btk.js';
+import * as Range from '../core/range-constants.js';
+import { stepWindMarker } from '../core/wind-marker-response.js';
 
 export class FlagRenderer
 {
   // Default flag configuration
-  static POLE_HEIGHT = 12; // yards
-  static POLE_THICKNESS = 0.1; // yards
+  static POLE_HEIGHT = Range.POLE_HEIGHT; // yards
+  static POLE_THICKNESS = Range.POLE_THICKNESS; // yards
   static FLAG_BASE_WIDTH = 60 / 36; // 60 inches = 1.67 yards
   static FLAG_TIP_WIDTH = 24 / 36; // 24 inches = 0.67 yards
   static FLAG_LENGTH = 16 / 3; // 16 feet = 5.33 yards
@@ -531,30 +533,24 @@ export class FlagRenderer
 
       // Get wind at flag position
       const wind = sampleWindAtThreeJsPosition(windGenerator, pos.x, pos.y, pos.z);
-      const windX_mph = wind.x; // cross
-      const windZ_mph = wind.z; // head/tail
-      const windHoriz_mph = Math.hypot(windX_mph, windZ_mph);
 
-      // Concave angle response: angle = min + span * clamp(v_h / flatSpeed, 0, 1)^exp
-      // (steep at low wind, flattening to horizontal at flatSpeed)
-      const span = this.cfg.flagMaxAngle - this.cfg.flagMinAngle;
-      const frac = Math.pow(Math.min(windHoriz_mph / this.cfg.flagAngleFlatSpeed, 1), this.cfg.flagAngleResponseExp);
-      const targetAngleDeg = this.cfg.flagMinAngle + span * frac;
-
-      // Wind direction in ground plane (-windZ because Three.js negative Z = downrange)
-      const targetDirection = windHoriz_mph > 1e-6 ? Math.atan2(-windZ_mph, windX_mph) : flag.currentDirection;
-
-      // Smooth interpolate current angle toward target
-      const angleDiff = targetAngleDeg - flag.currentAngle;
-      const angleStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), this.cfg.flagAngleInterpolationSpeed * deltaTime);
-      flag.currentAngle += angleStep;
-
-      // Smooth interpolate current direction toward target
-      let dirDiff = targetDirection - flag.currentDirection;
-      while (dirDiff > Math.PI) dirDiff -= 2 * Math.PI;
-      while (dirDiff < -Math.PI) dirDiff += 2 * Math.PI;
-      const dirStep = Math.sign(dirDiff) * Math.min(Math.abs(dirDiff), this.cfg.flagDirectionInterpolationSpeed * deltaTime);
-      flag.currentDirection += dirStep;
+      // Drive the lift angle + heading from the sampled wind (shared with socks)
+      const { angle, direction, windHoriz_mph } = stepWindMarker(
+      {
+        windX_mph: wind.x, // cross
+        windZ_mph: wind.z, // head/tail
+        currentAngle: flag.currentAngle,
+        currentDirection: flag.currentDirection,
+        deltaTime,
+        minAngle: this.cfg.flagMinAngle,
+        maxAngle: this.cfg.flagMaxAngle,
+        flatSpeed: this.cfg.flagAngleFlatSpeed,
+        responseExp: this.cfg.flagAngleResponseExp,
+        angleSpeed: this.cfg.flagAngleInterpolationSpeed,
+        directionSpeed: this.cfg.flagDirectionInterpolationSpeed
+      });
+      flag.currentAngle = angle;
+      flag.currentDirection = direction;
 
       // Update flap phase based on horizontal wind speed
       const flapFrequency = this.cfg.flagFlapFrequencyBase + windHoriz_mph * this.cfg.flagFlapFrequencyScale;

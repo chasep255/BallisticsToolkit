@@ -69,6 +69,12 @@ export class BallisticsEngine
    */
   async setup(bulletParams)
   {
+    // Transient WASM handles; the finally frees any an exception skipped past.
+    let atmosphere = null;
+    let zeroWind = null;
+    let targetPos = null;
+    let zeroVelBtk = null;
+
     try
     {
       // Store bullet parameters
@@ -97,7 +103,7 @@ export class BallisticsEngine
       );
 
       // Create atmosphere with explicit unit conversions
-      const atmosphere = new btk.Atmosphere(
+      atmosphere = new btk.Atmosphere(
         btk.Conversions.fahrenheitToKelvin(59),
         btk.Conversions.feetToMeters(0),
         0.5,
@@ -111,11 +117,13 @@ export class BallisticsEngine
 
       // Dispose atmosphere immediately after use
       atmosphere.delete();
+      atmosphere = null;
 
       // Set wind to zero for zeroing (dispose immediately after use)
-      const zeroWind = threeJsToBtkPosition(0, 0, 0);
+      zeroWind = threeJsToBtkPosition(0, 0, 0);
       this.ballisticSimulator.setWind(zeroWind);
       zeroWind.delete();
+      zeroWind = null;
 
       // Get target center from target system (Three.js coords in yards)
       const targetCenter = this.targets.getUserTargetCenter();
@@ -125,7 +133,7 @@ export class BallisticsEngine
       }
 
       // Convert yards to meters (same coordinate system)
-      const targetPos = threeJsToBtkPosition(
+      targetPos = threeJsToBtkPosition(
         targetCenter.x,
         targetCenter.y,
         targetCenter.z
@@ -147,11 +155,12 @@ export class BallisticsEngine
       const zeroEndTime = performance.now();
       const zeroTimeMs = zeroEndTime - zeroStartTime;
       targetPos.delete();
+      targetPos = null;
 
       console.log(`${LOG_PREFIX_ENGINE} Zero computation took ${zeroTimeMs.toFixed(1)}ms`);
 
       // Log the zeroed bullet velocity to show elevation and windage
-      const zeroVelBtk = this.zeroedBullet.getVelocity();
+      zeroVelBtk = this.zeroedBullet.getVelocity();
       const zeroVel = btkToThreeJsVelocity(zeroVelBtk);
       const zeroVelMag = Math.sqrt(zeroVel.x * zeroVel.x + zeroVel.y * zeroVel.y + zeroVel.z * zeroVel.z);
       // Calculate angles from velocity components (X=right, Y=up, Z=towards-camera where negative Z=downrange)
@@ -161,11 +170,20 @@ export class BallisticsEngine
       const windageMoa = btk.Conversions.radiansToMoa(windageRad);
       console.log(`${LOG_PREFIX_ENGINE} Zero complete: Elevation=${elevationMoa.toFixed(2)} MOA (${elevationRad.toFixed(6)} rad), Windage=${windageMoa.toFixed(2)} MOA (${windageRad.toFixed(6)} rad)`);
       zeroVelBtk.delete(); // Dispose Vector3D to prevent memory leak
+      zeroVelBtk = null;
     }
     catch (error)
     {
       console.error('Failed to setup ballistic system:', error);
       throw error;
+    }
+    finally
+    {
+      // Free any transient an exception skipped before its inline delete.
+      if (atmosphere) atmosphere.delete();
+      if (zeroWind) zeroWind.delete();
+      if (targetPos) targetPos.delete();
+      if (zeroVelBtk) zeroVelBtk.delete();
     }
   }
 
@@ -187,6 +205,17 @@ export class BallisticsEngine
 
     // Play shot sound immediately via ResourceManager
     ResourceManager.audio.playSound('shot1');
+
+    // WASM handles tracked here so the finally can free any that an exception
+    // skipped past (the happy path still deletes each inline, then nulls it).
+    let zeroVelBtk = null;
+    let variedVel = null;
+    let bulletStartPos = null;
+    let variedBullet = null;
+    let pointAtTarget = null;
+    let bulletState = null;
+    let bulletPosBtk = null;
+    let bulletVelBtk = null;
 
     try
     {
@@ -219,7 +248,7 @@ export class BallisticsEngine
       const accuracyErrorV = accuracyY * accuracyRadius; // radians
 
       // Apply scope aim and accuracy errors to the zeroed velocity
-      const zeroVelBtk = this.zeroedBullet.getVelocity();
+      zeroVelBtk = this.zeroedBullet.getVelocity();
       const zeroVel = btkToThreeJsVelocity(zeroVelBtk);
       const zeroVelMag = Math.sqrt(zeroVel.x * zeroVel.x + zeroVel.y * zeroVel.y + zeroVel.z * zeroVel.z);
       // Note: zeroVelBtk will be deleted after we're done using zeroVel
@@ -251,18 +280,19 @@ export class BallisticsEngine
 
       // Dispose zeroVelBtk now that we're done with zeroVel
       zeroVelBtk.delete();
+      zeroVelBtk = null;
 
       // Scale by actual MV (fps) and convert to BTK velocity
-      const variedVel = threeJsToBtkVelocity(
+      variedVel = threeJsToBtkVelocity(
         ux * actualMVFps,
         uy * actualMVFps,
         uz * actualMVFps
       );
 
       // Create bullet with varied initial state - start from muzzle (z=0)
-      const bulletStartPos = threeJsToBtkPosition(0, 0, 0);
+      bulletStartPos = threeJsToBtkPosition(0, 0, 0);
 
-      const variedBullet = new btk.Bullet(
+      variedBullet = new btk.Bullet(
         this.zeroedBullet,
         bulletStartPos,
         variedVel,
@@ -271,7 +301,9 @@ export class BallisticsEngine
 
       // Dispose temporary vectors immediately after bullet creation
       variedVel.delete();
+      variedVel = null;
       bulletStartPos.delete();
+      bulletStartPos = null;
 
       // Reset simulator with varied bullet
       this.ballisticSimulator.setInitialBullet(variedBullet);
@@ -279,6 +311,7 @@ export class BallisticsEngine
 
       // Dispose varied bullet immediately - simulator has copied the data
       variedBullet.delete();
+      variedBullet = null;
 
       // Sample wind at shooter position for logging
       const wind = sampleWindAtThreeJsPosition(this.windGenerator, 0, 0, 0);
@@ -290,7 +323,7 @@ export class BallisticsEngine
       const range_m = btk.Conversions.yardsToMeters(range);
       this.ballisticSimulator.simulateWithWind(range_m, dt, 5.0, this.windGenerator);
       this.lastTrajectory = this.ballisticSimulator.getTrajectory();
-      const pointAtTarget = this.lastTrajectory.atDistance(range_m); // distance in meters
+      pointAtTarget = this.lastTrajectory.atDistance(range_m); // distance in meters
 
       if (!pointAtTarget)
       {
@@ -299,17 +332,20 @@ export class BallisticsEngine
       }
 
       // Get bullet position and velocity at target (convert units: meters→yards, m/s→fps)
-      const bulletState = pointAtTarget.getState();
-      const bulletPosBtk = bulletState.getPosition();
-      const bulletVelBtk = bulletState.getVelocity();
+      bulletState = pointAtTarget.getState();
+      bulletPosBtk = bulletState.getPosition();
+      bulletVelBtk = bulletState.getVelocity();
       const bulletPos = btkToThreeJsPosition(bulletPosBtk); // Convert meters to yards
       const bulletVel = btkToThreeJsVelocity(bulletVelBtk); // Convert m/s to fps
       const impactVelocityFps = Math.sqrt(bulletVel.x ** 2 + bulletVel.y ** 2 + bulletVel.z ** 2); // fps
 
       // Dispose BTK objects
       bulletPosBtk.delete();
+      bulletPosBtk = null;
       bulletVelBtk.delete();
+      bulletVelBtk = null;
       bulletState.delete();
+      bulletState = null;
 
       // Get target coordinates from target system (Three.js coords, yards)
       const targetCenter = this.targets.getUserTargetCenter();
@@ -337,6 +373,7 @@ export class BallisticsEngine
       };
 
       pointAtTarget.delete(); // Dispose TrajectoryPoint to prevent memory leak
+      pointAtTarget = null;
 
       return this.pendingShotData;
     }
@@ -344,6 +381,20 @@ export class BallisticsEngine
     {
       console.error('Failed to fire shot:', error);
       throw error;
+    }
+    finally
+    {
+      // Free any handle an exception skipped before its inline delete (the
+      // happy path nulls each one, so this is a no-op then). Sub-objects
+      // before their parent.
+      if (bulletPosBtk) bulletPosBtk.delete();
+      if (bulletVelBtk) bulletVelBtk.delete();
+      if (bulletState) bulletState.delete();
+      if (pointAtTarget) pointAtTarget.delete();
+      if (variedBullet) variedBullet.delete();
+      if (variedVel) variedVel.delete();
+      if (bulletStartPos) bulletStartPos.delete();
+      if (zeroVelBtk) zeroVelBtk.delete();
     }
   }
 

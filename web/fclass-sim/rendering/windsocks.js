@@ -16,12 +16,14 @@ import
   sampleWindAtThreeJsPosition
 }
 from '../core/btk.js';
+import * as Range from '../core/range-constants.js';
+import { stepWindMarker } from '../core/wind-marker-response.js';
 
 export class WindSockRenderer
 {
   // Pole (shared look with the flag poles so the field is consistent)
-  static POLE_HEIGHT = 12; // yards
-  static POLE_THICKNESS = 0.1; // yards
+  static POLE_HEIGHT = Range.POLE_HEIGHT; // yards
+  static POLE_THICKNESS = Range.POLE_THICKNESS; // yards
 
   // Sock dimensions (yards)
   static SOCK_LENGTH = 4.5;
@@ -311,37 +313,32 @@ export class WindSockRenderer
       const sock = this.socks[i];
       const anchor = sock.anchor;
 
-      // Default to a steady droop if we have no wind generator yet (priming)
-      let targetAngleDeg = sock.currentAngle;
-      let targetDirection = sock.currentDirection;
+      // Hold the current pose if we have no wind generator yet (priming).
       let windHoriz_mph = 0;
 
       if (windGenerator)
       {
         const wind = sampleWindAtThreeJsPosition(windGenerator, anchor.x, anchor.y, anchor.z);
-        const windX_mph = wind.x; // cross
-        const windZ_mph = wind.z; // head/tail
-        windHoriz_mph = Math.hypot(windX_mph, windZ_mph);
 
-        const span = this.cfg.maxAngle - this.cfg.minAngle;
-        const frac = Math.pow(Math.min(windHoriz_mph / this.cfg.angleFlatSpeed, 1), this.cfg.angleResponseExp);
-        targetAngleDeg = this.cfg.minAngle + span * frac;
-
-        // -windZ because Three.js negative Z is downrange
-        targetDirection = windHoriz_mph > 1e-6 ? Math.atan2(-windZ_mph, windX_mph) : sock.currentDirection;
+        // Drive the lift angle + heading from the sampled wind (shared with flags)
+        const stepped = stepWindMarker(
+        {
+          windX_mph: wind.x, // cross
+          windZ_mph: wind.z, // head/tail
+          currentAngle: sock.currentAngle,
+          currentDirection: sock.currentDirection,
+          deltaTime,
+          minAngle: this.cfg.minAngle,
+          maxAngle: this.cfg.maxAngle,
+          flatSpeed: this.cfg.angleFlatSpeed,
+          responseExp: this.cfg.angleResponseExp,
+          angleSpeed: this.cfg.angleInterpolationSpeed,
+          directionSpeed: this.cfg.directionInterpolationSpeed
+        });
+        sock.currentAngle = stepped.angle;
+        sock.currentDirection = stepped.direction;
+        windHoriz_mph = stepped.windHoriz_mph;
       }
-
-      // Smooth toward target lift angle
-      const angleDiff = targetAngleDeg - sock.currentAngle;
-      const angleStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), this.cfg.angleInterpolationSpeed * deltaTime);
-      sock.currentAngle += angleStep;
-
-      // Smooth toward target direction (shortest way around the circle)
-      let dirDiff = targetDirection - sock.currentDirection;
-      while (dirDiff > Math.PI) dirDiff -= 2 * Math.PI;
-      while (dirDiff < -Math.PI) dirDiff += 2 * Math.PI;
-      const dirStep = Math.sign(dirDiff) * Math.min(Math.abs(dirDiff), this.cfg.directionInterpolationSpeed * deltaTime);
-      sock.currentDirection += dirStep;
 
       // Layer a small wind-scaled swing on top so it never looks rigid
       const swayFreq = this.cfg.swayFrequencyBase + windHoriz_mph * this.cfg.swayFrequencyScale;

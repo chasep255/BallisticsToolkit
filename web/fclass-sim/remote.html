@@ -79,6 +79,77 @@
     const $ = (id) => document.getElementById(id);
     const setConnStatus = (t) => { $('connectStatus').textContent = t; };
 
+    // ---- Match-end popups (pushed by the host; they're DOM overlays, not in
+    // the captured video, so the host sends them as state for us to re-render). ----
+    function clearRemoteNotifications()
+    {
+      document.querySelectorAll('.match-end-notification').forEach(n => n.remove());
+    }
+
+    function showRemoteNotification(notif)
+    {
+      if (!notif) return;
+      clearRemoteNotifications();
+
+      const isPair = notif.kind === 'pairResult';
+      const el = document.createElement('div');
+      el.className = 'match-end-notification';
+      el.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: ${isPair ? '#28a745' : '#ff9800'}; color: white;
+        padding: 20px 30px; border-radius: 8px; font-size: 18px; font-weight: bold;
+        text-align: center; z-index: 10001; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        border: 2px solid ${isPair ? '#1e7e34' : '#f57c00'};
+      `;
+      const btnStyle = `background: white; color: ${isPair ? '#1e7e34' : '#ff9800'}; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;`;
+
+      if (notif.kind === 'matchComplete')
+      {
+        el.innerHTML = `
+          <div style="margin-bottom: 12px;">⏱️ Match ${notif.matchIndex} Complete!</div>
+          <div style="font-size: 14px; margin-bottom: 16px;">${notif.recordShots} record shots fired<br>Ready for Match ${notif.matchIndex + 1}</div>
+          <button id="rpNextMatchBtn" style="${btnStyle}">Start Match ${notif.matchIndex + 1}</button>`;
+      }
+      else if (notif.kind === 'aggregateComplete')
+      {
+        el.innerHTML = `
+          <div style="margin-bottom: 12px;">🎯 Aggregate Complete!</div>
+          <div style="font-size: 14px; margin-bottom: 16px;">All ${notif.numMatches} matches finished<br>Check scorecard for final results</div>
+          <button id="rpViewScorecardBtn" style="${btnStyle}">View Scorecard</button>`;
+      }
+      else // pairResult
+      {
+        el.innerHTML = `
+          <div style="font-size: 24px; margin-bottom: 10px;">🏆 ${notif.winnerName} Wins!</div>
+          <div style="font-size: 14px; margin-bottom: 16px;">Check scorecard for the full breakdown</div>
+          <button id="rpViewScorecardBtn" style="${btnStyle}">View Scorecard</button>`;
+      }
+
+      document.body.appendChild(el);
+
+      // "Start Match" advances the match — host-authoritative, so relay it and
+      // clear locally (the host also pushes a dismiss once it advances).
+      const nextBtn = $('rpNextMatchBtn');
+      if (nextBtn)
+      {
+        nextBtn.addEventListener('click', () =>
+        {
+          if (link.isOpen) link.send({ type: 'advanceMatch' });
+          clearRemoteNotifications();
+        });
+      }
+      // "View Scorecard" is purely local — the viewer has its own pushed card.
+      const scBtn = $('rpViewScorecardBtn');
+      if (scBtn)
+      {
+        scBtn.addEventListener('click', () =>
+        {
+          scorecard.show();
+          clearRemoteNotifications();
+        });
+      }
+    }
+
     // ---- Inbound media + messages ----
     link.onStream = (stream) =>
     {
@@ -124,12 +195,12 @@
       }
       else if (msg.type === 'controls')
       {
-        // Show the viewer's Go For Record only on the viewer's own turn (p2)
-        // while it still has sighters to skip — so it shows that player's button
-        // and hides once pressed. (String fire has no active player id.)
+        // The host pushes this viewer's own player (p2) Go For Record
+        // availability, gated only by whether p2 still has sighters to skip —
+        // not by whose turn it is, so the player can decide while the other
+        // shoots. (String fire has no active player id.)
         const btn = $('rpGoForRecordBtn');
-        const show = msg.model && msg.model.goForRecord
-          && (msg.activePlayer === 'p2' || msg.activePlayer == null);
+        const show = !!(msg.model && msg.model.goForRecord);
         btn.style.display = show ? 'inline-block' : 'none';
         if (show && msg.model.goForRecordText) btn.textContent = msg.model.goForRecordText;
       }
@@ -140,6 +211,14 @@
       else if (msg.type === 'windHudState')
       {
         $('rpWindHudBtn').textContent = msg.visible ? 'Hide Wind HUD' : 'Show Wind HUD';
+      }
+      else if (msg.type === 'notification')
+      {
+        showRemoteNotification(msg.notif);
+      }
+      else if (msg.type === 'notificationDismiss')
+      {
+        clearRemoteNotifications();
       }
       else if (msg.type === 'bye')
       {

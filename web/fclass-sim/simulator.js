@@ -165,6 +165,7 @@ import
   RenderStats
 }
 from './core/RenderStats.js';
+import * as Range from './core/range-constants.js';
 
 const LOG_PREFIX_GAME = '[Game]';
 
@@ -521,9 +522,10 @@ function restartGame()
 {
   try
   {
-    // Remove any match end notifications
+    // Remove any match end notifications (locally and on a remote viewer)
     const notifications = document.querySelectorAll('.match-end-notification');
     notifications.forEach(notification => notification.remove());
+    if (remoteHost) remoteHost.pushNotificationDismiss();
 
     // Get current parameters
     const params = getGameParams();
@@ -658,16 +660,14 @@ class FClassSimulator
   // === RANGE & PHYSICAL DIMENSIONS ===
   static RANGE_TOTAL_WIDTH = 200;
   static RANGE_LANE_WIDTH = 50;
-  static POLE_HEIGHT = 12;
-  static POLE_THICKNESS = 0.15;
   static POLE_INTERVAL = 100;
   static PITS_HEIGHT = 3;
   static PITS_DEPTH = 1;
   static PITS_OFFSET = 5;
 
   // === TARGET ANIMATION ===
-  static TARGET_SIZE = 2; // yards - size of target frames
-  static TARGET_GAP_ABOVE_PITS = 0.2; // Gap between target bottom and pit top when raised
+  static TARGET_SIZE = Range.TARGET_SIZE; // yards - size of target frames
+  static TARGET_GAP_ABOVE_PITS = Range.TARGET_GAP_ABOVE_PITS; // Gap between target bottom and pit top when raised
   static TARGET_MAX_HEIGHT = 0; // No additional height when raised (baseHeight already has the gap)
   static TARGET_HALF_MAST = -(FClassSimulator.TARGET_SIZE + FClassSimulator.TARGET_GAP_ABOVE_PITS) / 2; // Halfway between raised and lowered
   static TARGET_MIN_HEIGHT = -(FClassSimulator.TARGET_SIZE + FClassSimulator.TARGET_GAP_ABOVE_PITS); // Fully lowered (target size + gap)
@@ -1430,8 +1430,9 @@ class FClassSimulator
     this.windFieldHUD.setVisible(false);
 
     // ===== SCOPES =====
-    // Spotting scope - wide FOV range for scanning
-    this.spottingScope = new Scope(
+    // Both scopes share the same render target / camera anchor / range; only
+    // their framing (FOV, size, reticle) differs.
+    const scopeBase =
     {
       scene: this.scene,
       compositionScene: this.compositionScene,
@@ -1445,53 +1446,40 @@ class FClassSimulator
         z: 1
       },
       rangeDistance: this.distance,
+      initialLookAt:
+      {
+        x: 0,
+        y: FClassSimulator.TARGET_CENTER_HEIGHT,
+        z: -this.distance
+      },
+      msaaSamples: this.graphicsConfig.msaaSamples,
+      renderStats: this.renderStats
+    };
+
+    // Spotting scope - wide FOV range for scanning
+    this.spottingScope = new Scope(
+    {
+      ...scopeBase,
       position: 'bottom-left',
       sizeFraction: FClassSimulator.SPOTTING_SCOPE_DIAMETER_FRACTION,
       minFOV: FClassSimulator.CAMERA_FOV / FClassSimulator.SPOTTING_SCOPE_MAX_MAGNIFICATION,
       maxFOV: FClassSimulator.CAMERA_FOV / FClassSimulator.SPOTTING_SCOPE_MIN_MAGNIFICATION,
       initialFOV: FClassSimulator.CAMERA_FOV / 4,
-      initialLookAt:
-      {
-        x: 0,
-        y: FClassSimulator.TARGET_CENTER_HEIGHT,
-        z: -this.distance
-      },
-      reticle: false,
-      msaaSamples: this.graphicsConfig.msaaSamples,
-      renderStats: this.renderStats
+      reticle: false
     });
 
     // Rifle scope - narrower FOV for precision aiming
     this.rifleScope = new Scope(
     {
-      scene: this.scene,
-      compositionScene: this.compositionScene,
-      renderer: this.renderer,
-      canvasWidth: this.canvasWidth,
-      canvasHeight: this.canvasHeight,
-      cameraPosition:
-      {
-        x: 0,
-        y: FClassSimulator.TARGET_CENTER_HEIGHT,
-        z: 1
-      },
-      rangeDistance: this.distance,
+      ...scopeBase,
       position: 'bottom-right',
       sizeFraction: FClassSimulator.RIFLE_SCOPE_DIAMETER_FRACTION,
       initialFOV: FClassSimulator.RIFLE_SCOPE_INITIAL_FOV_MOA / 60.0,
       minFOV: FClassSimulator.RIFLE_SCOPE_MIN_FOV / 60.0,
       maxFOV: FClassSimulator.RIFLE_SCOPE_MAX_FOV / 60.0,
-      initialLookAt:
-      {
-        x: 0,
-        y: FClassSimulator.TARGET_CENTER_HEIGHT,
-        z: -this.distance
-      },
       reticle: true,
       focalPlane: this.focalPlane, // SFP: reticle stays fixed size, FFP: reticle scales with zoom
-      maxDialMOA: FClassSimulator.RIFLE_SCOPE_MAX_DIAL_MOA, // Maximum dial adjustment
-      msaaSamples: this.graphicsConfig.msaaSamples,
-      renderStats: this.renderStats
+      maxDialMOA: FClassSimulator.RIFLE_SCOPE_MAX_DIAL_MOA // Maximum dial adjustment
     });
 
     // ===== INPUT =====
@@ -1882,6 +1870,25 @@ class FClassSimulator
   }
 
   /**
+   * Aggregate score summary, e.g. "150-7x". Shared by both HUD modes so the
+   * format lives in one place.
+   */
+  scoreValue(score, xCount)
+  {
+    return `${score}-${xCount}x`;
+  }
+
+  /**
+   * Last-shot summary from a driver lastShot model: an X-ring hit shows just
+   * "X" (not "10x"), otherwise the numeric score. "--" when there's no shot yet.
+   */
+  lastShotValue(lastShot)
+  {
+    if (!lastShot) return '--';
+    return lastShot.isX ? 'X' : `${lastShot.score}`;
+  }
+
+  /**
    * Single right-anchored panel for string fire mode. Match data comes from the
    * driver; target/last-shot diagnostics are owned by the simulator.
    */
@@ -1895,12 +1902,12 @@ class FClassSimulator
       { label: m.timerLabel, value: m.timerValue },
       { label: 'Target:', value: targetNumber },
       this.shotsRow(m.shots),
-      { label: 'Score:', value: `${m.score}-${m.xCount}x` }
+      { label: 'Score:', value: this.scoreValue(m.score, m.xCount) }
     ];
 
     if (m.lastShot)
     {
-      rows.push({ label: 'Last Shot:', value: `${m.lastShot.score}${m.lastShot.isX ? 'x' : ''}` });
+      rows.push({ label: 'Last Shot:', value: this.lastShotValue(m.lastShot) });
       rows.push({ label: 'MV:', value: `${Math.round(m.lastShot.mvFps)} fps` });
       rows.push({ label: 'Impact V:', value: `${Math.round(m.lastShot.impactVelocityFps)} fps` });
     }
@@ -1930,8 +1937,8 @@ class FClassSimulator
       rows: [
         { label: 'Time:', value: p.timerValue },
         this.shotsRow(p.shots),
-        { label: 'Score:', value: `${p.score}-${p.xCount}x` },
-        { label: 'Last:', value: p.lastShot ? `${p.lastShot.score}${p.lastShot.isX ? 'x' : ''}` : '--' }
+        { label: 'Score:', value: this.scoreValue(p.score, p.xCount) },
+        { label: 'Last:', value: this.lastShotValue(p.lastShot) }
       ]
     }));
   }
@@ -2029,6 +2036,10 @@ class FClassSimulator
    */
   showSegmentNotification(event)
   {
+    // Mirror the popup to a remote viewer — it's a DOM overlay, not in the
+    // captured canvas, so it won't otherwise appear in the video stream.
+    if (this.remoteHost) this.remoteHost.pushNotification(this.buildNotificationModel(event));
+
     if (this.mode === 'pair')
     {
       this.showPairResultNotification(event);
@@ -2037,6 +2048,35 @@ class FClassSimulator
     {
       this.showStringNotification(event);
     }
+  }
+
+  /**
+   * Serializable description of the current match-end popup for the remote
+   * viewer. `kind` is unambiguous: pair fire always announces a winner; string
+   * fire is either a match-complete (offer next match) or aggregate-complete.
+   */
+  buildNotificationModel(event)
+  {
+    return {
+      kind: this.mode === 'pair' ? 'pairResult' : event.type,
+      matchIndex: event.matchIndex,
+      numMatches: event.numMatches,
+      recordShots: event.recordShots,
+      winnerName: event.winnerName
+    };
+  }
+
+  /**
+   * Advance to the next match (string fire). Shared by the host's "Start Match"
+   * button and the remote viewer's button (relayed via RemoteHost.onAdvanceMatch).
+   */
+  advanceToNextMatch()
+  {
+    document.querySelectorAll('.match-end-notification').forEach(n => n.remove());
+    this.driver.advance(ResourceManager.time.getElapsedTime());
+    this.updateControls();
+    this.updateHUD();
+    if (this.remoteHost) this.remoteHost.pushNotificationDismiss();
   }
 
   /**
@@ -2099,13 +2139,7 @@ class FClassSimulator
 
     if (nextMatchBtn)
     {
-      nextMatchBtn.addEventListener('click', () =>
-      {
-        this.driver.advance(ResourceManager.time.getElapsedTime());
-        notification.remove();
-        this.updateControls();
-        this.updateHUD();
-      });
+      nextMatchBtn.addEventListener('click', () => this.advanceToNextMatch());
     }
 
     if (viewScorecardBtn)
@@ -2298,18 +2332,21 @@ class FClassSimulator
   }
 
   /**
-   * Apply a "Go For Record" request, honoring turn ownership in pair fire over
-   * Remote Play (host = p1, viewer = p2).
+   * Apply a "Go For Record" request. In pair fire over Remote Play (host = p1,
+   * viewer = p2) it targets the requesting player — who may end their sighters
+   * early even while the other player is shooting.
    * @param {'local'|'remote'} source
    */
   requestGoForRecord(source)
   {
     if (this.mode === 'pair' && this.remoteHost)
     {
-      const allowed = source === 'remote' ? 'p2' : 'p1';
-      if (this.driver.getActivePlayerId() !== allowed) return;
+      this.driver.goForRecord(source === 'remote' ? 'p2' : 'p1');
     }
-    this.driver.goForRecord();
+    else
+    {
+      this.driver.goForRecord();
+    }
     this.updateControls();
     this.updateHUD();
   }
@@ -2323,20 +2360,30 @@ class FClassSimulator
     const controls = this.driver.getControlsModel();
     const activePlayer = this.driver.getActivePlayerId ? this.driver.getActivePlayerId() : null;
 
-    // Each screen only shows its own player's Go For Record. With a remote viewer
-    // playing p2, the host's button applies only on p1's turn (the viewer shows
-    // p2's own). In local hotseat the one screen serves the active shooter.
-    const hostMayGoForRecord = !(this.mode === 'pair' && this.remoteHost) || activePlayer === 'p1';
+    // Each screen shows its own player's Go For Record. A player may go for
+    // record whenever they still have sighters to skip — even during the other
+    // player's turn — so the button is gated by that player's sighter state, not
+    // by whose turn it is. With a remote viewer playing p2, the host is p1.
+    const pairRemote = this.mode === 'pair' && !!this.remoteHost;
 
     const goBtn = document.getElementById('goForRecordBtn');
     if (goBtn)
     {
-      const show = controls.goForRecord && hostMayGoForRecord;
+      const show = pairRemote ? this.driver.canGoForRecord('p1') : controls.goForRecord;
+      const text = pairRemote ? this.driver.goForRecordTextFor('p1') : controls.goForRecordText;
       goBtn.style.display = show ? 'inline-block' : 'none';
-      if (show) goBtn.textContent = controls.goForRecordText;
+      if (show) goBtn.textContent = text;
     }
 
-    if (this.remoteHost) this.remoteHost.pushControls(controls, activePlayer);
+    // The viewer plays p2, so push p2's own availability (un-gated by turn)
+    // rather than the active player's.
+    if (this.remoteHost)
+    {
+      const viewerControls = pairRemote
+        ? { goForRecord: this.driver.canGoForRecord('p2'), goForRecordText: this.driver.goForRecordTextFor('p2') }
+        : controls;
+      this.remoteHost.pushControls(viewerControls, activePlayer);
+    }
   }
 
   // ===== Remote Play (host side) =====
@@ -2365,6 +2412,7 @@ class FClassSimulator
     host.onGoForRecord = () => this.requestGoForRecord('remote');
     host.onPause = () => this.togglePause();
     host.onWindHud = () => this.toggleWindHUD();
+    host.onAdvanceMatch = () => this.advanceToNextMatch();
 
     // Combine canvas video + game audio (gunshots, wind, scope clicks) into one
     // outbound stream. contentHint=detail keeps the reticle/target sharp.
