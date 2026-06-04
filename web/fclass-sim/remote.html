@@ -83,10 +83,11 @@
     link.onStream = (stream) =>
     {
       $('remoteVideo').srcObject = stream;
+      const CONN_LABEL = { lan: 'direct (LAN)', p2p: 'direct (P2P)', relay: 'via relay (TURN)', unknown: '…' };
       link.startStatsMonitor((s) =>
       {
         $('rpBandwidth').textContent =
-          `↓ ${(s.kbps / 1000).toFixed(1)} Mbps · ${s.relay ? 'via relay' : 'direct'}`;
+          `↓ ${(s.kbps / 1000).toFixed(1)} Mbps · ${CONN_LABEL[s.connType] || s.connType}`;
       });
     };
 

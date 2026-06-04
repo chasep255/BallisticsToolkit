@@ -109,7 +109,7 @@ export class PeerJSLink
 
   /**
    * Poll media bandwidth from the connection and report it.
-   * @param {(s: {kbps:number, totalBytes:number, relay:boolean}) => void} onUpdate
+   * @param {(s: {kbps:number, totalBytes:number, connType:'lan'|'p2p'|'relay'|'unknown'}) => void} onUpdate
    * @param {number} intervalMs
    */
   startStatsMonitor(onUpdate, intervalMs = 1000)
@@ -133,17 +133,23 @@ export class PeerJSLink
           else if (r.type === 'inbound-rtp') { bytes += r.bytesReceived || 0; ts = Math.max(ts, r.timestamp || 0); }
           else if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') pair = r;
         });
-        let relay = false;
+        // Classify the active path from the selected candidate pair: TURN relay
+        // if either end is 'relay'; LAN if both are 'host'; otherwise direct P2P
+        // (one side is a STUN-reflexive candidate).
+        let connType = 'unknown';
         if (pair && stats.get)
         {
-          const local = stats.get(pair.localCandidateId);
-          relay = !!(local && local.candidateType === 'relay');
+          const lt = (stats.get(pair.localCandidateId) || {}).candidateType;
+          const rt = (stats.get(pair.remoteCandidateId) || {}).candidateType;
+          if (lt === 'relay' || rt === 'relay') connType = 'relay';
+          else if (lt === 'host' && rt === 'host') connType = 'lan';
+          else if (lt) connType = 'p2p';
         }
         const dt = lastTs ? (ts - lastTs) / 1000 : 0;
         const kbps = dt > 0 ? Math.max(0, ((bytes - lastBytes) * 8 / 1000) / dt) : 0;
         lastBytes = bytes;
         lastTs = ts;
-        if (lastTs && dt > 0) onUpdate({ kbps, totalBytes: bytes, relay });
+        if (lastTs && dt > 0) onUpdate({ kbps, totalBytes: bytes, connType });
       }
       catch { /* getStats unsupported / connection gone */ }
     };

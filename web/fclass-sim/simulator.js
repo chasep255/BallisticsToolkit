@@ -331,11 +331,12 @@ function setupRemotePlayUI()
   const copyBtn = document.getElementById('remoteCopyOfferBtn');
 
   const setStatus = (text) => { if (statusEl) statusEl.textContent = text; };
+  const CONN_LABEL = { lan: 'direct (LAN)', p2p: 'direct (P2P)', relay: 'via relay (TURN)', unknown: '…' };
   const showBandwidth = (s, arrow) =>
   {
     const mbps = (s.kbps / 1000).toFixed(1);
     const total = s.totalBytes >= 1e6 ? `${(s.totalBytes / 1e6).toFixed(0)} MB` : `${(s.totalBytes / 1e3).toFixed(0)} KB`;
-    return `${arrow} ${mbps} Mbps · ${total} · ${s.relay ? 'via relay (TURN)' : 'direct'}`;
+    return `${arrow} ${mbps} Mbps · ${total} · ${CONN_LABEL[s.connType] || s.connType}`;
   };
 
   // remote.html?room=<id> — one link the host sends; the client opens it and
