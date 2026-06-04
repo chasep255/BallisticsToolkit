@@ -20,9 +20,13 @@ export class FlagRenderer
   static FLAG_SEGMENTS = 10; // Number of segments for flag geometry
   static FLAG_MIN_ANGLE = 1; // degrees from vertical
   static FLAG_MAX_ANGLE = 90; // degrees from vertical
-  // Nonlinear response: angle = MIN + (MAX-MIN) * (1 - exp(-K * v_h^2)), with v_h in mph
-  // Choose K so ~90° at ~15 mph (≈99% of span) → K ≈ 0.0205
-  static FLAG_ANGLE_RESPONSE_K = 0.0205;
+  // Concave response tuned for reading LIGHT winds (high-power "angle ÷ 4" lore):
+  //   frac = clamp(v_h / FLAT_SPEED, 0, 1) ^ EXP,  angle = MIN + (MAX-MIN) * frac
+  // EXP < 1 makes the curve steep at the bottom and flatten toward horizontal, so
+  // the lightest winds move the flag the most (the opposite of a v^2 toe). Reaches
+  // horizontal at FLAT_SPEED. See ssusa.org high-power wind-reading guide.
+  static FLAG_ANGLE_FLAT_SPEED = 20; // mph at which the flag reads horizontal
+  static FLAG_ANGLE_RESPONSE_EXP = 0.7; // <1 = concave (low-end sensitive)
   static FLAG_ANGLE_INTERPOLATION_SPEED = 30; // degrees per second
   static FLAG_DIRECTION_INTERPOLATION_SPEED = 1.0; // radians per second
   static FLAG_FLAP_FREQUENCY_BASE = 0.5; // Hz at 10 mph
@@ -54,7 +58,8 @@ export class FlagRenderer
       flagSegments: config.flagSegments ?? FlagRenderer.FLAG_SEGMENTS,
       flagMinAngle: config.flagMinAngle ?? FlagRenderer.FLAG_MIN_ANGLE,
       flagMaxAngle: config.flagMaxAngle ?? FlagRenderer.FLAG_MAX_ANGLE,
-      flagAngleResponseK: config.flagAngleResponseK ?? FlagRenderer.FLAG_ANGLE_RESPONSE_K,
+      flagAngleFlatSpeed: config.flagAngleFlatSpeed ?? FlagRenderer.FLAG_ANGLE_FLAT_SPEED,
+      flagAngleResponseExp: config.flagAngleResponseExp ?? FlagRenderer.FLAG_ANGLE_RESPONSE_EXP,
       flagAngleInterpolationSpeed: config.flagAngleInterpolationSpeed ?? FlagRenderer.FLAG_ANGLE_INTERPOLATION_SPEED,
       flagDirectionInterpolationSpeed: config.flagDirectionInterpolationSpeed ?? FlagRenderer.FLAG_DIRECTION_INTERPOLATION_SPEED,
       flagFlapFrequencyBase: config.flagFlapFrequencyBase ?? FlagRenderer.FLAG_FLAP_FREQUENCY_BASE,
@@ -530,9 +535,11 @@ export class FlagRenderer
       const windZ_mph = wind.z; // head/tail
       const windHoriz_mph = Math.hypot(windX_mph, windZ_mph);
 
-      // Nonlinear angle response: angle = min + span * (1 - exp(-K * v_h^2))
+      // Concave angle response: angle = min + span * clamp(v_h / flatSpeed, 0, 1)^exp
+      // (steep at low wind, flattening to horizontal at flatSpeed)
       const span = this.cfg.flagMaxAngle - this.cfg.flagMinAngle;
-      const targetAngleDeg = this.cfg.flagMinAngle + span * (1 - Math.exp(-this.cfg.flagAngleResponseK * windHoriz_mph * windHoriz_mph));
+      const frac = Math.pow(Math.min(windHoriz_mph / this.cfg.flagAngleFlatSpeed, 1), this.cfg.flagAngleResponseExp);
+      const targetAngleDeg = this.cfg.flagMinAngle + span * frac;
 
       // Wind direction in ground plane (-windZ because Three.js negative Z = downrange)
       const targetDirection = windHoriz_mph > 1e-6 ? Math.atan2(-windZ_mph, windX_mph) : flag.currentDirection;

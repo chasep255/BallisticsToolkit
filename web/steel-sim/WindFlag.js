@@ -53,7 +53,8 @@ export class WindFlag
     // Physics parameters (now used in shader)
     this.flagMinAngle = config.flagMinAngle ?? Config.WIND_FLAG_CONFIG.flagMinAngle;
     this.flagMaxAngle = config.flagMaxAngle ?? Config.WIND_FLAG_CONFIG.flagMaxAngle;
-    this.flagAngleResponseK = config.flagAngleResponseK ?? Config.WIND_FLAG_CONFIG.flagAngleResponseK;
+    this.flagAngleFlatSpeed = config.flagAngleFlatSpeed ?? Config.WIND_FLAG_CONFIG.flagAngleFlatSpeed;
+    this.flagAngleResponseExp = config.flagAngleResponseExp ?? Config.WIND_FLAG_CONFIG.flagAngleResponseExp;
     this.flagFlapFrequencyBase = config.flagFlapFrequencyBase ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyBase;
     this.flagFlapFrequencyScale = config.flagFlapFrequencyScale ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyScale;
     this.flagFlapAmplitude = config.flagFlapAmplitude ?? Config.WIND_FLAG_CONFIG.flagFlapAmplitude;
@@ -268,9 +269,13 @@ export class WindFlag
       {
         value: this.flagMaxAngle
       },
-      uAngleResponseK:
+      uAngleFlatSpeed:
       {
-        value: this.flagAngleResponseK
+        value: this.flagAngleFlatSpeed
+      },
+      uAngleResponseExp:
+      {
+        value: this.flagAngleResponseExp
       },
       uFlapAmplitude:
       {
@@ -290,7 +295,8 @@ export class WindFlag
       shader.uniforms.uFlagLength = this.uniforms.uFlagLength;
       shader.uniforms.uMinAngle = this.uniforms.uMinAngle;
       shader.uniforms.uMaxAngle = this.uniforms.uMaxAngle;
-      shader.uniforms.uAngleResponseK = this.uniforms.uAngleResponseK;
+      shader.uniforms.uAngleFlatSpeed = this.uniforms.uAngleFlatSpeed;
+      shader.uniforms.uAngleResponseExp = this.uniforms.uAngleResponseExp;
       shader.uniforms.uFlapAmplitude = this.uniforms.uFlapAmplitude;
       shader.uniforms.uWaveLength = this.uniforms.uWaveLength;
 
@@ -307,7 +313,8 @@ export class WindFlag
         uniform float uFlagLength;
         uniform float uMinAngle;
         uniform float uMaxAngle;
-        uniform float uAngleResponseK;
+        uniform float uAngleFlatSpeed;
+        uniform float uAngleResponseExp;
         uniform float uFlapAmplitude;
         uniform float uWaveLength;
         `
@@ -328,9 +335,9 @@ export class WindFlag
         // Wind direction (atan2 of horizontal components)
         float windDir = windSpeed > 0.001 ? atan(windZ, windX) : 0.0;
         
-        // Nonlinear angle response: angle = min + span * (1 - exp(-k * v^2))
+        // Concave angle response: angle = min + span * clamp(v/flatSpeed,0,1)^exp
         float angleSpan = uMaxAngle - uMinAngle;
-        float angleDeg = uMinAngle + angleSpan * (1.0 - exp(-uAngleResponseK * windSpeedMph * windSpeedMph));
+        float angleDeg = uMinAngle + angleSpan * pow(clamp(windSpeedMph / uAngleFlatSpeed, 0.0, 1.0), uAngleResponseExp);
         float angleRad = angleDeg * 0.01745329; // deg to rad
         
         // Local space: X = along flag, Y = width, Z = thickness
@@ -384,7 +391,7 @@ export class WindFlag
         float nWindDir = nWindSpeed > 0.001 ? atan(nWindZ, nWindX) : 0.0;
         
         float nAngleSpan = uMaxAngle - uMinAngle;
-        float nAngleDeg = uMinAngle + nAngleSpan * (1.0 - exp(-uAngleResponseK * nWindSpeedMph * nWindSpeedMph));
+        float nAngleDeg = uMinAngle + nAngleSpan * pow(clamp(nWindSpeedMph / uAngleFlatSpeed, 0.0, 1.0), uAngleResponseExp);
         float nAngleRad = nAngleDeg * 0.01745329;
         
         float nCosDir = cos(nWindDir);
@@ -589,7 +596,8 @@ export class WindFlagFactory
       flagSegments: config.flagSegments ?? Config.WIND_FLAG_CONFIG.flagSegments,
       flagMinAngle: config.flagMinAngle ?? Config.WIND_FLAG_CONFIG.flagMinAngle,
       flagMaxAngle: config.flagMaxAngle ?? Config.WIND_FLAG_CONFIG.flagMaxAngle,
-      flagAngleResponseK: config.flagAngleResponseK ?? Config.WIND_FLAG_CONFIG.flagAngleResponseK,
+      flagAngleFlatSpeed: config.flagAngleFlatSpeed ?? Config.WIND_FLAG_CONFIG.flagAngleFlatSpeed,
+      flagAngleResponseExp: config.flagAngleResponseExp ?? Config.WIND_FLAG_CONFIG.flagAngleResponseExp,
       flagFlapFrequencyBase: config.flagFlapFrequencyBase ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyBase,
       flagFlapFrequencyScale: config.flagFlapFrequencyScale ?? Config.WIND_FLAG_CONFIG.flagFlapFrequencyScale,
       flagFlapAmplitude: config.flagFlapAmplitude ?? Config.WIND_FLAG_CONFIG.flagFlapAmplitude,
@@ -844,8 +852,11 @@ export class WindFlagFactory
       shader.uniforms.uMaxAngle = {
         value: cfg.flagMaxAngle
       };
-      shader.uniforms.uAngleResponseK = {
-        value: cfg.flagAngleResponseK
+      shader.uniforms.uAngleFlatSpeed = {
+        value: cfg.flagAngleFlatSpeed
+      };
+      shader.uniforms.uAngleResponseExp = {
+        value: cfg.flagAngleResponseExp
       };
       shader.uniforms.uFlapAmplitude = {
         value: cfg.flagFlapAmplitude
@@ -873,7 +884,8 @@ export class WindFlagFactory
         uniform float uFlagLength;
         uniform float uMinAngle;
         uniform float uMaxAngle;
-        uniform float uAngleResponseK;
+        uniform float uAngleFlatSpeed;
+        uniform float uAngleResponseExp;
         uniform float uFlapAmplitude;
         uniform float uWaveLength;
         uniform float uFurlBase;   // steady roll root->tip (radians)
@@ -890,7 +902,7 @@ export class WindFlagFactory
           float windDir = windSpeed > 0.001 ? atan(windZ, windX) : 0.0;
 
           float angleSpan = uMaxAngle - uMinAngle;
-          float angleDeg = uMinAngle + angleSpan * (1.0 - exp(-uAngleResponseK * windSpeedMph * windSpeedMph));
+          float angleDeg = uMinAngle + angleSpan * pow(clamp(windSpeedMph / uAngleFlatSpeed, 0.0, 1.0), uAngleResponseExp);
           float angleRad = angleDeg * 0.01745329;
 
           float cosDir = cos(windDir);

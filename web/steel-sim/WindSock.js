@@ -74,7 +74,8 @@ export class WindSockFactory
       lengthSegments: config.lengthSegments ?? c.lengthSegments,
       minAngle: config.sockMinAngle ?? c.sockMinAngle,
       maxAngle: config.sockMaxAngle ?? c.sockMaxAngle,
-      angleResponseK: config.sockAngleResponseK ?? c.sockAngleResponseK,
+      angleFlatSpeed: config.sockAngleFlatSpeed ?? c.sockAngleFlatSpeed,
+      angleResponseExp: config.sockAngleResponseExp ?? c.sockAngleResponseExp,
       angleInterpolationSpeed: config.sockAngleInterpolationSpeed ?? c.sockAngleInterpolationSpeed,
       directionInterpolationSpeed: config.sockDirectionInterpolationSpeed ?? c.sockDirectionInterpolationSpeed,
       swayFrequencyBase: config.swayFrequencyBase ?? c.swayFrequencyBase,
@@ -281,7 +282,8 @@ export class WindSockFactory
         windHoriz_mph = Math.hypot(windX, windZ) * 2.237; // m/s -> mph
 
         const span = cfg.maxAngle - cfg.minAngle;
-        targetAngleDeg = cfg.minAngle + span * (1 - Math.exp(-cfg.angleResponseK * windHoriz_mph * windHoriz_mph));
+        const frac = Math.pow(Math.min(windHoriz_mph / cfg.angleFlatSpeed, 1), cfg.angleResponseExp);
+        targetAngleDeg = cfg.minAngle + span * frac;
 
         // -windZ because Three.js negative Z is downrange (BTK convention)
         targetDirection = windHoriz_mph > 1e-6 ? Math.atan2(-windZ, windX) : sock.currentDirection;

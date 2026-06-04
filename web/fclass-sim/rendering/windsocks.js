@@ -29,11 +29,13 @@ export class WindSockRenderer
   static SOCK_TAIL_RADIUS = 0.32; // narrow trailing end
   static STRING_LENGTH = 0.6; // gap between pole-top swivel and the mouth
 
-  // Same nonlinear lift response as the flags so both react identically to wind.
-  // angle = MIN + (MAX-MIN) * (1 - exp(-K * v_h^2)), v_h in mph, ~90° by ~15 mph.
+  // Same concave lift response as the flags so both react identically to wind:
+  //   frac = clamp(v_h / FLAT_SPEED, 0, 1) ^ EXP,  angle = MIN + (MAX-MIN) * frac
+  // EXP < 1 makes light winds move the sock the most; horizontal at FLAT_SPEED.
   static SOCK_MIN_ANGLE = 2; // degrees from vertical (slight droop when calm)
   static SOCK_MAX_ANGLE = 90; // degrees from vertical (horizontal in strong wind)
-  static SOCK_ANGLE_RESPONSE_K = 0.0205;
+  static SOCK_ANGLE_FLAT_SPEED = 20; // mph at which the sock reads horizontal
+  static SOCK_ANGLE_RESPONSE_EXP = 0.7; // <1 = concave (low-end sensitive)
   static SOCK_ANGLE_INTERPOLATION_SPEED = 30; // degrees per second
   static SOCK_DIRECTION_INTERPOLATION_SPEED = 1.0; // radians per second
 
@@ -64,7 +66,8 @@ export class WindSockRenderer
       lengthSegments: Math.max(4, Math.round(flagSegments / 2.5)),
       minAngle: config.minAngle ?? WindSockRenderer.SOCK_MIN_ANGLE,
       maxAngle: config.maxAngle ?? WindSockRenderer.SOCK_MAX_ANGLE,
-      angleResponseK: config.angleResponseK ?? WindSockRenderer.SOCK_ANGLE_RESPONSE_K,
+      angleFlatSpeed: config.angleFlatSpeed ?? WindSockRenderer.SOCK_ANGLE_FLAT_SPEED,
+      angleResponseExp: config.angleResponseExp ?? WindSockRenderer.SOCK_ANGLE_RESPONSE_EXP,
       angleInterpolationSpeed: config.angleInterpolationSpeed ?? WindSockRenderer.SOCK_ANGLE_INTERPOLATION_SPEED,
       directionInterpolationSpeed: config.directionInterpolationSpeed ?? WindSockRenderer.SOCK_DIRECTION_INTERPOLATION_SPEED,
       swayFrequencyBase: config.swayFrequencyBase ?? WindSockRenderer.SOCK_SWAY_FREQUENCY_BASE,
@@ -321,7 +324,8 @@ export class WindSockRenderer
         windHoriz_mph = Math.hypot(windX_mph, windZ_mph);
 
         const span = this.cfg.maxAngle - this.cfg.minAngle;
-        targetAngleDeg = this.cfg.minAngle + span * (1 - Math.exp(-this.cfg.angleResponseK * windHoriz_mph * windHoriz_mph));
+        const frac = Math.pow(Math.min(windHoriz_mph / this.cfg.angleFlatSpeed, 1), this.cfg.angleResponseExp);
+        targetAngleDeg = this.cfg.minAngle + span * frac;
 
         // -windZ because Three.js negative Z is downrange
         targetDirection = windHoriz_mph > 1e-6 ? Math.atan2(-windZ_mph, windX_mph) : sock.currentDirection;

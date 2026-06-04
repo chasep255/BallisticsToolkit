@@ -202,7 +202,10 @@ export function initConfig()
     flagSegments: 32,
     flagMinAngle: 1.0, // degrees
     flagMaxAngle: 90.0, // degrees
-    flagAngleResponseK: 0.0205,
+    // Concave response (low-end sensitive): frac = clamp(v/flatSpeed,0,1)^exp.
+    // exp < 1 makes light winds move the flag most; horizontal at flatSpeed mph.
+    flagAngleFlatSpeed: 20.0, // mph at which the flag reads horizontal
+    flagAngleResponseExp: 0.7, // <1 = concave
     flagAngleInterpolationSpeed: 30.0, // deg/s
     flagDirectionInterpolationSpeed: 1.0, // rad/s
     flagFlapFrequencyBase: 0.5, // Hz
@@ -230,7 +233,8 @@ export function initConfig()
     lengthSegments: 8,
     sockMinAngle: 2.0, // degrees from vertical (slight droop when calm)
     sockMaxAngle: 90.0, // degrees from vertical (horizontal in strong wind)
-    sockAngleResponseK: 0.0205,
+    sockAngleFlatSpeed: 20.0, // mph at which the sock reads horizontal
+    sockAngleResponseExp: 0.7, // <1 = concave (low-end sensitive)
     sockAngleInterpolationSpeed: 30.0, // deg/s
     sockDirectionInterpolationSpeed: 1.0, // rad/s
     swayFrequencyBase: 0.4, // Hz at 0 mph
