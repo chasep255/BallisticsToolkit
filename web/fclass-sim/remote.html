@@ -44,6 +44,7 @@
         <button id="rpWindHudBtn" class="btn btn-secondary">Show Wind HUD</button>
         <button id="rpSoundBtn" class="btn btn-secondary">🔊 Enable sound</button>
       </div>
+      <div id="rpBandwidth" class="rp-hint"></div>
       <div class="canvas-wrap">
         <div style="position: relative;">
           <video id="remoteVideo" autoplay playsinline muted></video>
@@ -79,7 +80,15 @@
     const setConnStatus = (t) => { $('connectStatus').textContent = t; };
 
     // ---- Inbound media + messages ----
-    link.onStream = (stream) => { $('remoteVideo').srcObject = stream; };
+    link.onStream = (stream) =>
+    {
+      $('remoteVideo').srcObject = stream;
+      link.startStatsMonitor((s) =>
+      {
+        $('rpBandwidth').textContent =
+          `↓ ${(s.kbps / 1000).toFixed(1)} Mbps · ${s.relay ? 'via relay' : 'direct'}`;
+      });
+    };
 
     link.onOpen = () =>
     {

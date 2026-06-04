@@ -327,9 +327,16 @@ function setupRemotePlayUI()
   const panel = document.getElementById('remotePlayPanel');
   const linkEl = document.getElementById('remoteInviteLink');
   const statusEl = document.getElementById('remoteStatus');
+  const bwEl = document.getElementById('remoteBandwidth');
   const copyBtn = document.getElementById('remoteCopyOfferBtn');
 
   const setStatus = (text) => { if (statusEl) statusEl.textContent = text; };
+  const showBandwidth = (s, arrow) =>
+  {
+    const mbps = (s.kbps / 1000).toFixed(1);
+    const total = s.totalBytes >= 1e6 ? `${(s.totalBytes / 1e6).toFixed(0)} MB` : `${(s.totalBytes / 1e3).toFixed(0)} KB`;
+    return `${arrow} ${mbps} Mbps · ${total} · ${s.relay ? 'via relay (TURN)' : 'direct'}`;
+  };
 
   // remote.html?room=<id> — one link the host sends; the client opens it and
   // connects automatically via the PeerJS broker. The same link reconnects.
@@ -361,6 +368,7 @@ function setupRemotePlayUI()
       {
         setStatus('✓ Player connected.');
         if (webglGame) { webglGame.pushScorecardNow(); webglGame.pushControlsNow(); webglGame.pushWindHudNow(); }
+        remoteHost.link.startStatsMonitor((s) => { if (bwEl) bwEl.textContent = showBandwidth(s, '↑'); });
       };
       remoteHost.onClose = () =>
         setStatus('Player disconnected — they can reopen the same link to rejoin. Your match keeps running.');

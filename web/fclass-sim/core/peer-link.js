@@ -22,10 +22,16 @@
 import * as PeerJS from 'https://esm.sh/peerjs@1.5.4';
 const Peer = PeerJS.Peer || PeerJS.default;
 
-// STUN only (same as before). Add TURN here later for mobile/VPN support.
+// STUN for direct connections, plus a free no-account TURN relay (Open Relay) as
+// a FALLBACK. ICE always prefers a direct path and only relays through TURN when
+// a direct connection is impossible (e.g. cellular/VPN). The TURN relay is
+// best-effort and counts against its shared bandwidth, so it's a backstop only.
 const DEFAULT_ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' }
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
 ];
 
 export class PeerJSLink
@@ -37,6 +43,7 @@ export class PeerJSLink
     this.mediaCall = null;  // outbound (host) / inbound (client) media connection
     this.iceServers = options.iceServers || DEFAULT_ICE_SERVERS;
     this._open = false;
+    this._statsTimer = null;
 
     // User-assignable callbacks.
     this.onOpen = null;
@@ -100,8 +107,52 @@ export class PeerJSLink
     if (this.conn && this._open) this.conn.send(value);
   }
 
+  /**
+   * Poll media bandwidth from the connection and report it.
+   * @param {(s: {kbps:number, totalBytes:number, relay:boolean}) => void} onUpdate
+   * @param {number} intervalMs
+   */
+  startStatsMonitor(onUpdate, intervalMs = 1000)
+  {
+    if (this._statsTimer) clearInterval(this._statsTimer); // no duplicate timers
+    let lastBytes = 0;
+    let lastTs = 0;
+    const poll = async () =>
+    {
+      try
+      {
+        const pc = this.mediaCall && this.mediaCall.peerConnection;
+        if (!pc || !pc.getStats) return;
+        const stats = await pc.getStats();
+        let bytes = 0;
+        let ts = 0;
+        let pair = null;
+        stats.forEach((r) =>
+        {
+          if (r.type === 'outbound-rtp') { bytes += r.bytesSent || 0; ts = Math.max(ts, r.timestamp || 0); }
+          else if (r.type === 'inbound-rtp') { bytes += r.bytesReceived || 0; ts = Math.max(ts, r.timestamp || 0); }
+          else if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') pair = r;
+        });
+        let relay = false;
+        if (pair && stats.get)
+        {
+          const local = stats.get(pair.localCandidateId);
+          relay = !!(local && local.candidateType === 'relay');
+        }
+        const dt = lastTs ? (ts - lastTs) / 1000 : 0;
+        const kbps = dt > 0 ? Math.max(0, ((bytes - lastBytes) * 8 / 1000) / dt) : 0;
+        lastBytes = bytes;
+        lastTs = ts;
+        if (lastTs && dt > 0) onUpdate({ kbps, totalBytes: bytes, relay });
+      }
+      catch { /* getStats unsupported / connection gone */ }
+    };
+    this._statsTimer = setInterval(poll, intervalMs);
+  }
+
   close()
   {
+    if (this._statsTimer) { clearInterval(this._statsTimer); this._statsTimer = null; }
     try { if (this.mediaCall) this.mediaCall.close(); } catch { /* ignore */ }
     try { if (this.conn) this.conn.close(); } catch { /* ignore */ }
     try { if (this.peer) this.peer.destroy(); } catch { /* ignore */ }
