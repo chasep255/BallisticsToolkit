@@ -331,8 +331,8 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(0.5_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);          // steady base
-      w.addComponent(0.25_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f);  // gusty component with gate
+      w.addComponent(0.5_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
+      w.addComponent(0.25_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f);
 
       return w;
     };
@@ -341,8 +341,8 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(1.5_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);          // steady base
-      w.addComponent(1.0_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f);   // gusty component with gate
+      w.addComponent(1.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
+      w.addComponent(1.0_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f);
 
       return w;
     };
@@ -351,9 +351,8 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);          // steady base
-      w.addComponent(1.5_mph, 2000.0_yd, 2000.0_yd, 5.0_min, 0.5f);             // local variations
-      w.addComponent(5.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.5f, 1.2f);   // gusts
+      w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
+      w.addComponent(3.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.75f, 1.0f);
       return w;
     };
 
@@ -361,9 +360,8 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(7.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);          // steady base
-      w.addComponent(10.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.5f, 1.2f);  // gusty component with gate
-
+      w.addComponent(6.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
+      w.addComponent(6.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.75f, 1.0f);
       return w;
     };
 
@@ -371,9 +369,47 @@ namespace btk::physics
     {
       WindGenerator w;
       w.setAdvectionGain(5.0);
-      w.addComponent(12.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);         // steady base
-      w.addComponent(15.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.5f, 1.2f);  // gusty component with gate
+      w.addComponent(10.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
+      w.addComponent(10.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.75f, 1.0f);
 
+      return w;
+    };
+
+    presets_["Switchy"] = []()
+    {
+      WindGenerator w;
+      w.setAdvectionGain(5.0);
+      w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 2.5_min, 0.5f);
+      return w;
+    };
+
+    presets_["Turbulent"] = []()
+    {
+      WindGenerator w;
+      w.setAdvectionGain(5.0);
+      w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 5.0_min, 1.0f);
+      w.addComponent(3.0_mph, 300.0_yd, 300.0_yd, 1.0_min, 1.0f);
+      w.addComponent(2.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
+
+      return w;
+    };
+
+    presets_["Shear"] = []()
+    {
+      WindGenerator w;
+      w.setAdvectionGain(5.0);
+      w.addComponent(4.0_mph, 1000.0_yd, 1000.0_yd, 10.0_min, 0.75);
+      return w;
+    };
+
+
+    presets_["Gusty"] = []()
+    {
+      WindGenerator w;
+      w.setAdvectionGain(5.0);
+      w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 5.0_min, 0.5f, 1.0f);
+      w.addComponent(3.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 1.0f, 1.0f);
+      w.addComponent(3.0_mph, 500.0_yd, 500.0_yd, 0.5_min, 1.0f, 1.0f);
       return w;
     };
   }
