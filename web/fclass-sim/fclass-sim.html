@@ -189,13 +189,13 @@
             Stream the running sim to someone on another computer who can play it &mdash; useful for letting a friend take a turn, or playing pair fire across the internet. Your PC does all the rendering; they see a live video and their keystrokes control your sim (with slight input lag).<br><br>
             <strong>To host:</strong><br>
             - Check <strong>Host Remote Play</strong> in the config bar <em>before</em> starting (so the match clock doesn't run during setup)<br>
-            - Copy the <em>invite link</em> it generates and send it to the other player<br>
-            - They open the link &mdash; it connects automatically and they start playing. Press <strong>Start Game</strong> when ready.<br><br>
-            No copy/paste codes &mdash; the link is all they need. (Connections are brokered by the free PeerJS service; the audio/video itself is peer-to-peer.) The viewer can open the Scorecard on their end.<br><br>
-            <strong>Reconnecting:</strong> if the player drops, your match keeps running &mdash; they just reopen the same link to rejoin.<br><br>
+            - Copy the <em>invite link</em> and send it to the other player (any way you like)<br>
+            - They open that link in a browser; when it connects, they can play. Press <strong>Start Game</strong> when you're both ready<br>
+            - The viewer can open the <strong>Scorecard</strong> on their end. Signaling goes through the free PeerJS broker; video, audio, and controls are peer-to-peer once connected<br><br>
+            <strong>Will it connect?</strong> Sometimes &mdash; there is no guarantee. Remote Play uses WebRTC with <strong>STUN only</strong> (no <strong>TURN relay</strong>). That means we only try a direct path between your machines. It often works on ordinary home Wi‑Fi, but success depends on both networks cooperating: strict NAT, corporate firewalls, <strong>VPNs</strong>, and <strong>cellular/mobile data</strong> frequently block or break the link, and we have nothing to fall back on. If it fails or drops, both players should try home Wi‑Fi with VPN off; if it still won't connect, Remote Play may simply not work on those networks.<br><br>
+            <strong>Reconnecting:</strong> if the player drops, your match keeps running &mdash; they reopen the same invite link to try again.<br><br>
             <strong>Pair Fire:</strong> the host plays Player 1 (left) and the viewer plays Player 2 (right). Controls are active only for whoever's turn it is, and the viewer gets their own <em>Go For Record</em> button on their turn.<br><br>
-            <strong>Audio &amp; quality:</strong> game audio (gunshots, wind, scope clicks) streams too &mdash; the viewer clicks <em>Enable sound</em> to hear it (browsers block autoplay audio until then). Video sharpness depends on the host's render resolution (window size + graphics preset) and the connection bandwidth.<br><br>
-            <strong>Connection limits:</strong> the audio/video is direct peer-to-peer, which works best when both players are on ordinary home/office networks. It may fail to connect over <strong>cellular/mobile data</strong> or through a <strong>VPN</strong>, because those networks block the direct connection WebRTC needs. If it won't connect, have the other player turn off their VPN or switch from cellular to Wi-Fi.
+            <strong>Audio &amp; quality:</strong> game audio (gunshots, wind, scope clicks) streams too &mdash; the viewer clicks <em>Enable sound</em> to hear it (browsers block autoplay audio until then). Video sharpness depends on the host's render resolution (window size + graphics preset) and the connection bandwidth.
           </div>
         </div>
 
