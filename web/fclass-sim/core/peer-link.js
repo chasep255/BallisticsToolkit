@@ -22,16 +22,23 @@
 import * as PeerJS from 'https://esm.sh/peerjs@1.5.4';
 const Peer = PeerJS.Peer || PeerJS.default;
 
-// STUN for direct connections, plus a free no-account TURN relay (Open Relay) as
-// a FALLBACK. ICE always prefers a direct path and only relays through TURN when
-// a direct connection is impossible (e.g. cellular/VPN). The TURN relay is
-// best-effort and counts against its shared bandwidth, so it's a backstop only.
+// STUN only. STUN lets each peer discover its public address so ICE can negotiate
+// a DIRECT peer-to-peer path — it works whenever at least one side's NAT is
+// cooperative (the common case). It cannot relay: if a peer sits behind a
+// symmetric NAT or a firewall that blocks direct connections, the link fails and
+// there is no fallback. A TURN relay would cover that case, but free anonymous
+// TURN no longer exists — every provider (Metered Open Relay, ExpressTURN,
+// Cloudflare) now requires a signed-up account + credentials. We deliberately
+// don't ship the old `openrelay.metered.ca` anonymous endpoint: Metered retired
+// it, so it only produces "ICE failed, your TURN server appears to be broken"
+// errors and slows ICE discovery without ever relaying. To add a relay fallback,
+// drop a TURN entry here with real credentials (see core/peer-link README notes).
+// Kept under five servers — more than that slows ICE candidate gathering.
 const DEFAULT_ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' }
 ];
 
 export class PeerJSLink
