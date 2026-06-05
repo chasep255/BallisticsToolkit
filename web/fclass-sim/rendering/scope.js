@@ -95,8 +95,13 @@ export class Scope
       this.createScopeDialDisplay();
     }
 
+    // Mirage strength multiplier (0 = disabled). When disabled, render() skips
+    // the mirage pass entirely and draws the scene straight to the final target.
+    this.mirageIntensity = config.mirageIntensity ?? 1.0;
+    this.mirageEnabled = this.mirageIntensity > 0;
+
     // Create mirage effect and intermediate render target
-    this.mirageEffect = new MirageEffect(this.renderer);
+    this.mirageEffect = new MirageEffect(this.renderer, this.mirageIntensity);
     this.mirageTarget = new THREE.WebGLRenderTarget(renderSize, renderSize,
     {
       minFilter: THREE.LinearFilter,
@@ -828,27 +833,14 @@ export class Scope
   {
     this.updateCamera();
 
-    // Step 1: Render scene to intermediate mirage target
-    this.renderer.setRenderTarget(this.mirageTarget);
-    this.renderer.clear();
-    if (this.renderStats)
-    {
-      const scopeName = this.reticle ? 'rifle' : 'spotting';
-      this.renderStats.render(this.renderer, this.scene, this.camera, `Scope.${scopeName}`);
-    }
-    else
-    {
-      this.renderer.render(this.scene, this.camera);
-    }
-
-    // Step 2: Apply mirage effect from mirageTarget to final renderTarget
+    // Compute current wind data for the HUD whenever a wind field exists,
+    // independent of whether the mirage effect is drawn.
+    let intersection = null;
     if (windGenerator)
     {
-      // Calculate where scope's center ray intersects the range bounding box
-      // Range box: X from -rangeWidth/2 to +rangeWidth/2, Y from 0 to maxHeight, Z from 0 to -rangeDistance
-      const intersection = this.calculateRangeIntersection();
-
-      // Store current wind data for display
+      // Where the scope's center ray meets the range box (used for wind sample
+      // and mirage anchoring).
+      intersection = this.calculateRangeIntersection();
       const wind = sampleWindAtThreeJsPosition(windGenerator, intersection.x, intersection.y, intersection.z);
       const windSpeed = Math.sqrt(wind.x * wind.x + wind.z * wind.z);
       const windAngle = Math.atan2(wind.x, -wind.z) * 180 / Math.PI;
@@ -857,21 +849,47 @@ export class Scope
         angle: windAngle,
         distance: intersection.distance
       };
+    }
+    else
+    {
+      this.currentWind = null;
+    }
 
-      this.mirageEffect.update(
-        this.currentFOV,
-        windGenerator,
-        intersection
-      );
+    const scopeName = this.reticle ? 'rifle' : 'spotting';
+    const useMirage = this.mirageEnabled && windGenerator;
+
+    if (useMirage)
+    {
+      // Step 1: render scene to the intermediate mirage target.
+      this.renderer.setRenderTarget(this.mirageTarget);
+      this.renderer.clear();
+      if (this.renderStats)
+      {
+        this.renderStats.render(this.renderer, this.scene, this.camera, `Scope.${scopeName}`);
+      }
+      else
+      {
+        this.renderer.render(this.scene, this.camera);
+      }
+
+      // Step 2: apply mirage from the intermediate target to the final target.
+      this.mirageEffect.update(this.currentFOV, windGenerator, intersection);
       this.mirageEffect.apply(this.mirageTarget.texture, this.renderTarget);
     }
     else
     {
-      // Fallback: copy without mirage effect
+      // Mirage off (preset "None") or no wind field: render the scene straight
+      // to the final target, skipping the mirage pass entirely.
       this.renderer.setRenderTarget(this.renderTarget);
       this.renderer.clear();
-      this.renderer.render(this.scene, this.camera);
-      this.currentWind = null;
+      if (this.renderStats)
+      {
+        this.renderStats.render(this.renderer, this.scene, this.camera, `Scope.${scopeName}`);
+      }
+      else
+      {
+        this.renderer.render(this.scene, this.camera);
+      }
     }
 
     this.renderer.setRenderTarget(null);
@@ -923,6 +941,20 @@ export class Scope
     this.currentFOV = state.currentFOV;
     this.updateCamera();
     this.updateScopeDialDisplay();
+  }
+
+  /**
+   * Set mirage strength (0 = disabled, skips the pass; >0 = strength multiplier).
+   * Takes effect on the next render — supports live changes from the UI.
+   */
+  setMirageIntensity(scale)
+  {
+    this.mirageIntensity = scale;
+    this.mirageEnabled = scale > 0;
+    if (this.mirageEffect)
+    {
+      this.mirageEffect.setIntensityScale(scale);
+    }
   }
 
   /**

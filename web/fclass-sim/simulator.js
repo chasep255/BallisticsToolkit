@@ -39,6 +39,7 @@ const DEFAULT_PARAMS = {
   turnTime: 'unlimited',
   fclassMode: 'fclass-1000',
   windPreset: 'Moderate',
+  mirageLevel: 'Medium',
   focalPlane: 'SFP',
   mvSd: '7.0',
   rifleAccuracy: '0.25',
@@ -458,6 +459,16 @@ function setupUI()
     matchModeEl.addEventListener('change', updateModeVisibility);
   }
 
+  // Mirage strength selector takes effect live (no restart needed)
+  const mirageLevelEl = document.getElementById('mirageLevel');
+  if (mirageLevelEl)
+  {
+    mirageLevelEl.addEventListener('change', () =>
+    {
+      if (webglGame) webglGame.setMirageLevel(mirageLevelEl.value);
+    });
+  }
+
   // Wind HUD toggle button
   document.getElementById('windHUDBtn').addEventListener('click', () =>
   {
@@ -585,6 +596,7 @@ function getGameParams()
     windPreset: document.getElementById('windPreset').value,
     graphicsPreset: document.getElementById('graphicsPreset').value,
     windMarker: document.getElementById('windMarker').value,
+    mirageLevel: document.getElementById('mirageLevel').value,
     focalPlane: document.getElementById('focalPlane').value,
     fclassMode: fclassMode,
     // Match format
@@ -697,6 +709,14 @@ class FClassSimulator
   static CAMERA_FOV = 30;
   static CAMERA_EYE_HEIGHT = 0.1;
 
+  // Mirage strength presets → MirageEffect intensity multiplier (0 = off/skip pass)
+  static MIRAGE_LEVEL_SCALE = {
+    None: 0,
+    Light: 0.5,
+    Medium: 1.25,
+    Heavy: 2.5
+  };
+
   // === UI & DISPLAY ===
   static MIN_SCREEN_WIDTH = 800;
   static WARNING_COLOR = '#ff9800';
@@ -736,6 +756,8 @@ class FClassSimulator
     this.graphicsPreset = params.graphicsPreset || 'Medium';
     this.graphicsConfig = GraphicsPresets.getPreset(this.graphicsPreset);
     this.windMarker = params.windMarker || 'flags';
+    this.mirageLevel = params.mirageLevel || 'Medium';
+    this.mirageIntensity = FClassSimulator.MIRAGE_LEVEL_SCALE[this.mirageLevel] ?? 1.0;
     this.focalPlane = params.focalPlane || 'SFP';
 
     // Bullet parameters
@@ -1456,7 +1478,8 @@ class FClassSimulator
         z: -this.distance
       },
       msaaSamples: this.graphicsConfig.msaaSamples,
-      renderStats: this.renderStats
+      renderStats: this.renderStats,
+      mirageIntensity: this.mirageIntensity
     };
 
     // Spotting scope - wide FOV range for scanning
@@ -1610,6 +1633,15 @@ class FClassSimulator
   pushWindHudNow()
   {
     if (this.remoteHost) this.remoteHost.pushWindHud(!!this.windFieldHUDVisible);
+  }
+
+  /** Set mirage strength preset (None/Light/Medium/Heavy) live on both scopes. */
+  setMirageLevel(level)
+  {
+    this.mirageLevel = level;
+    this.mirageIntensity = FClassSimulator.MIRAGE_LEVEL_SCALE[level] ?? 1.0;
+    if (this.spottingScope) this.spottingScope.setMirageIntensity(this.mirageIntensity);
+    if (this.rifleScope) this.rifleScope.setMirageIntensity(this.mirageIntensity);
   }
 
   pause()
