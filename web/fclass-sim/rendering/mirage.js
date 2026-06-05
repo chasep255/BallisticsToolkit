@@ -34,9 +34,9 @@ export class MirageEffect
 {
   // Constants
   static BASE_FOV = 30; // Reference FOV for 1x zoom (matches main camera FOV)
-  static BASE_INTENSITY = 0.015; // Per-layer mirage intensity at 1x zoom (pre-normalization)
+  static BASE_INTENSITY = 0.025; // Per-layer mirage intensity at 1x zoom (pre-normalization)
   static MPH_TO_YARDS_PER_SEC = 0.4888889; // 1 mph = 0.4888889 yd/s
-  static HEAT_RISE_SPEED = 2.0; // Heat rise speed in yards/second
+  static HEAT_RISE_SPEED = 1.0; // Heat rise speed in yards/second
   static WIND_SMOOTHING_ALPHA = 0.01; // EMA smoothing factor for per-layer wind [0..1]
 
   // Per-layer attenuation: layer fades to 0 by this horizontal wind speed (mph)
@@ -61,14 +61,14 @@ export class MirageEffect
   // Spatial frequency (1/yards) of heat-column features inside a single layer.
   // ~1 yd features at 1.0 is in the ballpark of real near-ground convective
   // plumes once you sum across layers.
-  static NOISE_FREQ = 1.0;
+  static NOISE_FREQ = 1.5;
 
   // The summed per-layer distortion drives two separate visual effects.
   // They share the same underlying noise field but have independent scales
   // so they can be tuned independently:
   //   - Spatial: how far the UV is warped (the visible "warble" of the image)
   //   - Shading: how strongly the chromatic edge tint is applied
-  static SPATIAL_DISTORTION_SCALE = 0.005; // UV displacement scale
+  static SPATIAL_DISTORTION_SCALE = 0.003; // UV displacement scale
   static SHADING_INTENSITY_SCALE = 2.0;    // tint strength scale
 
   constructor(renderer)

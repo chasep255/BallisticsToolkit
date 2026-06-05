@@ -234,7 +234,9 @@
             - Light wind: vertical boil<br>
             - Moderate wind: leaning shimmer<br>
             - Strong wind: mostly horizontal flow<br>
-            - Mirage samples wind over final 25% of distance to aim point<br><br>
+            - Modeled as five independent layers of air along the line of sight (20/40/60/80/100% of the way to the target). Each layer reads its own local wind and runs at its own speed<br>
+            - Near-shooter columns appear large and soft; target-end columns appear small and crisp &mdash; same depth-of-field feel as a real spotting scope focused at the target<br>
+            - Head wind doesn't drag mirage around (heat columns sliding along your line of sight don't shift their apparent position), but cross and vertical wind do<br><br>
 
             <strong>Wind HUD (Optional):</strong><br>
             - Toggle on/off with button during match<br>
@@ -341,7 +343,7 @@
             - 2D curl-noise field with multiple octaves and advection<br>
             - RMS-normalized for consistent magnitude across presets<br>
             - Flags, mirage, and wind HUD sample same unified field<br>
-            - Mirage emphasizes wind in final 25% of distance to aim point<br><br>
+            - Mirage is rendered as five independent depth slabs (20/40/60/80/100% of the line of sight); each slab samples wind locally and drifts independently<br><br>
 
             <strong>Debug Mode:</strong><br>
             - Add <code>?debug=1</code> to URL for rapid testing mode<br>
