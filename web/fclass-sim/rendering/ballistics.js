@@ -425,6 +425,20 @@ export class BallisticsEngine
     return this.lastTrajectory;
   }
 
+  /**
+   * Toggle the bullet trace (glow sprite) live. Enabling takes effect on the
+   * next shot (the sprite is created lazily in startBulletAnimation); disabling
+   * hides any current sprite immediately.
+   */
+  setShowBulletTrace(enabled)
+  {
+    this.showBulletTrace = enabled === true;
+    if (!this.showBulletTrace && this.bulletGlowSprite)
+    {
+      this.bulletGlowSprite.visible = false;
+    }
+  }
+
   // ===== BULLET ANIMATION =====
 
   createBulletGlowTexture()

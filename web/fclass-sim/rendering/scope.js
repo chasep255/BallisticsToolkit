@@ -56,6 +56,17 @@ export class Scope
     this.zeroOffsetYaw = 0; // Horizontal dial (L/R)
     this.zeroOffsetPitch = 0; // Vertical dial (U/D)
 
+    // Recoil effect state. Recoil kicks the aim (yaw/pitch) on fire and settles
+    // to a residual offset the shooter must correct — same model as Steel Sim.
+    this.recoilPreset = config.recoilPreset || 'None';
+    this.recoilT = Infinity; // time since trigger (Infinity = inactive)
+    this.recoilAppliedYaw = 0;   // recoil offset currently applied this shot (rad)
+    this.recoilAppliedPitch = 0;
+    this.recoilBoostYaw = 0;     // initial kick offset (rad)
+    this.recoilBoostPitch = 0;
+    this.recoilSettleYaw = 0;    // residual offset after settle (rad)
+    this.recoilSettlePitch = 0;
+
     // Render statistics tracking (optional)
     this.renderStats = config.renderStats || null;
 
@@ -568,6 +579,134 @@ export class Scope
     this.pitch -= radians;
   }
 
+  // ===== RECOIL =====
+  // On fire, the aim rises by boostDeg over RISE_TIME, then eases back to a
+  // residual settleDeg the shooter must dial/hold out. The rise (rather than an
+  // instant snap) means the shot reads first and the muzzle climbs after it,
+  // like a real rifle. Applied to the aim (yaw/pitch), not the reticle, and only
+  // after the shot is fired so its ballistics are unaffected.
+  static RECOIL_RISE_TIME_S = 0.07;   // shot → peak kick
+  static RECOIL_SETTLE_TIME_S = 0.22; // peak → residual
+  static RECOIL_PRESETS = {
+    None: null,
+    Light: { boostDeg: 0.025, settleDeg: 0.005 },
+    Medium: { boostDeg: 0.05, settleDeg: 0.012 },
+    Heavy: { boostDeg: 0.09, settleDeg: 0.022 }
+  };
+
+  /**
+   * Set recoil preset ('None' | 'Light' | 'Medium' | 'Heavy'). Live-safe.
+   */
+  setRecoilPreset(preset)
+  {
+    if (!Object.prototype.hasOwnProperty.call(Scope.RECOIL_PRESETS, preset))
+    {
+      preset = 'None';
+    }
+    this.recoilPreset = preset;
+    this.finishRecoil(); // settle any active transition immediately
+  }
+
+  /**
+   * Trigger recoil — call right after firing so the shot's ballistics use the
+   * pre-kick aim. Kicks the aim in a random cone around "up". The kick rises
+   * from zero (see applyRecoilTransition) rather than snapping.
+   */
+  triggerRecoil()
+  {
+    const preset = Scope.RECOIL_PRESETS[this.recoilPreset];
+    if (!preset) return; // None / disabled
+
+    this.finishRecoil();
+
+    // Direction: within a 15° cone around straight up.
+    const thetaRad = (Math.random() * 15.0) * (Math.PI / 180);
+    const phiRad = Math.random() * Math.PI * 2.0;
+    const yawDir = Math.sin(thetaRad) * Math.cos(phiRad);
+    const pitchDir = Math.cos(thetaRad); // always upward
+
+    const boostRad = preset.boostDeg * (Math.PI / 180);
+    const settleRad = preset.settleDeg * (Math.PI / 180);
+
+    this.recoilBoostYaw = yawDir * boostRad;
+    this.recoilBoostPitch = pitchDir * boostRad;
+    this.recoilSettleYaw = yawDir * settleRad;
+    this.recoilSettlePitch = pitchDir * settleRad;
+
+    // Start from zero offset and rise — no instant kick.
+    this.recoilAppliedYaw = 0;
+    this.recoilAppliedPitch = 0;
+    this.recoilT = 0.0;
+  }
+
+  /**
+   * Advance the recoil rise→settle transition. Call once per frame with dt (s).
+   */
+  applyRecoilTransition(dt)
+  {
+    if (this.recoilT === Infinity) return;
+
+    this.recoilT += dt;
+
+    const riseTime = Scope.RECOIL_RISE_TIME_S;
+    let desiredYaw, desiredPitch;
+
+    if (this.recoilT < riseTime)
+    {
+      // Rise phase: 0 → boost
+      const frac = this.recoilT / riseTime;
+      const eased = 0.5 - 0.5 * Math.cos(Math.PI * frac);
+      desiredYaw = this.recoilBoostYaw * eased;
+      desiredPitch = this.recoilBoostPitch * eased;
+    }
+    else
+    {
+      // Settle phase: boost → residual
+      const frac = Math.min(1, (this.recoilT - riseTime) / Scope.RECOIL_SETTLE_TIME_S);
+      const eased = 0.5 - 0.5 * Math.cos(Math.PI * frac);
+      desiredYaw = this.recoilBoostYaw + (this.recoilSettleYaw - this.recoilBoostYaw) * eased;
+      desiredPitch = this.recoilBoostPitch + (this.recoilSettlePitch - this.recoilBoostPitch) * eased;
+      if (frac >= 1)
+      {
+        this.finishRecoil();
+        return;
+      }
+    }
+
+    this.yaw += desiredYaw - this.recoilAppliedYaw;
+    this.pitch += desiredPitch - this.recoilAppliedPitch;
+    this.recoilAppliedYaw = desiredYaw;
+    this.recoilAppliedPitch = desiredPitch;
+  }
+
+  /**
+   * Snap the current transition to its settle point and go inactive, leaving the
+   * residual offset baked into yaw/pitch.
+   */
+  finishRecoil()
+  {
+    if (this.recoilT === Infinity) return;
+    this.yaw += this.recoilSettleYaw - this.recoilAppliedYaw;
+    this.pitch += this.recoilSettlePitch - this.recoilAppliedPitch;
+    this.clearRecoil();
+  }
+
+  /**
+   * Drop any active recoil transition without touching yaw/pitch. Use when the
+   * aim is being set absolutely (reset, pair-fire state swap) so a lingering
+   * transition can't corrupt the new aim on the next frame.
+   */
+  clearRecoil()
+  {
+    this.recoilT = Infinity;
+    this.recoilAppliedYaw = 0;
+    this.recoilAppliedPitch = 0;
+    this.recoilBoostYaw = 0;
+    this.recoilBoostPitch = 0;
+    this.recoilSettleYaw = 0;
+    this.recoilSettlePitch = 0;
+  }
+
   /**
    * Zoom in (divide FOV by factor)
    */
@@ -669,6 +808,7 @@ export class Scope
    */
   resetScope()
   {
+    this.clearRecoil();
     this.zeroOffsetYaw = 0;
     this.zeroOffsetPitch = 0;
     this.yaw = 0;
@@ -934,6 +1074,7 @@ export class Scope
    */
   setScopeState(state)
   {
+    this.clearRecoil();
     this.yaw = state.yaw;
     this.pitch = state.pitch;
     this.zeroOffsetYaw = state.zeroOffsetYaw;

@@ -78,6 +78,7 @@
       <div class="param-item"><label for="windMarker" title="Downrange wind indicators">Wind Markers</label><select id="windMarker" title="Downrange wind indicators"><option value="socks">Socks</option><option value="flags" selected>Flags</option></select></div>
       <div class="param-item"><label for="mirageLevel" title="Heat-shimmer intensity in the scopes. None skips the effect entirely (small performance gain).">Mirage</label><select id="mirageLevel" title="Heat-shimmer intensity in the scopes. None skips the effect entirely (small performance gain)."><option value="None">None</option><option value="Light">Light</option><option value="Medium" selected>Medium</option><option value="Heavy">Heavy</option></select></div>
       <div class="param-item"><label for="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom">Reticle</label><select id="focalPlane" title="Reticle focal plane: SFP stays fixed size, FFP scales with zoom"><option value="SFP" selected>SFP (Fixed)</option><option value="FFP">FFP (Scaling)</option></select></div>
+      <div class="param-item"><label for="recoilPreset" title="Recoil effect intensity - aim kicks and settles on firing; you correct the residual">Recoil</label><select id="recoilPreset" title="Recoil effect intensity - aim kicks and settles on firing; you correct the residual"><option value="None">None</option><option value="Light" selected>Light</option><option value="Medium">Medium</option><option value="Heavy">Heavy</option></select></div>
       <div class="param-item"><label for="mvSd" title="Muzzle velocity variation in fps - typical values: 5-15 fps">MV σ (fps)</label><input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50" title="Muzzle velocity variation in fps - typical values: 5-15 fps"></div>
       <div class="param-item"><label for="rifleAccuracy" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)">Accuracy (MOA)</label><input type="number" id="rifleAccuracy" value="0.25" step="0.05" min="0" max="5" title="Rifle accuracy in MOA (1 MOA ≈ 1 inch at 100 yards)"></div>
       <div class="param-item"><label for="bc" title="Ballistic Coefficient (0.001-1.0)">BC</label><input type="number" id="bc" value="0.311" step="0.001" min="0.001" max="1.0" title="Ballistic Coefficient (0.001-1.0)"></div>
@@ -169,7 +170,9 @@
             - FFP: reticle scales with zoom, hash marks scale proportionally<br><br>
 
             <strong>Firing:</strong><br>
-            - <kbd>Space</kbd> Fire shot (disabled while target is down)
+            - <kbd>Space</kbd> Fire shot (disabled while target is down)<br>
+            - With the <strong>Recoil</strong> parameter set, each shot kicks the aim up and settles to a small residual you must correct (hold or re-aim) before the next shot &mdash; set it to None to disable<br>
+            - The <strong>Recoil</strong>, <strong>Show Bullet Trace</strong>, and <strong>Mirage</strong> parameters all take effect immediately, no restart needed
           </div>
         </div>
         

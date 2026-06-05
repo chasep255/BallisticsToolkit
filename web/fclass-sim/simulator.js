@@ -51,7 +51,8 @@ const DEFAULT_PARAMS = {
   length: '1.4',
   twist: '8.0',
   enableSpinEffects: true,
-  showBulletTrace: true
+  showBulletTrace: true,
+  recoilPreset: 'Light'
 };
 
 /**
@@ -469,6 +470,26 @@ function setupUI()
     });
   }
 
+  // Recoil preset takes effect live (no restart needed)
+  const recoilPresetEl = document.getElementById('recoilPreset');
+  if (recoilPresetEl)
+  {
+    recoilPresetEl.addEventListener('change', () =>
+    {
+      if (webglGame) webglGame.setRecoilPreset(recoilPresetEl.value);
+    });
+  }
+
+  // Bullet trace toggle takes effect live (no restart needed)
+  const showBulletTraceEl = document.getElementById('showBulletTrace');
+  if (showBulletTraceEl)
+  {
+    showBulletTraceEl.addEventListener('change', () =>
+    {
+      if (webglGame) webglGame.setShowBulletTrace(showBulletTraceEl.checked);
+    });
+  }
+
   // Wind HUD toggle button
   document.getElementById('windHUDBtn').addEventListener('click', () =>
   {
@@ -618,7 +639,8 @@ function getGameParams()
     twist: document.getElementById('enableSpinEffects').checked ? parseFloat(document.getElementById('twist').value) : 0.0,
     mvSd: parseFloat(document.getElementById('mvSd').value),
     rifleAccuracy: parseFloat(document.getElementById('rifleAccuracy').value),
-    showBulletTrace: document.getElementById('showBulletTrace').checked
+    showBulletTrace: document.getElementById('showBulletTrace').checked,
+    recoilPreset: document.getElementById('recoilPreset').value
   };
 }
 
@@ -771,6 +793,7 @@ class FClassSimulator
     this.mvSd = params.mvSd;
     this.rifleAccuracy = params.rifleAccuracy;
     this.showBulletTrace = params.showBulletTrace !== false;
+    this.recoilPreset = params.recoilPreset || 'None';
 
     // Check for debug mode from URL parameter
     const urlParams = new URLSearchParams(window.location.search);
@@ -1505,7 +1528,8 @@ class FClassSimulator
       maxFOV: FClassSimulator.RIFLE_SCOPE_MAX_FOV / 60.0,
       reticle: true,
       focalPlane: this.focalPlane, // SFP: reticle stays fixed size, FFP: reticle scales with zoom
-      maxDialMOA: FClassSimulator.RIFLE_SCOPE_MAX_DIAL_MOA // Maximum dial adjustment
+      maxDialMOA: FClassSimulator.RIFLE_SCOPE_MAX_DIAL_MOA, // Maximum dial adjustment
+      recoilPreset: this.recoilPreset // recoil kicks the rifle aim on fire
     });
 
     // ===== INPUT =====
@@ -1644,6 +1668,20 @@ class FClassSimulator
     if (this.rifleScope) this.rifleScope.setMirageIntensity(this.mirageIntensity);
   }
 
+  /** Set recoil preset (None/Light/Medium/Heavy) live on the rifle scope. */
+  setRecoilPreset(preset)
+  {
+    this.recoilPreset = preset;
+    if (this.rifleScope) this.rifleScope.setRecoilPreset(preset);
+  }
+
+  /** Toggle the bullet trace live on the ballistics engine. */
+  setShowBulletTrace(enabled)
+  {
+    this.showBulletTrace = enabled;
+    if (this.ballistics) this.ballistics.setShowBulletTrace(enabled);
+  }
+
   pause()
   {
     if (!this.isRunning || this.isPaused) return;
@@ -1748,6 +1786,9 @@ class FClassSimulator
   updateRifleScopeCamera()
   {
     if (!this.rifleScope) return;
+
+    // Advance any in-progress recoil settle (no-op when idle / paused).
+    this.rifleScope.applyRecoilTransition(ResourceManager.time.getDeltaTime());
 
     // Check if target system and user target exist
     if (!this.targets || !this.targets.userTarget)
@@ -2279,6 +2320,10 @@ class FClassSimulator
 
     // Start bullet animation
     this.ballistics.startBulletAnimation();
+
+    // Kick the aim — triggered after the shot so its ballistics use the
+    // pre-recoil aim; the shooter corrects the residual settle afterward.
+    this.rifleScope.triggerRecoil();
   }
 
   /**
