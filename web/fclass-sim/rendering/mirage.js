@@ -1,6 +1,19 @@
 /**
- * MirageEffect - Heat mirage/shimmer effect for realistic scope views
- * Applies distortion based on wind speed, direction, and zoom level
+ * MirageEffect - Layered heat-mirage shimmer for scope views.
+ *
+ * The atmosphere along the line of sight is modeled as N independent slabs
+ * (LAYER_FRACS), each with its own:
+ *   - wind sample, EMA-smoothed
+ *   - accumulated wind drift (cross, vertical + heat-rise)
+ *   - simplex noise field (uncorrelated across layers via their world-space depth)
+ *   - attenuation derived from the layer's local horizontal wind speed
+ *
+ * Each layer's world scale is `layer_distance * tan(fov/2) * 2`, so a
+ * fixed-physical-size noise feature appears 1/t larger in the viewport at
+ * shallower layers. The near layer (20%) reads as big soft blobs and the
+ * far layer (100%) reads as crisp small features without any explicit blur:
+ * simplex noise is C^2 continuous, and the multi-scale stacking of layers
+ * gives the depth-of-field appearance for free.
  *
  * This file incorporates GLSL Simplex noise code derived from work by
  * Stefan Gustavson and Ashima Arts, distributed under the MIT License.
@@ -21,17 +34,47 @@ export class MirageEffect
 {
   // Constants
   static BASE_FOV = 30; // Reference FOV for 1x zoom (matches main camera FOV)
-  static BASE_INTENSITY = 0.03; // Base mirage intensity at 1x zoom
-  static MPH_TO_YARDS_PER_SEC = 0.4888889; // Conversion factor: 1 mph = 0.4888889 yd/s
+  static BASE_INTENSITY = 0.015; // Per-layer mirage intensity at 1x zoom (pre-normalization)
+  static MPH_TO_YARDS_PER_SEC = 0.4888889; // 1 mph = 0.4888889 yd/s
   static HEAT_RISE_SPEED = 2.0; // Heat rise speed in yards/second
-  static WIND_SMOOTHING_ALPHA = 0.01; // EMA smoothing factor for wind [0..1]
-  static WIND_SAMPLE_COUNT = 6; // Number of wind samples along line of sight
-  static WIND_SAMPLE_START = 0.75; // Start sampling at 75% of distance
-  static WIND_SAMPLE_STEP = 0.05; // Step size between samples (5%)
+  static WIND_SMOOTHING_ALPHA = 0.01; // EMA smoothing factor for per-layer wind [0..1]
+
+  // Per-layer attenuation: layer fades to 0 by this horizontal wind speed (mph)
+  static WIND_FADE_SPEED_MPH = 15.0;
+
+  // Slabs of atmosphere sampled along the line of sight (fractions of the
+  // intersection distance). Each entry becomes one independent noise layer.
+  static LAYER_FRACS = [0.20, 0.40, 0.60, 0.80, 1.00];
+
+  // Debug: per-layer enable mask. Set to [1,1,1,1,1] for normal operation;
+  // zero out specific entries to isolate a single layer's contribution.
+  // Per-layer normalization is recomputed from the active count so the
+  // remaining layer(s) display at their natural single-layer magnitude.
+  static DEBUG_LAYER_MASK = [1.0, 1.0, 1.0, 1.0, 1.0];
+
+  // Each slab samples wind at multiple positions and averages them before
+  // EMA-smoothing, giving each layer a smoother, less point-y wind reading.
+  // Offsets are in fractions of intersection distance, added to the layer's
+  // center fraction (clamped to [0, 1] to stay inside the wind field).
+  static LAYER_SAMPLE_OFFSETS = [-0.10, 0.0, +0.10];
+
+  // Spatial frequency (1/yards) of heat-column features inside a single layer.
+  // ~1 yd features at 1.0 is in the ballpark of real near-ground convective
+  // plumes once you sum across layers.
+  static NOISE_FREQ = 1.0;
+
+  // The summed per-layer distortion drives two separate visual effects.
+  // They share the same underlying noise field but have independent scales
+  // so they can be tuned independently:
+  //   - Spatial: how far the UV is warped (the visible "warble" of the image)
+  //   - Shading: how strongly the chromatic edge tint is applied
+  static SPATIAL_DISTORTION_SCALE = 0.005; // UV displacement scale
+  static SHADING_INTENSITY_SCALE = 2.0;    // tint strength scale
 
   constructor(renderer)
   {
     this.renderer = renderer;
+    this.numLayers = MirageEffect.LAYER_FRACS.length;
 
     // Create orthographic camera for full-screen quad rendering
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -47,13 +90,24 @@ export class MirageEffect
     this.quad = new THREE.Mesh(geometry, this.material);
     this.scene.add(this.quad);
 
-    // Accumulated advection (integrated wind over time) in yards: (cross, vertical, head)
-    this.accumulatedDriftVec = new THREE.Vector3(0, 0, 0);
-    this.smoothedWind = new THREE.Vector3(0, 0, 0); // (cross, vertical, head) in mph
+    // Per-layer EMA-smoothed wind (cross, vertical, head) in mph.
+    // Head is tracked solely to compute per-layer attenuation.
+    this.smoothedWind = [];
+    // Per-layer accumulated drift (cross, vertical) in yards. Head wind does
+    // not advect the noise — it would only slide heat columns along the line
+    // of sight, which doesn't change their apparent position.
+    this.accumulatedDrift = [];
+    for (let i = 0; i < this.numLayers; i++)
+    {
+      this.smoothedWind.push(new THREE.Vector3(0, 0, 0));
+      this.accumulatedDrift.push(new THREE.Vector2(0, 0));
+    }
   }
 
   createMaterial()
   {
+    const NUM_LAYERS = this.numLayers;
+
     // Simplex noise function for GLSL
     const simplexNoise = `
       // Simplex 3D noise
@@ -130,7 +184,7 @@ export class MirageEffect
 
     const vertexShader = `
       varying vec2 vUv;
-      
+
       void main() {
         vUv = uv;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -138,90 +192,66 @@ export class MirageEffect
     `;
 
     const fragmentShader = `
+      #define NUM_LAYERS ${NUM_LAYERS}
+
       uniform sampler2D tDiffuse;
-      uniform float intensity;
-      uniform vec3 windAdvection; // Accumulated 3D wind advection (cross, vertical, head) in yards
-      uniform float windSpeedTotal; // Total wind speed in mph (for attenuation)
-      uniform vec3 worldOffset;  // World-space 3D offset for anchoring mirage (x, y, z)
-      uniform float worldScale;  // Scale factor for world coordinates
-      
+      uniform float noiseFreq;
+      uniform float spatialScale;                // UV displacement multiplier
+      uniform float shadingScale;                // chromatic tint multiplier
+      uniform vec3 layerOffsets[NUM_LAYERS];     // world-space anchor (yards) per layer
+      uniform float layerScales[NUM_LAYERS];     // viewport world width (yards) per layer
+      uniform vec2 layerDrifts[NUM_LAYERS];      // accumulated wind drift (cross, vertical) yards
+      uniform float layerIntensities[NUM_LAYERS]; // per-layer noise weight (zoom * fade / sqrt(N))
+
       varying vec2 vUv;
-      
+
       ${simplexNoise}
-      
+
       void main() {
         vec2 uv = vUv;
-        
-        // Early exit if intensity is very low
-        if (intensity < 0.001) {
-          gl_FragColor = texture2D(tDiffuse, uv);
-          return;
+
+        float totalDistortion = 0.0;
+
+        // One noise sample per layer. Layers are decorrelated because each
+        // layer's world-space anchor (especially the z coordinate) is many
+        // yards from the others — far beyond simplex's correlation length.
+        for (int i = 0; i < NUM_LAYERS; i++) {
+          vec3 worldPos = vec3(
+            ((uv.x - 0.5) * layerScales[i] + layerOffsets[i].x - layerDrifts[i].x) * noiseFreq,
+            ((uv.y - 0.5) * layerScales[i] + layerOffsets[i].y - layerDrifts[i].y) * noiseFreq,
+             layerOffsets[i].z                                                       * noiseFreq
+          );
+
+          float n = snoise(worldPos);
+          totalDistortion += n * layerIntensities[i];
         }
-        
-        // Convert UV to 3D world-space coordinates (anchored to landscape)
-        // UV maps to X (horizontal) and Y (vertical) in view space
-        // Z (downrange) comes from worldOffset.z
-        vec3 worldPos = vec3(
-          (uv.x - 0.5) * worldScale + worldOffset.x,
-          (uv.y - 0.5) * worldScale + worldOffset.y,
-          worldOffset.z
-        );
-        
-        // Create multiple octaves of 3D noise for realistic heat shimmer
-        // Apply full 3D wind advection (includes heat rise baked into Y component)
-        // Layer 1: Large slow waves (scale 0.5)
-        float noise1 = snoise(vec3(
-          worldPos.x * 0.5 - windAdvection.x * 0.5 * 0.8,
-          worldPos.y * 0.5 - windAdvection.y * 0.5 * 0.8,
-          worldPos.z * 0.5 - windAdvection.z * 0.5 * 0.8
-        ));
-        
-        // Layer 2: Medium waves (scale 1.0)
-        float noise2 = snoise(vec3(
-          worldPos.x * 1.0 - windAdvection.x * 1.0 * 0.9,
-          worldPos.y * 1.0 - windAdvection.y * 1.0 * 0.9,
-          worldPos.z * 1.0 - windAdvection.z * 1.0 * 0.9
-        ));
-        
-        // Layer 3: Small fast waves (scale 2.0)
-        float noise3 = snoise(vec3(
-          worldPos.x * 2.0 - windAdvection.x * 2.0 * 1.0,
-          worldPos.y * 2.0 - windAdvection.y * 2.0 * 1.0,
-          worldPos.z * 2.0 - windAdvection.z * 2.0 * 1.0
-        ));
-        
-        // Combine noise layers with different weights
-        float noise = noise1 * 0.5 + noise2 * 0.3 + noise3 * 0.2;
-        
-        // Distortion is purely vertical; horizontal drift comes from advection
-        vec2 distortion = vec2(0.0, noise);
-        
-        // Apply intensity (zoom-dependent) and fade out with total wind speed
-        // Smooth continuous fade from 0 to 15 mph (completely gone at 15 mph)
-        float fade = clamp(1.0 - (abs(windSpeedTotal) / 15.0), 0.0, 1.0);
-        
-        // Calculate tint strength from raw noise before scaling (noise ranges ~-1 to 1)
-        float noiseMag = abs(noise); // Absolute value of noise for edge detection
-        float tintStrength = noiseMag * intensity * fade * 2.0; // Scale with intensity and fade
-        
-        distortion *= intensity * fade;
-        
-        // Scale distortion to pixel space
-        vec2 distortedUV = uv + distortion * 0.01;
-        
-        // Sample texture with distorted UV coordinates
+
+        // Mirage refracts light vertically (rising hot air = vertical n-gradient).
+        // Spatial and shading scales are independent so each can be tuned alone.
+        vec2 distortedUV = uv + vec2(0.0, totalDistortion) * spatialScale;
+
         vec4 color = texture2D(tDiffuse, distortedUV);
-        
-        // Add edge tint based on noise magnitude
-        // Heat mirage creates chromatic aberration at edges
-        tintStrength = clamp(tintStrength, 0.0, 0.4); // Cap at 40% for visible effect
-        
-        // Blue/purple tint at edges (heat refraction effect)
+
+        // Chromatic edge tint scales with total distortion magnitude
+        float tintStrength = clamp(abs(totalDistortion) * shadingScale, 0.0, 0.4);
         color.rgb = mix(color.rgb, color.rgb * vec3(0.85, 0.9, 1.0), tintStrength);
-        
+
         gl_FragColor = color;
       }
     `;
+
+    // Initialize uniform array storage
+    const layerOffsetsInit = [];
+    const layerScalesInit = [];
+    const layerDriftsInit = [];
+    const layerIntensitiesInit = [];
+    for (let i = 0; i < NUM_LAYERS; i++)
+    {
+      layerOffsetsInit.push(new THREE.Vector3(0, 0, 0));
+      layerScalesInit.push(0);
+      layerDriftsInit.push(new THREE.Vector2(0, 0));
+      layerIntensitiesInit.push(0);
+    }
 
     return new THREE.ShaderMaterial(
     {
@@ -231,25 +261,33 @@ export class MirageEffect
         {
           value: null
         },
-        intensity:
+        noiseFreq:
         {
-          value: 0
+          value: MirageEffect.NOISE_FREQ
         },
-        windAdvection:
+        spatialScale:
         {
-          value: new THREE.Vector3(0, 0, 0)
+          value: MirageEffect.SPATIAL_DISTORTION_SCALE
         },
-        windSpeedTotal:
+        shadingScale:
         {
-          value: 0
+          value: MirageEffect.SHADING_INTENSITY_SCALE
         },
-        worldOffset:
+        layerOffsets:
         {
-          value: new THREE.Vector3(0, 0, 0)
+          value: layerOffsetsInit
         },
-        worldScale:
+        layerScales:
         {
-          value: 1.0
+          value: layerScalesInit
+        },
+        layerDrifts:
+        {
+          value: layerDriftsInit
+        },
+        layerIntensities:
+        {
+          value: layerIntensitiesInit
         }
       },
       vertexShader: vertexShader,
@@ -267,81 +305,100 @@ export class MirageEffect
    */
   update(fov, windGenerator, intersection)
   {
-    // Get delta time from TimeManager (already clamped to [0.0005, 0.05] and handles pause/resume)
+    // Get delta time from TimeManager (already clamped and pause-aware)
     const dt = ResourceManager.time.getDeltaTime();
 
-    // Calculate intensity based on FOV (smaller FOV = more zoom = more mirage)
+    // Zoom-dependent base intensity (smaller FOV = more visible mirage)
     const zoomFactor = MirageEffect.BASE_FOV / fov;
+    const baseIntensity = Math.min(zoomFactor * MirageEffect.BASE_INTENSITY, 1.0);
 
-    // Linear scaling for more pronounced effect at high zoom
-    // At 1x zoom (FOV=30): intensity = BASE_INTENSITY
-    // At 10x zoom (FOV=3): intensity = 10 * BASE_INTENSITY
-    // At 100x zoom (FOV=0.3): intensity = 1.0 (clamped)
-    this.material.uniforms.intensity.value = Math.min(zoomFactor * MirageEffect.BASE_INTENSITY, 1.0);
+    // Normalize per-layer intensity so the RMS of the summed contributions
+    // matches what a single-layer model produced at the same baseIntensity.
+    // Uses the squared-mask sum so the active-layer count drives normalization;
+    // turning layers off via DEBUG_LAYER_MASK doesn't dim the remaining ones.
+    const mask = MirageEffect.DEBUG_LAYER_MASK;
+    let maskSqSum = 0;
+    for (let i = 0; i < this.numLayers; i++) maskSqSum += mask[i] * mask[i];
+    const perLayerNorm = baseIntensity / Math.sqrt(Math.max(maskSqSum, 1e-6));
 
-    // Use intersection point for world-space anchoring
-    // This is where the scope's center ray hits the range box (3D world position)
-    // For 3D noise: X = left/right, Y = vertical height, Z = downrange distance
-    this.material.uniforms.worldOffset.value.set(intersection.x, intersection.y, intersection.z);
+    const halfFovRad = (fov * Math.PI / 180) * 0.5;
+    const tanHalfFov = Math.tan(halfFovRad);
 
-    // Calculate world scale based on FOV and distance to intersection
-    // Larger FOV = more world space visible = larger scale
-    const worldScale = intersection.distance * Math.tan((fov * Math.PI / 180) / 2) * 2;
-    this.material.uniforms.worldScale.value = worldScale;
+    const layerOffsetsArr = this.material.uniforms.layerOffsets.value;
+    const layerScalesArr = this.material.uniforms.layerScales.value;
+    const layerDriftsArr = this.material.uniforms.layerDrifts.value;
+    const layerIntensitiesArr = this.material.uniforms.layerIntensities.value;
 
-    // Sample wind in the last 25% of distance before intersection
-    const targetDistance = intersection.distance;
-    let totalCross = 0; // crosswind accumulator (wind.x)
-    let totalVertical = 0; // vertical wind accumulator (wind.y)
-    let totalHead = 0; // headwind accumulator (wind.z)
+    const alpha = MirageEffect.WIND_SMOOTHING_ALPHA;
+    const yardsPerSecPerMph = MirageEffect.MPH_TO_YARDS_PER_SEC;
+    const heatRiseDelta = MirageEffect.HEAT_RISE_SPEED * dt;
+    const fadeSpeed = MirageEffect.WIND_FADE_SPEED_MPH;
 
-    for (let i = 0; i < MirageEffect.WIND_SAMPLE_COUNT; i++)
+    const sampleOffsets = MirageEffect.LAYER_SAMPLE_OFFSETS;
+    const samplesPerLayer = sampleOffsets.length;
+
+    for (let i = 0; i < this.numLayers; i++)
     {
-      const t = MirageEffect.WIND_SAMPLE_START + (i * MirageEffect.WIND_SAMPLE_STEP);
-      const sampleDistance = targetDistance * t;
+      const t = MirageEffect.LAYER_FRACS[i];
 
-      // Calculate position at this distance along the line of sight
+      // Layer anchor (noise lookup origin) at the slab center
       const sampleX = intersection.x * t;
       const sampleY = intersection.y * t;
       const sampleZ = intersection.z * t;
 
-      const wind = sampleWindAtThreeJsPosition(windGenerator, sampleX, sampleY, sampleZ);
-      totalCross += wind.x;
-      totalVertical += wind.y;
-      totalHead += wind.z;
+      // Average wind over multiple positions inside the slab so each layer
+      // gets a smoother local wind reading than a single point sample.
+      let avgWindX = 0;
+      let avgWindY = 0;
+      let avgWindZ = 0;
+      for (let s = 0; s < samplesPerLayer; s++)
+      {
+        let ts = t + sampleOffsets[s];
+        if (ts < 0) ts = 0;
+        else if (ts > 1) ts = 1;
+        const wind = sampleWindAtThreeJsPosition(
+          windGenerator,
+          intersection.x * ts,
+          intersection.y * ts,
+          intersection.z * ts
+        );
+        avgWindX += wind.x;
+        avgWindY += wind.y;
+        avgWindZ += wind.z;
+      }
+      avgWindX /= samplesPerLayer;
+      avgWindY /= samplesPerLayer;
+      avgWindZ /= samplesPerLayer;
+
+      // EMA-smooth the averaged wind in place
+      const sw = this.smoothedWind[i];
+      sw.x = sw.x * (1 - alpha) + avgWindX * alpha;
+      sw.y = sw.y * (1 - alpha) + avgWindY * alpha;
+      sw.z = sw.z * (1 - alpha) + avgWindZ * alpha;
+
+      // Accumulate drift (cross + vertical; vertical includes heat rise).
+      // Head wind is intentionally omitted — it slides columns along the line
+      // of sight without changing their apparent screen position.
+      const drift = this.accumulatedDrift[i];
+      drift.x += sw.x * yardsPerSecPerMph * dt;
+      drift.y += sw.y * yardsPerSecPerMph * dt + heatRiseDelta;
+
+      // Per-layer attenuation from this layer's horizontal wind magnitude.
+      // High wind well-mixes the slab and visibly suppresses its shimmer.
+      const horizSpeed = Math.hypot(sw.x, sw.z);
+      const fade = Math.max(0, Math.min(1, 1 - horizSpeed / fadeSpeed));
+
+      // Layer world geometry: scale grows linearly with depth so a fixed
+      // physical noise feature appears 1/t larger in the viewport at near layers
+      const layerDistance = intersection.distance * t;
+      const layerScale = layerDistance * tanHalfFov * 2;
+
+      // Write uniforms (mutate-in-place; three.js picks up the changes)
+      layerOffsetsArr[i].set(sampleX, sampleY, sampleZ);
+      layerScalesArr[i] = layerScale;
+      layerDriftsArr[i].set(drift.x, drift.y);
+      layerIntensitiesArr[i] = perLayerNorm * fade * mask[i];
     }
-
-    // Use non-weighted average
-    // Wind from BTK wrapper is already in mph
-    const avgCross_mph = totalCross / MirageEffect.WIND_SAMPLE_COUNT;
-    const avgVertical_mph = totalVertical / MirageEffect.WIND_SAMPLE_COUNT;
-    const avgHead_mph = totalHead / MirageEffect.WIND_SAMPLE_COUNT;
-
-    // Apply EMA smoothing to wind vector (cross, vertical, head)
-    const a = MirageEffect.WIND_SMOOTHING_ALPHA;
-    this.smoothedWind.x = this.smoothedWind.x * (1 - a) + avgCross_mph * a;
-    this.smoothedWind.y = this.smoothedWind.y * (1 - a) + avgVertical_mph * a;
-    this.smoothedWind.z = this.smoothedWind.z * (1 - a) + avgHead_mph * a;
-
-    // Integrate wind speed over time to get accumulated 3D advection
-    // Heat rise: constant upward advection (hot air rises from ground)
-    // Advection vector this frame in yards (cross, vertical + heat rise, head)
-    const advectX = this.smoothedWind.x * MirageEffect.MPH_TO_YARDS_PER_SEC * dt;
-    const advectY = this.smoothedWind.y * MirageEffect.MPH_TO_YARDS_PER_SEC * dt + MirageEffect.HEAT_RISE_SPEED * dt;
-    const advectZ = this.smoothedWind.z * MirageEffect.MPH_TO_YARDS_PER_SEC * dt;
-    this.accumulatedDriftVec.x += advectX;
-    this.accumulatedDriftVec.y += advectY;
-    this.accumulatedDriftVec.z += advectZ;
-
-    // Pass wind data to shader
-    this.material.uniforms.windAdvection.value.set(
-      this.accumulatedDriftVec.x,
-      this.accumulatedDriftVec.y,
-      this.accumulatedDriftVec.z
-    );
-    // Total horizontal wind speed for attenuation (mirage fades in high wind)
-    const smoothedTotal = Math.hypot(this.smoothedWind.x, this.smoothedWind.z);
-    this.material.uniforms.windSpeedTotal.value = smoothedTotal;
   }
 
   /**
@@ -357,22 +414,24 @@ export class MirageEffect
   }
 
   /**
-   * Get current wind speed (crosswind component only)
-   * @returns {number} Current wind speed in mph (positive = right, negative = left)
+   * Get current crosswind for HUD display (target-end layer — what the eye
+   * actually reads off the in-focus part of the mirage).
+   * @returns {number} Crosswind in mph (positive = right, negative = left)
    */
   getSmoothedWindSpeed()
   {
-    return this.smoothedWind.x;
+    return this.smoothedWind[this.numLayers - 1].x;
   }
 
   /**
-   * Get current smoothed wind vector (cross, head) in mph
+   * Get current smoothed wind vector (cross, vertical) at the target layer.
    */
   getSmoothedWindVector()
   {
+    const sw = this.smoothedWind[this.numLayers - 1];
     return {
-      x: this.smoothedWind.x,
-      y: this.smoothedWind.y
+      x: sw.x,
+      y: sw.y
     };
   }
 
