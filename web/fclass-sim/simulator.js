@@ -49,7 +49,8 @@ const DEFAULT_PARAMS = {
   weight: '140',
   length: '1.4',
   twist: '8.0',
-  enableSpinEffects: true
+  enableSpinEffects: true,
+  showBulletTrace: true
 };
 
 /**
@@ -604,7 +605,8 @@ function getGameParams()
     length: parseFloat(document.getElementById('length').value),
     twist: document.getElementById('enableSpinEffects').checked ? parseFloat(document.getElementById('twist').value) : 0.0,
     mvSd: parseFloat(document.getElementById('mvSd').value),
-    rifleAccuracy: parseFloat(document.getElementById('rifleAccuracy').value)
+    rifleAccuracy: parseFloat(document.getElementById('rifleAccuracy').value),
+    showBulletTrace: document.getElementById('showBulletTrace').checked
   };
 }
 
@@ -713,7 +715,7 @@ class FClassSimulator
   static RIFLE_SCOPE_DIAMETER_FRACTION = 0.55;
   static RIFLE_SCOPE_PAN_SPEED = 0.125; // 1/8 MOA per key press
   static RIFLE_SCOPE_INITIAL_FOV_MOA = 27.0 // Initial FOV in MOA
-  static RIFLE_SCOPE_MIN_FOV = 19.5; // Minimum FOV in MOA
+  static RIFLE_SCOPE_MIN_FOV = 13.5; // Minimum FOV in MOA (~80x, matches real high-mag scopes like March-X 8-80)
   static RIFLE_SCOPE_MAX_FOV = 72.0; // Maximum FOV in MOA
   static RIFLE_SCOPE_ZOOM_FACTOR = 1.05; // Zoom factor per key press (5% change)
   static RIFLE_SCOPE_MAX_DIAL_MOA = 10; // Maximum dial adjustment in MOA (±10 MOA)
@@ -746,6 +748,7 @@ class FClassSimulator
     this.twist = params.twist;
     this.mvSd = params.mvSd;
     this.rifleAccuracy = params.rifleAccuracy;
+    this.showBulletTrace = params.showBulletTrace !== false;
 
     // Check for debug mode from URL parameter
     const urlParams = new URLSearchParams(window.location.search);
@@ -1509,6 +1512,7 @@ class FClassSimulator
         windGenerator: this.windGenerator,
         distance: this.distance,
         shadowsEnabled: this.graphicsConfig.shadowsEnabled,
+        showBulletTrace: this.showBulletTrace,
         onShotComplete: (shotData) => this.onShotComplete(shotData)
       });
 

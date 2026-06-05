@@ -29,6 +29,7 @@ export class BallisticsEngine
     // Ballistic parameters
     this.distance = config.distance;
     this.shadowsEnabled = config.shadowsEnabled ?? true;
+    this.showBulletTrace = config.showBulletTrace ?? true;
 
     // Ballistic state
     this.ballisticSimulator = null;
@@ -484,8 +485,8 @@ export class BallisticsEngine
       this.scene.add(this.bulletMesh);
     }
 
-    // Create pressure wave glow sprite
-    if (!this.bulletGlowSprite)
+    // Create pressure wave glow sprite (the visible bullet trace)
+    if (this.showBulletTrace && !this.bulletGlowSprite)
     {
       const glowTexture = this.createBulletGlowTexture();
       this.bulletGlowMaterial = new THREE.SpriteMaterial(
@@ -504,7 +505,7 @@ export class BallisticsEngine
 
     // Make bullet and glow visible for new animation
     this.bulletMesh.visible = true;
-    this.bulletGlowSprite.visible = true;
+    if (this.bulletGlowSprite) this.bulletGlowSprite.visible = true;
 
     // Animation state
     const totalTimeS = this.lastTrajectory.getTotalTime();
@@ -556,7 +557,7 @@ export class BallisticsEngine
       const posBtk = stateAnim.getPosition();
       const pos = btkToThreeJsPosition(posBtk); // Convert meters to yards
       this.bulletMesh.position.set(pos.x, pos.y, pos.z);
-      this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
+      if (this.bulletGlowSprite) this.bulletGlowSprite.position.set(pos.x, pos.y, pos.z);
       posBtk.delete();
       stateAnim.delete();
       optPoint.delete();
@@ -567,7 +568,7 @@ export class BallisticsEngine
     {
       // Hide bullet mesh and glow
       this.bulletMesh.visible = false;
-      this.bulletGlowSprite.visible = false;
+      if (this.bulletGlowSprite) this.bulletGlowSprite.visible = false;
 
       // Process shot completion
       if (this.pendingShotData && this.onShotComplete)
