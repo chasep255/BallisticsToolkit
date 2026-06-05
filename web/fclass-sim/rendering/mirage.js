@@ -18,8 +18,8 @@
  *   z  ← headwind             (downrange; low frequency so it churns slowly)
  *   t  ← constant clock       (plumes form and dissipate in place over time)
  *
- * Anisotropy (X high, Y low) makes the features tall and narrow — the vertical
- * structure the eye reads as a "column". Head wind doesn't translate the
+ * Anisotropy (X higher than Y) makes the features taller than wide — the
+ * vertical structure the eye reads as a "column". Head wind doesn't translate the
  * pattern on screen (columns slide along the line of sight), so it only churns
  * the z-axis; with NOISE_FREQ_Z small, the column refreshes gradually. Head
  * wind also feeds the per-layer attenuation via the horizontal-wind magnitude.
@@ -50,8 +50,11 @@ export class MirageEffect
 
   // ---- Intensity / appearance ----
   static BASE_INTENSITY           = 0.025;  // per-layer noise weight at 1x zoom (pre-1/sqrt(N) normalization)
+  static ZOOM_INTENSITY_CAP       = 2.0;    // ceiling on the zoom-driven intensity growth. Mirage wobble
+                                            // scales with magnification; this caps it so the UV warp can't
+                                            // sample absurdly far off-pixel at extreme zoom.
   static SPATIAL_DISTORTION_SCALE = 0.003;  // UV displacement scale — how far the image warbles
-  static SHADING_INTENSITY_SCALE  = 2.0;    // chromatic edge-tint multiplier
+  static SHADING_INTENSITY_SCALE  = 1.0;    // chromatic edge-tint multiplier
   static SHADING_MAX_STRENGTH     = 0.85;   // clamp on the tint mix amount. Keep high enough that
                                             // heavier presets don't all saturate to the same tint.
 
@@ -64,16 +67,16 @@ export class MirageEffect
   // is advected by its own driver — crosswind→x, vertical wind + heat rise→y,
   // headwind→z, constant clock→t — and each frequency below converts that
   // axis's units into noise space. Higher frequency = smaller/faster features.
-  //   X (1/yd): horizontal feature size. High → narrow columns.
-  //   Y (1/yd): vertical feature size.   Low  → tall columns (Y << X).
+  //   X (1/yd): horizontal feature size. Higher → narrower features.
+  //   Y (1/yd): vertical feature size.   Lower than X → taller than wide (columns).
   //   Z (1/yd): downrange. Low, so the air column along the line of sight is
-  //             nearly uniform — headwind churns it only slowly, and it keeps
-  //             the per-layer slabs (hundreds of yards apart) decorrelated.
+  //             nearly uniform — headwind churns it only slowly, and the
+  //             per-layer slabs stay decorrelated by their distinct depth.
   //   T (1/s):  in-place evolution rate (plumes form and dissipate). Lower is
   //             slower; without it a calm-wind scope view would freeze.
-  static NOISE_FREQ_X             = 2.5;
-  static NOISE_FREQ_Y             = 1.5;
-  static NOISE_FREQ_Z             = 0.025;
+  static NOISE_FREQ_X             = 3;
+  static NOISE_FREQ_Y             = 2;
+  static NOISE_FREQ_Z             = 0.05;
   static NOISE_FREQ_T             = 0.2;
 
   // ---- Layered atmosphere ----
@@ -81,7 +84,7 @@ export class MirageEffect
   // (the first spans 0→first). Each frame the slab samples wind at one random
   // point in that range and mixes it into the EMA, which converges on the
   // slab's average wind — full coverage of the range, one sample per frame.
-  static LAYER_FRACS              = [0.33, 0.66, 1.0]; // far-edge depth fraction of each slab
+  static LAYER_FRACS              = [0.5, 0.8, 1.0]; // far-edge depth fraction of each slab
   static WIND_FADE_SPEED_MPH      = 15.0;             // per-layer attenuation: layer fades to 0 by this horizontal wind speed
 
   // ---- Debug ----
@@ -339,7 +342,7 @@ export class MirageEffect
     // the user strength preset is applied *after* the clamp, otherwise every
     // preset would saturate to the same value once zoomed in.
     const zoomFactor = MirageEffect.BASE_FOV / fov;
-    const zoomIntensity = Math.min(zoomFactor * MirageEffect.BASE_INTENSITY, 1.0);
+    const zoomIntensity = Math.min(zoomFactor * MirageEffect.BASE_INTENSITY, MirageEffect.ZOOM_INTENSITY_CAP);
     const baseIntensity = zoomIntensity * this.intensityScale;
 
     // Normalize per-layer intensity so the RMS of the summed contributions
@@ -445,14 +448,15 @@ export class MirageEffect
   }
 
   /**
-   * Get current smoothed wind vector (cross, vertical) at the target layer.
+   * Get current smoothed wind vector (cross, head) in mph at the target layer —
+   * the two horizontal components a shooter reads (vertical is ~0 in this field).
    */
   getSmoothedWindVector()
   {
     const sw = this.smoothedWind[this.numLayers - 1];
     return {
       x: sw.x,
-      y: sw.y
+      y: sw.z
     };
   }
 
