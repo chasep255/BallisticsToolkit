@@ -116,6 +116,7 @@ export class StringFireMatchDriver extends MatchDriver
       impactVelocityFps: shotData.impactVelocityFps,
       relativeX: shotData.relativeX ?? null,
       relativeY: shotData.relativeY ?? null,
+      diag: shotData.diag ?? null,
       timeSec: this.timerDuration - this.timeRemaining,
       suddenDeath: false
     });
@@ -260,7 +261,7 @@ export class StringFireMatchDriver extends MatchDriver
     for (let m = 1; m <= this.numMatches; m++)
     {
       const matchShots = this.shotLog.filter(s => s.section === m);
-      const sighters = matchShots.filter(s => s.isSighter).map(s => ({ score: s.score, isX: s.isX }));
+      const sighters = matchShots.filter(s => s.isSighter).map(s => ({ score: s.score, isX: s.isX, diag: s.diag ?? null }));
       const records = matchShots.filter(s => !s.isSighter);
       const { total, xCount } = this.aggregate(records);
 
@@ -270,7 +271,7 @@ export class StringFireMatchDriver extends MatchDriver
       sections.push({
         label: `Match ${m}`,
         sighters: sighters,
-        records: records.map(s => ({ score: s.score, isX: s.isX })),
+        records: records.map(s => ({ score: s.score, isX: s.isX, diag: s.diag ?? null })),
         suddenDeath: [],
         recordSlots: this.maxRecordShots,
         group: MatchDriver.buildGroup(matchShots),

@@ -218,6 +218,7 @@ export class PairFireDriver extends MatchDriver
       impactVelocityFps: shotData.impactVelocityFps,
       relativeX: shotData.relativeX ?? null,
       relativeY: shotData.relativeY ?? null,
+      diag: shotData.diag ?? null,
       timeSec: 0,
       suddenDeath: suddenDeath
     });
@@ -488,8 +489,8 @@ export class PairFireDriver extends MatchDriver
     const sighterShots = this.shotLog.filter(s => s.player === playerId && s.isSighter);
     // Record + sudden-death shots both count and plot on the target.
     const scoringShots = this.scoringShotsFor(playerId);
-    const sighters = sighterShots.map(s => ({ score: s.score, isX: s.isX }));
-    const records = scoringShots.map(s => ({ score: s.score, isX: s.isX }));
+    const sighters = sighterShots.map(s => ({ score: s.score, isX: s.isX, diag: s.diag ?? null }));
+    const records = scoringShots.map(s => ({ score: s.score, isX: s.isX, diag: s.diag ?? null }));
     const { total, xCount } = this.aggregate(scoringShots);
 
     return {
