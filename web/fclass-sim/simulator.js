@@ -1208,7 +1208,9 @@ class FClassSimulator
 
     if (this.windGenerator)
     {
-      this.windGenerator.advanceTime(ResourceManager.time.getElapsedTime());
+      // windTimeOffset is bumped between matches to fast-forward the wind field,
+      // simulating the time that passes during the break (same preset, new state).
+      this.windGenerator.advanceTime(ResourceManager.time.getElapsedTime() + (this.windTimeOffset || 0));
     }
 
     // Update bullet animation (if any)
@@ -1404,30 +1406,11 @@ class FClassSimulator
     this.compositionCamera.position.z = 5; // Position camera at z=5 to see layers 0-3
 
     // ===== WIND & ENVIRONMENT =====
-    // Create wind sampling box using simulator world dimensions
-    const halfWidth = FClassSimulator.RANGE_TOTAL_WIDTH / 2; // yards
-
-    // Wind box extends from behind shooter to past target, with padding on all sides
-    // Three.js coords: minCorner: behind shooter (positive Z), left edge (-X), at ground level (-Y)
-    // Three.js coords: maxCorner: past target (negative Z), right edge (+X), above ground (+Y)
-    // BTK and Three.js use the same coordinate system, so we just convert units
+    // The wind sampling box (sized to the range) is built in createWindGenerator.
     await waitForBTK();
-    const minCornerX_yd = -halfWidth - FClassSimulator.WIND_BOX_PADDING;
-    const minCornerY_yd = 0;
-    const minCornerZ_yd = FClassSimulator.WIND_BOX_PADDING;
-    const maxCornerX_yd = halfWidth + FClassSimulator.WIND_BOX_PADDING;
-    const maxCornerY_yd = FClassSimulator.WIND_BOX_HEIGHT;
-    const maxCornerZ_yd = -(this.distance + FClassSimulator.WIND_BOX_PADDING);
-
-    const minCorner = threeJsToBtkPosition(minCornerX_yd, minCornerY_yd, minCornerZ_yd);
-    const maxCorner = threeJsToBtkPosition(maxCornerX_yd, maxCornerY_yd, maxCornerZ_yd);
-
     console.log(`[Wind] Creating wind generator: ${this.windPreset}`);
-    this.windGenerator = btk.WindPresets.getPreset(this.windPreset, minCorner, maxCorner);
-
-    // Clean up temporary vectors
-    minCorner.delete();
-    maxCorner.delete();
+    this.windGenerator = this.createWindGenerator(this.windPreset);
+    this.windTimeOffset = 0; // bumped between matches to fast-forward the field
 
     // Wind markers: classic flags or more-visible wind socks (user-selectable)
     const MarkerRenderer = this.windMarker === 'flags' ? FlagRenderer : WindSockRenderer;
@@ -2176,10 +2159,54 @@ class FClassSimulator
   advanceToNextMatch()
   {
     document.querySelectorAll('.match-end-notification').forEach(n => n.remove());
+
+    // Real matches have a break between them while targets are scored and squads
+    // rotate, so the wind has time to shift. Fast-forward the wind field (same
+    // preset, evolved state) to mimic that passage of time.
+    this.advanceWindBetweenMatches();
+
     this.driver.advance(ResourceManager.time.getElapsedTime());
     this.updateControls();
     this.updateHUD();
     if (this.remoteHost) this.remoteHost.pushNotificationDismiss();
+  }
+
+  /**
+   * Build a wind generator for the given preset, sized to the range's wind box.
+   * Caller owns the returned WASM object (free it with .delete()).
+   */
+  createWindGenerator(presetName)
+  {
+    const btk = getBTK();
+    const halfWidth = FClassSimulator.RANGE_TOTAL_WIDTH / 2;
+    const pad = FClassSimulator.WIND_BOX_PADDING;
+
+    // Wind box extends from behind the shooter to past the target, padded on all
+    // sides. Three.js/BTK share a coordinate system (X right, Y up, -Z downrange):
+    // minCorner = behind shooter (+Z), left (-X), ground (Y=0); maxCorner = past
+    // target (-Z), right (+X), above ground.
+    const minCorner = threeJsToBtkPosition(-halfWidth - pad, 0, pad);
+    const maxCorner = threeJsToBtkPosition(halfWidth + pad, FClassSimulator.WIND_BOX_HEIGHT, -(this.distance + pad));
+
+    const generator = btk.WindPresets.getPreset(presetName, minCorner, maxCorner);
+
+    minCorner.delete();
+    maxCorner.delete();
+    return generator;
+  }
+
+  /**
+   * Fast-forward the wind field to simulate the break between matches: keep the
+   * same preset but jump its clock ahead by a randomized chunk so the next match
+   * opens on a fresh, decorrelated state of the same conditions. The offset is
+   * applied on top of game time every frame in render().
+   */
+  advanceWindBetweenMatches()
+  {
+    // 5–15 minutes of simulated downtime between matches.
+    const jumpSeconds = 300 + Math.random() * 600;
+    this.windTimeOffset = (this.windTimeOffset || 0) + jumpSeconds;
+    console.log(`[Wind] Advanced wind ${Math.round(jumpSeconds)}s for between-match break (total offset ${Math.round(this.windTimeOffset)}s)`);
   }
 
   /**
@@ -2423,19 +2450,20 @@ class FClassSimulator
       y: this.distance * Math.tan(diag.aim.pitch)
     };
 
-    // Walk the trajectory down range, sampling bullet position and the wind it
-    // actually flew through at each step.
+    // Walk the trajectory down range at fixed 25-yard intervals (plus the exact
+    // target distance), sampling bullet position and the wind it actually flew
+    // through at each station. The plot interpolates these with a smooth spline.
     diag.trajectory = [];
     diag.windProfile = [];
     const btk = getBTK();
     const traj = this.ballistics ? this.ballistics.getLastTrajectory() : null;
     if (traj && btk)
     {
-      const steps = 24;
-      for (let i = 0; i <= steps; i++)
+      const stepYd = 25;
+      const stations = Math.max(1, Math.ceil(this.distance / stepYd));
+      for (let i = 0; i <= stations; i++)
       {
-        const frac = i / steps;
-        const distYd = this.distance * frac;
+        const distYd = Math.min(i * stepYd, this.distance);
         const point = traj.atDistance(btk.Conversions.yardsToMeters(distYd));
         if (!point) continue;
 

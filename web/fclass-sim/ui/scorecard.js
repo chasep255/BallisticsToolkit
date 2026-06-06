@@ -482,6 +482,34 @@ export class Scorecard
   }
 
   /**
+   * Build an SVG path through the given screen points using a Catmull-Rom spline
+   * (converted to cubic beziers), so sampled curves render smooth rather than as
+   * straight segments. Endpoints are clamped (no overshoot past the ends).
+   * @param {Array<{x:number, y:number}>} pts
+   */
+  smoothPath(pts)
+  {
+    if (!pts || pts.length === 0) return '';
+    if (pts.length === 1) return `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    if (pts.length === 2) return `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)} L${pts[1].x.toFixed(1)},${pts[1].y.toFixed(1)}`;
+
+    let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++)
+    {
+      const p0 = pts[i === 0 ? 0 : i - 1];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2 < pts.length ? i + 2 : pts.length - 1];
+      const c1x = p1.x + (p2.x - p0.x) / 6;
+      const c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6;
+      const c2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+    return d;
+  }
+
+  /**
    * Down-range view of the shot: distance runs up the Y axis (shooter at bottom,
    * target center at top). The horizontal direction carries two overlaid scales
    * — bullet drift in MOA (orange) and the crosswind it flew through in mph
@@ -544,24 +572,16 @@ export class Scorecard
     // to the aim point at the target. The gap to the drift curve is the wind.
     svg += `<line x1="${xDrift(0).toFixed(1)}" y1="${yDown(0).toFixed(1)}" x2="${xDrift(aimMoa).toFixed(1)}" y2="${yDown(maxZ).toFixed(1)}" stroke="#34c759" stroke-width="1.6" stroke-dasharray="5 3" stroke-opacity="0.9"/>`;
 
-    // Crosswind curve (cyan).
+    // Crosswind curve (cyan), smoothed across the 25-yard samples.
     if (wind.length >= 2)
     {
-      let path = '';
-      wind.forEach((p, i) =>
-      {
-        path += `${i === 0 ? 'M' : 'L'}${xCross(p.cross).toFixed(1)},${yDown(p.z).toFixed(1)} `;
-      });
-      svg += `<path d="${path}" fill="none" stroke="#32d6ff" stroke-width="2" stroke-opacity="0.9"/>`;
+      const pts = wind.map(p => ({ x: xCross(p.cross), y: yDown(p.z) }));
+      svg += `<path d="${this.smoothPath(pts)}" fill="none" stroke="#32d6ff" stroke-width="2" stroke-opacity="0.9"/>`;
     }
 
-    // Drift curve (orange).
-    let dpath = '';
-    traj.forEach((p, i) =>
-    {
-      dpath += `${i === 0 ? 'M' : 'L'}${xDrift(driftMoa[i]).toFixed(1)},${yDown(p.z).toFixed(1)} `;
-    });
-    svg += `<path d="${dpath}" fill="none" stroke="#ff9f0a" stroke-width="2.2"/>`;
+    // Drift curve (orange), smoothed.
+    const driftPts = traj.map((p, i) => ({ x: xDrift(driftMoa[i]), y: yDown(p.z) }));
+    svg += `<path d="${this.smoothPath(driftPts)}" fill="none" stroke="#ff9f0a" stroke-width="2.2"/>`;
 
     // Down-range labels (left axis): shooter at bottom, target at top.
     svg += `<text x="${padL - 5}" y="${padT + plotH}" fill="rgba(255,255,255,0.7)" font-size="9" text-anchor="end">0</text>`;

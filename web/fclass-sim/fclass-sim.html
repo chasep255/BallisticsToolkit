@@ -265,6 +265,7 @@
             - Use "Go For Record" to end the sighters phase early<br>
             - A match ends at the record-shot count OR when time expires<br>
             - Acknowledge the match-complete dialog to start the next match<br>
+            - Between matches the wind field is fast-forwarded to simulate the break &mdash; the preset (overall conditions) stays the same, but the wind shifts to a fresh state, so re-read it for each new match<br>
             - The combined score across all matches is the aggregate<br><br>
 
             <strong>Pair Fire:</strong><br>
@@ -331,7 +332,13 @@
             - String Fire: breakdown per match (sighters + record shots) with per-match and aggregate totals<br>
             - Pair Fire: split per shooter with each player's sighters, record shots, total, and X-count; the winner is highlighted<br>
             - Each section has an expandable "Target" diagram showing the impacts on a scaled target (yellow = sighters, red = record shots)<br>
-            - Available anytime (shows parameters even before first shot)
+            - Available anytime (shows parameters even before first shot)<br><br>
+            <strong>Per-Shot Analytics:</strong> click any scored shot cell to open a detail view for that shot:<br>
+            - <strong>Point of Aim vs Impact</strong> target face &mdash; green crosshair = your aim (including dial), red dot = the actual impact, with a connector showing the miss<br>
+            - <strong>Trajectory vs Wind</strong> plot &mdash; distance runs up the Y axis (shooter at the bottom, target center at the top); the bullet's drift (orange, in MOA) and the crosswind it flew through (cyan, in mph) are overlaid, with a straight dashed line marking the point of aim, so you can see the wind walk the bullet off the line of departure<br>
+            - <strong>Stats</strong> in MOA: scope dial, aim + dial, impact offset, and wind at the shooter<br>
+            - A pre-recoil <strong>sight-picture screenshot</strong> taken the instant the shot broke (shown on the host; omitted for remote viewers to save bandwidth)<br>
+            - Close the detail with its &times; button, or close the whole card with the &times; in the header
           </div>
         </div>
         
