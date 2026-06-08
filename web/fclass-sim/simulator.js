@@ -2545,6 +2545,7 @@ class FClassSimulator
     this.inputGateHandler = (event) =>
     {
       if (event.type !== 'keydown') return;
+      if (isEditableTarget(event)) return; // never swallow typing in a text field
       if (this.mode !== 'pair' || !this.remoteHost) return;
       if (!GAME_KEY_CODES.has(event.code)) return; // leave browser shortcuts alone
       const allowed = event.btkRemote ? 'p2' : 'p1';
@@ -2603,13 +2604,21 @@ class FClassSimulator
 
     // The viewer plays p2, so push p2's own availability (un-gated by turn)
     // rather than the active player's.
-    if (this.remoteHost)
+    if (this.remoteHost) this.remoteHost.pushControls(this.viewerControlsModel(), activePlayer);
+  }
+
+  /**
+   * Controls model to mirror to the remote viewer. The viewer plays p2, so in
+   * pair fire its Go For Record reflects p2's own sighter state (un-gated by
+   * whose turn it is), not the active player's.
+   */
+  viewerControlsModel()
+  {
+    if (this.mode === 'pair' && this.remoteHost)
     {
-      const viewerControls = pairRemote
-        ? { goForRecord: this.driver.canGoForRecord('p2'), goForRecordText: this.driver.goForRecordTextFor('p2') }
-        : controls;
-      this.remoteHost.pushControls(viewerControls, activePlayer);
+      return { goForRecord: this.driver.canGoForRecord('p2'), goForRecordText: this.driver.goForRecordTextFor('p2') };
     }
+    return this.driver.getControlsModel();
   }
 
   // ===== Remote Play (host side) =====
@@ -2704,7 +2713,7 @@ class FClassSimulator
   {
     if (!this.remoteHost) return;
     const activePlayer = this.driver.getActivePlayerId ? this.driver.getActivePlayerId() : null;
-    this.remoteHost.pushControls(this.driver.getControlsModel(), activePlayer);
+    this.remoteHost.pushControls(this.viewerControlsModel(), activePlayer);
   }
 
   /**
