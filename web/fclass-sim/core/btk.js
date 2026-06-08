@@ -1,28 +1,15 @@
-import BallisticsToolkit from '../../ballistics_toolkit_wasm.js';
+// The WASM loader lives in the shared module; re-export it so this app's
+// modules keep importing waitForBTK/getBTK from here. The Three.js coordinate
+// helpers below are fclass-specific and stay local.
+import { waitForBTK, getBTK } from '../../shared/btk.js';
 
-// Load BTK module at module level (promise-based, non-blocking)
-let btk = null;
-const btkPromise = BallisticsToolkit().then(module =>
-{
-  btk = module;
-  // Make BTK globally accessible once loaded
-  if (typeof window !== 'undefined')
-  {
-    window.btk = btk;
-  }
-  return module;
-});
+export { waitForBTK, getBTK };
 
-// Wait for BTK to be ready
-export async function waitForBTK()
+// Local handle to the loaded module for the conversion helpers below.
+function btkOrThrow()
 {
-  await btkPromise;
-  return btk;
-}
-
-// Get BTK (may be null if not loaded yet)
-export function getBTK()
-{
+  const btk = getBTK();
+  if (!btk) throw new Error('BTK not loaded yet');
   return btk;
 }
 
@@ -36,7 +23,7 @@ export function getBTK()
  */
 export function btkToThreeJsPosition(btkVec)
 {
-  if (!btk) throw new Error('BTK not loaded yet');
+  const btk = btkOrThrow();
   return {
     x: btk.Conversions.metersToYards(btkVec.x),
     y: btk.Conversions.metersToYards(btkVec.y),
@@ -54,7 +41,7 @@ export function btkToThreeJsPosition(btkVec)
  */
 export function threeJsToBtkPosition(x_yd, y_yd, z_yd)
 {
-  if (!btk) throw new Error('BTK not loaded yet');
+  const btk = btkOrThrow();
   return new btk.Vector3D(
     btk.Conversions.yardsToMeters(x_yd),
     btk.Conversions.yardsToMeters(y_yd),
@@ -70,7 +57,7 @@ export function threeJsToBtkPosition(x_yd, y_yd, z_yd)
  */
 export function btkToThreeJsVelocity(btkVec)
 {
-  if (!btk) throw new Error('BTK not loaded yet');
+  const btk = btkOrThrow();
   return {
     x: btk.Conversions.mpsToFps(btkVec.x),
     y: btk.Conversions.mpsToFps(btkVec.y),
@@ -88,7 +75,7 @@ export function btkToThreeJsVelocity(btkVec)
  */
 export function threeJsToBtkVelocity(x_fps, y_fps, z_fps)
 {
-  if (!btk) throw new Error('BTK not loaded yet');
+  const btk = btkOrThrow();
   return new btk.Vector3D(
     btk.Conversions.fpsToMps(x_fps),
     btk.Conversions.fpsToMps(y_fps),
@@ -104,7 +91,7 @@ export function threeJsToBtkVelocity(x_fps, y_fps, z_fps)
  */
 export function btkWindToThreeJs(windBtk)
 {
-  if (!btk) throw new Error('BTK not loaded yet');
+  const btk = btkOrThrow();
   return {
     x: btk.Conversions.mpsToMph(windBtk.x),
     y: btk.Conversions.mpsToMph(windBtk.y),
@@ -123,7 +110,7 @@ export function btkWindToThreeJs(windBtk)
  */
 export function sampleWindAtThreeJsPosition(generator, x_yd, y_yd, z_yd)
 {
-  if (!btk) throw new Error('BTK not loaded yet');
+  const btk = btkOrThrow();
   if (!generator)
   {
     return {
