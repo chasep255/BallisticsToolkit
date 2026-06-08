@@ -76,7 +76,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Competition Presets** - 14 standard competition target configurations (SR, MR, LR, F-Class) with correct ring diameters
 - **Ring Editor** - Customize ring labels, diameters, fill colors, and line colors; add or remove rings for fully custom targets
 - **Tiling Layouts** - Print 1, 2, 4, or 6 targets per page with automatic centering and clipping
-- **Exact 1:1 Scale** - Rings print at their actual physical dimensions; uses browser print with 300 DPI rendering
+- **1:1 Scale** - Rings are generated at their actual physical dimensions and print true-to-size at 100% (Actual Size); uses browser print with 300 DPI rendering. Verify with a ruler before use
 - **Print Options** - Paper size (Letter, Legal, Tabloid, A4, A3, custom), orientation, margins, ring labels, target info, label colors, ring line thickness
 
 ## Quick Start
@@ -89,7 +89,7 @@ Visit the [Ballistic Calculator](https://www.ballisticstoolkit.com/ballistic-cal
 3. **Wind** - Speed and direction using 12-hour clock (wind coming from the clock direction, target at 12). 12=headwind, 6=tailwind, 3=from right, 9=from left
 4. **Shot data** - Muzzle velocity, zero range, scope height
 
-Results display drop and drift corrections (including spin drift) in your choice of milliradians or MOA for precise long-range adjustments.
+Results display drop and drift corrections (including spin drift) in your choice of milliradians or MOA.
 
 ### Load Comparison
 Visit the [Load Comparison](https://www.ballisticstoolkit.com/load-comp/load-comp.html) to compare two loads:
@@ -161,7 +161,7 @@ Visit the [Target Generator](https://www.ballisticstoolkit.com/target-gen/target
 3. **Print Settings** - Paper size (Letter, Legal, Tabloid, A4, A3, custom), orientation, margins, tiling layouts (1-up, 2-up, 4-up, 6-up)
 4. **Display Options** - Ring labels, target info text, label/info colors, ring line thickness, custom target label
 
-Generate targets at exact 1:1 physical scale using browser print. Targets larger than the paper are clipped at the page edge. Tiled layouts place multiple targets per page for smaller targets.
+Generate targets at 1:1 physical scale using browser print (print at 100% / Actual Size to preserve true dimensions; verify with a ruler). Targets larger than the paper are clipped at the page edge. Tiled layouts place multiple targets per page for smaller targets.
 
 ## Building from Source
 
