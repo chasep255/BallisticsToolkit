@@ -1,13 +1,8 @@
 import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
 import { createSettingsCookies } from '../settings-cookies.js';
 import * as THREE from 'three';
-import
-{
-  SmokeSimulation
-}
-from './core/smoke-sim.js';
 
-const SettingsCookies = createSettingsCookies('wind_sim_');
+const SettingsCookies = createSettingsCookies('wind_gen_');
 
 const DEFAULT_PARAMS = {
   timeScale: '1.0',
@@ -17,7 +12,6 @@ const DEFAULT_PARAMS = {
 let btk = null; // WASM module
 let wind = null; // BTK wind generator (WASM)
 let visualizations = []; // Array of WindFieldVisualization instances
-let smokeSimulation = null; // Smoke simulation for composite visualization
 let animId = null;
 let startTime = 0;
 let dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -1028,9 +1022,6 @@ function buildAllVisualizations()
     return wind.sample(x, y, z);
   });
 
-  // Create separate smoke flow visualization section
-  createSmokeVisualizationSection(container, 'smoke-flow', 'Smoke Flow Visualization');
-
   // Initialize all visualizations
   for (const viz of visualizations)
   {
@@ -1091,104 +1082,6 @@ function createVisualizationSection(container, canvasId, title, samplingFunction
   visualizations.push(visualization);
 }
 
-function createSmokeVisualizationSection(container, canvasId, title)
-{
-  // Create section container
-  const section = document.createElement('div');
-  section.className = 'wind-field-section';
-
-  // Create title
-  const titleEl = document.createElement('div');
-  titleEl.className = 'wind-field-title';
-  titleEl.textContent = title;
-  section.appendChild(titleEl);
-
-  // Create canvas wrapper
-  const canvasWrap = document.createElement('div');
-  canvasWrap.className = 'wind-field-canvas-wrap';
-
-  // Create canvas
-  const canvas = document.createElement('canvas');
-  canvas.id = canvasId;
-  canvas.className = 'wind-field-canvas';
-  canvas.width = 1000;
-  canvas.height = 200;
-  canvasWrap.appendChild(canvas);
-
-  // Add axis labels
-  const axisLabels = document.createElement('div');
-  axisLabels.className = 'axis-labels';
-  axisLabels.innerHTML = `
-    <div class="x-axis-label left">0 yd</div>
-    <div class="x-axis-label center">500 yd</div>
-    <div class="x-axis-label right">1000 yd</div>
-    <div class="x-axis-label title">Downrange (yards)</div>
-    <div class="y-axis-label top">-100 yd</div>
-    <div class="y-axis-label center">0 yd</div>
-    <div class="y-axis-label bottom">+100 yd</div>
-    <div class="y-axis-label title">Crossrange (yards)</div>
-  `;
-  canvasWrap.appendChild(axisLabels);
-
-  // Add legend
-  const legend = document.createElement('div');
-  legend.className = 'legend';
-  legend.textContent = 'Smoke particles show wind flow patterns. Color = local wind speed (cool = slow, warm = fast).';
-  canvasWrap.appendChild(legend);
-
-  section.appendChild(canvasWrap);
-  container.appendChild(section);
-
-  // Create Three.js scene for smoke simulation
-  const scene = new THREE.Scene();
-
-  // Match the wind visualization camera bounds: 0-1000 X, -100 to +100 Y
-  const marginX = 20;
-  const marginY = 20;
-  const camera = new THREE.OrthographicCamera(
-    -marginX,
-    1000 + marginX,
-    100 + marginY,
-    -100 - marginY,
-    -10,
-    10
-  );
-  camera.position.set(0, 0, 5);
-  camera.lookAt(0, 0, 0);
-
-  const renderer = new THREE.WebGLRenderer(
-  {
-    canvas: canvas,
-    alpha: false, // Opaque black background
-    antialias: true,
-    preserveDrawingBuffer: false
-  });
-  renderer.setSize(1000, 200, false); // Don't update style
-  renderer.setClearColor(0x000000, 1.0); // Solid black background
-  renderer.sortObjects = false; // Disable sorting for better performance
-
-  // Dispose existing smoke simulation if any
-  if (smokeSimulation)
-  {
-    smokeSimulation.dispose();
-    smokeSimulation = null;
-  }
-
-  // Create new smoke simulation with bounds
-  const bounds = {
-    minX_m: 0.0,
-    maxX_m: 914.4, // 1000 yards
-    minY_m: -91.44, // -100 yards
-    maxY_m: 91.44 // 100 yards
-  };
-  smokeSimulation = new SmokeSimulation(btk, scene, wind, bounds);
-  smokeSimulation.setEnabled(true); // Always enabled
-
-  // Store renderer and scene for cleanup
-  smokeSimulation.renderer = renderer;
-  smokeSimulation.camera = camera;
-}
-
 function clearAllVisualizations()
 {
   // Dispose all visualizations
@@ -1197,17 +1090,6 @@ function clearAllVisualizations()
     viz.dispose();
   }
   visualizations = [];
-
-  // Dispose smoke simulation
-  if (smokeSimulation)
-  {
-    smokeSimulation.dispose();
-    if (smokeSimulation.renderer)
-    {
-      smokeSimulation.renderer.dispose();
-    }
-    smokeSimulation = null;
-  }
 
   // Clear container
   const container = document.getElementById('windVisualizations');
@@ -1261,16 +1143,6 @@ function drawFrame()
   {
     viz.update();
     viz.renderer.render(viz.scene, viz.camera);
-  }
-
-  // Update and render smoke simulation
-  if (smokeSimulation)
-  {
-    smokeSimulation.advanceTime(t);
-    if (smokeSimulation.renderer && smokeSimulation.camera)
-    {
-      smokeSimulation.renderer.render(smokeSimulation.scene, smokeSimulation.camera);
-    }
   }
 
   // Update global stats by aggregating from all visualizations
@@ -1598,6 +1470,6 @@ document.addEventListener('DOMContentLoaded', async () =>
   catch (error)
   {
     console.error('Failed to initialize:', error);
-    showError('Failed to load wind simulator. Please refresh the page.');
+    showError('Failed to load wind generator. Please refresh the page.');
   }
 });

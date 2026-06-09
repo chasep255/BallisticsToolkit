@@ -1,6 +1,6 @@
 /**
  * WindFieldHUD - Graphical wind field visualization overlay
- * Similar to wind-sim's composite view, displays wind speed (color) and direction (arrows)
+ * Similar to wind-gen's composite view, displays wind speed (color) and direction (arrows)
  * as a vertical strip at the top-left, showing downrange progression from top (shooter) to bottom (target).
  */
 

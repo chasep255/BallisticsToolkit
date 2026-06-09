@@ -43,7 +43,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Full Ballistics** - Same G1/G7 drag models, atmosphere, spin effects, and wind variability as the other tools
 - **Persistent Settings** - Cookie-based save/restore of all parameters
 
-### 🌬️ Wind Simulator
+### 🌬️ Wind Generator
 - **Real-time Wind Visualization** - Interactive 2D wind field visualization showing wind speed and direction across the range
 - **Procedural Wind Patterns** - Multi-octave curl noise generates swirling wind patterns that evolve over time
 - **Wind Presets** - Zero, Dead, Calm, Moderate, Strong, Extra Strong
@@ -54,7 +54,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Pair Fire** - Per-turn timer (or unlimited), per-player sighters and configurable record shots, per-shooter scope persistence, dual HUD with active-shooter highlight, and X-count → sudden-death tiebreak
 - **Dual Scopes** - Spotting scope for wind reading, rifle scope for aiming
 - **Wind Reading** - Heat mirage effect responds to wind speed and direction; reactive 3D wind markers (selectable wind flags or wind socks) at multiple distances
-- **Advanced Wind Simulation** - Multi‑octave curl noise with advection and multiple presets (see Wind Simulator)
+- **Advanced Wind Simulation** - Multi‑octave curl noise with advection and multiple presets (see Wind Generator)
 - **Spin Effects** - Spin drift and crosswind jump included in trajectory calculations and trace visualizations
 - **Match-Style Scoring** - Authentic target animation, detailed scorecard with per-section impact (grouping) diagrams
 - **Remote Play (Beta)** - Host a match and stream the live view (and audio) to another person who plays it remotely. The host shares a single invite link; connections are brokered by the free PeerJS service and the audio/video is peer-to-peer (no account). In Pair Fire the host plays Player 1 and the remote player plays Player 2, with turn-gated controls

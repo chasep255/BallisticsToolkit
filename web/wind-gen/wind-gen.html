@@ -3,37 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wind Simulator | Ballistics Toolkit</title>
+  <title>Wind Generator | Ballistics Toolkit</title>
   <meta name="description" content="Real-time wind visualization with multi-octave curl noise and per-component advection. Visualize wind patterns and atmospheric effects for precision shooting.">
-  <meta name="keywords" content="wind simulator, wind visualization, curl noise, simplex noise, turbulence modeling, atmospheric effects, wind flags">
-  <link rel="canonical" href="https://www.ballisticstoolkit.com/wind-sim/wind-sim.html">
+  <meta name="keywords" content="wind generator, wind visualization, curl noise, simplex noise, turbulence modeling, atmospheric effects, wind flags">
+  <link rel="canonical" href="https://www.ballisticstoolkit.com/wind-gen/wind-gen.html">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://www.ballisticstoolkit.com/wind-sim/wind-sim.html">
-  <meta property="og:title" content="Wind Simulator">
+  <meta property="og:url" content="https://www.ballisticstoolkit.com/wind-gen/wind-gen.html">
+  <meta property="og:title" content="Wind Generator">
   <meta property="og:description" content="Real-time wind visualization with multi-octave curl noise and per-component advection. Visualize wind patterns and atmospheric effects for precision shooting.">
   <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://www.ballisticstoolkit.com/wind-sim/wind-sim.html">
-  <meta property="twitter:title" content="Wind Simulator">
+  <meta property="twitter:url" content="https://www.ballisticstoolkit.com/wind-gen/wind-gen.html">
+  <meta property="twitter:title" content="Wind Generator">
   <meta property="twitter:description" content="Real-time wind visualization with multi-octave curl noise and per-component advection. Visualize wind patterns and atmospheric effects for precision shooting.">
   <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
   
   <link rel="icon" type="image/x-icon" href="../ballistics-toolkit-favicon.ico">
   <link rel="stylesheet" href="../common.css">
-  <link rel="stylesheet" href="wind-sim.css">
+  <link rel="stylesheet" href="wind-gen.css">
   
   <!-- Schema.org structured data -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Wind Simulator",
+    "name": "Wind Generator",
     "description": "Real-time wind visualization with multi-octave curl noise and per-component advection",
-    "url": "https://www.ballisticstoolkit.com/wind-sim/wind-sim.html",
+    "url": "https://www.ballisticstoolkit.com/wind-gen/wind-gen.html",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Web Browser",
     "offers": {
@@ -53,13 +53,13 @@
       }
     }
   </script>
-  <script type="module" src="wind-sim.js"></script>
+  <script type="module" src="wind-gen.js"></script>
 </head>
-<body data-page="wind-sim">
+<body data-page="wind-gen">
   <div class="nav-header"></div>
 
   <div class="app-container">
-      <h1>🌬️ Wind Simulator</h1>
+      <h1>🌬️ Wind Generator</h1>
 
     <div class="params-bar">
       <div class="param-item">
@@ -171,7 +171,7 @@
   <div id="helpModal" class="help-modal" style="display: none;">
     <div class="help-modal-content">
       <div class="help-modal-header">
-        <h2>🌬️ Wind Simulator Help</h2>
+        <h2>🌬️ Wind Generator Help</h2>
         <span class="help-close">&times;</span>
       </div>
       <div class="help-modal-body">
@@ -217,8 +217,7 @@
             <strong>Wind Visualization:</strong> Each grid point shows wind using two elements: colored squares indicate wind speed (blue=calm, red=strong), and white triangles indicate wind direction (point downwind). The squares provide the speed color map while triangles rotate to show instantaneous wind direction.<br><br>
             <strong>2D Wind Field:</strong> The wind varies continuously across both downrange (0-1000 yards) and crossrange (±100 yards) dimensions. Each component contributes patterns at different spatial scales, creating simulated variation.<br><br>
             <strong>Speed Scale:</strong> Color gradient represents wind speed: deep blue ≈ 0 mph, transitioning to red at the Color Threshold setting. The gradient transitions smoothly based on wind speed, with faster winds appearing more red.<br><br>
-            <strong>Triangle Direction:</strong> Each white triangle points in the direction the wind is blowing (downwind). Triangle rotation shows instantaneous wind direction at that location.<br><br>
-            <strong>Smoke Flow:</strong> A separate dark panel releases a continuous stream of particles into the same wind field. The particles drift with the local wind, so you can watch the flow itself — its swirls, gusts, and overall drift — and they are tinted by local wind speed (cooler where slow, warmer where fast), fading out as they age.
+            <strong>Triangle Direction:</strong> Each white triangle points in the direction the wind is blowing (downwind). Triangle rotation shows instantaneous wind direction at that location.
           </div>
         </div>
 

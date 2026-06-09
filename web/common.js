@@ -198,7 +198,7 @@ function setActiveNavLink()
     'perf-matrix': 'perf-matrix/perf-matrix.html',
     'target-sim': 'target-sim/target-sim.html',
     'hit-sim': 'hit-sim/hit-sim.html',
-    'wind-sim': 'wind-sim/wind-sim.html',
+    'wind-gen': 'wind-gen/wind-gen.html',
     'steel-sim': 'steel-sim/steel-sim.html',
     'fclass-sim': 'fclass-sim/fclass-sim.html',
     'target-gen': 'target-gen/target-gen.html'
@@ -248,7 +248,7 @@ function generateNavigation(currentPageName)
                 ${link('target-sim/target-sim.html', 'target-sim', 'Target Sim', 'Target Simulator')}
                 ${link('target-gen/target-gen.html', 'target-gen', 'Target Gen', 'Target Generator')}
                 ${link('hit-sim/hit-sim.html', 'hit-sim', 'Hit Sim', 'Hit Simulator')}
-                ${link('wind-sim/wind-sim.html', 'wind-sim', 'Wind Sim', 'Wind Simulator')}
+                ${link('wind-gen/wind-gen.html', 'wind-gen', 'Wind Gen', 'Wind Generator')}
                 ${link('steel-sim/steel-sim.html', 'steel-sim', 'Steel Sim', 'Steel Simulator')}
                 ${link('fclass-sim/fclass-sim.html', 'fclass-sim', 'F-Class Sim', 'F-Class Simulator')}
             </div>

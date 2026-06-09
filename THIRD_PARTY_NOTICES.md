@@ -4,7 +4,7 @@ This project includes or references third‑party software. The following notice
 
 ## Three.js
 - Project: three.js (used via unpkg CDN)
-- Version: 0.160.0 (wind-sim, fclass-sim) and 0.180.0 (steel-sim)
+- Version: 0.160.0 (wind-gen, fclass-sim) and 0.180.0 (steel-sim)
 - License: MIT
 - Website: https://threejs.org/
 - Source: https://github.com/mrdoob/three.js
