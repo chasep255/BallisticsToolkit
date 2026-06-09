@@ -290,7 +290,7 @@
             - <strong>BC:</strong> Ballistic coefficient (aerodynamic efficiency, higher = less drift/drop)<br>
             - <strong>Drag Function:</strong> G7 (modern boat-tail) or G1 (flat-base/older)<br>
             - <strong>Diameter:</strong> Caliber in inches (affects scoring and spin)<br>
-            - <strong>Weight:</strong> Bullet weight in grains (for spin moment of inertia)<br>
+            - <strong>Weight:</strong> Bullet weight in grains (for stability factor and spin effects)<br>
             - <strong>Length:</strong> Bullet length in inches (for spin calculations)<br><br>
 
             <strong>Rifle:</strong><br>
@@ -301,9 +301,8 @@
             - <strong>Reticle:</strong> SFP (fixed size) or FFP (scales with zoom)<br><br>
 
             <strong>Spin Effects (When Enabled):</strong><br>
-            - Spin drift is zeroed during setup<br>
-            - Crosswind jump simulated when wind changes<br>
-            - Brief trajectory jump before bullet stabilizes
+            - Spin drift (Litz formula) is zeroed during setup<br>
+            - Crosswind jump applied as a vertical impulse when the wind the bullet sees changes
           </div>
         </div>
         
@@ -347,9 +346,9 @@
           <div class="param-help">
             <strong>Ballistics Engine:</strong><br>
             - WebAssembly-powered physics simulation (runs in browser)<br>
-            - RK2 integration of a modified point-mass (4DOF) state<br>
+            - RK2 integration of a modified point-mass trajectory<br>
             - Iterative zeroing in calm wind conditions<br>
-            - Spin effects: drift zeroed, crosswind jump modeled as transient<br><br>
+            - Spin effects: Litz spin drift (zeroed at sight-in) and crosswind aerodynamic jump<br><br>
 
             <strong>Wind Simulation:</strong><br>
             - 2D curl-noise field with multiple octaves and advection<br>
@@ -364,7 +363,7 @@
           <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
           <div class="param-help">
             <strong>Entertainment/Educational Simulation:</strong> This is a shooting simulation game. While it uses physics-based ballistic calculations, it is designed for entertainment and learning, not for generating real-world firing data.<br><br>
-            <strong>Ballistics Model:</strong> Uses a modified point-mass (4DOF) trajectory with highly approximate, empirically tuned spin effects. These are rough approximations and may differ significantly from real-world behavior.<br><br>
+            <strong>Ballistics Model:</strong> Uses a modified point-mass trajectory with Bryan Litz's empirical spin-drift and crosswind-jump formulas. These are widely-used approximations and may differ from real-world behavior.<br><br>
             <strong>Wind Model:</strong> 2D curl-noise field provides plausible patterns for gameplay but does not model terrain effects, thermals, or turbulence.<br><br>
             <strong>Mirage Model:</strong> Simplified heat shimmer effect based on wind and distance. Real mirage behavior is more complex and variable.<br><br>
             <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete information.

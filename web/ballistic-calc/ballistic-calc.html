@@ -57,12 +57,12 @@
         <!-- Parameters Bar -->
         <div class="params-bar">
             <div class="param-item">
-                <label for="weight" title="Bullet weight in grains - required for spin moment of inertia calculations">Weight (grains)</label>
-                <input type="number" id="weight" value="140" step="0.1" title="Bullet weight in grains - required for spin moment of inertia calculations">
+                <label for="weight" title="Bullet weight in grains - used for the stability factor (SG), sectional density, and kinetic energy">Weight (grains)</label>
+                <input type="number" id="weight" value="140" step="0.1" title="Bullet weight in grains - used for the stability factor (SG), sectional density, and kinetic energy">
             </div>
             <div class="param-item">
-                <label for="diameter" title="Bullet diameter in inches - used for spin aerodynamics and moment of inertia">Diameter (in)</label>
-                <input type="number" id="diameter" value="0.264" step="0.001" title="Bullet diameter in inches - used for spin aerodynamics and moment of inertia">
+                <label for="diameter" title="Bullet diameter in inches - used for the stability factor (SG) and spin aerodynamics">Diameter (in)</label>
+                <input type="number" id="diameter" value="0.264" step="0.001" title="Bullet diameter in inches - used for the stability factor (SG) and spin aerodynamics">
             </div>
             <div class="param-item">
                 <label for="bc" title="Ballistic Coefficient (0.001-1.0) - higher values mean better aerodynamics">BC</label>
@@ -76,12 +76,12 @@
                     </select>
                 </div>
             <div class="param-item">
-                <label for="length" title="Bullet length in inches - used for moment of inertia and spin aerodynamics calculations">Length (in)</label>
-                <input type="number" id="length" value="1.4" step="0.01" title="Bullet length in inches - used for moment of inertia and spin aerodynamics calculations">
+                <label for="length" title="Bullet length in inches - used for the stability factor (SG) and spin aerodynamics calculations">Length (in)</label>
+                <input type="number" id="length" value="1.4" step="0.01" title="Bullet length in inches - used for the stability factor (SG) and spin aerodynamics calculations">
             </div>
             <div class="param-item">
-                <label for="twistRate" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate bullet spin rate for spin drift and crosswind jump effects. Uses 4DOF simulation with simplified spin aerodynamics">Twist (in/turn)</label>
-                <input type="number" id="twistRate" value="8" step="0.1" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate bullet spin rate for spin drift and crosswind jump effects. Uses 4DOF simulation with simplified spin aerodynamics">
+                <label for="twistRate" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate the bullet spin rate and stability factor (SG), which drive Litz's spin-drift and crosswind-jump formulas">Twist (in/turn)</label>
+                <input type="number" id="twistRate" value="8" step="0.1" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate the bullet spin rate and stability factor (SG), which drive Litz's spin-drift and crosswind-jump formulas">
             </div>
             <div class="param-item" style="display: flex; align-items: center; gap: 8px;">
                 <input type="checkbox" id="enableSpinEffects" checked style="width: auto; margin: 0;">
@@ -196,8 +196,8 @@
                     <div class="param-help">
                         <strong>Weight (grains):</strong> Bullet weight in grains. Typical: .223 (55-77 gr), .308 (150-180 gr), .30-06 (150-220 gr).<br><br>
                         <strong>BC (Ballistic Coefficient):</strong> Drag efficiency relative to standard projectile. Typical: 0.1-0.5 for most rifle bullets. Higher = better aerodynamics.<br><br>
-                        <strong>Diameter (inches):</strong> Bullet diameter. Used for spin aerodynamics and moment of inertia calculations. Typical: .223 (0.224"), .308 (0.308").<br><br>
-                        <strong>Length (inches):</strong> Bullet length from tip to base. Used for moment of inertia and spin aerodynamics calculations. Typical: .223 (0.7-1.0"), .308 (1.0-1.4").<br><br>
+                        <strong>Diameter (inches):</strong> Bullet diameter. Used for the stability factor (SG) and spin aerodynamics calculations. Typical: .223 (0.224"), .308 (0.308").<br><br>
+                        <strong>Length (inches):</strong> Bullet length from tip to base. Used for the stability factor (SG) and spin aerodynamics calculations. Typical: .223 (0.7-1.0"), .308 (1.0-1.4").<br><br>
                         <strong>Twist (in/turn):</strong> Barrel twist rate. Enter positive for right-hand (RH) twist (e.g., 8 for 1:8 twist), negative for left-hand (LH). Common: .223 (1:7 or 1:8), .308 (1:10 or 1:12). Used to calculate bullet spin rate for spin drift and crosswind jump effects.<br><br>
                         <strong>Drag Model:</strong> G1 (traditional) vs G7 (modern). G7 generally better suited for boat tail bullets, G1 for flat base bullets.
                     </div>
@@ -237,7 +237,7 @@
                         • <strong>Spin Drift:</strong> A rightward drift (for right-hand twist) caused by gyroscopic precession. This effect increases with range and is independent of wind direction.<br>
                         • <strong>Crosswind Jump:</strong> Vertical deflection when crosswinds interact with the spinning bullet, causing it to rise or fall slightly.<br><br>
                         <strong>Twist Rate:</strong> Enter your barrel twist rate (e.g., 8 for 1:8 twist). Positive values = right-hand twist, negative = left-hand twist. This determines the bullet's spin rate, which affects both spin drift magnitude and direction. The calculated spin rate (in RPM) is always displayed in the results, regardless of whether spin effects are enabled in the simulation.<br><br>
-                        <strong>Modeling Approach:</strong> Spin effects use highly approximate, empirically tuned aerodynamics. The model tracks bullet spin and computes lateral/vertical accelerations from wind, spin, and angle-of-attack dynamics, but these are rough approximations. Right-hand twist yields rightward spin drift; left-hand twist reverses the direction.<br><br>
+                        <strong>Modeling Approach:</strong> Spin effects use Bryan Litz's published empirical formulas (<em>Applied Ballistics for Long-Range Shooting</em>). Spin drift is computed from the bullet's gyroscopic stability factor (SG) and time of flight; crosswind jump from SG, bullet length, and the crosswind the bullet encounters. SG is the Miller stability factor corrected to muzzle velocity and air density. Right-hand twist yields rightward spin drift; left-hand twist reverses the direction. These are widely-used approximations, not a full aerodynamic solve.<br><br>
                         <strong>Accuracy Note:</strong> These effects are modeled to illustrate expected trends and add realism. They are not a substitute for verified dope and may not match all bullet/rifle combinations precisely.
                     </div>
                 </div>
@@ -265,7 +265,7 @@
                         <strong>Miller Twist Rule:</strong> Calculates bullet stability using the Miller stability factor (SG):<br>
                         • <strong>Stability Factor (SG):</strong> Indicates bullet stability. Values below 1.0 are unstable (red), 1.0-1.5 is marginal stability (orange), and 1.5+ is good stability (green).<br>
                         • <strong>Ideal Twist Rate:</strong> For stable bullets (SG ≥ 1.5), shows the twist rate that would produce the current SG value. For unstable/marginal bullets, shows the minimum twist rate needed for SG = 1.5 (good stability).<br>
-                        • The Miller formula accounts for bullet weight, diameter, length, and twist rate to determine gyroscopic stability.
+                        • The Miller formula accounts for bullet weight, diameter, length, and twist rate; the displayed SG is further corrected for muzzle velocity and air density, and is the same SG that drives the spin-drift and crosswind-jump model.
                     </div>
                 </div>
                 
@@ -294,9 +294,9 @@
                 <div class="help-section">
                     <h3>Technical Details</h3>
                     <div class="param-help">
-                        <strong>Model (modified point-mass / 4DOF):</strong> A point-mass trajectory (position and velocity, integrated with RK2) plus the bullet's spin, from which spin drift (yaw of repose) and a transient crosswind jump are computed. This is what's commonly called a "4DOF" or modified point-mass model; it does not integrate full angular (pitch/yaw) motion the way a 5DOF/6DOF solver would.<br><br>
+                        <strong>Model (modified point-mass):</strong> A point-mass trajectory (position and velocity, integrated with RK2) with spin drift and crosswind jump layered on from Bryan Litz's empirical formulas. It does not integrate the bullet's angular (pitch/yaw) motion the way a 4DOF/6DOF solver would — the spin effects are closed-form empirical corrections, the same general approach used by Applied Ballistics' own solver.<br><br>
                         <strong>Drag (G1/G7):</strong> Uses standard empirical drag tables (G1/G7). Air density corrections are applied from temperature, humidity, and altitude to adjust deceleration along the velocity vector.<br><br>
-                        <strong>Moment of Inertia:</strong> When spin effects are enabled, moment of inertia is estimated from bullet weight, length, and diameter. This affects how the spinning bullet responds to wind forces.
+                        <strong>Stability Factor (SG):</strong> When spin effects are enabled, the corrected Miller stability factor — computed once at the muzzle from twist, velocity, and air density — sets the magnitude of both spin drift and crosswind jump.
                     </div>
                 </div>
 
@@ -306,7 +306,7 @@
                     <div class="param-help">
                         <strong>Accuracy:</strong> This calculator provides estimates based on mathematical models. Actual trajectory may vary due to bullet manufacturing variations, barrel harmonics, atmospheric micro-variations, and other factors. Do not rely on these calculations for any purpose where incorrect data could be hazardous.<br><br>
                         <strong>Accuracy Degrades With:</strong> Longer ranges, longer flight times, and atypical bullet parameters (unusual BCs, very light/heavy bullets, extreme velocities, etc).<br><br>
-                        <strong>Spin Aerodynamics:</strong> Spin drift and crosswind jump are an empirical fit — physically motivated but hand-tuned to look right, not derived from measured aerodynamic coefficients, CFD, or a rigorous 6DOF solve. Treat them as flavor that adds realism, not as data, and expect them to differ significantly from real-world behavior.<br><br>
+                        <strong>Spin Aerodynamics:</strong> Spin drift and crosswind jump use Bryan Litz's published empirical formulas — widely-used first-order estimates keyed off the gyroscopic stability factor, not a rigorous 6DOF aerodynamic solve. They follow real-world trends well for typical supersonic rifle loads but can differ for unusual bullets, marginal stability, or transonic flight. Verify against your own dope.<br><br>
                         <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete safety and liability information.
                     </div>
                 </div>
