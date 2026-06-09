@@ -36,6 +36,7 @@ const DEFAULT_PARAMS = {
   minutesPerMatch: '20',
   player1Name: 'Player1',
   player2Name: 'Player2',
+  player2Type: 'human',
   pairShots: '10',
   turnTime: 'unlimited',
   fclassMode: 'fclass-1000',
@@ -84,6 +85,43 @@ function updateModeVisibility()
   {
     el.style.display = isPair ? '' : 'none';
   });
+  updatePlayer2TypeUI();
+}
+
+// Remembers the human-entered Player 2 name while an AI is selected, so it can
+// be restored when switching back to Human.
+let lastHumanPlayer2Name = DEFAULT_PARAMS.player2Name || 'Player2';
+
+/**
+ * When Player 2 is an AI, the name field is auto-filled with the AI's label and
+ * locked; switching back to Human restores the last human-entered name.
+ */
+function updatePlayer2TypeUI()
+{
+  const typeEl = document.getElementById('player2Type');
+  const nameEl = document.getElementById('player2Name');
+  if (!typeEl || !nameEl) return;
+  const isAI = typeEl.value.startsWith('ai-');
+  if (isAI)
+  {
+    // Stash the human name (ignore an AI label already sitting in the box, e.g.
+    // restored from a cookie) before overwriting it.
+    if (!nameEl.disabled && !nameEl.value.startsWith('AI '))
+    {
+      lastHumanPlayer2Name = nameEl.value || lastHumanPlayer2Name;
+    }
+    const level = typeEl.value.slice(3);
+    nameEl.value = `AI – ${AI_PROFILES[level] ? AI_PROFILES[level].label : level}`;
+    nameEl.disabled = true;
+  }
+  else
+  {
+    if (nameEl.disabled || nameEl.value.startsWith('AI '))
+    {
+      nameEl.value = lastHumanPlayer2Name;
+    }
+    nameEl.disabled = false;
+  }
 }
 
 function setDefaultValues()
@@ -170,6 +208,13 @@ import
 }
 from './core/RenderStats.js';
 import * as Range from './core/range-constants.js';
+import
+{
+  AIShooter,
+  AI_PROFILES,
+  WIND_READ_STATIONS
+}
+from './core/ai-shooter.js';
 
 const LOG_PREFIX_GAME = '[Game]';
 
@@ -219,6 +264,10 @@ const GAME_KEY_CODES = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyQ', 'KeyR',
   'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract'
 ]);
+
+// The trigger. Against an AI opponent only this is turn-gated — the player can
+// still pan/zoom/dial their own scope while the AI is shooting.
+const FIRE_KEY_CODES = new Set(['Space']);
 
 // Capture the live canvas as a video track (only meaningful once rendering).
 function canvasVideoTrack()
@@ -461,6 +510,12 @@ function setupUI()
     matchModeEl.addEventListener('change', updateModeVisibility);
   }
 
+  const player2TypeEl = document.getElementById('player2Type');
+  if (player2TypeEl)
+  {
+    player2TypeEl.addEventListener('change', updatePlayer2TypeUI);
+  }
+
   // Mirage strength selector takes effect live (no restart needed)
   const mirageLevelEl = document.getElementById('mirageLevel');
   if (mirageLevelEl)
@@ -628,6 +683,7 @@ function getGameParams()
     minutesPerMatch: parseFloat(document.getElementById('minutesPerMatch').value),
     player1Name: document.getElementById('player1Name').value || 'Player1',
     player2Name: document.getElementById('player2Name').value || 'Player2',
+    player2Type: document.getElementById('player2Type').value,
     pairShots: parseInt(document.getElementById('pairShots').value),
     turnSeconds: turnTimeValue === 'unlimited' ? null : parseInt(turnTimeValue),
     // Bullet parameters
@@ -797,13 +853,20 @@ class FClassSimulator
     const urlParams = new URLSearchParams(window.location.search);
     this.debugMode = urlParams.get('debug') === '1';
 
+    // AI opponent (pair fire only): player 2 can be an AI you compete against.
+    const player2Type = params.player2Type || 'human';
+    this.aiOpponentLevel = (params.mode === 'pair' && player2Type.startsWith('ai-')) ? player2Type.slice(3) : null;
+    this.aiOpponent = null; // created in start() after drift calibration
+    this.aiFireAt = null; // game time at which the pair-fire AI breaks its shot
+
     // Match driver (format-specific rules + state + shot log + display models)
     this.mode = params.mode === 'pair' ? 'pair' : 'string';
     if (this.mode === 'pair')
     {
+      const p2Name = this.aiOpponentLevel ? `AI – ${AI_PROFILES[this.aiOpponentLevel].label}` : params.player2Name;
       this.driver = new PairFireDriver({
         player1Name: params.player1Name,
-        player2Name: params.player2Name,
+        player2Name: p2Name,
         recordShots: params.pairShots,
         turnSeconds: params.turnSeconds
       });
@@ -1248,6 +1311,9 @@ class FClassSimulator
       this.handleDriverEvent(event);
     }
 
+    // Advance the AI shooters (field cadence + pair opponent's turn)
+    this.updateAIShooters();
+
     // Show a deferred segment-end notification once the target is ready
     if (this.pendingSegmentEvent && this.targets.isTargetReady())
     {
@@ -1610,6 +1676,17 @@ class FClassSimulator
     // Update scorecard to display parameters before any shots
     this.refreshScorecard();
 
+    // AI shooters (pair-fire opponent / string-mode AI line)
+    try
+    {
+      this.setupAIShooters();
+    }
+    catch (error)
+    {
+      console.error('Failed to setup AI shooters:', error);
+      throw error;
+    }
+
     // Capture initial scope state (rifle + spotting) for both players (pair fire)
     if (this.mode === 'pair')
     {
@@ -1845,6 +1922,24 @@ class FClassSimulator
   // ===== BALLISTICS & SHOOTING =====
 
   /**
+   * Bullet parameters (from the UI) in the shape the ballistic solvers expect
+   */
+  getBulletParams()
+  {
+    return {
+      mvFps: this.mv,
+      bc: this.bc,
+      dragFunction: this.dragFunction,
+      diameterInches: this.diameter,
+      weightGrains: this.weight,
+      lengthInches: this.length,
+      twistInchesPerTurn: this.twist,
+      mvSdFps: this.mvSd,
+      rifleAccuracyMoa: this.rifleAccuracy
+    };
+  }
+
+  /**
    * Setup ballistics with zeroing
    */
   async setupBallistics()
@@ -1852,25 +1947,36 @@ class FClassSimulator
     try
     {
       // Use bullet parameters from constructor (passed via params)
-      await this.ballistics.setup(
-      {
-        mvFps: this.mv,
-        bc: this.bc,
-        dragFunction: this.dragFunction,
-        diameterInches: this.diameter,
-        weightGrains: this.weight,
-        lengthInches: this.length,
-        twistInchesPerTurn: this.twist,
-        mvSdFps: this.mvSd,
-        rifleAccuracyMoa: this.rifleAccuracy
-      });
-
+      await this.ballistics.setup(this.getBulletParams());
     }
     catch (error)
     {
       console.error('Failed to setup ballistic system:', error);
       throw error;
     }
+  }
+
+  /**
+   * Create the pair-fire AI opponent (if player 2 is an AI). Requires targets +
+   * ballistics to exist (drift calibration runs real sims through the solver).
+   */
+  setupAIShooters()
+  {
+    if (this.aiOpponentLevel === null) return;
+
+    // Calibrate via the player's solver (the AI shares the rifle in pair fire)
+    const cal = this.ballistics.solver.calibrateDriftSensitivity();
+    const windWeights = this.ballistics.solver.computeWindWeights(WIND_READ_STATIONS);
+    this.aiOpponent = new AIShooter(
+    {
+      level: this.aiOpponentLevel,
+      name: `AI – ${AI_PROFILES[this.aiOpponentLevel].label}`,
+      distanceYards: this.distance,
+      driftMoaPerMph: cal.driftMoaPerMph,
+      jumpMoaPerMph: cal.jumpMoaPerMph,
+      laneX: 0,
+      windWeights: windWeights
+    });
   }
 
   // ===== UI & DISPLAY =====
@@ -2102,10 +2208,12 @@ class FClassSimulator
 
   /**
    * Swap rifle + spotting scope state when the active player changes (pair fire only).
+   * With an AI opponent there is nothing to swap - the human keeps their sight
+   * picture and watches the AI's shot land.
    */
   swapScopeIfTurnChanged()
   {
-    if (this.mode !== 'pair')
+    if (this.mode !== 'pair' || this.aiOpponent)
     {
       return;
     }
@@ -2336,9 +2444,13 @@ class FClassSimulator
   }
 
   /**
-   * Fire a shot and display the impact
+   * Fire a shot and display the impact.
+   *
+   * @param {Object|null} aimOverride - {yaw, pitch, isAI} radians; when set
+   *   (pair-fire AI opponent) the shot uses this aim instead of the player's
+   *   rifle scope, takes no screenshot, and doesn't kick the player's aim.
    */
-  fireShot()
+  fireShot(aimOverride = null)
   {
     if (!this.ballistics)
     {
@@ -2368,6 +2480,22 @@ class FClassSimulator
 
     // Trigger-pull bookkeeping (e.g. stop the pair-fire turn clock)
     this.driver.onShotFired(ResourceManager.time.getElapsedTime());
+
+    const isAI = aimOverride !== null && aimOverride.isAI === true;
+
+    if (isAI)
+    {
+      // Diagnostics record the AI's commanded hold; no sight picture exists
+      // (the AI has no screen) and the player's scope must not recoil.
+      this.pendingShotDiag = {
+        aim: { yaw: aimOverride.yaw, pitch: aimOverride.pitch },
+        dial: { h: 0, v: 0 }
+      };
+
+      this.ballistics.fireShot(aimOverride);
+      this.ballistics.startBulletAnimation();
+      return;
+    }
 
     // Get rifle scope aim
     const aim = this.rifleScope.getAim();
@@ -2399,11 +2527,81 @@ class FClassSimulator
     this.pendingRecoil = true;
   }
 
+  // ===== AI SHOOTERS =====
+
+  /**
+   * Per-frame AI bookkeeping: the pair-fire opponent reads wind and breaks its
+   * shot when its time comes. Uses game time so pause/tab-hide freeze it too.
+   */
+  updateAIShooters()
+  {
+    const now = ResourceManager.time.getElapsedTime();
+
+    if (this.aiOpponent)
+    {
+      this.aiOpponent.updateWindRead(this.windGenerator, ResourceManager.time.getDeltaTime());
+
+      if (this.aiFireAt !== null && now >= this.aiFireAt &&
+        this.driver.getActivePlayerId() === 'p2' &&
+        this.driver.canFire() && this.targets.isTargetReady() &&
+        !this.ballistics.isBulletAnimating())
+      {
+        this.aiFireAt = null;
+        this.fireAIShot();
+      }
+    }
+  }
+
+  /**
+   * Schedule (or cancel) the pair-fire AI's next shot based on whose turn it is.
+   * Called whenever the turn state may have changed.
+   */
+  scheduleAITurnIfNeeded()
+  {
+    if (!this.aiOpponent) return;
+
+    if (this.driver.isComplete() || this.driver.getActivePlayerId() !== 'p2')
+    {
+      this.aiFireAt = null;
+      return;
+    }
+    if (this.aiFireAt !== null) return; // already scheduled
+
+    const now = ResourceManager.time.getElapsedTime();
+    const delay = this.aiOpponent.decideDelaySeconds(this.driver.turnRemaining ?? null);
+    this.aiFireAt = now + delay;
+    console.log(`${LOG_PREFIX_GAME} AI opponent will fire in ${delay.toFixed(1)}s`);
+  }
+
+  /**
+   * The pair-fire AI breaks its shot: plan a hold from its wind read and fire
+   * through the regular visible pipeline (tracer, sounds, target animation).
+   */
+  fireAIShot()
+  {
+    const btk = getBTK();
+    const hold = this.aiOpponent.planShot();
+    this.fireShot(
+    {
+      yaw: btk.Conversions.moaToRadians(hold.holdXMoa),
+      pitch: btk.Conversions.moaToRadians(hold.holdYMoa),
+      isAI: true
+    });
+  }
+
   /**
    * Handle shot completion (called by BallisticsSystem after bullet animation)
    */
   onShotComplete(shotData)
   {
+    // A shot that misses the target board entirely is a zero (no hole on the
+    // backer, no spotter - see TargetRenderer.isOnBoard).
+    if (!this.targets.isOnBoard(shotData.relativeX, shotData.relativeY))
+    {
+      shotData.score = 0;
+      shotData.isX = false;
+    }
+
     // Assemble per-shot diagnostics (aim + dial captured at trigger break, plus
     // the down-range trajectory/wind profile and sight-picture screenshot) and
     // attach them so the driver records them with the shot.
@@ -2536,16 +2734,21 @@ class FClassSimulator
     // Advance the driver's turn first, then mirror the new active shooter's scopes.
     this.driver.onTargetReady(ResourceManager.time.getElapsedTime());
     this.swapScopeIfTurnChanged();
+    this.scheduleAITurnIfNeeded();
 
     this.updateHUD();
     this.updateControls();
   }
 
   /**
-   * Turn gate for pair fire over Remote Play: the host plays player 1, the
-   * remote viewer plays player 2. Block keydowns from the source whose turn it
-   * isn't (capture phase, before the scope/fire handlers). Keyups always pass so
-   * a held key can't get stuck when the turn flips.
+   * Turn gate for pair fire (capture phase, before the scope/fire handlers).
+   * Keyups always pass so a held key can't get stuck when the turn flips.
+   *
+   * - vs a human over Remote Play: host is p1, viewer is p2; block whichever
+   *   source's turn it isn't (they share the rifle, so all controls are gated).
+   * - vs an AI: the human is p1 and keeps their own scope, so only the trigger
+   *   is gated — local and remote both drive p1 (sharing the lone shooter like
+   *   string fire) and can pan/zoom/dial freely; neither can fire on the AI's turn.
    */
   setupInputGate()
   {
@@ -2553,10 +2756,24 @@ class FClassSimulator
     {
       if (event.type !== 'keydown') return;
       if (isEditableTarget(event)) return; // never swallow typing in a text field
-      if (this.mode !== 'pair' || !this.remoteHost) return;
+      if (this.mode !== 'pair' || (!this.remoteHost && !this.aiOpponent)) return;
       if (!GAME_KEY_CODES.has(event.code)) return; // leave browser shortcuts alone
-      const allowed = event.btkRemote ? 'p2' : 'p1';
-      if (this.driver.getActivePlayerId() !== allowed)
+
+      let block = false;
+      if (this.aiOpponent)
+      {
+        // Versus an AI, both the local and the remote client drive the human
+        // side (p1) - just like sharing the lone shooter in string fire. Only
+        // the trigger is turn-gated, so neither can fire on the AI's turn.
+        block = FIRE_KEY_CODES.has(event.code) && this.driver.getActivePlayerId() !== 'p1';
+      }
+      else
+      {
+        const allowed = event.btkRemote ? 'p2' : 'p1';
+        block = this.driver.getActivePlayerId() !== allowed;
+      }
+
+      if (block)
       {
         event.stopImmediatePropagation();
         if (event.cancelable) event.preventDefault();
@@ -2573,7 +2790,12 @@ class FClassSimulator
    */
   requestGoForRecord(source)
   {
-    if (this.mode === 'pair' && this.remoteHost)
+    if (this.mode === 'pair' && this.aiOpponent)
+    {
+      // Local and remote both drive the human side (p1) versus an AI.
+      this.driver.goForRecord('p1');
+    }
+    else if (this.mode === 'pair' && this.remoteHost)
     {
       this.driver.goForRecord(source === 'remote' ? 'p2' : 'p1');
     }
@@ -2597,14 +2819,15 @@ class FClassSimulator
     // Each screen shows its own player's Go For Record. A player may go for
     // record whenever they still have sighters to skip — even during the other
     // player's turn — so the button is gated by that player's sighter state, not
-    // by whose turn it is. With a remote viewer playing p2, the host is p1.
-    const pairRemote = this.mode === 'pair' && !!this.remoteHost;
+    // by whose turn it is. With a remote viewer or an AI playing p2, the host
+    // (the human) is p1.
+    const pairSplit = this.mode === 'pair' && (!!this.remoteHost || !!this.aiOpponent);
 
     const goBtn = document.getElementById('goForRecordBtn');
     if (goBtn)
     {
-      const show = pairRemote ? this.driver.canGoForRecord('p1') : controls.goForRecord;
-      const text = pairRemote ? this.driver.goForRecordTextFor('p1') : controls.goForRecordText;
+      const show = pairSplit ? this.driver.canGoForRecord('p1') : controls.goForRecord;
+      const text = pairSplit ? this.driver.goForRecordTextFor('p1') : controls.goForRecordText;
       goBtn.style.display = show ? 'inline-block' : 'none';
       if (show) goBtn.textContent = text;
     }
@@ -2621,6 +2844,12 @@ class FClassSimulator
    */
   viewerControlsModel()
   {
+    if (this.mode === 'pair' && this.aiOpponent)
+    {
+      // Versus an AI the remote client plays the human side (p1), just like it
+      // drives the lone shooter in string fire - so it gets p1's Go For Record.
+      return { goForRecord: this.driver.canGoForRecord('p1'), goForRecordText: this.driver.goForRecordTextFor('p1') };
+    }
     if (this.mode === 'pair' && this.remoteHost)
     {
       return { goForRecord: this.driver.canGoForRecord('p2'), goForRecordText: this.driver.goForRecordTextFor('p2') };
@@ -2799,6 +3028,8 @@ class FClassSimulator
     {
       this.ballistics.dispose();
     }
+    this.aiOpponent = null;
+    this.aiFireAt = null;
     if (this.windFieldHUD)
     {
       this.windFieldHUD.dispose();
@@ -2992,3 +3223,59 @@ else
   // DOM already loaded, initialize immediately
   initializeApp();
 }
+
+/**
+ * Console harness for tuning the AI skill profiles: fires N headless shots for
+ * an AI of the given level against the live wind generator and prints the
+ * string. Run from the browser console while a game is running, e.g.
+ *   btkAiHarness('hard', 20)
+ * Caveat: the wind field doesn't evolve during the synchronous loop (game time
+ * advances per frame), so all shots see the same wind instant - good for
+ * dispersion/hold tuning, less so for condition-chasing dynamics.
+ */
+window.btkAiHarness = (level = 'hard', numShots = 20) =>
+{
+  if (!webglGame || !webglGame.ballistics || !webglGame.ballistics.solver)
+  {
+    console.error('[AIHarness] Start a game first');
+    return null;
+  }
+
+  const btk = getBTK();
+  const solver = webglGame.ballistics.solver;
+  const cal = solver.calibrateDriftSensitivity();
+  const windWeights = solver.computeWindWeights(WIND_READ_STATIONS);
+  const ai = new AIShooter(
+  {
+    level: level,
+    distanceYards: webglGame.distance,
+    driftMoaPerMph: cal.driftMoaPerMph,
+    jumpMoaPerMph: cal.jumpMoaPerMph,
+    laneX: 0,
+    windWeights: windWeights
+  });
+
+  // Seed the wind read (large dt -> EMA snaps to the current sample)
+  ai.updateWindRead(webglGame.windGenerator, 1000);
+
+  let total = 0;
+  let xCount = 0;
+  const scores = [];
+  for (let i = 0; i < numShots; i++)
+  {
+    ai.updateWindRead(webglGame.windGenerator, 5);
+    const hold = ai.planShot();
+    const result = solver.solveShot(
+    {
+      yawRad: btk.Conversions.moaToRadians(hold.holdXMoa),
+      pitchRad: btk.Conversions.moaToRadians(hold.holdYMoa)
+    });
+    const { score, isX } = solver.scoreImpact(result.relativeX, result.relativeY);
+    total += score;
+    if (isX) xCount++;
+    scores.push(isX ? 'X' : score);
+  }
+
+  console.log(`[AIHarness] ${level} @ ${webglGame.distance}yd, ${numShots} shots: ${total}-${xCount}X  [${scores.join(' ')}]`);
+  return { total, xCount, scores };
+};

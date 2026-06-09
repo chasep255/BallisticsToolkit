@@ -566,6 +566,17 @@ export class TargetRenderer
     };
   }
 
+  /**
+   * Whether an impact (yards from target center) landed on the target board -
+   * i.e. within the frame. A shot outside it missed the board entirely (a
+   * zero), so there's no hole to mark with a spotter.
+   */
+  isOnBoard(relativeX, relativeY)
+  {
+    const half = this.cfg.targetSize / 2;
+    return Math.abs(relativeX) <= half && Math.abs(relativeY) <= half;
+  }
+
   getBtkTarget()
   {
     return this.btkTarget;
@@ -750,27 +761,31 @@ export class TargetRenderer
               this.spotterRelativeY = this.pendingNewSpotterData.relativeY;
               this.spotterDistance = this.pendingNewSpotterData.distance;
 
-              // Create new spotter marker
-              const spotterDiameterYards = this.spotterDistance * 0.25 / 3438;
-              const spotterRadiusYards = spotterDiameterYards / 2;
-
-              const markerGeometry = new THREE.SphereGeometry(spotterRadiusYards, 8, 8);
-              const markerMaterial = new THREE.MeshStandardMaterial(
+              // Only place a spotter if the shot actually hit the target board;
+              // a complete miss (off the frame) leaves no hole to mark, so the
+              // marker would just float in the air.
+              if (this.isOnBoard(this.spotterRelativeX, this.spotterRelativeY))
               {
-                color: new THREE.Color(1.0, 0.35, 0.0),
-                emissive: new THREE.Color(1.0, 0.0, 0.0),
-                emissiveIntensity: 0.8,
-                toneMapped: false
-              });
+                const spotterDiameterYards = this.spotterDistance * 0.25 / 3438;
+                const spotterRadiusYards = spotterDiameterYards / 2;
 
-              this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-              this.lastShotMarker.castShadow = this.shadowsEnabled;
-              this.lastShotMarker.receiveShadow = this.shadowsEnabled;
-              this.scene.add(this.lastShotMarker);
+                const markerGeometry = new THREE.SphereGeometry(spotterRadiusYards, 8, 8);
+                const markerMaterial = new THREE.MeshStandardMaterial(
+                {
+                  color: new THREE.Color(1.0, 0.35, 0.0),
+                  emissive: new THREE.Color(1.0, 0.0, 0.0),
+                  emissiveIntensity: 0.8,
+                  toneMapped: false
+                });
 
-              // Position will be updated in updateSpotterPosition()
+                this.lastShotMarker = new THREE.Mesh(markerGeometry, markerMaterial);
+                this.lastShotMarker.castShadow = this.shadowsEnabled;
+                this.lastShotMarker.receiveShadow = this.shadowsEnabled;
+                this.scene.add(this.lastShotMarker);
+                // Position will be updated in updateSpotterPosition()
+              }
 
-              // Add scoring disc(s) for this shot
+              // Add scoring disc(s) for this shot (a miss shows the miss discs)
               this.addScoringDiscForScore(
                 this.pendingNewSpotterData.score,
                 this.pendingNewSpotterData.isX
@@ -1092,6 +1107,7 @@ export class TargetRenderer
       toneMapped: false,
       side: THREE.DoubleSide // Visible from both sides
     });
+
   }
 
   /**
@@ -1112,36 +1128,41 @@ export class TargetRenderer
   }
 
   /**
-   * Add scoring disc(s) for a given score
+   * F-Class scoring disc positions for a score, relative to target center.
+   * Shared by the user-target and AI pit-service paths.
+   * @returns {Array<{x:number, y:number}>}
    */
-  addScoringDiscForScore(score, isX)
+  discPositionsForScore(score, isX)
   {
-    if (!this.userTarget) return;
-
     const frameHalfSize = this.cfg.targetSize / 2; // Discs sit at the frame corners/edges
     const gapInches = 1.0; // 1 inch gap between disc and frame edge
     const gapYards = gapInches / 36.0; // Convert to yards
     const discRadiusYards = (6.0 / 36.0) / 2.0; // 6 inch disc radius in yards
     const edgePos = frameHalfSize - gapYards - discRadiusYards; // Position discs with 1" gap from edge
 
-    // Get user target center from instance
-    const targetCenter = this.getUserTargetCenter();
-    if (!targetCenter) return;
-
-    const targetX = targetCenter.x;
-    const targetY = targetCenter.y;
-    const targetZ = targetCenter.z;
-
-    // Z position in front of target but behind shot marker (marker is at +0.1)
-    const discZ = targetZ + 0.1;
-
-    // Define disc positions for each score (relative to target center)
-    const positions = {
-      'X': [
+    if (score < 5)
+    {
+      // Miss: two discs in the bottom corners
+      return [
+      {
+        x: -edgePos,
+        y: -edgePos
+      },
+      {
+        x: edgePos,
+        y: -edgePos
+      }];
+    }
+    if (score === 10 && isX)
+    {
+      // X-ring hit: 3 o'clock
+      return [
       {
         x: edgePos,
         y: 0
-      }], // 3 o'clock
+      }];
+    }
+    const positions = {
       '10': [
       {
         x: edgePos,
@@ -1171,40 +1192,30 @@ export class TargetRenderer
       {
         x: edgePos,
         y: -edgePos
-      }], // Bottom-right corner
-      'miss': [
-        {
-          x: -edgePos,
-          y: -edgePos
-        }, // Bottom-left
-        {
-          x: edgePos,
-          y: -edgePos
-        } // Bottom-right
-      ]
+      }] // Bottom-right corner
     };
+    return positions[score.toString()] || [];
+  }
 
-    // Determine which positions to use
-    let discPositions = [];
+  /**
+   * Add scoring disc(s) for a given score
+   */
+  addScoringDiscForScore(score, isX)
+  {
+    if (!this.userTarget) return;
 
-    if (score < 5)
-    {
-      // Miss: two discs in bottom corners
-      discPositions = positions['miss'];
-    }
-    else if (score === 10 && isX)
-    {
-      // X-ring hit: 3 o'clock position
-      discPositions = positions['X'];
-    }
-    else
-    {
-      // Regular score: use score as key
-      discPositions = positions[score.toString()] || [];
-    }
+    // Get user target center from instance
+    const targetCenter = this.getUserTargetCenter();
+    if (!targetCenter) return;
+
+    const targetX = targetCenter.x;
+    const targetY = targetCenter.y;
+
+    // Z position in front of target but behind shot marker (marker is at +0.1)
+    const discZ = targetCenter.z + 0.1;
 
     // Create and add disc(s)
-    for (const pos of discPositions)
+    for (const pos of this.discPositionsForScore(score, isX))
     {
       const disc = this.createScoringDisc(
         targetX + pos.x,

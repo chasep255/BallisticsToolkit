@@ -52,6 +52,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 ### 🎮 F-Class Simulator
 - **Two Match Modes** - String Fire (configurable matches, shots per match, and minutes per match; defaults 3 × 20 shots × 20 min aggregate) and Pair Fire (two players alternating on one rifle/target)
 - **Pair Fire** - Per-turn timer (or unlimited), per-player sighters and configurable record shots, per-shooter scope persistence, dual HUD with active-shooter highlight, and X-count → sudden-death tiebreak
+- **AI Opponent (Pair Fire)** - Set Player 2 to an AI to duel the computer on the shared target. Each level differs only in how well it reads the wind: Easy misjudges it badly (a large percentage error, stale flat read), Medium is decent, Hard reads accurately, weights the near wind by time-of-flight, and shoots near-clean. The AI holds for both wind drift and crosswind jump, fires through the same rifle dispersion you do (no extra wobble), and takes a realistic skill-based pause before each shot; you keep your sight picture and watch its shot land
 - **Dual Scopes** - Spotting scope for wind reading, rifle scope for aiming
 - **Wind Reading** - Heat mirage effect responds to wind speed and direction; reactive 3D wind markers (selectable wind flags or wind socks) at multiple distances
 - **Advanced Wind Simulation** - Multi‑octave curl noise with advection and multiple presets (see Wind Generator)
