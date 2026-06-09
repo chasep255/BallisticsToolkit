@@ -80,8 +80,8 @@
                 <input type="number" id="length" value="1.4" step="0.01" title="Bullet length in inches - used for the stability factor (SG) and spin aerodynamics calculations">
             </div>
             <div class="param-item">
-                <label for="twistRate" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate the bullet spin rate and stability factor (SG), which drive Litz's spin-drift and crosswind-jump formulas">Twist (in/turn)</label>
-                <input type="number" id="twistRate" value="8" step="0.1" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate the bullet spin rate and stability factor (SG), which drive Litz's spin-drift and crosswind-jump formulas">
+                <label for="twistRate" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate the bullet spin rate and stability factor (SG), which drive the Litz-based spin-drift and crosswind-jump model">Twist (in/turn)</label>
+                <input type="number" id="twistRate" value="8" step="0.1" title="Barrel twist rate in inches per turn (e.g., 8 for 1:8 twist) - used to calculate the bullet spin rate and stability factor (SG), which drive the Litz-based spin-drift and crosswind-jump model">
             </div>
             <div class="param-item" style="display: flex; align-items: center; gap: 8px;">
                 <input type="checkbox" id="enableSpinEffects" checked style="width: auto; margin: 0;">
@@ -237,7 +237,7 @@
                         • <strong>Spin Drift:</strong> A rightward drift (for right-hand twist) caused by gyroscopic precession. This effect increases with range and is independent of wind direction.<br>
                         • <strong>Crosswind Jump:</strong> Vertical deflection when crosswinds interact with the spinning bullet, causing it to rise or fall slightly.<br><br>
                         <strong>Twist Rate:</strong> Enter your barrel twist rate (e.g., 8 for 1:8 twist). Positive values = right-hand twist, negative = left-hand twist. This determines the bullet's spin rate, which affects both spin drift magnitude and direction. The calculated spin rate (in RPM) is always displayed in the results, regardless of whether spin effects are enabled in the simulation.<br><br>
-                        <strong>Modeling Approach:</strong> Spin effects use Bryan Litz's published empirical formulas (<em>Applied Ballistics for Long-Range Shooting</em>). Spin drift is computed from the bullet's gyroscopic stability factor (SG) and time of flight; crosswind jump from SG, bullet length, and the crosswind the bullet encounters. SG is the Miller stability factor corrected to muzzle velocity and air density. Right-hand twist yields rightward spin drift; left-hand twist reverses the direction. These are widely-used approximations, not a full aerodynamic solve.<br><br>
+                        <strong>Modeling Approach:</strong> Spin effects are based on Bryan Litz's published empirical formulas (<em>Applied Ballistics for Long-Range Shooting</em>). Spin drift is computed from the bullet's gyroscopic stability factor (SG) and time of flight; crosswind jump from SG, bullet length, and the crosswind the bullet encounters. SG is the Miller stability factor corrected to muzzle velocity and air density. Right-hand twist yields rightward spin drift; left-hand twist reverses the direction. These are widely-used approximations, not a full aerodynamic solve.<br><br>
                         <strong>Accuracy Note:</strong> These effects are modeled to illustrate expected trends and add realism. They are not a substitute for verified dope and may not match all bullet/rifle combinations precisely.
                     </div>
                 </div>
@@ -263,9 +263,9 @@
                         • <strong>Sectional Density:</strong> Weight divided by diameter squared, shown in lb/in². Higher values indicate better penetration potential.<br>
                         • <strong>Spin Rate:</strong> Bullet rotation rate in RPM, calculated from muzzle velocity and barrel twist rate. Displayed regardless of whether spin effects are enabled in the simulation.<br><br>
                         <strong>Miller Twist Rule:</strong> Calculates bullet stability using the Miller stability factor (SG):<br>
-                        • <strong>Stability Factor (SG):</strong> Indicates bullet stability. Values below 1.0 are unstable (red), 1.0-1.5 is marginal stability (orange), and 1.5+ is good stability (green).<br>
+                        • <strong>Stability Factor (SG):</strong> Indicates bullet stability. Two values are shown: <em>base</em> (standard sea-level conditions) and <em>corrected</em> (adjusted for your muzzle velocity and air density). Values below 1.0 are unstable (red), 1.0-1.5 is marginal stability (orange), and 1.5+ is good stability (green); the rating uses the corrected value.<br>
                         • <strong>Ideal Twist Rate:</strong> For stable bullets (SG ≥ 1.5), shows the twist rate that would produce the current SG value. For unstable/marginal bullets, shows the minimum twist rate needed for SG = 1.5 (good stability).<br>
-                        • The Miller formula accounts for bullet weight, diameter, length, and twist rate; the displayed SG is further corrected for muzzle velocity and air density, and is the same SG that drives the spin-drift and crosswind-jump model.
+                        • The Miller formula accounts for bullet weight, diameter, length, and twist rate. The corrected SG further adjusts for muzzle velocity and air density, and is the same SG that drives the spin-drift and crosswind-jump model.
                     </div>
                 </div>
                 
@@ -294,9 +294,10 @@
                 <div class="help-section">
                     <h3>Technical Details</h3>
                     <div class="param-help">
-                        <strong>Model (modified point-mass):</strong> A point-mass trajectory (position and velocity, integrated with RK2) with spin drift and crosswind jump layered on from Bryan Litz's empirical formulas. It does not integrate the bullet's angular (pitch/yaw) motion the way a 4DOF/6DOF solver would — the spin effects are closed-form empirical corrections, the same general approach used by Applied Ballistics' own solver.<br><br>
+                        <strong>Model (modified point-mass):</strong> A point-mass trajectory (position and velocity, integrated with RK2) with spin drift and crosswind jump layered on from Bryan Litz's empirical formulas. It does not integrate the bullet's angular (pitch/yaw) motion the way a 4DOF/6DOF solver would — the spin effects are empirical corrections, the same general approach used by Applied Ballistics' own solver.<br><br>
                         <strong>Drag (G1/G7):</strong> Uses standard empirical drag tables (G1/G7). Air density corrections are applied from temperature, humidity, and altitude to adjust deceleration along the velocity vector.<br><br>
-                        <strong>Stability Factor (SG):</strong> When spin effects are enabled, the corrected Miller stability factor — computed once at the muzzle from twist, velocity, and air density — sets the magnitude of both spin drift and crosswind jump.
+                        <strong>Stability Factor (SG):</strong> When spin effects are enabled, the corrected Miller stability factor — computed once at the muzzle from twist, velocity, and air density — sets the magnitude of both spin drift and crosswind jump.<br><br>
+                        <strong>How Litz's formulas are applied:</strong> Litz publishes spin drift as a closed form in <em>total</em> time of flight (SD = 1.25·(SG+1.2)·TOF<sup>1.83</sup>) and aerodynamic jump as a single muzzle constant (MOA per mph of crosswind). To run them inside a step-by-step trajectory, we adapt both: spin drift is applied as the time-derivative of that curve at the running flight time, so the integrator reproduces the same drift continuously rather than only at the final TOF; aerodynamic jump is applied as a vertical velocity impulse whenever the crosswind the bullet is flying through <em>changes</em>. A uniform wind from the muzzle reproduces Litz's published jump exactly, while a wind that begins or shifts downrange yields a correspondingly smaller, correctly-positioned jump — a generalization of Litz's muzzle-only figure to a varying wind.
                     </div>
                 </div>
 
@@ -306,7 +307,7 @@
                     <div class="param-help">
                         <strong>Accuracy:</strong> This calculator provides estimates based on mathematical models. Actual trajectory may vary due to bullet manufacturing variations, barrel harmonics, atmospheric micro-variations, and other factors. Do not rely on these calculations for any purpose where incorrect data could be hazardous.<br><br>
                         <strong>Accuracy Degrades With:</strong> Longer ranges, longer flight times, and atypical bullet parameters (unusual BCs, very light/heavy bullets, extreme velocities, etc).<br><br>
-                        <strong>Spin Aerodynamics:</strong> Spin drift and crosswind jump use Bryan Litz's published empirical formulas — widely-used first-order estimates keyed off the gyroscopic stability factor, not a rigorous 6DOF aerodynamic solve. They follow real-world trends well for typical supersonic rifle loads but can differ for unusual bullets, marginal stability, or transonic flight. Verify against your own dope.<br><br>
+                        <strong>Spin Aerodynamics:</strong> Spin drift and crosswind jump are based on Bryan Litz's published empirical formulas — widely-used first-order estimates keyed off the gyroscopic stability factor, not a rigorous 6DOF aerodynamic solve. They follow real-world trends well for typical supersonic rifle loads but can differ for unusual bullets, marginal stability, or transonic flight. Note also that we apply them continuously over the trajectory rather than as a single end-of-flight figure, and the downrange/varying-wind jump behavior is our own extension of Litz's muzzle-only figure, not a published result. Verify against your own dope.<br><br>
                         <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete safety and liability information.
                     </div>
                 </div>

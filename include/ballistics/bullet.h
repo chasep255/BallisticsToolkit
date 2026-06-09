@@ -143,13 +143,6 @@ namespace btk::ballistics
       return std::atan2(velocity_.x, -velocity_.z); // rad
     }
 
-    constexpr float estimateSpinMomentOfInertia() const
-    {
-      constexpr float K_RG = 0.30f; // radius-of-gyration factor (×diameter)
-      float r_eff = K_RG * diameter_;
-      return weight_ * r_eff * r_eff; // m * (k_rg * d)^2
-    }
-
     /**
      * @brief Calculate Miller stability factor (SG) for a given twist rate
      *

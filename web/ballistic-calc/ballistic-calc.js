@@ -229,10 +229,12 @@ function calculateTrajectory()
   // Always calculate from the display spin rate, not the simulation spin rate
   const spinRateRpm = spinRateForDisplay * 60.0 / (2.0 * Math.PI);
 
-  // Calculate Miller stability factor, corrected to actual muzzle conditions
-  // (velocity + air density) so it matches the SG definition Litz's spin-drift
-  // and aerodynamic-jump formulas are fit against.
+  // Miller stability factor. We show both the base factor (standard sea-level
+  // conditions) and the factor corrected to actual muzzle conditions (velocity +
+  // air density) — the corrected one matches the SG definition Litz's spin-drift
+  // and aerodynamic-jump formulas are fit against, and is what drives the model.
   const twistRateInches = parseFloat(document.getElementById('twistRate').value);
+  const millerStabilityFactorBase = bullet.computeMillerStabilityFactor(twistRateInches);
   const millerStabilityFactor = bullet.computeMillerStabilityFactorCorrected(
     twistRateInches,
     muzzleVelocity,
@@ -263,7 +265,7 @@ function calculateTrajectory()
   };
 
   // Display results
-  displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, inputParams);
+  displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, millerStabilityFactorBase, inputParams);
 
   // Dispose BTK objects to prevent memory leaks
   // Note: trajectoryObj is owned by simulator, don't delete it
@@ -272,7 +274,7 @@ function calculateTrajectory()
   bullet.delete();
 }
 
-function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, inputParams)
+function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelvin, sectionalDensity, spinRateRpm, enableSpinEffects, millerStabilityFactor, millerStabilityFactorBase, inputParams)
 {
   const tableBody = document.getElementById('trajectoryTable').getElementsByTagName('tbody')[0];
   tableBody.innerHTML = '';
@@ -321,8 +323,11 @@ function displayResults(trajectory, airDensity, pressure, speedOfSound, tempKelv
     infoHTML += ` | Spin Rate: ${Math.abs(spinRateRpm).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} RPM`;
   }
   
-  // Add Miller stability factor and ideal twist rate
-  infoHTML += `<br><strong>Miller Twist Rule:</strong> Stability Factor (SG): ${millerStabilityFactor.toFixed(2)}`;
+  // Add Miller stability factor (base + corrected) and stability rating.
+  // The corrected SG (actual muzzle velocity + air density) is what drives the
+  // spin model and is used for the stability rating; the base SG is shown for
+  // reference at standard sea-level conditions.
+  infoHTML += `<br><strong>Miller Twist Rule:</strong> Stability Factor (SG): ${millerStabilityFactorBase.toFixed(2)} base | ${millerStabilityFactor.toFixed(2)} corrected (at conditions)`;
   if (millerStabilityFactor < 1.0)
   {
     infoHTML += ` <span style="color: #d32f2f;">(Unstable - SG &lt; 1.0)</span>`;

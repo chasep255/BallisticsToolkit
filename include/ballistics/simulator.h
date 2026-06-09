@@ -154,12 +154,6 @@ namespace btk::ballistics
     const Trajectory& getTrajectory() const { return trajectory_; };
 
     /**
-     * @brief Get the corrected muzzle gyroscopic stability factor (SG) used by
-     *        the Litz spin-drift / aerodynamic-jump model. Computed at launch.
-     */
-    float getStabilityFactor() const { return sg_; }
-
-    /**
      * @brief Get deceleration (drag retardation) for a bullet state
      *
      * @param bullet Bullet state to calculate deceleration for
