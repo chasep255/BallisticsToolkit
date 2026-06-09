@@ -703,13 +703,10 @@ class FClassSimulator
   static PITS_OFFSET = 5;
 
   // === TARGET ANIMATION ===
-  static TARGET_SIZE = Range.TARGET_SIZE; // yards - size of target frames
   static TARGET_GAP_ABOVE_PITS = Range.TARGET_GAP_ABOVE_PITS; // Gap between target bottom and pit top when raised
-  static TARGET_MAX_HEIGHT = 0; // No additional height when raised (baseHeight already has the gap)
-  static TARGET_HALF_MAST = -(FClassSimulator.TARGET_SIZE + FClassSimulator.TARGET_GAP_ABOVE_PITS) / 2; // Halfway between raised and lowered
-  static TARGET_MIN_HEIGHT = -(FClassSimulator.TARGET_SIZE + FClassSimulator.TARGET_GAP_ABOVE_PITS); // Fully lowered (target size + gap)
-  static TARGET_CENTER_HEIGHT = FClassSimulator.PITS_HEIGHT + FClassSimulator.TARGET_GAP_ABOVE_PITS + FClassSimulator.TARGET_SIZE / 2; // Target center height when raised
-  static TARGET_ANIMATION_SPEED = 0.75; // yards per second
+  // Frame size and the resulting target-center height are per-target (the frame
+  // scales with the paper face), so they are computed in start() as
+  // this.frameSize / this.targetCenterHeight rather than fixed here.
 
   // Pair fire: pause after the target is back up before switching shooters,
   // so the shooter who just fired can see their impact.
@@ -1030,7 +1027,7 @@ class FClassSimulator
     // Near plane at 0.5 yards, far plane at 2500 yards to ensure clouds are visible
     this.camera = new THREE.PerspectiveCamera(FClassSimulator.CAMERA_FOV, aspect, 0.5, 2500);
     // Camera positioned 1 yard behind shooter, at target center height
-    const targetCenterHeight = FClassSimulator.TARGET_CENTER_HEIGHT;
+    const targetCenterHeight = this.targetCenterHeight;
     this.camera.position.set(0, targetCenterHeight, 1); // At shooter position (Z=1, slightly behind muzzle)
     this.camera.up.set(0, 1, 0); // Y is up in Three.js
     this.camera.lookAt(0, targetCenterHeight, -this.distance); // Look downrange (negative Z)
@@ -1351,6 +1348,16 @@ class FClassSimulator
     console.log(`${LOG_PREFIX_GAME} Bullet: ${this.bc} BC, ${this.mv}fps MV, ${this.mvSd}fps SD`);
     console.log(`${LOG_PREFIX_GAME} Rifle accuracy: ${this.rifleAccuracy} MOA`);
 
+    // Per-target frame geometry: the frame is sized relative to the paper face,
+    // so the target center height (what the camera/scopes aim at) varies by
+    // target. Derive it here once so the scopes and the TargetRenderer agree.
+    const btkForFrame = getBTK();
+    const frameTarget = btkForFrame.Targets.getTarget(String(this.targetType));
+    this.faceSizeYards = btkForFrame.Conversions.metersToYards(frameTarget.getFaceSize());
+    frameTarget.delete();
+    this.frameSize = this.faceSizeYards * Range.FRAME_TO_FACE_RATIO;
+    this.targetCenterHeight = FClassSimulator.PITS_HEIGHT + FClassSimulator.TARGET_GAP_ABOVE_PITS + this.frameSize / 2;
+
     // ===== THREE.JS CORE =====
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb); // Fallback color
@@ -1481,7 +1488,7 @@ class FClassSimulator
       windGenerator: this.windGenerator,
       targetDistance: this.distance,
       rangeWidth: FClassSimulator.RANGE_LANE_WIDTH,
-      targetHeight: FClassSimulator.TARGET_CENTER_HEIGHT
+      targetHeight: this.targetCenterHeight
     });
     this.windFieldHUDVisible = false; // Start hidden
     this.windFieldHUD.setVisible(false);
@@ -1499,14 +1506,14 @@ class FClassSimulator
       cameraPosition:
       {
         x: 0,
-        y: FClassSimulator.TARGET_CENTER_HEIGHT,
+        y: this.targetCenterHeight,
         z: 1
       },
       rangeDistance: this.distance,
       initialLookAt:
       {
         x: 0,
-        y: FClassSimulator.TARGET_CENTER_HEIGHT,
+        y: this.targetCenterHeight,
         z: -this.distance
       },
       msaaSamples: this.graphicsConfig.msaaSamples,
@@ -2059,7 +2066,7 @@ class FClassSimulator
     // Mark a miss low on the target (no bullet was fired)
     this.targets.markShotWithAnimation(
       timeout.relativeX,
-      timeout.relativeY - FClassSimulator.TARGET_SIZE,
+      timeout.relativeY - this.frameSize,
       this.distance,
       0,
       false,

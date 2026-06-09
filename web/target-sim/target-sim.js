@@ -564,57 +564,35 @@ class TargetSimulator
     this.targetCenterX = this.canvas.width / 2 + this.panX;
     this.targetCenterY = this.canvas.height / 2 + this.panY;
 
-    // Draw concentric circles for each scoring ring
-    const ringSpecs = [
+    // Draw concentric circles for each scoring ring, from outer (5) to inner
+    // (10). Rings at or inside the target's aiming black are filled black,
+    // the rest stay white - the black boundary varies per target.
+    const aimingBlackRing = target.getAimingBlackRing();
+    for (let ring = 5; ring <= 10; ring++)
     {
-      ring: 5,
-      fill: 'white'
-    },
-    {
-      ring: 6,
-      fill: 'white'
-    },
-    {
-      ring: 7,
-      fill: 'black'
-    },
-    {
-      ring: 8,
-      fill: 'black'
-    },
-    {
-      ring: 9,
-      fill: 'black'
-    },
-    {
-      ring: 10,
-      fill: 'black'
-    }];
-
-    for (const spec of ringSpecs)
-    {
-      const ringInnerDiameter = target.getRingInnerDiameter(spec.ring);
+      const inBlack = aimingBlackRing > 0 && ring >= aimingBlackRing;
+      const ringInnerDiameter = target.getRingInnerDiameter(ring);
       const radiusInches = btk.Conversions.metersToInches(ringInnerDiameter) / 2;
       const radiusPixels = radiusInches * this.targetScale;
 
       // Draw filled circle
       this.ctx.beginPath();
       this.ctx.arc(this.targetCenterX, this.targetCenterY, radiusPixels, 0, 2 * Math.PI);
-      this.ctx.fillStyle = spec.fill;
+      this.ctx.fillStyle = inBlack ? 'black' : 'white';
       this.ctx.fill();
 
       // Draw boundary line
-      this.ctx.strokeStyle = spec.fill === 'black' ? 'white' : 'black';
+      this.ctx.strokeStyle = inBlack ? 'white' : 'black';
       this.ctx.lineWidth = 1;
       this.ctx.stroke();
 
       // Add ring number
-      if (spec.ring >= 5 && spec.ring <= 9)
+      if (ring >= 5 && ring <= 9)
       {
-        this.ctx.fillStyle = spec.fill === 'black' ? 'white' : 'black';
+        this.ctx.fillStyle = inBlack ? 'white' : 'black';
         this.ctx.font = 'bold 10px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(spec.ring.toString(), this.targetCenterX, this.targetCenterY - radiusPixels + 15);
+        this.ctx.fillText(ring.toString(), this.targetCenterX, this.targetCenterY - radiusPixels + 15);
       }
     }
 

@@ -213,7 +213,10 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("scoreHit", &Target::scoreHit)
     .function("isXRing", &Target::isXRing)
     .function("getRingInnerDiameter", &Target::getRingInnerDiameter)
-    .function("getRingOuterDiameter", &Target::getRingOuterDiameter);
+    .function("getRingOuterDiameter", &Target::getRingOuterDiameter)
+    .function("getAimingBlackRing", &Target::getAimingBlackRing)
+    .function("getAimingBlackDiameter", &Target::getAimingBlackDiameter)
+    .function("getFaceSize", &Target::getFaceSize);
 
   // Removed legacy Hit value_object and AccuracyMetrics/legacy scoring bindings
 

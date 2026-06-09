@@ -4,8 +4,9 @@
 namespace btk::match
 {
 
-  Target::Target(const std::string& name, float ring_10, float ring_9, float ring_8, float ring_7, float ring_6, float ring_5, float x_ring, const std::string& description)
-    : name_(name), description_(description), ring_diameters_{ring_5, ring_6, ring_7, ring_8, ring_9, ring_10, x_ring}
+  Target::Target(const std::string& name, float ring_10, float ring_9, float ring_8, float ring_7, float ring_6, float ring_5, float x_ring, const std::string& description, int aiming_black_ring,
+                 float face_size)
+    : name_(name), description_(description), ring_diameters_{ring_5, ring_6, ring_7, ring_8, ring_9, ring_10, x_ring}, aiming_black_ring_(aiming_black_ring), face_size_(face_size)
   {
   }
 

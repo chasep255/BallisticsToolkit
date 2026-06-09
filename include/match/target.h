@@ -31,8 +31,11 @@ namespace btk::match
      * @param ring_5 5-ring diameter in m
      * @param x_ring X-ring diameter in m (defaults to ring_10)
      * @param description Human-readable description
+     * @param aiming_black_ring Outermost ring inside the aiming black (5-10, 0 = no black)
+     * @param face_size Target paper (face) edge length in m; faces are square
      */
-    Target(const std::string& name, float ring_10, float ring_9, float ring_8, float ring_7, float ring_6, float ring_5, float x_ring = 0.0f, const std::string& description = "");
+    Target(const std::string& name, float ring_10, float ring_9, float ring_8, float ring_7, float ring_6, float ring_5, float x_ring = 0.0f, const std::string& description = "",
+           int aiming_black_ring = 7, float face_size = btk::math::Conversions::inchesToMeters(72.0f));
 
     /**
      * @brief Get diameter of specified ring (0-6, where 6=X, 5=10, etc.)
@@ -77,10 +80,27 @@ namespace btk::match
     const std::string& getDescription() const { return description_; }
     float getXRingDiameter() const { return ring_diameters_[6]; } // m
 
+    /**
+     * @brief Outermost ring inside the aiming black (5-10, 0 = no aiming black)
+     */
+    int getAimingBlackRing() const { return aiming_black_ring_; }
+
+    /**
+     * @brief Diameter of the aiming black in m (0 if the target has no black)
+     */
+    float getAimingBlackDiameter() const { return aiming_black_ring_ >= 5 ? ring_diameters_[aiming_black_ring_ - 5] : 0.0f; }
+
+    /**
+     * @brief Target paper (face) edge length in m; faces are square
+     */
+    float getFaceSize() const { return face_size_; }
+
     private:
     std::string name_;
     std::string description_;
     float ring_diameters_[7]; // m
+    int aiming_black_ring_;   // outermost ring in the aiming black (0 = none)
+    float face_size_;         // m
   };
 
 } // namespace btk::match

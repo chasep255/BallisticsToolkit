@@ -16,7 +16,7 @@ let currentPresetName = '';
 let currentPresetDesc = '';
 
 // Ring colors keyed by scheme
-function defaultRingColor(index, scheme = 'standard', isCenter = false)
+function defaultRingColor(inBlack, scheme = 'standard', isCenter = false)
 {
   if (scheme === 'br')
   {
@@ -28,8 +28,9 @@ function defaultRingColor(index, scheme = 'standard', isCenter = false)
     // Other rings: white fill with black ring line and labels
     return { fill: '#ffffff', line: '#000000', label: '#000000' };
   }
-  // Standard NRA-style: rings 5,6 white; rings 7-X black
-  if (index <= 1)
+  // Standard NRA-style: rings inside the target's aiming black are filled
+  // black; the rest are white (the black boundary varies per target).
+  if (!inBlack)
   {
     return { fill: '#ffffff', line: '#000000', label: '#000000' };
   }
@@ -51,7 +52,7 @@ let rings = []; // Array of { label, diameter, fillColor, lineColor, labelColor 
 
 // Bump suffix when the default color scheme or ring shape changes so users
 // pick up fresh defaults instead of stale cached data.
-const RINGS_STORAGE_KEY = 'target_gen_rings_v2';
+const RINGS_STORAGE_KEY = 'target_gen_rings_v3';
 
 function saveRings()
 {
@@ -220,7 +221,7 @@ function fetchTargetData(key)
     diameters.push(toIn(target.getRingInnerDiameter(r)));
   }
   diameters.push(toIn(target.getRingInnerDiameter(11)));
-  const data = { name: target.getName(), desc: target.getDescription(), diameters };
+  const data = { name: target.getName(), desc: target.getDescription(), diameters, aimingBlackRing: target.getAimingBlackRing() };
   target.delete();
   return data;
 }
@@ -238,7 +239,10 @@ function loadPreset(key)
   rings = data.diameters.map((diam, i) =>
   {
     const isCenter = (i === data.diameters.length - 1);
-    const colors = defaultRingColor(i, scheme, isCenter);
+    // Index 0-5 are rings 5-10; the last entry is the X ring (always in the
+    // black when the target has an aiming black).
+    const inBlack = data.aimingBlackRing > 0 && (isCenter || i + 5 >= data.aimingBlackRing);
+    const colors = defaultRingColor(inBlack, scheme, isCenter);
     return {
       label: RING_LABELS[i],
       showLabel: true,
@@ -338,7 +342,8 @@ function onRemoveRing(e)
 
 function addRing()
 {
-  const colors = defaultRingColor(rings.length);
+  // Added rings default to black unless they're among the outermost two
+  const colors = defaultRingColor(rings.length > 1);
   rings.push({
     label: String(rings.length + 1),
     showLabel: true,

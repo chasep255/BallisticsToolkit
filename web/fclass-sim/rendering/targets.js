@@ -56,6 +56,9 @@ export class TargetRenderer
 
     // Instanced rendering
     this.targetInstancedMesh = null;
+    this.postInstancedMesh = null; // Wooden carrier posts, 2 per frame
+    this.postLength = 0;
+    this.postOffsetX = 0;
     this.numberBoxes = []; // Individual meshes since each has unique texture
 
     // Match-style animation state machine
@@ -88,6 +91,15 @@ export class TargetRenderer
       this.targetInstancedMesh.geometry.dispose();
       this.targetInstancedMesh.material.dispose();
       this.targetInstancedMesh = null;
+    }
+
+    // Remove carrier post instanced mesh
+    if (this.postInstancedMesh)
+    {
+      this.scene.remove(this.postInstancedMesh);
+      this.postInstancedMesh.geometry.dispose();
+      this.postInstancedMesh.material.dispose();
+      this.postInstancedMesh = null;
     }
 
     // Remove number boxes
@@ -173,39 +185,10 @@ export class TargetRenderer
     const centerX = 512;
     const centerY = 512;
 
-    // Scale: 2 yards = 1024 pixels, so 1 yard = 512 pixels
-    const pixelsPerYard = 512;
-
-    // Fill entire canvas with light buff/tan color
-    context.fillStyle = '#F1DD9E'; // Light buff/tan
-    context.fillRect(0, 0, 1024, 1024);
-
-    // Draw concentric circles from outer to inner (buff outer, black center)
-    const ringSpecs = [
-    {
-      ring: 5,
-      fill: '#F1DD9E' // Light buff/tan
-    },
-    {
-      ring: 6,
-      fill: '#F1DD9E' // Light buff/tan
-    },
-    {
-      ring: 7,
-      fill: 'black'
-    },
-    {
-      ring: 8,
-      fill: 'black'
-    },
-    {
-      ring: 9,
-      fill: 'black'
-    },
-    {
-      ring: 10,
-      fill: 'black'
-    }];
+    // The canvas spans the whole frame; the paper face is centered within it.
+    // The frame is sized relative to the face (see createTargets), so the
+    // pixels-per-yard scale depends on the frame, not a fixed 2-yard quad.
+    const pixelsPerYard = 1024 / this.cfg.targetSize;
 
     // Access BTK module
     const btk = getBTK();
@@ -214,20 +197,45 @@ export class TargetRenderer
       throw new Error('BTK module not available');
     }
 
-    for (const spec of ringSpecs)
+    // Fill entire canvas with the frame backer (cardboard) color
+    context.fillStyle = '#C7A368'; // Cardboard tan
+    context.fillRect(0, 0, 1024, 1024);
+
+    // Draw the target paper centered on the frame. The face size comes from the
+    // target definition (e.g. 35" MR-63 paper at 300 yd, full 72" LR face at 1000).
+    const faceSizeYards = btk.Conversions.metersToYards(this.btkTarget.getFaceSize());
+    const facePixels = Math.min(faceSizeYards * pixelsPerYard, 1024);
+    context.fillStyle = '#F1DD9E'; // Light buff/tan
+    context.fillRect(centerX - facePixels / 2, centerY - facePixels / 2, facePixels, facePixels);
+
+    // Draw concentric scoring rings from outer (5) to inner (10). Rings at or
+    // inside the aiming black ring are filled black, the rest stay buff
+    // (e.g. MR-1FC: 36" black through the 6 ring, 48" 5 ring in white).
+    const aimingBlackRing = this.btkTarget.getAimingBlackRing();
+    const ringRadii = {}; // ring number -> radius in pixels, for number placement
+    for (let ring = 5; ring <= 10; ring++)
     {
-      const ringDiameterMeters = this.btkTarget.getRingInnerDiameter(spec.ring);
+      const inBlack = aimingBlackRing > 0 && ring >= aimingBlackRing;
+      const ringDiameterMeters = this.btkTarget.getRingInnerDiameter(ring);
       const ringDiameterYards = btk.Conversions.metersToYards(ringDiameterMeters);
       const radiusPixels = (ringDiameterYards / 2) * pixelsPerYard;
+      ringRadii[ring] = radiusPixels;
+
+      // A ring as wide as the paper is the rest of the face (e.g. the LR
+      // target's "5 area" is the full 72"x72" square) - nothing to draw.
+      if (!inBlack && ringDiameterYards >= faceSizeYards)
+      {
+        continue;
+      }
 
       // Draw filled circle
       context.beginPath();
       context.arc(centerX, centerY, radiusPixels, 0, 2 * Math.PI);
-      context.fillStyle = spec.fill;
+      context.fillStyle = inBlack ? 'black' : '#F1DD9E';
       context.fill();
 
       // Draw boundary line
-      context.strokeStyle = spec.fill === 'black' ? 'white' : 'black';
+      context.strokeStyle = inBlack ? 'white' : 'black';
       context.lineWidth = 2;
       context.stroke();
     }
@@ -245,16 +253,34 @@ export class TargetRenderer
     context.lineWidth = 2;
     context.stroke();
 
-    // Draw white X in center
-    const xSize = xRingRadius * 0.5;
-    context.strokeStyle = 'white';
-    context.lineWidth = 4;
-    context.beginPath();
-    context.moveTo(centerX - xSize, centerY - xSize);
-    context.lineTo(centerX + xSize, centerY + xSize);
-    context.moveTo(centerX - xSize, centerY + xSize);
-    context.lineTo(centerX + xSize, centerY - xSize);
-    context.stroke();
+    // Ring numbers along the horizontal axis, mirrored left and right, with an
+    // "X" at center. Each digit sits in the middle of the band it labels;
+    // digits in the black are white, those on the buff are dark. Each label is
+    // shrunk to fit its band width so two-digit "10" doesn't spill over.
+    const baseFont = Math.max(7, Math.min(18, facePixels * 0.02));
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    for (let v = 6; v <= 10; v++)
+    {
+      const outer = ringRadii[v];
+      const inner = (v === 10) ? xRingRadius : ringRadii[v + 1];
+      const labelRadius = (outer + inner) / 2;
+      const label = String(v);
+      // Fit the label inside ~70% of the band's radial width (≈0.6*font per
+      // character) so it stays clear of the ring lines on both sides.
+      const fitFont = (outer - inner) * 0.7 / (label.length * 0.6);
+      const fontPx = Math.max(6, Math.min(baseFont, fitFont));
+      context.font = `bold ${fontPx}px Arial`;
+      const inBlack = aimingBlackRing > 0 && v >= aimingBlackRing;
+      context.fillStyle = inBlack ? '#ffffff' : '#1a1a1a';
+      context.fillText(label, centerX - labelRadius, centerY);
+      context.fillText(label, centerX + labelRadius, centerY);
+    }
+    // Center X, sized to sit inside the X-ring (always within the black)
+    const xFont = Math.max(6, Math.min(baseFont, (xRingRadius * 2) / 0.7));
+    context.font = `bold ${xFont}px Arial`;
+    context.fillStyle = '#ffffff';
+    context.fillText('X', centerX, centerY);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
@@ -297,7 +323,18 @@ export class TargetRenderer
     // Create BTK target for dimensions
     this.btkTarget = btk.Targets.getTarget(String(this.targetType));
 
-    // Create shared target texture
+    // Size the frame relative to this target's paper face, so closer (smaller
+    // paper) targets get proportionally smaller frames instead of a fixed
+    // oversized one. The frame center sits a fixed gap above the pits, so the
+    // whole carrier (frame + sign + posts) is sized and placed from here.
+    this.faceSizeYards = btk.Conversions.metersToYards(this.btkTarget.getFaceSize());
+    const frameSize = this.faceSizeYards * Range.FRAME_TO_FACE_RATIO;
+    this.cfg.targetSize = frameSize;
+    this.cfg.targetHalfMast = -(frameSize + this.cfg.targetGapAbovePits) / 2;
+    this.cfg.targetMinHeight = -(frameSize + this.cfg.targetGapAbovePits);
+    this.targetCenterHeight = this.pitsHeight + this.cfg.targetGapAbovePits + frameSize / 2;
+
+    // Create shared target texture (uses cfg.targetSize / faceSizeYards above)
     this.targetTexture = this.createTargetTexture();
 
     // Create pits with concrete texture
@@ -340,11 +377,13 @@ export class TargetRenderer
     this.pits.position.set(0, this.pitsHeight / 2, -(this.rangeDistance - this.pitsOffset));
     this.scene.add(this.pits);
 
-    // Calculate how many targets fit in the range width
+    // Pack as many frames across the pit width as fit. The gap scales with the
+    // frame so the lane looks consistent at every distance; smaller (closer)
+    // frames pack more targets in.
     const targetSize = this.cfg.targetSize;
-    const targetSpacing = 1; // yards between targets
+    const targetSpacing = targetSize * 0.4; // yards between frames
     const totalTargetWidth = targetSize + targetSpacing;
-    const maxTargets = Math.floor(this.rangeWidth / totalTargetWidth);
+    const maxTargets = Math.max(1, Math.floor((this.rangeWidth + targetSpacing) / totalTargetWidth));
 
     // Position targets centered on the range width
     const totalTargetsWidth = maxTargets * targetSize + (maxTargets - 1) * targetSpacing;
@@ -366,6 +405,30 @@ export class TargetRenderer
     this.targetInstancedMesh.castShadow = this.shadowsEnabled;
     this.targetInstancedMesh.receiveShadow = this.shadowsEnabled;
     this.scene.add(this.targetInstancedMesh);
+
+    // Wooden carrier posts on each side of the frame. They run from the top of
+    // the number board (which they support) down past the frame into the pits,
+    // so neither the frame nor the sign above it floats. Offsets are relative
+    // to the frame center; bottoms reach ground level when the target is raised.
+    const postWidth = 0.1; // yards (~3.5" lumber)
+    this.postOffsetX = targetSize / 2 + postWidth / 2;
+    // Number board center sits targetSize + 0.2 above the frame center and is
+    // itself targetSize tall, so its top is one-and-a-half target heights up.
+    const signTopOffset = targetSize + 0.2 + targetSize / 2;
+    const postBottomOffset = -this.targetCenterHeight; // ground level when raised
+    this.postLength = signTopOffset - postBottomOffset;
+    this.postCenterOffset = (signTopOffset + postBottomOffset) / 2;
+    const postGeometry = new THREE.BoxGeometry(postWidth, this.postLength, 0.1);
+    const postMaterial = new THREE.MeshStandardMaterial(
+    {
+      color: 0x8a6a45, // Weathered lumber
+      roughness: 0.9,
+      metalness: 0.0
+    });
+    this.postInstancedMesh = new THREE.InstancedMesh(postGeometry, postMaterial, maxTargets * 2);
+    this.postInstancedMesh.castShadow = this.shadowsEnabled;
+    this.postInstancedMesh.receiveShadow = this.shadowsEnabled;
+    this.scene.add(this.postInstancedMesh);
 
     // Set up target instances and create individual number boxes
     const matrix = new THREE.Matrix4();
@@ -410,6 +473,7 @@ export class TargetRenderer
         targetHeightGoal: 0,
         animating: false
       });
+      this.updatePostMatrices(this.targetFrames[i]);
 
       // Initialize animation state - start immediately with random timing
       this.targetAnimationStates.push(
@@ -421,6 +485,7 @@ export class TargetRenderer
     }
 
     this.targetInstancedMesh.instanceMatrix.needsUpdate = true;
+    this.postInstancedMesh.instanceMatrix.needsUpdate = true;
 
     // Set center target as user target
     let centerTargetIndex = 0;
@@ -439,6 +504,19 @@ export class TargetRenderer
 
     // Initialize scoring disc resources
     this.initializeScoringDiscResources();
+  }
+
+  /**
+   * Position the two carrier posts of a frame at its current height
+   */
+  updatePostMatrices(targetFrame)
+  {
+    const matrix = new THREE.Matrix4();
+    const centerY = targetFrame.baseHeight + targetFrame.currentHeight + this.postCenterOffset;
+    matrix.makeTranslation(targetFrame.xPos - this.postOffsetX, centerY, -this.rangeDistance);
+    this.postInstancedMesh.setMatrixAt(targetFrame.instanceId * 2, matrix);
+    matrix.makeTranslation(targetFrame.xPos + this.postOffsetX, centerY, -this.rangeDistance);
+    this.postInstancedMesh.setMatrixAt(targetFrame.instanceId * 2 + 1, matrix);
   }
 
   getTargetCenter(targetNumber)
@@ -734,6 +812,7 @@ export class TargetRenderer
       position.set(targetFrame.xPos, targetFrame.baseHeight + targetFrame.currentHeight, -this.rangeDistance);
       matrix.compose(position, quaternion, scale);
       this.targetInstancedMesh.setMatrixAt(targetFrame.instanceId, matrix);
+      this.updatePostMatrices(targetFrame);
 
       // Update number box position
       if (targetFrame.numberBox)
@@ -826,6 +905,7 @@ export class TargetRenderer
         position.set(targetFrame.xPos, targetFrame.baseHeight + targetFrame.currentHeight, -this.rangeDistance);
         matrix.compose(position, quaternion, scale);
         this.targetInstancedMesh.setMatrixAt(targetFrame.instanceId, matrix);
+        this.updatePostMatrices(targetFrame);
 
         // Update number box position
         if (targetFrame.numberBox)
@@ -836,8 +916,9 @@ export class TargetRenderer
       }
     }
 
-    // Mark instance matrix as needing update
+    // Mark instance matrices as needing update
     this.targetInstancedMesh.instanceMatrix.needsUpdate = true;
+    this.postInstancedMesh.instanceMatrix.needsUpdate = true;
   }
 
   // ===== SHOT MARKERS =====
@@ -1031,11 +1112,11 @@ export class TargetRenderer
   {
     if (!this.userTarget) return;
 
-    const frameHalfSize = 1.0; // Target frame is 2x2 yards
-    const gapInches = 1.0; // 1 inch gap between disc and frame edge
+    const faceHalfSize = this.faceSizeYards / 2; // Discs sit on the paper face, not the larger frame
+    const gapInches = 1.0; // 1 inch gap between disc and paper edge
     const gapYards = gapInches / 36.0; // Convert to yards
     const discRadiusYards = (6.0 / 36.0) / 2.0; // 6 inch disc radius in yards
-    const edgePos = frameHalfSize - gapYards - discRadiusYards; // Position discs with 1" gap from edge
+    const edgePos = faceHalfSize - gapYards - discRadiusYards; // Position discs with 1" gap from edge
 
     // Get user target center from instance
     const targetCenter = this.getUserTargetCenter();
