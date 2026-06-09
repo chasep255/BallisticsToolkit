@@ -317,7 +317,7 @@
             - <strong>Sighters:</strong> Count N/∞ (Match 1) or N/2 (later matches), only shown during sighters<br>
             - <strong>Shots:</strong> Record shots fired / total (turns green when complete)<br>
             - <strong>Score:</strong> Total score and X-count for current match<br>
-            - <strong>Last Shot:</strong> Score value (e.g., "10x" or "9")<br>
+            - <strong>Last Shot:</strong> Score value (e.g., "X" or "9")<br>
             - <strong>MV:</strong> Muzzle velocity for last shot (fps)<br>
             - <strong>Impact V:</strong> Impact velocity for last shot (fps)<br><br>
             <strong>Pair Fire mode</strong> shows one compact panel per shooter (Player 1 left, Player 2 right) with their turn clock, shot count, score, and last shot. The active shooter's panel is highlighted.
@@ -347,7 +347,7 @@
           <div class="param-help">
             <strong>Ballistics Engine:</strong><br>
             - WebAssembly-powered physics simulation (runs in browser)<br>
-            - RK2 integration with 4DOF state<br>
+            - RK2 integration of a modified point-mass (4DOF) state<br>
             - Iterative zeroing in calm wind conditions<br>
             - Spin effects: drift zeroed, crosswind jump modeled as transient<br><br>
 
@@ -355,12 +355,7 @@
             - 2D curl-noise field with multiple octaves and advection<br>
             - RMS-normalized for consistent magnitude across presets<br>
             - Flags, mirage, and wind HUD sample same unified field<br>
-            - Mirage is rendered as independent depth slabs along the line of sight; each slab samples wind locally and drifts independently<br><br>
-
-            <strong>Debug Mode:</strong><br>
-            - Add <code>?debug=1</code> to URL for rapid testing mode<br>
-            - 1-minute matches with 2 record shots<br>
-            - Console logging for zeroing, shots, wind, and scoring
+            - Mirage is rendered as independent depth slabs along the line of sight; each slab samples wind locally and drifts independently
           </div>
         </div>
 
@@ -369,7 +364,7 @@
           <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
           <div class="param-help">
             <strong>Entertainment/Educational Simulation:</strong> This is a shooting simulation game. While it uses physics-based ballistic calculations, it is designed for entertainment and learning, not for generating real-world firing data.<br><br>
-            <strong>Ballistics Model:</strong> Uses 4DOF trajectory with highly approximate, empirically tuned spin effects. These are rough approximations and may differ significantly from real-world behavior.<br><br>
+            <strong>Ballistics Model:</strong> Uses a modified point-mass (4DOF) trajectory with highly approximate, empirically tuned spin effects. These are rough approximations and may differ significantly from real-world behavior.<br><br>
             <strong>Wind Model:</strong> 2D curl-noise field provides plausible patterns for gameplay but does not model terrain effects, thermals, or turbulence.<br><br>
             <strong>Mirage Model:</strong> Simplified heat shimmer effect based on wind and distance. Real mirage behavior is more complex and variable.<br><br>
             <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete information.

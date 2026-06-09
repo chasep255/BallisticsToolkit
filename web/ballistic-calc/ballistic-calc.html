@@ -294,7 +294,7 @@
                 <div class="help-section">
                     <h3>Technical Details</h3>
                     <div class="param-help">
-                        <strong>Model (4DOF):</strong> Trajectory is integrated with a 4DOF model that tracks position (x,y,z) and spin rate. Integration uses RK2 with small time steps for stability and performance.<br><br>
+                        <strong>Model (modified point-mass / 4DOF):</strong> A point-mass trajectory (position and velocity, integrated with RK2) plus the bullet's spin, from which spin drift (yaw of repose) and a transient crosswind jump are computed. This is what's commonly called a "4DOF" or modified point-mass model; it does not integrate full angular (pitch/yaw) motion the way a 5DOF/6DOF solver would.<br><br>
                         <strong>Drag (G1/G7):</strong> Uses standard empirical drag tables (G1/G7). Air density corrections are applied from temperature, humidity, and altitude to adjust deceleration along the velocity vector.<br><br>
                         <strong>Moment of Inertia:</strong> When spin effects are enabled, moment of inertia is estimated from bullet weight, length, and diameter. This affects how the spinning bullet responds to wind forces.
                     </div>
@@ -306,7 +306,7 @@
                     <div class="param-help">
                         <strong>Accuracy:</strong> This calculator provides estimates based on mathematical models. Actual trajectory may vary due to bullet manufacturing variations, barrel harmonics, atmospheric micro-variations, and other factors. Do not rely on these calculations for any purpose where incorrect data could be hazardous.<br><br>
                         <strong>Accuracy Degrades With:</strong> Longer ranges, longer flight times, and atypical bullet parameters (unusual BCs, very light/heavy bullets, extreme velocities, etc).<br><br>
-                        <strong>Spin Aerodynamics:</strong> Spin effects use highly approximate, empirically tuned models. These are rough approximations and may differ significantly from real-world behavior. Not derived from CFD or rigorous 6DOF analysis.<br><br>
+                        <strong>Spin Aerodynamics:</strong> Spin drift and crosswind jump are an empirical fit — physically motivated but hand-tuned to look right, not derived from measured aerodynamic coefficients, CFD, or a rigorous 6DOF solve. Treat them as flavor that adds realism, not as data, and expect them to differ significantly from real-world behavior.<br><br>
                         <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete safety and liability information.
                     </div>
                 </div>

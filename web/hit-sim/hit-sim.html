@@ -157,7 +157,9 @@
                         <strong>MV (fps):</strong> Muzzle velocity in feet per second.<br><br>
                         <strong>Weight / Diameter / Length:</strong> Bullet geometry and mass used by the trajectory model.<br><br>
                         <strong>Twist (in/turn):</strong> Barrel twist rate (e.g., 8 for 1:8 twist).<br><br>
-                        <strong>Spin Effects:</strong> Includes spin drift and crosswind jump for realism.
+                        <strong>Spin Effects:</strong> Includes spin drift and crosswind jump for realism.<br><br>
+                        <strong>Range (yd):</strong> Distance to the target the shots are fired at.<br><br>
+                        <strong>Shots:</strong> Number of shots to simulate; more shots give smoother statistics.
                     </div>
                 </div>
 
@@ -176,7 +178,8 @@
                         <strong>Cross Wind σ (mph):</strong> Side-to-side wind variability (main driver of horizontal spread).<br><br>
                         <strong>H/T Wind σ (mph):</strong> Head/tail variability (small influence on drop).<br><br>
                         <strong>Vert Wind σ (mph):</strong> Up/down air movement (usually minor).<br><br>
-                        <strong>Accuracy (MOA):</strong> Rifle+shooter precision; 1 MOA is about 1 inch at 100 yards.
+                        <strong>Accuracy (MOA):</strong> Rifle+shooter precision; 1 MOA is about 1 inch at 100 yards.<br><br>
+                        <strong>Scope Cant (deg):</strong> Per-shot rifle tilt about the bore axis, drawn uniformly from &minus;value to +value degrees; it trades some elevation hold for windage (and vice versa). Set 0 to disable.
                     </div>
                 </div>
 
@@ -193,11 +196,12 @@
                     <h3>Statistics</h3>
                     <div class="param-help">
                         <strong>Hit Probability:</strong> Fraction of shots landing inside the target shape.<br><br>
+                        <strong>Shots / Hits / Misses:</strong> Total shots simulated, and how many landed inside vs. outside the target.<br><br>
                         <strong>Horizontal/Vertical Spread:</strong> Max X and Y extent of the group (inches).<br><br>
-                        <strong>Extreme Spread:</strong> Maximum distance between any two impacts (inches).<br><br>
+                        <strong>Extreme Spread:</strong> Largest distance between any two impacts (inches). Exact up to 5,000 shots; above that it is a close bounding-box approximation.<br><br>
                         <strong>Mean Radius:</strong> Average distance from group center (inches).<br><br>
                         <strong>Radial Std Dev:</strong> Standard deviation of radial distances from center (inches).<br><br>
-                        <strong>CEP (50%):</strong> Circular Error Probable -- radius of circle containing 50% of shots (inches).
+                        <strong>CEP (50%):</strong> Circular Error Probable -- radius of the circle, centered on the group's center, containing 50% of shots (inches).
                     </div>
                 </div>
 

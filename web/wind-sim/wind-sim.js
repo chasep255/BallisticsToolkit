@@ -1133,7 +1133,7 @@ function createSmokeVisualizationSection(container, canvasId, title)
   // Add legend
   const legend = document.createElement('div');
   legend.className = 'legend';
-  legend.textContent = 'Smoke particles show wind flow patterns. Color = speed (blue→red).';
+  legend.textContent = 'Smoke particles show wind flow patterns. Color = local wind speed (cool = slow, warm = fast).';
   canvasWrap.appendChild(legend);
 
   section.appendChild(canvasWrap);

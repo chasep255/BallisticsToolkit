@@ -334,7 +334,8 @@
             <strong>Altitude:</strong> Elevation above sea level in feet. Higher altitude = less air density = less drag. Pressure is estimated using a standard atmosphere model.<br><br>
             <strong>Humidity:</strong> Relative humidity percentage. Higher humidity slightly reduces air density.<br><br>
             <strong>BC Range:</strong> Define the start, end, and increment for ballistic coefficients.<br><br>
-            <strong>MV Range:</strong> Define the start, end, and increment for muzzle velocities in fps.
+            <strong>MV Range:</strong> Define the start, end, and increment for muzzle velocities in fps.<br><br>
+            <strong>Grid size:</strong> Start must be below End and the increment positive. Each axis is capped at 50 steps (and needs at least 2), so a very small increment across a wide range will be limited.
           </div>
         </div>
 
@@ -343,10 +344,10 @@
           <div class="param-help">
             <strong>Wind Drift (10 mph):</strong> Shows drift at the specified range with a 10 mph full-value crosswind from 3 o'clock. Lower values (green) are better.<br><br>
             <strong>Drop:</strong> Shows bullet drop below the muzzle line. Lower values (green) mean less drop.<br><br>
-            <strong>MV Sensitivity:</strong> Shows the drop difference between MV ±0.5% (1% total spread). Lower values (green) mean the load is less sensitive to velocity variations, making it more forgiving of inconsistent ammunition.<br><br>
             <strong>Final Velocity:</strong> Remaining velocity at target range in fps. Higher values (green) are better.<br><br>
             <strong>Final Energy:</strong> Remaining kinetic energy at target range in ft-lbs. Higher values (green) are better.<br><br>
-            Each row represents a different BC, and each column represents a different MV. Color coding helps identify the best (green) and worst (red) combinations.
+            <strong>MV Sensitivity:</strong> Shows the drop difference between MV ±0.5% (1% total spread). Lower values (green) mean the load is less sensitive to velocity variations, making it more forgiving of inconsistent ammunition.<br><br>
+            Each row represents a different BC, and each column a different MV. Color is scaled <em>independently within each grid</em> (green = best, red = worst for that metric), so the same color in two different grids is not comparable.
           </div>
         </div>
 

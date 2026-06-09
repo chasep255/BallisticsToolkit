@@ -207,7 +207,7 @@
             <strong>Time Speed:</strong> Simulation speed multiplier (0.1x-20x). Controls how fast time advances in the simulation. 1.0x = real-time, higher values speed up time evolution. Useful for observing long-term patterns quickly.<br><br>
             <strong>Color Threshold:</strong> Wind speed (mph) at which arrows turn red in the visualization. All arrows below this threshold show as blue/green, above it they transition to red. Adjust to highlight different wind speed ranges.<br><br>
             <strong>Restart:</strong> Reset the wind simulation to time zero and regenerate the field. Each restart uses the same preset parameters but produces different patterns due to randomized noise seeds.<br><br>
-            <strong>Simulation Time:</strong> Displays elapsed simulation time in seconds. Time advances according to the Time Speed multiplier.
+            <strong>Reset to Defaults:</strong> Restore the Preset, Time Speed, and Color Threshold controls to their default values.
           </div>
         </div>
         
@@ -217,7 +217,8 @@
             <strong>Wind Visualization:</strong> Each grid point shows wind using two elements: colored squares indicate wind speed (blue=calm, red=strong), and white triangles indicate wind direction (point downwind). The squares provide the speed color map while triangles rotate to show instantaneous wind direction.<br><br>
             <strong>2D Wind Field:</strong> The wind varies continuously across both downrange (0-1000 yards) and crossrange (±100 yards) dimensions. Each component contributes patterns at different spatial scales, creating simulated variation.<br><br>
             <strong>Speed Scale:</strong> Color gradient represents wind speed: deep blue ≈ 0 mph, transitioning to red at the Color Threshold setting. The gradient transitions smoothly based on wind speed, with faster winds appearing more red.<br><br>
-            <strong>Triangle Direction:</strong> Each white triangle points in the direction the wind is blowing (downwind). Triangle rotation shows instantaneous wind direction at that location.
+            <strong>Triangle Direction:</strong> Each white triangle points in the direction the wind is blowing (downwind). Triangle rotation shows instantaneous wind direction at that location.<br><br>
+            <strong>Smoke Flow:</strong> A separate dark panel releases a continuous stream of particles into the same wind field. The particles drift with the local wind, so you can watch the flow itself — its swirls, gusts, and overall drift — and they are tinted by local wind speed (cooler where slow, warmer where fast), fading out as they age.
           </div>
         </div>
 
@@ -226,7 +227,10 @@
           <div class="param-help">
             <strong>Active Components:</strong> Number of wind components in the current preset. Each component adds a layer of variation at different spatial and temporal scales.<br><br>
             <strong>Min/Max/Avg Speed:</strong> Statistics computed across the entire visible wind field. Updates in real-time as the field evolves. These values help you understand the overall wind conditions.<br><br>
-            <strong>Advection Gain:</strong> Multiplier that controls how quickly wind patterns drift across the range. Set by presets (typically 5.0). Higher values make patterns move faster without changing the instantaneous wind speeds. This simulates the transport of wind patterns by larger-scale flows.
+            <strong>Advection Gain:</strong> Multiplier that controls how quickly wind patterns drift across the range. Set by the preset (5.0 in the built-in presets). Higher values make patterns move faster without changing the instantaneous wind speeds. This simulates the transport of wind patterns by larger-scale flows.<br><br>
+            <strong>Simulation Time:</strong> Elapsed simulation time in seconds, advancing according to the Time Speed multiplier.<br><br>
+            <strong>Global Advection Offset (yards):</strong> Cumulative distance the entire wind field has drifted from its origin due to advection.<br><br>
+            <strong>Global Advection Speed (mph):</strong> Current drift velocity of the whole wind field — the speed at which the patterns move across the range.
           </div>
         </div>
 
@@ -241,9 +245,7 @@
             <strong>Temporal Scale (min):</strong> How quickly this component evolves over time. Larger values (e.g., 40 min) mean slow, gradual changes. Smaller values (e.g., 1-2 min) create rapid temporal variation. Controls the period of temporal oscillations.<br><br>
             <strong>Exponent:</strong> Reshapes the RMS-normalized magnitude. The magnitude is first normalized by RMS, then the exponent is applied. Values < 1.0 make magnitudes more uniform/steady; values > 1.0 increase calm-vs-gust contrast (gustier). Typical range: 0.3 (steady) to 2.0 (gustier).<br><br>
             <strong>Gate (× strength):</strong> Sigmoid gate threshold as a dimensionless ratio of strength. When > 0, the final magnitude gates itself through a sigmoid centered at <code>threshold × strength</code>. Below that point: gate mostly closed (very quiet wind). Above it: gate opens and allows wind through. Creates alternating quiet periods and gusts. 0 = no gating (continuous wind). Note that final magnitude is clipped at 2× strength, so values ≥ 2 keep the gate effectively closed.<br><br>
-            <strong>RMS Normalization:</strong> Root Mean Square value used to normalize the curl field magnitude for stable energy levels. Initialized once at startup by sampling 1000 random (x, y, t) locations. This value ensures consistent magnitude distribution across time and between components. Displayed in scientific notation (e.g., 1.23e-02).<br><br>
-            <strong>Global Advection Offset (yards):</strong> Cumulative spatial offset applied to all wind components due to advection. Shows how far the entire wind field has drifted from its origin. Larger values indicate more advection has occurred.<br><br>
-            <strong>Global Advection Speed (mph):</strong> Current drift velocity of the entire wind field. Calculated by sampling random points within the range, averaging the wind, and smoothing with EMA. This is the speed at which the wind patterns move across the range.
+            <strong>RMS Normalization:</strong> Root Mean Square value used to normalize the curl field magnitude for stable energy levels. Initialized once at startup by sampling 1000 random (x, y, t) locations. This value ensures consistent magnitude distribution across time and between components. Displayed in scientific notation (e.g., 1.23e-02).
           </div>
         </div>
         

@@ -64,7 +64,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 ### 🔩 Steel Target Simulator
 - **Interactive Steel Range** - Shooting simulator with reactive steel targets and full ballistics. Multiple target racks from 100 to 1760 yards (1 mile) with plates from ~2″ chips to large 6‑ft gongs.
 - **Hunting Mode** - Enable boars and prairie dogs via separate checkboxes. Prairie dogs scattered 100-1000 yards, pop up/down randomly. Boars spawn 150-1200 yards, walk randomly.
-- **Physics-Based Ballistics** - 4DOF trajectory simulation with G1/G7 drag models, wind presets, spin drift, and crosswind jump. Muzzle velocity variation (MV σ) and rifle accuracy (MOA) model shot-to-shot spreads.
+- **Physics-Based Ballistics** - Modified point-mass (4DOF) trajectory simulation with G1/G7 drag models, wind presets, spin drift, and crosswind jump. Muzzle velocity variation (MV σ) and rifle accuracy (MOA) model shot-to-shot spreads.
 - **Target Physics** - Steel targets hang from virtual chains with momentum transfer, damping, and rotation. Center hits drive linear swing; edge hits kick targets into rotation. Impacts leave visible mark splatter and spawn metal dust.
 - **Impact Detection** - Spatial binning system for efficient collision detection. Accurate hit/miss detection with visual feedback (HUD shows impact status).
 - **Wind & Environment** - 3D landscape with selectable wind markers (wind socks or flags) along the range driven by the same curl‑noise wind field used for the f-class sim. Brown ground dust when you miss; silver‑gray metallic dust when you hit steel.
@@ -190,7 +190,7 @@ The `-s` flag starts a local server at http://localhost:8001
 - **Language**: C++17 compiled to WebAssembly with Emscripten
 - **Frontend**: Vanilla JavaScript with modern CSS
 - **Performance**: Optimized C++ core with WebGL graphics
-- **Spin Aerodynamics**: 4DOF trajectory with simplified, empirically tuned spin effects; spin rate from twist and muzzle velocity
+- **Spin Aerodynamics**: Modified point-mass (4DOF) trajectory with simplified, empirically tuned spin effects; spin rate from twist and muzzle velocity
 - **Wind Module**: 2D curl‑noise wind field with presets; procedural, evolving patterns
 - **Match Scoring**: Competitive scoring system with statistics
 - **Deployment**: GitHub Actions auto‑deploys to GitHub Pages

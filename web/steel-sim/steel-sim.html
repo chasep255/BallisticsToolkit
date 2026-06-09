@@ -220,7 +220,7 @@
         <!-- Overview -->
         <div class="help-section">
           <h3>Overview</h3>
-          <p>Steel Target Simulator is an interactive steel range with ballistics simulation and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with 4DOF trajectory simulation, wind presets, spin effects, and simulation-oriented target responses. Features dual scopes (rifle + spotting), MRAD/MOA dial adjustments, optional heat mirage effects, wind markers (wind socks or flags), dust/metal effects, and a HUD.</p>
+          <p>Steel Target Simulator is an interactive steel range with ballistics simulation and steel target physics. Shoot at reactive steel racks from 100 to 1760 yards (1 mile) with modified point-mass (4DOF) trajectory simulation, wind presets, spin effects, and simulation-oriented target responses. Features dual scopes (rifle + spotting), MRAD/MOA dial adjustments, optional heat mirage effects, wind markers (wind socks or flags), dust/metal effects, and a HUD.</p>
         </div>
         
         <!-- Quick Start -->
@@ -228,7 +228,7 @@
           <h3>Quick Start</h3>
           <div class="param-help">
             1. Click <strong>Start</strong> to begin<br>
-            2. Click inside either <strong>scope</strong> (rifle scope bottom-right, spotting scope bottom-left) to enter aiming mode<br>
+            2. Click inside either <strong>scope</strong> (rifle scope on the right, spotting scope bottom-left) to enter aiming mode<br>
             3. <strong>Move mouse</strong> to aim, <strong>click</strong> to fire (rifle scope only)<br>
             4. Use <strong>Tab</strong> to switch between rifle and spotting scopes<br>
             5. Use <strong>arrow keys</strong> to adjust elevation/windage dials<br>
@@ -241,7 +241,7 @@
           <h3>Controls</h3>
           <div class="param-help">
             <strong>Desktop - Scope Controls:</strong><br>
-            - <kbd>Click</kbd> inside either scope (rifle scope bottom-right, spotting scope bottom-left) to enter scope mode<br>
+            - <kbd>Click</kbd> inside either scope (rifle scope on the right, spotting scope bottom-left) to enter scope mode<br>
             - The active scope shows a dull red border to indicate which one you're controlling<br>
             - <kbd>Tab</kbd> Switch between rifle and spotting scopes (only when in scope mode)<br>
             - Move mouse to pan/aim the active scope<br>
@@ -253,7 +253,7 @@
             <strong>Desktop - Dial Controls:</strong><br>
             - <kbd>ArrowUp</kbd>/<kbd>ArrowDown</kbd> dial elevation (0.1 MRAD or 0.25 MOA; hold <kbd>Shift</kbd> for 1.0 MRAD / 1.0 MOA)<br>
             - <kbd>ArrowLeft</kbd>/<kbd>ArrowRight</kbd> dial windage (0.1 MRAD or 0.25 MOA; hold <kbd>Shift</kbd> for 1.0 MRAD / 1.0 MOA)<br>
-            - <kbd>R</kbd> reset both dials to zero (only when in rifle scope mode)<br>
+            - <kbd>R</kbd> reset both rifle dials to zero (while aiming in either scope)<br>
             - On-screen dial buttons (U/D/L/R/⟲) next to HUD work anytime<br><br>
 
             <strong>Desktop - Focus/Range Finder:</strong><br>
@@ -291,12 +291,12 @@
 
             <strong>Hunting Mode:</strong><br>
             - Enable via the "Hogs" and "Prairie Dogs" checkboxes in settings<br>
-            - Must restart game for changes to take effect<br><br>
+            - Press <strong>Restart</strong> (appears next to Pause once a game is running) for the change to take effect<br><br>
             
             <strong>Prairie Dogs:</strong><br>
             - Scattered from 100 to 1000 yards, approximately 16 inches tall<br>
             - Randomly pop up and down (roughly 30% up, 70% down)<br>
-            - Each state lasts 5-90 seconds before changing<br>
+            - Each state lasts roughly 5-75 seconds before changing<br>
             - When hit: quick upward jump + red mist effect, respawn after ~1 minute<br><br>
             
             <strong>Boars:</strong><br>
@@ -320,7 +320,9 @@
             - <strong>Accuracy:</strong> Rifle+shooter precision in MOA<br>
             - <strong>Zero Distance:</strong> Distance at which rifle is zeroed (yards)<br>
             - <strong>Scope Height:</strong> Height of scope above bore (inches)<br>
-            - <strong>Wind Preset:</strong> Controls wind patterns affecting trajectory<br><br>
+            - <strong>Wind Preset:</strong> Selects the downrange wind conditions — overall strength plus gust and turbulence character — driving the field that affects trajectory and mirage<br>
+            - <strong>Wind Markers:</strong> Show wind downrange as Flags or Wind Socks<br>
+            - <strong>Reset to Defaults:</strong> Restore every setting above to its default value<br><br>
 
             <strong>Scope Type (MRAD/MOA):</strong><br>
             - Select in the settings bar to change reticle tick spacing and dial units<br>
@@ -439,7 +441,7 @@
           <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
           <div class="param-help">
             <strong>Entertainment/Educational Simulation:</strong> This is a shooting simulation game. While it uses physics-based ballistic calculations, it is designed for entertainment and learning, not for generating real-world firing data.<br><br>
-            <strong>Ballistics Model:</strong> Uses 4DOF trajectory with highly approximate, empirically tuned spin effects. These are rough approximations and may differ significantly from real-world behavior.<br><br>
+            <strong>Ballistics Model:</strong> Uses a modified point-mass (4DOF) trajectory with highly approximate, empirically tuned spin effects. These are rough approximations and may differ significantly from real-world behavior.<br><br>
             <strong>Wind Model:</strong> 2D curl-noise field provides plausible patterns for gameplay but does not model terrain effects, thermals, or turbulence.<br><br>
             <strong>Target Physics:</strong> Simplified rigid-body response for visual feedback. Real steel targets may behave differently based on mounting, material, and wear.<br><br>
             <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete information.
