@@ -141,6 +141,7 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .function("getElevationAngle", &Bullet::getElevationAngle)
     .function("getAzimuthAngle", &Bullet::getAzimuthAngle)
     .function("computeMillerStabilityFactor", &Bullet::computeMillerStabilityFactor)
+    .function("computeMillerStabilityFactorCorrected", &Bullet::computeMillerStabilityFactorCorrected)
     .function("computeIdealTwistRate", &Bullet::computeIdealTwistRate)
     .class_function("computeSpinRateFromTwist", &Bullet::computeSpinRateFromTwist);
 

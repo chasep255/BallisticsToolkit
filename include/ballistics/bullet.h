@@ -38,8 +38,8 @@ namespace btk::ballistics
      * @param drag_function Drag function type (default: G7)
      */
     constexpr Bullet(float weight, float diameter, float length, float bc, DragFunction drag_function = DragFunction::G7)
-      : weight_(weight), diameter_(diameter), length_(length), bc_(bc), drag_function_(drag_function), position_(0.0f, 0.0f, 0.0f), velocity_(0.0f, 0.0f, 0.0f), spin_rate_(0.0f), beta_eq_right_(0.0f),
-        beta_eq_up_(0.0f), has_flight_state_(false)
+      : weight_(weight), diameter_(diameter), length_(length), bc_(bc), drag_function_(drag_function), position_(0.0f, 0.0f, 0.0f), velocity_(0.0f, 0.0f, 0.0f), spin_rate_(0.0f),
+        has_flight_state_(false)
     {
     }
 
@@ -53,7 +53,7 @@ namespace btk::ballistics
      */
     constexpr Bullet(const Bullet& bullet, const btk::math::Vector3D& position, const btk::math::Vector3D& velocity, float spin_rate)
       : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_), drag_function_(bullet.drag_function_), position_(position), velocity_(velocity),
-        spin_rate_(spin_rate), beta_eq_right_(bullet.beta_eq_right_), beta_eq_up_(bullet.beta_eq_up_), has_flight_state_(true)
+        spin_rate_(spin_rate), has_flight_state_(true)
     {
     }
 
@@ -71,7 +71,7 @@ namespace btk::ballistics
      */
     constexpr Bullet(const Bullet& bullet, float position_x, float position_y, float position_z, float velocity_x, float velocity_y, float velocity_z, float spin_rate)
       : weight_(bullet.weight_), diameter_(bullet.diameter_), length_(bullet.length_), bc_(bullet.bc_), drag_function_(bullet.drag_function_), position_(position_x, position_y, position_z),
-        velocity_(velocity_x, velocity_y, velocity_z), spin_rate_(spin_rate), beta_eq_right_(bullet.beta_eq_right_), beta_eq_up_(bullet.beta_eq_up_), has_flight_state_(true)
+        velocity_(velocity_x, velocity_y, velocity_z), spin_rate_(spin_rate), has_flight_state_(true)
     {
     }
 
@@ -103,12 +103,6 @@ namespace btk::ballistics
     constexpr float getVelocityY() const { return velocity_.y; } // m/s
     constexpr float getVelocityZ() const { return velocity_.z; } // m/s
     constexpr float getSpinRate() const { return spin_rate_; }   // rad/s
-
-    // Crosswind lag state getters and setters (equilibrium lateral angles)
-    constexpr float getBetaEqRight() const { return beta_eq_right_; } // rad
-    constexpr float getBetaEqUp() const { return beta_eq_up_; }       // rad
-    void setBetaEqRight(float beta) { beta_eq_right_ = beta; }
-    void setBetaEqUp(float beta) { beta_eq_up_ = beta; }
 
     // Compute spin rate from signed twist pitch (meters/turn). RH>0, LH<0
     static constexpr float computeSpinRateFromTwist(float speed_mps, float twist_pitch_m_signed)
@@ -196,6 +190,38 @@ namespace btk::ballistics
     }
 
     /**
+     * @brief Miller stability factor corrected to actual muzzle conditions.
+     *
+     * Applies Miller's velocity and atmospheric corrections to the base factor,
+     * matching the SG definition used by Litz's spin-drift and aerodynamic-jump
+     * formulas (Applied Ballistics):
+     *   SG = SG_base · (V/2800)^(1/3) · (T_°R / 519) · (29.92 / P_inHg)
+     *
+     * The base factor is calibrated at 2800 fps, 59 °F (519 °R), 29.92 inHg.
+     *
+     * @param twist_inches_per_turn Twist rate in inches per turn
+     * @param velocity              Muzzle velocity in m/s
+     * @param temperature           Air temperature in K
+     * @param pressure              Barometric pressure in Pa
+     * @return Corrected gyroscopic stability factor (dimensionless)
+     */
+    float computeMillerStabilityFactorCorrected(float twist_inches_per_turn, float velocity, float temperature, float pressure) const
+    {
+      float sg = computeMillerStabilityFactor(twist_inches_per_turn);
+
+      float v_fps = btk::math::Conversions::mpsToFps(velocity);
+      float p_inHg = btk::math::Conversions::pascalsToInHg(pressure);
+      if(v_fps <= 0.0f || p_inHg <= 0.0f)
+        return sg;
+
+      float t_rankine = btk::math::Conversions::kelvinToRankine(temperature);
+
+      sg *= std::cbrt(v_fps / 2800.0f);               // Miller velocity correction
+      sg *= (t_rankine / 519.0f) * (29.92f / p_inHg); // Miller atmospheric (density) correction
+      return sg;
+    }
+
+    /**
      * @brief Calculate ideal twist rate using Miller twist rule
      *
      * Inverted from SG = 30m / (t²d³l(1+l²)), solving for T = t*d:
@@ -238,8 +264,6 @@ namespace btk::ballistics
     btk::math::Vector3D position_; // m
     btk::math::Vector3D velocity_; // m/s
     float spin_rate_;              // rad/s
-    float beta_eq_right_;          // rad - equilibrium lateral angle (right component)
-    float beta_eq_up_;             // rad - equilibrium lateral angle (up-in-plane component)
     bool has_flight_state_;
   };
 

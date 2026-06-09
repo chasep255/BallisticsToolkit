@@ -229,9 +229,16 @@ function calculateTrajectory()
   // Always calculate from the display spin rate, not the simulation spin rate
   const spinRateRpm = spinRateForDisplay * 60.0 / (2.0 * Math.PI);
 
-  // Calculate Miller stability factor
+  // Calculate Miller stability factor, corrected to actual muzzle conditions
+  // (velocity + air density) so it matches the SG definition Litz's spin-drift
+  // and aerodynamic-jump formulas are fit against.
   const twistRateInches = parseFloat(document.getElementById('twistRate').value);
-  const millerStabilityFactor = bullet.computeMillerStabilityFactor(twistRateInches);
+  const millerStabilityFactor = bullet.computeMillerStabilityFactorCorrected(
+    twistRateInches,
+    muzzleVelocity,
+    atmosphere.getTemperature(),
+    atmosphere.getPressure()
+  );
 
   // Collect all input parameters for display
   const inputParams = {

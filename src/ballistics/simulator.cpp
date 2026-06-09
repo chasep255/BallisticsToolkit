@@ -129,76 +129,102 @@ namespace btk::ballistics
     return (n > 1e-9f) ? (v / n) : fb;
   }
 
-  // Compute spin drift (steady) + Crosswind jump (transient)
-  btk::math::Vector3D Simulator::computeSpinWindAccel(Bullet& s, const btk::math::Vector3D& gravity, const btk::math::Vector3D& wind, float dt)
+  // Horizontal "right" axis (points +X for downrange -Z), perpendicular to the
+  // bullet's horizontal heading. Used for both spin drift and crosswind sensing.
+  static inline btk::math::Vector3D horizontalRight(const btk::math::Vector3D& v)
   {
-    // Air-relative velocity and trajectory direction
-    btk::math::Vector3D v = s.getVelocity();
-    btk::math::Vector3D u = v - wind;
-    float V = u.magnitude();
-    if(V < 1e-3f)
-      return btk::math::Vector3D(0.0f, 0.0f, 0.0f);
-    btk::math::Vector3D tHat = v.magnitude() > 1e-6f ? (v / v.magnitude()) : (u / V);
-
-    // Normal-plane basis: right ≈ +X, upInPl ≈ +Y for tHat ≈ -Z
-    btk::math::Vector3D worldUp = btk::math::Vector3D(0.0f, 1.0f, 0.0f);
-    btk::math::Vector3D right = safe_norm(tHat.cross(worldUp), btk::math::Vector3D(1.0f, 0.0f, 0.0f));
-    btk::math::Vector3D upInPl = safe_norm(right.cross(tHat), btk::math::Vector3D(0.0f, 1.0f, 0.0f));
-
-    // Aero scalars
-    float rho = atmosphere_.getAirDensity();
-    float qDyn = 0.5f * rho * V * V;
-    float Sref = 0.25f * M_PI_F * s.getDiameter() * s.getDiameter();
-
-    // Alignment rate Ω_p (how fast nose trims to flow)
-    // Use a representative aerodynamic moment arm: max(diameter, length)
-    float refLen = std::max(s.getDiameter(), s.getLength());
-    float denom = s.estimateSpinMomentOfInertia() * std::fabs(s.getSpinRate()) + 1e-12f;
-    float alignRate = (qDyn * Sref * refLen * std::fabs(restoring_moment_slope_per_rad_)) / denom;
-    // Stable low-pass factor for the lag state (use slower β_eq dynamics)
-    float betaAlignRate = beta_lag_scale_ * alignRate;
-    float aLP = 1.0f - std::exp(-betaAlignRate * dt);
-
-    // --- Spin drift (yaw-of-repose from gravity)
-    btk::math::Vector3D gPerp = gravity - tHat * gravity.dot(tHat);
-    btk::math::Vector3D tXg = gPerp.cross(tHat); // direction in plane (reversed for new coordinate system)
-    float yor = (alignRate > 1e-6f) ? yaw_of_repose_scale_ * (tXg.magnitude() / (V * alignRate)) : 0.0f;
-    // use the component along "right", signed by twist hand
-    int hand = (s.getSpinRate() >= 0.0f) ? +1 : -1;
-    float yorRight = hand * safe_norm(tXg, right).dot(right) * yor;
-    // Remove MAX_YAW_OF_REPOSE_RAD clamp as requested
-
-    // --- Crosswind jump via high-pass of lateral sideslip β = u_perp / V
-    btk::math::Vector3D u_perp = u - tHat * u.dot(tHat);
-    float betaR = u_perp.dot(right) / (V + 1e-12f);
-    float betaU = u_perp.dot(upInPl) / (V + 1e-12f);
-
-    float betaEqRight = s.getBetaEqRight();
-    float betaEqUp = s.getBetaEqUp();
-
-    betaEqRight += aLP * (betaR - betaEqRight);
-    betaEqUp += aLP * (betaU - betaEqUp);
-
-    s.setBetaEqRight(betaEqRight);
-    s.setBetaEqUp(betaEqUp);
-
-    float hpR = betaR - betaEqRight;
-    float hpU = betaU - betaEqUp;
-
-    // 90° rotation around tHat; sign by twist hand
-    float jumpR = yaw_of_repose_scale_ * (hand * hpU);
-    float jumpU = yaw_of_repose_scale_ * (hand * hpR);
-
-    // Convert tiny angles -> acceleration with lift slope
-    float gain = (qDyn * Sref * lift_slope_per_rad_) / s.getWeight();
-
-    btk::math::Vector3D extra = right * (gain * (yorRight + jumpR)) + upInPl * (gain * jumpU);
-
-    return extra;
+    btk::math::Vector3D fHoriz = safe_norm(btk::math::Vector3D(v.x, 0.0f, v.z), btk::math::Vector3D(0.0f, 0.0f, -1.0f));
+    return fHoriz.cross(btk::math::Vector3D(0.0f, 1.0f, 0.0f)); // = +X when heading is -Z
   }
 
-  // Calculate acceleration for a specific bullet state
-  btk::math::Vector3D Simulator::calculateAccelerationFor(Bullet& s, float dt)
+  // Litz spin drift, injected as an acceleration.
+  //
+  // The empirical drift curve is SD(t) = C · t^1.83 with C = 1.25·(SG + 1.2)
+  // (inches, t in seconds). To let the existing RK2 integrator reproduce that
+  // displacement we supply its second time-derivative:
+  //   a(t) = d²SD/dt² = 1.83·0.83·C · t^(-0.17)
+  // directed along the horizontal "right" axis, signed by twist hand.
+  btk::math::Vector3D Simulator::computeSpinDriftAccel(const Bullet& s, float t) const
+  {
+    if(sg_ <= 0.0f || t <= 0.0f)
+      return btk::math::Vector3D(0.0f, 0.0f, 0.0f);
+
+    // C in meters (1.25·(SG+1.2) is given in inches of drift)
+    float C_m = btk::math::Conversions::inchesToMeters(1.25f * (sg_ + 1.2f));
+    float a_mag = 1.83f * 0.83f * C_m * std::pow(t, -0.17f);
+
+    return horizontalRight(s.getVelocity()) * (a_mag * static_cast<float>(twist_hand_));
+  }
+
+  // Litz crosswind aerodynamic jump.
+  //
+  // Jump is an impulsive vertical deflection set by the crosswind the bullet
+  // first meets, with sensitivity (MOA per mph of crosswind):
+  //   sens = 0.01·SG − 0.0024·L_cal + 0.032
+  // We apply it as a vertical velocity impulse proportional to the *change* in
+  // crosswind each step. A steady wind from the muzzle fires the full impulse on
+  // the first step (0 → w); a wind that begins downrange fires its impulse there,
+  // and the remaining-range lever arm falls out of the integration for free.
+  void Simulator::applyCrosswindJump()
+  {
+    if(sg_ <= 0.0f)
+      return;
+
+    btk::math::Vector3D v = current_bullet_.getVelocity();
+    float V = v.magnitude();
+    if(V < 1e-3f)
+      return;
+
+    // Crosswind component (m/s): + = blowing toward the shooter's right (+X)
+    btk::math::Vector3D right = horizontalRight(v);
+    float wcross = wind_.dot(right);
+    float dwc = wcross - prev_wcross_;
+    prev_wcross_ = wcross;
+    if(dwc == 0.0f)
+      return;
+
+    float L_cal = current_bullet_.getLength() / current_bullet_.getDiameter();
+    float sens_moa_per_mph = 0.01f * sg_ - 0.0024f * L_cal + 0.032f;
+
+    // Convert the crosswind change to a jump angle, then to a vertical velocity.
+    float jump_moa = sens_moa_per_mph * btk::math::Conversions::mpsToMph(dwc);
+    float dtheta = btk::math::Conversions::moaToRadians(jump_moa); // rad
+
+    // Sign: right twist (hand +1) + wind from the right (dwc < 0) -> impact up.
+    float dvy = -V * dtheta * static_cast<float>(twist_hand_);
+
+    current_bullet_ = Bullet(current_bullet_, current_bullet_.getPosition(), btk::math::Vector3D(v.x, v.y + dvy, v.z), current_bullet_.getSpinRate());
+  }
+
+  // Compute the corrected muzzle SG and twist handedness from the launch state.
+  // Twist is recovered from the spin rate (inverse of computeSpinRateFromTwist),
+  // so no extra plumbing is needed.
+  //
+  // SG is deliberately a LAUNCH constant. Litz's formulas use SG as a single
+  // parameter that indexes the bullet's stability class; the downrange evolution
+  // of the trajectory is already absorbed into the empirical TOF^1.83 term (and
+  // into the jump being a muzzle/wind-entry event). Re-evaluating SG with the
+  // decaying downrange velocity would double-count that physics and corrupt the
+  // fit, not improve it. (Miller SG is itself defined as a muzzle estimate.)
+  void Simulator::computeLaunchStability()
+  {
+    float v = initial_bullet_.getVelocity().magnitude();
+    float spin = initial_bullet_.getSpinRate();
+    if(v < 1e-6f || std::fabs(spin) < 1e-9f)
+    {
+      sg_ = 0.0f;
+      twist_hand_ = 1;
+      return;
+    }
+
+    float twist_pitch_m = 2.0f * M_PI_F * v / std::fabs(spin);
+    float twist_in = btk::math::Conversions::metersToInches(twist_pitch_m);
+    sg_ = initial_bullet_.computeMillerStabilityFactorCorrected(twist_in, v, atmosphere_.getTemperature(), atmosphere_.getPressure());
+    twist_hand_ = (spin >= 0.0f) ? +1 : -1;
+  }
+
+  // Calculate acceleration for a specific bullet state at flight time t
+  btk::math::Vector3D Simulator::calculateAccelerationFor(const Bullet& s, float t) const
   {
     btk::math::Vector3D v_rel = s.getVelocity() - wind_;
     float v_rel_mag = v_rel.magnitude();
@@ -210,20 +236,26 @@ namespace btk::ballistics
     float drag_ret = computeDeceleration(s);
     btk::math::Vector3D drag_accel = -drag_ret * (v_rel / v_rel_mag);
 
-    // Add spin-aerodynamic effects
-    btk::math::Vector3D extra = computeSpinWindAccel(s, gravity, wind_, dt);
+    // Litz spin drift (steady, time-distributed). Crosswind jump is applied
+    // separately as a velocity impulse in timeStep().
+    btk::math::Vector3D drift = computeSpinDriftAccel(s, t);
 
-    return drag_accel + gravity + extra;
+    return drag_accel + gravity + drift;
   }
 
   // Setters
   void Simulator::setInitialBullet(const Bullet& bullet)
   {
     initial_bullet_ = bullet;
+    computeLaunchStability();
     resetToInitial();
   }
 
-  void Simulator::setAtmosphere(const btk::physics::Atmosphere& atmosphere) { atmosphere_ = atmosphere; }
+  void Simulator::setAtmosphere(const btk::physics::Atmosphere& atmosphere)
+  {
+    atmosphere_ = atmosphere;
+    computeLaunchStability(); // SG depends on air density
+  }
 
   void Simulator::setWind(const btk::math::Vector3D& wind) { wind_ = wind; }
 
@@ -247,6 +279,7 @@ namespace btk::ballistics
   {
     current_bullet_ = initial_bullet_;
     current_time_ = 0.0f;
+    prev_wcross_ = 0.0f; // so the muzzle crosswind fires its jump on the first step
     trajectory_.clear(); // Clear trajectory when resetting
   }
 
@@ -324,6 +357,7 @@ namespace btk::ballistics
 
     // Update initial bullet with zeroed state
     initial_bullet_ = initial_state;
+    computeLaunchStability();
     resetToInitial();
 
     // Return reference to the zeroed initial bullet
@@ -381,19 +415,25 @@ namespace btk::ballistics
   // Time step using stored state
   void Simulator::timeStep(float dt)
   {
-    Bullet s0 = current_bullet_;
+    // Crosswind aerodynamic jump: an impulse applied when the crosswind changes
+    // (including the muzzle 0 -> w transition on the first step).
+    applyCrosswindJump();
 
-    btk::math::Vector3D a0 = calculateAccelerationFor(s0, dt);
+    Bullet s0 = current_bullet_;
+    float t0 = current_time_;
+
+    // Spin-drift acceleration ~ t^(-0.17) is singular at t = 0; floor the sampled
+    // time at dt. The drift over [0, dt] is negligible, so the clamp is harmless.
+    btk::math::Vector3D a0 = calculateAccelerationFor(s0, std::max(t0, dt));
     btk::math::Vector3D vHalf = s0.getVelocity() + a0 * (0.5f * dt);
     btk::math::Vector3D xHalf = s0.getPosition() + vHalf * (0.5f * dt);
 
     Bullet sHalf(s0, xHalf, vHalf, s0.getSpinRate());
-    btk::math::Vector3D aHalf = calculateAccelerationFor(sHalf, dt);
+    btk::math::Vector3D aHalf = calculateAccelerationFor(sHalf, std::max(t0 + 0.5f * dt, dt));
 
     btk::math::Vector3D v1 = s0.getVelocity() + aHalf * dt;
     btk::math::Vector3D x1 = s0.getPosition() + vHalf * dt; // RK2 uses midpoint velocity for position
 
-    // Create final state using sHalf (which has updated lag state from midpoint acceleration)
     current_bullet_ = Bullet(sHalf, x1, v1, s0.getSpinRate());
     current_time_ += dt;
 

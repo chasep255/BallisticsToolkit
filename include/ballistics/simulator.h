@@ -9,11 +9,6 @@
 namespace btk::ballistics
 {
 
-  constexpr float DEFAULT_LIFT_SLOPE_PER_RAD = 1.27169f;
-  constexpr float DEFAULT_RESTORING_MOMENT_SLOPE_PER_RAD = -0.124862f;
-  constexpr float DEFAULT_YAW_OF_REPOSE_SCALE = 0.426516f;
-  constexpr float DEFAULT_BETA_LAG_SCALE = 0.670554f;
-
   /**
    * @brief Stateful ballistics flight simulator
    *
@@ -33,9 +28,8 @@ namespace btk::ballistics
      * - Time: 0.0f seconds
      */
     Simulator()
-      : initial_bullet_(0.0f, 0.0f, 0.0f, 0.0f), current_bullet_(0.0f, 0.0f, 0.0f, 0.0f), atmosphere_(), wind_(0.0f, 0.0f, 0.0f), current_time_(0.0f), trajectory_(),
-        lift_slope_per_rad_(DEFAULT_LIFT_SLOPE_PER_RAD), restoring_moment_slope_per_rad_(DEFAULT_RESTORING_MOMENT_SLOPE_PER_RAD), yaw_of_repose_scale_(DEFAULT_YAW_OF_REPOSE_SCALE),
-        beta_lag_scale_(DEFAULT_BETA_LAG_SCALE)
+      : initial_bullet_(0.0f, 0.0f, 0.0f, 0.0f), current_bullet_(0.0f, 0.0f, 0.0f, 0.0f), atmosphere_(), wind_(0.0f, 0.0f, 0.0f), current_time_(0.0f), trajectory_(), sg_(0.0f), twist_hand_(1),
+        prev_wcross_(0.0f)
     {
     }
 
@@ -159,17 +153,11 @@ namespace btk::ballistics
     Trajectory& getTrajectory() { return trajectory_; };
     const Trajectory& getTrajectory() const { return trajectory_; };
 
-    // Aerodynamic parameter setters
-    void setLiftSlopePerRad(float value) { lift_slope_per_rad_ = value; }
-    void setRestoringMomentSlopePerRad(float value) { restoring_moment_slope_per_rad_ = value; }
-    void setYawOfReposeScale(float value) { yaw_of_repose_scale_ = value; }
-    void setBetaLagScale(float value) { beta_lag_scale_ = value; }
-
-    // Aerodynamic parameter getters
-    float getLiftSlopePerRad() const { return lift_slope_per_rad_; }
-    float getRestoringMomentSlopePerRad() const { return restoring_moment_slope_per_rad_; }
-    float getYawOfReposeScale() const { return yaw_of_repose_scale_; }
-    float getBetaLagScale() const { return beta_lag_scale_; }
+    /**
+     * @brief Get the corrected muzzle gyroscopic stability factor (SG) used by
+     *        the Litz spin-drift / aerodynamic-jump model. Computed at launch.
+     */
+    float getStabilityFactor() const { return sg_; }
 
     /**
      * @brief Get deceleration (drag retardation) for a bullet state
@@ -182,8 +170,18 @@ namespace btk::ballistics
     private:
     // Physics helpers
     float computeDeceleration(const Bullet& s) const;
-    btk::math::Vector3D calculateAccelerationFor(Bullet& s, float dt);
-    btk::math::Vector3D computeSpinWindAccel(Bullet& s, const btk::math::Vector3D& gravity, const btk::math::Vector3D& wind, float dt);
+    btk::math::Vector3D calculateAccelerationFor(const Bullet& s, float t) const;
+
+    // Litz spin-drift acceleration: SD(t) = 1.25·(SG+1.2)·t^1.83, injected as
+    // its second time-derivative so the integrator reproduces the drift curve.
+    btk::math::Vector3D computeSpinDriftAccel(const Bullet& s, float t) const;
+
+    // Litz crosswind aerodynamic jump: a vertical velocity impulse applied
+    // whenever the crosswind the bullet sees changes (muzzle entry + downrange).
+    void applyCrosswindJump();
+
+    // Compute the corrected muzzle SG + twist handedness from the launch state.
+    void computeLaunchStability();
 
     // Internal state
     Bullet initial_bullet_;
@@ -193,11 +191,10 @@ namespace btk::ballistics
     float current_time_;
     Trajectory trajectory_;
 
-    // Tunable aerodynamic parameters
-    float lift_slope_per_rad_;
-    float restoring_moment_slope_per_rad_;
-    float yaw_of_repose_scale_;
-    float beta_lag_scale_;
+    // Litz spin model (computed at launch)
+    float sg_;          // corrected muzzle gyroscopic stability factor
+    int twist_hand_;    // +1 = right-hand twist, -1 = left-hand
+    float prev_wcross_; // crosswind (m/s) seen on the previous step, for the jump impulse
   };
 
 } // namespace btk::ballistics
