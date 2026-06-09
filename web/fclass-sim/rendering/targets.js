@@ -20,7 +20,8 @@ export class TargetRenderer
   static TARGET_MAX_HEIGHT = 0; // No additional height when raised
   static TARGET_HALF_MAST = -(TargetRenderer.TARGET_SIZE + TargetRenderer.TARGET_GAP_ABOVE_PITS) / 2;
   static TARGET_MIN_HEIGHT = -(TargetRenderer.TARGET_SIZE + TargetRenderer.TARGET_GAP_ABOVE_PITS);
-  static TARGET_ANIMATION_SPEED = 0.75; // yards per second
+  static TARGET_ANIMATION_SPEED = 0.75; // yards per second (fallback; overridden per-target in createTargets)
+  static TARGET_RAISE_LOWER_SECONDS = 2.8; // constant raise/lower duration regardless of frame size
 
   constructor(config)
   {
@@ -330,9 +331,14 @@ export class TargetRenderer
     this.faceSizeYards = btk.Conversions.metersToYards(this.btkTarget.getFaceSize());
     const frameSize = this.faceSizeYards * Range.FRAME_TO_FACE_RATIO;
     this.cfg.targetSize = frameSize;
-    this.cfg.targetHalfMast = -(frameSize + this.cfg.targetGapAbovePits) / 2;
-    this.cfg.targetMinHeight = -(frameSize + this.cfg.targetGapAbovePits);
+    const fullTravel = frameSize + this.cfg.targetGapAbovePits;
+    this.cfg.targetHalfMast = -fullTravel / 2;
+    this.cfg.targetMinHeight = -fullTravel;
     this.targetCenterHeight = this.pitsHeight + this.cfg.targetGapAbovePits + frameSize / 2;
+    // Drive the speed off the travel distance so the raise/lower takes a
+    // constant time at every distance (otherwise the taller LR frame, which
+    // travels farther, drops/raises noticeably slower than a 300yd frame).
+    this.cfg.targetAnimationSpeed = fullTravel / TargetRenderer.TARGET_RAISE_LOWER_SECONDS;
 
     // Create shared target texture (uses cfg.targetSize / faceSizeYards above)
     this.targetTexture = this.createTargetTexture();
@@ -1112,11 +1118,11 @@ export class TargetRenderer
   {
     if (!this.userTarget) return;
 
-    const faceHalfSize = this.faceSizeYards / 2; // Discs sit on the paper face, not the larger frame
-    const gapInches = 1.0; // 1 inch gap between disc and paper edge
+    const frameHalfSize = this.cfg.targetSize / 2; // Discs sit at the frame corners/edges
+    const gapInches = 1.0; // 1 inch gap between disc and frame edge
     const gapYards = gapInches / 36.0; // Convert to yards
     const discRadiusYards = (6.0 / 36.0) / 2.0; // 6 inch disc radius in yards
-    const edgePos = faceHalfSize - gapYards - discRadiusYards; // Position discs with 1" gap from edge
+    const edgePos = frameHalfSize - gapYards - discRadiusYards; // Position discs with 1" gap from edge
 
     // Get user target center from instance
     const targetCenter = this.getUserTargetCenter();
