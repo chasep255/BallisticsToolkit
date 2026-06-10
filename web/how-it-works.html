@@ -334,8 +334,8 @@
                 <strong>Important caveat:</strong> Litz's published formula describes the jump at the <em>muzzle</em> for a single constant crosswind. The engine generalizes it to wind <em>changes</em> met downrange, which is an <strong>engineering extension, not experimentally validated here</strong>. It is built so a constant wind reduces to the published muzzle jump; treat the downrange behavior as plausible and approximate, not established ballistics.
             </div>
 
-            <p>With that understood: each step, the engine compares the crosswind the bullet sees to the previous step and fires an impulse proportional to the <em>change</em>, so a constant wind fires its whole jump at the muzzle while a gust met downrange fires there:</p>
-            \[ \Delta\theta = \text{sens}\cdot\Delta w_\perp \;\;(\text{MOA}\to\text{rad}), \qquad \Delta v_y = -V\,\Delta\theta\cdot \text{hand} \]
+            <p>With that understood: each step, the engine compares the crosswind the bullet sees to the previous step and fires an impulse proportional to the <em>change</em> \(\Delta w_\perp\), so a constant wind fires its whole jump at the muzzle while a gust met downrange fires there. That change sets a small jump angle \(\Delta\theta = \text{sens}\cdot\Delta w_\perp\) (with \(\text{sens}\) in MOA per mph, converted to radians), applied as a kick to the bullet's vertical velocity, where \(\text{hand}=\pm1\) sets the sign from the twist direction:</p>
+            \[ \Delta v_y = -\,V\,\Delta\theta\cdot \text{hand} \]
             <p>This assumes the jump is effectively instantaneous, that the muzzle sensitivity still applies downrange, and that successive wind changes add up linearly, all approximations.</p>
 
             <div class="takeaway">Spin drift and crosswind jump are empirical corrections layered onto the point-mass path, not a full simulation of the bullet's orientation.</div>
@@ -387,7 +387,7 @@
                 <figcaption>The wind blows along the contours of \(\psi\), circling each ridge and basin rather than crossing them, and is fastest where the rings crowd, the look of real eddies.</figcaption>
             </figure>
 
-            <p>Why not simulate the air for real? True computational fluid dynamics would solve the Navier&ndash;Stokes equations on a fine grid, far too expensive for real time and dependent on inputs no shooter has (terrain, thermal layering). Curl noise gives coherent, plausible, divergence-free eddies cheaply. Several layers stack: a broad slow base wind, a medium gusting layer, and fine turbulence. Each is normalized and reshaped, and the whole field <strong>advects</strong> (drifts downwind) so eddies travel down the range.</p>
+            <p>Why not simulate the air for real? True computational fluid dynamics would solve the Navier&ndash;Stokes equations on a fine grid, far too expensive to run live in a browser. It would not buy much realism here anyway: a real solve still needs boundary conditions, the gusty inflow that drives the whole field, and those are effectively random, so the important randomness has to be invented either way. Curl noise gives the same coherent, plausible, divergence-free eddies directly and cheaply. Several layers stack: a broad slow base wind, a medium gusting layer, and fine turbulence. Each is normalized and reshaped, and the whole field <strong>advects</strong> (drifts downwind) so eddies travel down the range.</p>
             <div class="deep">
                 <strong>Under the hood:</strong> the curl is taken by central differences in the noise's scaled coordinates and converted back to world units by the chain rule; each layer's magnitude is normalized against an RMS estimated from ~1000 samples, then reshaped by an exponent and an optional gate. The 2D curl yields only horizontal wind.
             </div>
