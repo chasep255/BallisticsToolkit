@@ -585,7 +585,7 @@ export class TargetRenderer
   /**
    * Scoring-ring geometry for the current target, used to draw the scorecard
    * grouping diagram. Radii are in yards from target center.
-   * @returns {{rings: Array<{ring:number, radiusYards:number}>, xRadiusYards:number}}
+   * @returns {{rings: Array<{ring:number, radiusYards:number}>, xRadiusYards:number, faceSizeYards:number}}
    */
   getScoringRings()
   {
@@ -597,7 +597,8 @@ export class TargetRenderer
       rings.push({ ring: ring, radiusYards: btk.Conversions.metersToYards(diameterMeters) / 2 });
     }
     const xRadiusYards = btk.Conversions.metersToYards(this.btkTarget.getXRingDiameter()) / 2;
-    return { rings, xRadiusYards };
+    const faceSizeYards = btk.Conversions.metersToYards(this.btkTarget.getFaceSize());
+    return { rings, xRadiusYards, faceSizeYards };
   }
 
   raiseTarget(targetNumber)

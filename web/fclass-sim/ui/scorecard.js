@@ -386,7 +386,7 @@ export class Scorecard
 
     html += `<div class="shot-detail-grid">`;
     html += `<div class="shot-detail-panel"><div class="shot-detail-panel-title">Point of Aim vs Impact</div>${this.renderShotTarget(diag)}</div>`;
-    html += `<div class="shot-detail-panel"><div class="shot-detail-panel-title">Trajectory vs Wind (down range)</div>${this.renderTrajectoryPlot(diag)}</div>`;
+    html += `<div class="shot-detail-panel"><div class="shot-detail-panel-title">Trajectory vs Crosswind</div>${this.renderTrajectoryPlot(diag)}</div>`;
     html += `</div>`;
 
     html += this.renderShotStats(diag);
@@ -512,8 +512,11 @@ export class Scorecard
   /**
    * Down-range view of the shot: distance runs up the Y axis (shooter at bottom,
    * target center at top). The horizontal direction carries two overlaid scales
-   * — bullet drift in MOA (orange) and the crosswind it flew through in mph
-   * (cyan) — so you can read how the wind walked the bullet off line.
+   * — the bullet's lateral position (orange, top axis), with the axis spanning
+   * the target paper width, and the crosswind it flew through in mph (cyan,
+   * bottom axis), with the axis fixed at ±20 mph (ticked every 5) — so you can
+   * read how the wind walked the bullet off line. Both axes are constant across
+   * shots; a shot that drifts off the paper clips past the axis edge.
    */
   renderTrajectoryPlot(diag)
   {
@@ -525,9 +528,6 @@ export class Scorecard
     }
 
     const dist = diag.distance || traj[traj.length - 1].z || 1;
-    const MOA_PER_RAD = 3437.746;
-    // Lateral offset as angular drift (MOA), subtended at the target distance.
-    const toMoa = yards => (yards / dist) * MOA_PER_RAD;
 
     const w = 300;
     const h = 300;
@@ -541,21 +541,26 @@ export class Scorecard
 
     const maxZ = dist;
     // Reference the plot to the line of sight to target center, so the vertical
-    // zero axis runs through the X (the bull): a centered hit returns the drift
+    // zero axis runs through the X (the bull): a centered hit returns the path
     // curve to the axis at the top. targetX (the center's absolute lateral
     // position) is recovered from the final point and the known impact offset.
     const last = traj[traj.length - 1];
     const impactX = diag.impact ? diag.impact.x : last.x;
     const targetX = last.x - impactX;
-    const driftMoa = traj.map(p => toMoa(p.x - targetX * (p.z / maxZ)));
+    // Bullet's lateral position relative to the center line, in yards.
+    const latYards = traj.map(p => p.x - targetX * (p.z / maxZ));
     // Point of aim (incl. dial) as a straight line of departure, center-relative.
-    const aimMoa = diag.aimPoint ? toMoa(diag.aimPoint.x) : 0;
-    const maxDrift = Math.max(0.25, ...driftMoa.map(Math.abs), Math.abs(aimMoa)) * 1.15;
-    const crossVals = wind.map(p => p.cross);
-    const maxCross = Math.max(0.5, ...crossVals.map(Math.abs)) * 1.15;
+    const aimYards = diag.aimPoint ? diag.aimPoint.x : 0;
+
+    // Constant axes so plots compare shot to shot: the lateral (bullet-path)
+    // axis spans the target paper width, the crosswind axis is fixed at ±20 mph.
+    const spec = this.targetSpec;
+    const halfPaperYd = ((spec && spec.faceSizeYards ? spec.faceSizeYards : 2) / 2) || 1;
+    const halfPaperIn = halfPaperYd * 36;
+    const maxCross = 20;
 
     const yDown = z => (padT + plotH) - (z / maxZ) * plotH; // 0 at bottom, target at top
-    const xDrift = moa => cx + (moa / maxDrift) * (plotW / 2);
+    const xLat = yards => cx + (yards / halfPaperYd) * (plotW / 2);
     const xCross = mph => cx + (mph / maxCross) * (plotW / 2);
 
     let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="traj-svg">`;
@@ -564,13 +569,34 @@ export class Scorecard
     // Center (the X) vertical axis, and down-range axis on the left.
     svg += `<line x1="${cx}" y1="${padT}" x2="${cx}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>`;
     svg += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>`;
-    // Top axis = wind (cyan), bottom axis = drift (orange).
-    svg += `<line x1="${padL}" y1="${padT}" x2="${w - padR}" y2="${padT}" stroke="#32d6ff" stroke-width="1" stroke-opacity="0.5"/>`;
-    svg += `<line x1="${padL}" y1="${padT + plotH}" x2="${w - padR}" y2="${padT + plotH}" stroke="#ff9f0a" stroke-width="1" stroke-opacity="0.5"/>`;
+    // Top axis = bullet path (orange), bottom axis = crosswind (cyan).
+    svg += `<line x1="${padL}" y1="${padT}" x2="${w - padR}" y2="${padT}" stroke="#ff9f0a" stroke-width="1" stroke-opacity="0.5"/>`;
+    svg += `<line x1="${padL}" y1="${padT + plotH}" x2="${w - padR}" y2="${padT + plotH}" stroke="#32d6ff" stroke-width="1" stroke-opacity="0.5"/>`;
+
+    // Scoring-ring borders at the target plane (top): a tick on each side of
+    // center at the ring radius, on the paper-width scale, so you can read which
+    // ring the bullet path arrives in. Drawn before the curves so they overlay.
+    if (spec && spec.rings)
+    {
+      const bounds = spec.rings.map(r => ({ label: String(r.ring), r: r.radiusYards }));
+      if (spec.xRadiusYards) bounds.push({ label: 'X', r: spec.xRadiusYards });
+      for (const b of bounds)
+      {
+        for (const sign of [-1, 1])
+        {
+          const tx = xLat(sign * b.r);
+          if (tx < padL - 0.5 || tx > w - padR + 0.5) continue; // ring border is beyond the paper edge
+          // Keep edge labels (e.g. the 5-ring at the paper edge) inside the plot.
+          const anchor = tx > w - padR - 4 ? 'end' : tx < padL + 4 ? 'start' : 'middle';
+          svg += `<line x1="${tx.toFixed(1)}" y1="${padT - 1}" x2="${tx.toFixed(1)}" y2="${padT + 5}" stroke="#e9d39a" stroke-width="1" stroke-opacity="0.85"/>`;
+          svg += `<text x="${tx.toFixed(1)}" y="${padT - 3}" fill="#e9d39a" font-size="7" text-anchor="${anchor}" fill-opacity="0.9">${b.label}</text>`;
+        }
+      }
+    }
 
     // Point-of-aim line (straight line of departure): from center at the shooter
     // to the aim point at the target. The gap to the drift curve is the wind.
-    svg += `<line x1="${xDrift(0).toFixed(1)}" y1="${yDown(0).toFixed(1)}" x2="${xDrift(aimMoa).toFixed(1)}" y2="${yDown(maxZ).toFixed(1)}" stroke="#34c759" stroke-width="1.6" stroke-dasharray="5 3" stroke-opacity="0.9"/>`;
+    svg += `<line x1="${xLat(0).toFixed(1)}" y1="${yDown(0).toFixed(1)}" x2="${xLat(aimYards).toFixed(1)}" y2="${yDown(maxZ).toFixed(1)}" stroke="#34c759" stroke-width="1.6" stroke-dasharray="5 3" stroke-opacity="0.9"/>`;
 
     // Crosswind curve (cyan), smoothed across the 25-yard samples.
     if (wind.length >= 2)
@@ -579,27 +605,39 @@ export class Scorecard
       svg += `<path d="${this.smoothPath(pts)}" fill="none" stroke="#32d6ff" stroke-width="2" stroke-opacity="0.9"/>`;
     }
 
-    // Drift curve (orange), smoothed.
-    const driftPts = traj.map((p, i) => ({ x: xDrift(driftMoa[i]), y: yDown(p.z) }));
-    svg += `<path d="${this.smoothPath(driftPts)}" fill="none" stroke="#ff9f0a" stroke-width="2.2"/>`;
+    // Bullet-path curve (orange), smoothed.
+    const pathPts = traj.map((p, i) => ({ x: xLat(latYards[i]), y: yDown(p.z) }));
+    svg += `<path d="${this.smoothPath(pathPts)}" fill="none" stroke="#ff9f0a" stroke-width="2.2"/>`;
 
     // Down-range labels (left axis): shooter at bottom, target at top.
     svg += `<text x="${padL - 5}" y="${padT + plotH}" fill="rgba(255,255,255,0.7)" font-size="9" text-anchor="end">0</text>`;
     svg += `<text x="${padL - 5}" y="${padT + 4}" fill="rgba(255,255,255,0.7)" font-size="9" text-anchor="end">${Math.round(maxZ)}yd</text>`;
     svg += `<text x="11" y="${padT + plotH / 2}" fill="rgba(255,255,255,0.65)" font-size="10" text-anchor="middle" transform="rotate(-90 11 ${padT + plotH / 2})">down range</text>`;
 
-    // Bottom drift axis (MOA, orange).
-    svg += `<text x="${padL}" y="${h - 8}" fill="#ff9f0a" font-size="9">-${maxDrift.toFixed(1)}</text>`;
-    svg += `<text x="${w - padR}" y="${h - 8}" fill="#ff9f0a" font-size="9" text-anchor="end">+${maxDrift.toFixed(1)} MOA</text>`;
-    // Top wind axis (mph, cyan).
-    svg += `<text x="${padL}" y="14" fill="#32d6ff" font-size="9">-${maxCross.toFixed(1)}</text>`;
-    svg += `<text x="${w - padR}" y="14" fill="#32d6ff" font-size="9" text-anchor="end">+${maxCross.toFixed(1)} mph</text>`;
+    // Top bullet-path axis (orange): the ends are offsets from center, the center
+    // title gives the full paper width so ±36" doesn't read as the paper size.
+    svg += `<text x="${padL}" y="14" fill="#ff9f0a" font-size="9">-${halfPaperIn.toFixed(0)}"</text>`;
+    svg += `<text x="${cx}" y="14" fill="#ff9f0a" font-size="9" text-anchor="middle" fill-opacity="0.85">${(halfPaperIn * 2).toFixed(0)}" paper</text>`;
+    svg += `<text x="${w - padR}" y="14" fill="#ff9f0a" font-size="9" text-anchor="end">+${halfPaperIn.toFixed(0)}"</text>`;
+    // Bottom crosswind axis (mph, cyan), ticked at 5/10/15/20 on each side.
+    const axisY = padT + plotH;
+    for (const mph of [5, 10, 15, 20])
+    {
+      for (const sign of [-1, 1])
+      {
+        const tx = xCross(sign * mph);
+        const anchor = mph === maxCross ? (sign < 0 ? 'start' : 'end') : 'middle';
+        svg += `<line x1="${tx.toFixed(1)}" y1="${axisY}" x2="${tx.toFixed(1)}" y2="${axisY + 4}" stroke="#32d6ff" stroke-width="1" stroke-opacity="0.7"/>`;
+        svg += `<text x="${tx.toFixed(1)}" y="${axisY + 13}" fill="#32d6ff" font-size="8" text-anchor="${anchor}">${sign < 0 ? '-' : ''}${mph}</text>`;
+      }
+    }
+    svg += `<text x="${w - padR}" y="${h - 5}" fill="#32d6ff" font-size="8" text-anchor="end">mph</text>`;
 
     svg += `</svg>`;
 
     let legend = `<div class="shot-detail-legend">`;
     legend += `<span><span class="swatch swatch-aim"></span>Point of aim</span>`;
-    legend += `<span><span class="swatch swatch-drift"></span>Drift (MOA)</span>`;
+    legend += `<span><span class="swatch swatch-drift"></span>Bullet path</span>`;
     legend += `<span><span class="swatch swatch-wind"></span>Crosswind (mph)</span>`;
     legend += `</div>`;
 
@@ -607,7 +645,8 @@ export class Scorecard
   }
 
   /**
-   * Text stats block: dial, aim hold, wind, and the realized impact offset.
+   * Text stats block: dial, aim hold, the realized impact offset, and the
+   * muzzle/impact velocities for this shot.
    */
   renderShotStats(diag)
   {
@@ -631,18 +670,14 @@ export class Scorecard
     const vDir = dial.v <= 0 ? 'U' : 'D';
     const hDir = dial.h <= 0 ? 'R' : 'L';
 
-    let windText = '–';
-    if (diag.windAtShooter)
-    {
-      const cw = diag.windAtShooter.cross;
-      windText = `${fmt(Math.abs(cw), 1)} mph cross, ${cw >= 0 ? 'from left' : 'from right'}`;
-    }
+    const fps = v => (v === null || v === undefined || isNaN(v)) ? '–' : `${Math.round(v)} fps`;
 
     const rows = [
       ['Scope dial', `${fmt(Math.abs(dial.v), 2)} MOA ${vDir} / ${fmt(Math.abs(dial.h), 2)} MOA ${hDir}`],
       ['Aim + dial', offsetMoa(aim.x, aim.y)],
       ['Impact', offsetMoa(impact.x, impact.y)],
-      ['Wind at shooter', windText]
+      ['Muzzle velocity', fps(diag.mvFps)],
+      ['Impact velocity', fps(diag.impactVelocityFps)]
     ];
 
     let html = `<div class="shot-detail-stats">`;

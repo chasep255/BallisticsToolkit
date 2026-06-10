@@ -2609,6 +2609,8 @@ class FClassSimulator
     shotData.diag.impact = { x: shotData.relativeX, y: shotData.relativeY };
     shotData.diag.score = shotData.score;
     shotData.diag.isX = shotData.isX;
+    shotData.diag.mvFps = shotData.mvFps;
+    shotData.diag.impactVelocityFps = shotData.impactVelocityFps;
 
     // Classify and log the shot through the driver (handles phase/turn transitions)
     this.driver.onShotScored(shotData, ResourceManager.time.getElapsedTime());
@@ -2693,7 +2695,6 @@ class FClassSimulator
         }
       }
     }
-    diag.windAtShooter = diag.windProfile.length ? diag.windProfile[0] : null;
 
     return diag;
   }
