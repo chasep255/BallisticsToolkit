@@ -226,7 +226,7 @@ function setActiveNavLink()
 function generateNavigation(currentPageName)
 {
   // Determine path prefix based on current page
-  const isRootPage = currentPageName === 'index' || currentPageName === 'about';
+  const isRootPage = currentPageName === 'index' || currentPageName === 'about' || currentPageName === 'how-it-works';
   const pathPrefix = isRootPage ? '' : '../';
 
   const act = (page) => currentPageName === page ? 'class="active"' : '';
@@ -284,7 +284,7 @@ function setupCommonPageStructure()
   let footer = document.querySelector('.site-footer');
   if (!footer)
   {
-    const pathPrefix = (currentPageName === 'index' || currentPageName === 'about') ? '' : '../';
+    const pathPrefix = (currentPageName === 'index' || currentPageName === 'about' || currentPageName === 'how-it-works') ? '' : '../';
     footer = document.createElement('div');
     footer.className = 'site-footer';
     footer.style.cssText = 'margin-top:40px;padding:20px 0;border-top:1px solid #e5e5e5;color:#666;font-size:14px;';
@@ -302,6 +302,8 @@ function setupCommonPageStructure()
           <a href="https://github.com/chasep255/BallisticsToolkit" target="_blank" rel="noopener">GitHub</a>
           <span>·</span>
           <a href="${pathPrefix}about.html">About</a>
+          <span>·</span>
+          <a href="${pathPrefix}how-it-works.html">How It Works</a>
           <span>·</span>
           <a href="${pathPrefix}contact.html">Contact</a>
           <span>·</span>
@@ -498,7 +500,7 @@ function btkGetPathPrefix()
 {
   const body = document.body;
   const currentPageName = body?.dataset?.page || 'index';
-  const isRootPage = currentPageName === 'index' || currentPageName === 'about';
+  const isRootPage = currentPageName === 'index' || currentPageName === 'about' || currentPageName === 'how-it-works';
   return isRootPage ? '' : '../';
 }
 

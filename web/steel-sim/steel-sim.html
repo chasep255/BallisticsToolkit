@@ -320,7 +320,7 @@
             - <strong>Accuracy:</strong> Rifle+shooter precision in MOA<br>
             - <strong>Zero Distance:</strong> Distance at which rifle is zeroed (yards)<br>
             - <strong>Scope Height:</strong> Height of scope above bore (inches)<br>
-            - <strong>Wind Preset:</strong> Selects the downrange wind conditions — overall strength plus gust and turbulence character — driving the field that affects trajectory and mirage<br>
+            - <strong>Wind Preset:</strong> Selects the downrange wind conditions (overall strength plus gust and turbulence character) driving the field that affects trajectory and mirage<br>
             - <strong>Wind Markers:</strong> Show wind downrange as Flags or Wind Socks<br>
             - <strong>Reset to Defaults:</strong> Restore every setting above to its default value<br><br>
 
@@ -333,7 +333,7 @@
             <strong>Recoil Effect:</strong><br>
             - Toggle via dropdown in the settings bar (None/Light/Medium/Heavy)<br>
             - When enabled, each shot kicks the scope aim in a random direction (within a 15° cone, mostly upward)<br>
-            - After the kick, the aim settles to a reduced offset—you must manually return to target<br>
+            - After the kick, the aim settles to a reduced offset; you must manually return to target<br>
             - None: No recoil effect<br>
             - Light: Small kick, minimal settle offset<br>
             - Medium: Moderate kick and settle<br>
@@ -343,7 +343,7 @@
             <strong>Mirage/Optical Effects:</strong><br>
             - Toggle via the checkbox in the settings bar<br>
             - Simulates heat mirage/shimmer visible through the scope (visual effect)<br>
-            - Mirage moves with the wind—watch it to read wind direction and speed<br>
+            - Mirage moves with the wind; watch it to read wind direction and speed<br>
             - Higher magnification = stronger mirage (just like a real scope)<br>
             - Farther distances = stronger mirage (more air to look through)<br>
             - Very strong wind reduces mirage visibility (turbulence breaks up pattern)<br>
@@ -441,7 +441,7 @@
           <p style="font-style: italic; color: #666; margin-bottom: 10px;">This list is not exhaustive. Additional limitations, errors, or inaccuracies may exist.</p>
           <div class="param-help">
             <strong>Entertainment/Educational Simulation:</strong> This is a shooting simulation game. While it uses physics-based ballistic calculations, it is designed for entertainment and learning, not for generating real-world firing data.<br><br>
-            <strong>Ballistics Model:</strong> Uses a modified point-mass trajectory with spin drift and crosswind jump based on Bryan Litz's empirical formulas. These are widely-used approximations and may differ from real-world behavior. Because the wind field varies down the range, the crosswind jump is applied continuously as the wind the bullet sees changes — a generalization of Litz's muzzle-only jump (a uniform wind reproduces his published figure).<br><br>
+            <strong>Ballistics Model:</strong> Uses a modified point-mass trajectory with spin drift and crosswind jump based on Bryan Litz's empirical formulas. These are widely-used approximations and may differ from real-world behavior. Because the wind field varies down the range, the crosswind jump is applied continuously as the wind the bullet sees changes. A uniform wind reproduces Litz's published muzzle figure; applying it to downrange wind changes is our own engineering extension, not a published or experimentally validated result.<br><br>
             <strong>Wind Model:</strong> 2D curl-noise field provides plausible patterns for gameplay but does not model terrain effects, thermals, or turbulence.<br><br>
             <strong>Target Physics:</strong> Simplified rigid-body response for visual feedback. Real steel targets may behave differently based on mounting, material, and wear.<br><br>
             <strong>Full Disclaimers:</strong> See the <a href="../terms.html">Terms of Service</a> for complete information.

@@ -196,7 +196,7 @@
                 <div class="help-section">
                     <h3>Target &amp; Match Parameters</h3>
                     <div class="param-help">
-                        <strong>Target Type:</strong> Standard competitive targets with specific ring diameters. SR (200-300yd), MR (300-600yd), LR (800-1000yd). FCA variants are paste-over center inserts used in F-Class competition — they share the base target's outer rings but have smaller X and 10-ring diameters. IBS-100/200/300 are benchrest score targets for 100, 200, and 300 yards.<br><br>
+                        <strong>Target Type:</strong> Standard competitive targets with specific ring diameters. SR (200-300yd), MR (300-600yd), LR (800-1000yd). FCA variants are paste-over center inserts used in F-Class competition; they share the base target's outer rings but have smaller X and 10-ring diameters. IBS-100/200/300 are benchrest score targets for 100, 200, and 300 yards.<br><br>
                         <strong>Range:</strong> Distance to target in yards.<br><br>
                         <strong>Shots/Match:</strong> Number of rounds per match.<br><br>
                         <strong>Matches:</strong> Number of complete matches to simulate. Higher values improve statistical significance but increase computation time.
@@ -238,7 +238,7 @@
                     <h3>Technical Notes</h3>
                     <div class="param-help">
                         <strong>Monte Carlo:</strong> Per‑shot draws from statistical distributions (velocity, wind, accuracy). Wind/MV treated as normal with clipping for outliers; accuracy modeled as a uniform circle in MOA for simplicity.<br><br>
-                        <strong>Trajectory Engine:</strong> Same WebAssembly core as the Ballistic Calculator (RK2 integration). Modified point-mass trajectory with spin drift and crosswind jump based on Litz's empirical formulas available for realism.<br><br>
+                        <strong>Trajectory Engine:</strong> Same WebAssembly core as the Ballistic Calculator (RK2 integration). Modified point-mass trajectory with spin drift and crosswind jump based on Litz's empirical (fitted) approximations.<br><br>
                         <strong>Scoring:</strong> Competitive target specs with line-breaking; bullet diameter is used to determine ring breaks on boundaries.
                     </div>
                 </div>

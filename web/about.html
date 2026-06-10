@@ -47,7 +47,7 @@
         <div class="content-section">
             <h2>Project Overview</h2>
             <div class="highlight-box">
-                <p><strong>Ballistics Toolkit</strong> is a client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides trajectory calculations with atmospheric, wind, and spin effects, load comparison, Performance Matrix analysis, Monte Carlo target simulation, hit simulation, wind visualization, interactive steel target simulator, an interactive F‑Class match simulator, and a printable target generator—all running in your browser without any software installation.</p>
+                <p><strong>Ballistics Toolkit</strong> is a client-side web-based ballistics calculator and simulation suite for long-range shooting. Built with WebAssembly and Three.js, it provides trajectory calculations with atmospheric, wind, and spin effects, load comparison, Performance Matrix analysis, Monte Carlo target simulation, hit simulation, wind visualization, interactive steel target simulator, an interactive F‑Class match simulator, and a printable target generator, all running in your browser without any software installation.</p>
             </div>
         </div>
         
@@ -69,18 +69,19 @@
         
         <div class="content-section">
             <h2>How It Works</h2>
+            <p>The summary below lists the technology behind the suite. For a full, illustrated walkthrough of the ballistics model itself (drag tables, numerical integration, atmosphere, spin effects, and the curl-noise wind field, with equations and diagrams), see the dedicated <a href="how-it-works.html"><strong>How It Works</strong></a> page.</p>
             <ul class="tech-list">
                 <li class="tech-item"><strong>WebAssembly:</strong> Emscripten compilation for fast performance</li>
                 <li class="tech-item"><strong>Algorithms:</strong> 2nd-order Runge-Kutta (RK2) integration for trajectory calculations</li>
                 <li class="tech-item"><strong>Drag Models:</strong> G1 and G7 standard drag functions</li>
                 <li class="tech-item"><strong>Atmosphere:</strong> Uses temperature, humidity, and altitude inputs. Atmospheric pressure is calculated from altitude using the ISA power-law barometric formula.</li>
-                <li class="tech-item"><strong>Spin Aerodynamics:</strong> Modified point-mass trajectory with spin drift and crosswind jump based on Bryan Litz's empirical formulas — applied continuously along the trajectory and generalized to varying wind — driven by the gyroscopic stability factor.</li>
+                <li class="tech-item"><strong>Spin Aerodynamics:</strong> Modified point-mass trajectory with spin drift and crosswind jump from Bryan Litz's empirical (fitted) formulas, driven by the gyroscopic stability factor. Spin drift is applied continuously along the trajectory; the crosswind jump is generalized to wind changes met downrange, an engineering approximation beyond Litz's muzzle figure.</li>
                 <li class="tech-item"><strong>Wind Modeling:</strong> 2D curl field from time varying 3D Simplex noise with multi-octave components.</li>
-                <li class="tech-item"><strong>Focus:</strong> Depth-of-field style blur in the scope view, using a depth texture and thin‑lens model (focal distance, f‑number, sensor width) to weight a separable Gaussian blur.</li>
-                <li class="tech-item"><strong>Mirage:</strong> Post-process shimmer shader composed of independent atmospheric slabs along the line of sight, sampling one shared 4D simplex field (three spatial axes plus time). Each slab samples the wind at its own depth with EMA smoothing and its own drift and attenuation; near-shooter slabs naturally read as larger soft features and target-end slabs as crisp small features, mirroring the depth-of-field behavior of a focused spotting scope. Intensity is selectable (or off) per session.</li>
+                <li class="tech-item"><strong>Focus:</strong> Depth-of-field style blur in the scope view, using a depth texture and a thin‑lens model (objective diameter and focus distance set the defocus) to weight a separable Gaussian blur.</li>
+                <li class="tech-item"><strong>Mirage:</strong> Post-process shimmer shader composed of independent atmospheric slabs along the line of sight, sampling one shared 4D simplex field (three spatial axes plus time). Each slab samples the wind at its own depth with EMA smoothing and its own drift and attenuation; near-shooter slabs naturally read as larger soft features and target-end slabs as crisp small features, mirroring the depth-of-field behavior of a focused scope. Intensity is selectable (or off) per session.</li>
                 <li class="tech-item"><strong>Three.js & Shaders:</strong> WebGL rendering built on Three.js with custom materials and post-processing passes for scopes, mirage, and particle effects.</li>
                 <li class="tech-item"><strong>Remote Play (Beta):</strong> Browser-native WebRTC streams the host's live view and audio peer-to-peer to a remote player; connections are negotiated with the PeerJS library (broker signaling plus public STUN servers). No backend server of our own.</li>
-                <li class="tech-item"><strong>Steel Target Physics:</strong> Hanging targets with simple rigid-body style motion—momentum transfer, damping, and rotation—so center impacts swing and edge hits induce spin.</li>
+                <li class="tech-item"><strong>Steel Target Physics:</strong> Hanging targets with simple rigid-body style motion (momentum transfer, damping, and rotation), so center impacts swing and edge hits induce spin.</li>
                 <li class="tech-item"><strong>Impact & Dust Effects:</strong> Instanced impact marks on steel and ground plus particle-based dust clouds whose visibility responds to impact location, zoom, and environment.</li>
                 <li class="tech-item"><strong>Scopes:</strong> Pointer-lock rifle and spotting scopes with FFP reticles (Steel) or SFP/FFP selection (F‑Class), and angular units matched to the underlying ballistics (MRAD/MOA).</li>
                 <li class="tech-item"><strong>Shared Engine:</strong> Calculators, simulators, and the Performance Matrix all use the same underlying ballistics core so results stay consistent between tools.</li>
@@ -91,7 +92,7 @@
             <h2>Why Ballistics Toolkit</h2>
             <div class="highlight-box">
                 <p><strong>Plan & Train:</strong> Explore trajectory tables, visualize wind effects, and practice match flow from 300–1000 yards.</p>
-                <p><strong>Fast & Portable:</strong> Runs entirely in the browser — no login, no install.</p>
+                <p><strong>Fast & Portable:</strong> Runs entirely in the browser, no login, no install.</p>
             </div>
         </div>
         

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How It Works | Ballistics Toolkit</title>
+    <meta name="description" content="How Ballistics Toolkit models a bullet's flight: a modified point-mass trajectory engine (drag, atmosphere, wind, empirical spin corrections), the curl-noise wind field, mirage, impact detection and Monte Carlo dispersion, with its assumptions and limitations stated.">
+    <meta name="keywords" content="ballistics model, ballistic coefficient, G1 G7 drag, point mass trajectory, RK2 integration, spin drift, gyroscopic stability, Miller stability, crosswind jump, curl noise wind">
+    <link rel="canonical" href="https://www.ballisticstoolkit.com/how-it-works.html">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://www.ballisticstoolkit.com/how-it-works.html">
+    <meta property="og:title" content="How It Works: The Ballistics Model">
+    <meta property="og:description" content="How the toolkit computes trajectories and what the simulators add: drag, atmosphere, wind, spin corrections, the wind field, mirage, impact detection and Monte Carlo dispersion, with its assumptions stated.">
+    <meta property="og:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://www.ballisticstoolkit.com/how-it-works.html">
+    <meta property="twitter:title" content="How It Works: The Ballistics Model">
+    <meta property="twitter:description" content="How the toolkit computes trajectories and what the simulators add, with its assumptions and limitations stated.">
+    <meta property="twitter:image" content="https://www.ballisticstoolkit.com/ballistics-toolkit-logo.png">
+
+    <link rel="icon" type="image/x-icon" href="ballistics-toolkit-favicon.ico">
+    <link rel="stylesheet" href="common.css">
+
+    <!-- KaTeX for formatted math (loaded from CDN, like Three.js elsewhere in the suite) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        /* Page-specific styling for the explainer. Scoped to this page. */
+        .hiw-toc {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            border-radius: 8px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+        }
+        .hiw-toc h2 { margin-top: 0; }
+        .hiw-toc ul { margin: 4px 0 0 18px; }
+        .hiw-toc li { margin: 4px 0; }
+        .hiw-toc a { color: #007bff; text-decoration: none; }
+        .hiw-toc a:hover { text-decoration: underline; }
+        .content-section h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 8px;
+            margin-bottom: 14px;
+            scroll-margin-top: 80px;
+        }
+        .content-section h3 { color: #34495e; margin: 20px 0 8px; }
+        .content-section p { margin-bottom: 12px; }
+
+        .takeaway {
+            margin: 14px 0 0;
+            padding: 10px 14px;
+            background: #f4f8f4;
+            border-left: 4px solid #4caf50;
+            border-radius: 6px;
+            font-size: 0.96em;
+        }
+
+        /* "In plain terms" callout. */
+        .plain {
+            background: #eef6ff;
+            border-left: 4px solid #2196f3;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin: 14px 0;
+        }
+        .plain strong:first-child { color: #1565c0; }
+
+        /* "Under the hood" callout. */
+        .deep {
+            background: #f6f5fb;
+            border-left: 4px solid #6f42c1;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin: 14px 0;
+        }
+        .deep strong:first-child { color: #5a32a3; }
+
+        /* Caveat callout. */
+        .caveat {
+            background: #fff7ed;
+            border-left: 4px solid #e0913a;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin: 14px 0;
+        }
+        .caveat strong:first-child { color: #b06a16; }
+
+        figure.diagram { margin: 22px 0; text-align: center; }
+        figure.diagram svg {
+            max-width: 100%;
+            height: auto;
+            background: #fff;
+            border: 1px solid #e5e8ec;
+            border-radius: 8px;
+        }
+        figure.diagram figcaption {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 8px;
+            padding: 0 10px;
+        }
+
+        table.params { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.95em; }
+        table.params th, table.params td { border: 1px solid #e0e0e0; padding: 8px 10px; text-align: left; vertical-align: top; }
+        table.params th { background: #f2f4f7; }
+        table.params td:first-child { white-space: nowrap; font-weight: 600; color: #2c3e50; }
+
+        .katex-display { margin: 14px 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+
+        /* SVG diagram shared styling */
+        .dgm-axis { stroke: #95a5a6; stroke-width: 1.5; }
+        .dgm-arrow-v { stroke: #2c3e50; stroke-width: 2.5; fill: none; }
+        .dgm-arrow-drag { stroke: #e74c3c; stroke-width: 2.5; fill: none; }
+        .dgm-arrow-grav { stroke: #2980b9; stroke-width: 2.5; fill: none; }
+        .dgm-arrow-wind { stroke: #16a085; stroke-width: 2.5; fill: none; }
+        .dgm-curve { stroke: #007bff; stroke-width: 2.5; fill: none; }
+        .dgm-label { font: 13px 'Segoe UI', sans-serif; fill: #2c3e50; }
+        .dgm-label-sm { font: 11px 'Segoe UI', sans-serif; fill: #555; }
+        .dgm-muted { stroke: #cbd3da; stroke-width: 1; }
+    </style>
+</head>
+<body data-page="how-it-works">
+    <div class="nav-header">
+        <!-- Navigation will be generated by common.js -->
+    </div>
+
+    <div class="app-container">
+        <h1>How It Works</h1>
+
+        <div class="content-section">
+            <div class="highlight-box">
+                <p>Ballistics Toolkit is built on one shared <strong>trajectory engine</strong>, a small C++ core compiled to WebAssembly that runs in your browser with no backend. Every calculator and simulator calls it, so results stay consistent across the suite.</p>
+                <p>The engine integrates a bullet's flight step by step under gravity, aerodynamic drag, the local atmosphere and wind, with optional empirical corrections for spin. The result is a single trajectory: drop, drift, velocity and time of flight to any range.</p>
+                <p style="margin-bottom:0;">The simulators build on that single trajectory: a dynamic wind field you read through mirage, reactive targets with match scoring, and Monte Carlo runs that repeat a shot with randomized velocity, wind and aim to show a group and expected scores.</p>
+            </div>
+        </div>
+
+        <div class="content-section">
+            <div class="highlight-box">
+                <h2 style="margin-top:0;">The quick version</h2>
+                <ul style="margin:0;padding-left:22px;line-height:1.7;">
+                    <li>Bullet motion is <strong>numerically integrated</strong> step by step, not solved from one formula.</li>
+                    <li>Drag uses <strong>G1/G7 lookup tables</strong> scaled by your ballistic coefficient and the air density.</li>
+                    <li>Wind enters through the bullet's <strong>velocity relative to the air</strong>, not a separate drift formula.</li>
+                    <li><strong>Spin drift</strong> and <strong>crosswind jump</strong> are empirical corrections, not full orientation physics.</li>
+                    <li>The simulators add a <strong>dynamic wind field, mirage, target interaction</strong>, and randomized shot dispersion.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="content-section">
+            <h2>What this model is, and is not</h2>
+            <p><strong>It is</strong> a <strong>modified point-mass</strong> trajectory engine: the bullet is treated as a point with mass and a drag profile, integrated through time, with empirical corrections layered on for spin drift and crosswind jump. It is built for education, comparing loads, simulation and planning.</p>
+            <p><strong>It is not</strong> a full 6-degree-of-freedom model of the spinning bullet, and it does not capture every real-world effect. Deliberately left out: <strong>Coriolis and Eötvös</strong> drift from the Earth's rotation, <strong>powder temperature sensitivity</strong> (the muzzle velocity you enter is used as-is, so enter a value chronographed at your conditions), <strong>bore and rifle imperfections</strong>, and your own <strong>measurement error</strong> in wind, range and atmosphere. Treat the output as a planning estimate, not a guarantee.</p>
+        </div>
+
+        <div class="hiw-toc">
+            <h2>On this page</h2>
+            <ul>
+                <li><a href="#overview">How a trajectory is computed</a></li>
+                <li><a href="#bc">Drag and ballistic coefficient</a></li>
+                <li><a href="#integration">Stepping the bullet through time</a></li>
+                <li><a href="#atmosphere">Air density and atmosphere</a></li>
+                <li><a href="#wind">How wind enters the model</a></li>
+                <li><a href="#spin">Spin corrections</a></li>
+                <li><a href="#zeroing">Zeroing the rifle</a></li>
+                <li><a href="#simplex">Smooth noise: the building block</a></li>
+                <li><a href="#windgen">The wind field (curl noise)</a></li>
+                <li><a href="#mirage">Mirage and scope optics</a></li>
+                <li><a href="#impact">Impact detection</a></li>
+                <li><a href="#steel">Reactive steel targets</a></li>
+                <li><a href="#montecarlo">Simulating groups and scores</a></li>
+                <li><a href="#extras">AI, moving targets &amp; remote play</a></li>
+            </ul>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="overview">
+            <h2>How a trajectory is computed</h2>
+            <p>A flying bullet is pushed by three things: <strong>gravity</strong> pulling it down, <strong>aerodynamic drag</strong> opposing its motion through the air, and, because it is spinning, small <strong>gyroscopic effects</strong> sideways and vertically. The engine sums these into an acceleration and steps the bullet forward through time. The bullet's state is its position \(\mathbf{x}\) and velocity \(\mathbf{v}\):</p>
+            \[ \frac{d\mathbf{x}}{dt} = \mathbf{v}, \qquad \frac{d\mathbf{v}}{dt} = \mathbf{a} = \mathbf{a}_{\text{drag}} + \mathbf{g} + \mathbf{a}_{\text{spin}}, \qquad \mathbf{g} = (0,\,-9.80665,\,0)\ \tfrac{\text{m}}{\text{s}^2} \]
+
+            <figure class="diagram">
+                <svg viewBox="0 0 560 250" role="img" aria-label="Side view of a bullet's trajectory showing velocity, drag and gravity vectors">
+                    <line x1="30" y1="210" x2="540" y2="210" class="dgm-axis"/>
+                    <text x="40" y="228" class="dgm-label-sm">muzzle</text>
+                    <text x="470" y="228" class="dgm-label-sm">target (downrange, &minus;z)</text>
+                    <path d="M40,205 Q280,40 520,150" class="dgm-curve"/>
+                    <circle cx="386" cy="110" r="5" fill="#2c3e50"/>
+                    <line x1="386" y1="110" x2="460" y2="120" class="dgm-arrow-v" marker-end="url(#ah-v)"/>
+                    <text x="466" y="124" class="dgm-label">v</text>
+                    <line x1="386" y1="110" x2="312" y2="100" class="dgm-arrow-drag" marker-end="url(#ah-d)"/>
+                    <text x="264" y="96" class="dgm-label" fill="#e74c3c">drag</text>
+                    <line x1="386" y1="110" x2="386" y2="166" class="dgm-arrow-grav" marker-end="url(#ah-g)"/>
+                    <text x="392" y="156" class="dgm-label" fill="#2980b9">g</text>
+                    <g transform="translate(498,60)">
+                        <line x1="0" y1="0" x2="0" y2="-34" class="dgm-muted" marker-end="url(#ah-m)"/>
+                        <line x1="0" y1="0" x2="34" y2="0" class="dgm-muted" marker-end="url(#ah-m)"/>
+                        <text x="4" y="-30" class="dgm-label-sm">y (up)</text>
+                        <text x="20" y="14" class="dgm-label-sm">x</text>
+                    </g>
+                    <defs>
+                        <marker id="ah-v" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2c3e50"/></marker>
+                        <marker id="ah-d" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e74c3c"/></marker>
+                        <marker id="ah-g" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2980b9"/></marker>
+                        <marker id="ah-m" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#cbd3da"/></marker>
+                        <marker id="ah-w" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#16a085"/></marker>
+                        <marker id="ah-p" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6f42c1"/></marker>
+                    </defs>
+                </svg>
+                <figcaption>Forces on the bullet in flight. Drag always opposes motion <em>through the air</em>; gravity is constant; the spin effects (not shown) act sideways and vertically. Coordinate system: <strong>x</strong> = crossrange (right +), <strong>y</strong> = vertical (up +), downrange is <strong>&minus;z</strong>.</figcaption>
+            </figure>
+
+            <p>This is a <strong>3-DOF</strong> translational model: position and velocity are integrated, the bullet's orientation is not. The effects that really depend on the spin axis are folded back in as extra accelerations and impulses (see Spin corrections), which is what "modified" point-mass means.</p>
+
+            <div class="takeaway">Following the curve step by step is more flexible than any single drop-and-drift formula: drag, wind, atmosphere and spin all enter through the same integration path.</div>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="bc">
+            <h2>Drag and ballistic coefficient</h2>
+            <p>Drag is the main force slowing the bullet, and it changes sharply with speed, especially near the sound barrier. Rather than one drag number, the engine pairs a <strong>standard drag function</strong> (a reference curve for a typical bullet shape) with your <strong>ballistic coefficient (BC)</strong>, which says how your bullet compares to that reference. A higher BC means the bullet holds speed better, so less drop and less wind drift.</p>
+            <ul class="tech-list">
+                <li class="tech-item"><strong>G1</strong> is a flat-based reference shape, a good match for older flat-based bullets. It fits modern boat-tail bullets poorly, so a G1 BC effectively drifts with velocity.</li>
+                <li class="tech-item"><strong>G7</strong> is a boat-tail reference shape that matches modern long-range boat-tail bullets, giving a more constant BC across the supersonic range. G7 is the engine default.</li>
+            </ul>
+            <p>Each drag function is a small table indexed by speed (fps). Every velocity band carries a fitted pair \((a, m)\) so the <em>retardation</em> (deceleration, fps per second) is a clean power law, picked by a binary search on the air-relative speed:</p>
+            \[ r(v) = a\,v^{m}, \qquad \mathbf{a}_{\text{drag}} = -\,\frac{a\,v_r^{\,m}}{\text{BC}}\cdot\frac{\rho}{\rho_0}\;\hat{\mathbf{v}}_r, \qquad v_r = \lVert \mathbf{v}-\mathbf{w}\rVert \]
+            <p>Here \(\mathbf{w}\) is the local wind, \(\rho\) is the current air density and \(\rho_0 = 1.225\ \text{kg/m}^3\) is the reference density. Within this point-mass model, once the drag function and BC are fixed, bullet diameter and weight do <em>not</em> separately affect drag; they re-enter later through the spin and stability corrections, where mass, caliber and length matter.</p>
+            <div class="caveat">
+                <strong>Approximation:</strong> G1 and G7 are standard drag curves measured for reference projectile shapes. The table is indexed by raw speed in fps and is not re-scaled for the local speed of sound, so there is no separate Mach correction.
+            </div>
+            <div class="takeaway">Within this model, the drag function plus the BC and air density set the drag behavior; caliber and weight show up only later, through spin.</div>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="integration">
+            <h2>Stepping the bullet through time</h2>
+            <p>Because drag depends on speed and speed keeps changing, there is no closed-form path; it is computed step by step. The engine uses a <strong>second-order Runge&ndash;Kutta (RK2) midpoint</strong> step. A naive step trusts the slope at the <em>start</em> and overshoots; RK2 instead samples the slope at the <em>middle</em> of the step and uses that for the whole step. That costs a second acceleration evaluation per step (two instead of one), but it is accurate enough to allow much larger steps for the same error, so it is a good trade overall.</p>
+            \[ \mathbf{v}_{1/2} = \mathbf{v}_0 + \tfrac{1}{2}\mathbf{a}_0\,\Delta t, \qquad \mathbf{a}_{1/2} = \mathbf{a}\!\left(\mathbf{x}_{1/2},\,\mathbf{v}_{1/2},\,t_0+\tfrac{1}{2}\Delta t\right) \]
+            \[ \boxed{\;\mathbf{v}_{1} = \mathbf{v}_0 + \mathbf{a}_{1/2}\,\Delta t, \qquad \mathbf{x}_{1} = \mathbf{x}_0 + \mathbf{v}_{1/2}\,\Delta t\;} \]
+
+            <figure class="diagram">
+                <svg viewBox="0 0 560 220" role="img" aria-label="An RK2 midpoint step versus the naive Euler step">
+                    <path d="M55,168 Q270,150 515,48" class="dgm-curve"/>
+                    <text x="436" y="44" class="dgm-label" fill="#007bff">true path</text>
+                    <circle cx="55" cy="168" r="5" fill="#2c3e50"/>
+                    <text x="42" y="190" class="dgm-label-sm">x&#8320;</text>
+                    <line x1="55" y1="168" x2="515" y2="129" stroke="#e74c3c" stroke-width="2" stroke-dasharray="6 5"/>
+                    <text x="430" y="141" class="dgm-label" fill="#e74c3c">naive step</text>
+                    <line x1="257" y1="155" x2="313" y2="143" stroke="#6f42c1" stroke-width="2"/>
+                    <circle cx="285" cy="149" r="4.5" fill="#6f42c1"/>
+                    <text x="206" y="146" class="dgm-label-sm" fill="#6f42c1">midpoint</text>
+                    <text x="206" y="160" class="dgm-label-sm" fill="#6f42c1">(slope sampled)</text>
+                    <line x1="55" y1="168" x2="515" y2="67" stroke="#16a085" stroke-width="2.5"/>
+                    <circle cx="515" cy="67" r="4.5" fill="#16a085"/>
+                    <text x="452" y="62" class="dgm-label" fill="#16a085">RK2 step</text>
+                </svg>
+                <figcaption>RK2 takes a half-step along the start slope to a midpoint (on the naive line), samples the steeper slope there, and uses it for the whole step, parallel to the tick, landing closer to the true path than the start-tangent step.</figcaption>
+            </figure>
+
+            <p>The simulation marches until the bullet passes the requested distance (or a time cap); values at exact distances are interpolated between the two stored points that bracket them.</p>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="atmosphere">
+            <h2>Air density and atmosphere</h2>
+            <p>Drag scales with <strong>air density</strong>, which depends on temperature, altitude and humidity, so the same bullet drops and drifts less in thin mountain air than in cold, dense sea-level air. You enter temperature, altitude and humidity; pressure is derived from the altitude. Density comes from the ideal gas law with a humidity correction (moist air is slightly <em>less</em> dense, the \(0.378\,e\) term):</p>
+            \[ \rho = \frac{P - 0.378\,e}{R_{\text{air}}\,T}, \qquad R_{\text{air}} \approx 287.05\ \tfrac{\text{J}}{\text{kg}\cdot\text{K}}, \qquad e = \text{RH}\cdot 611.2\,\exp\!\left(\frac{17.67\,T_c}{T_c + 243.5}\right) \]
+            <p>Pressure follows the International Standard Atmosphere power law from altitude \(h\):</p>
+            \[ P = P_0\left(1 + \frac{L\,h}{T_0}\right)^{-g/(R_{\text{air}} L)}, \qquad P_0 = 101325\ \text{Pa},\; T_0 = 288.15\ \text{K},\; L = -0.0065\ \text{K/m} \]
+            <div class="deep">
+                <strong>Under the hood:</strong> air density enters the trajectory only as the ratio \(\rho/\rho_0\) in the drag term, a single scaling on retardation. It also enters the gyroscopic stability factor (see Spin corrections), which is why a cold, dense, high-pressure day lowers stability.
+            </div>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="wind">
+            <h2>How wind enters the model</h2>
+            <p>Drag acts on the bullet's velocity <em>relative to the air</em>. So wind enters by subtracting it from the bullet's velocity before computing drag: the \(\mathbf{v} - \mathbf{w}\) you already saw in the drag equation. A crosswind tilts the drag vector slightly downwind, and integrated over the flight that becomes lateral drift. There is no separate "wind drift formula"; drift, the small range effect of a head or tail wind, and the interaction of wind with a slowing bullet are all handled by the same integration path.</p>
+            <p>The model never tracks which way the bullet is pointing: ordinary wind drift falls out of air-relative drag alone. The two effects that <em>do</em> depend on the bullet's orientation, spin drift and the crosswind's vertical jump, are handled separately under Spin corrections.</p>
+            <p>Calculator-style tools use a single uniform wind across the flight. The simulators sample a full <strong>wind field</strong> that varies with range, crossrange and time, so the bullet flies through different wind at every point; that field is described below.</p>
+            <div class="takeaway">The important point: wind is not added as a separate correction; it enters through the bullet's velocity relative to the air.</div>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="spin">
+            <h2>Spin corrections</h2>
+            <p>Rifling spins the bullet to keep it pointed forward. A spin-stabilized bullet's center of pressure sits ahead of its center of mass, so without spin it would tumble; the spin holds it nose-forward. That spin also produces two small effects at long range, <strong>spin drift</strong> and <strong>crosswind jump</strong>. Both are real gyroscopic effects, but here they are modeled with formulas from Bryan Litz (Applied Ballistics): <strong>fitted approximations</strong>, physics-motivated curves with empirically fitted constants, rather than derived from first principles or integrated as full orientation dynamics. They are adapted here to run inside the step-by-step integrator.</p>
+            <p>A useful way to think about it: a spinning bullet behaves like a gyroscope, so a force on it shows up as motion about a perpendicular axis, the way a spinning top leans and circles instead of falling. That 90&deg; response is where both effects come from.</p>
+
+            <h3>Gyroscopic stability (Miller)</h3>
+            <p>A stability factor \(S_g\) measures the spin margin, starting from the Miller twist rule and corrected to the actual velocity and air conditions:</p>
+            \[ S_{g,0} = \frac{30\,m}{t^{2}\,d^{3}\,l\,(1+l^{2})}, \qquad S_g = S_{g,0}\left(\frac{V}{2800}\right)^{1/3}\frac{T_R}{519}\cdot\frac{29.92}{P_{\text{inHg}}} \]
+            <p>with \(m\) in grains, \(d\) in inches, \(l = L/d\) the length in calibers, \(t\) the twist in calibers per turn, \(V\) in fps, \(T_R\) in &deg;Rankine and \(P_{\text{inHg}}\) in inches of mercury. As a rule of thumb \(S_g > 1.4\) is stable. The Miller rule assumes a roughly uniform bullet density, so it is approximate and can under-estimate <strong>plastic-tipped</strong> bullets; a tip-corrected form fits those better.</p>
+
+            <h3>Spin drift</h3>
+            <p>Litz fits the net sideways displacement as a function of time of flight (for a right-hand twist the bullet drifts right, roughly 0.8&ndash;0.9&nbsp;MOA at 1000&nbsp;yd for a typical match load):</p>
+            \[ \text{SD}(t) = 1.25\,(S_g + 1.2)\;t^{1.83}\quad[\text{inches}] \]
+            <p>A point-mass integrator cannot simply add a displacement on top of its path, so the engine differentiates the law twice and injects it as a sideways acceleration, letting the same RK2 step reproduce the curve:</p>
+            \[ a_{\text{spin}}(t) = \frac{d^{2}\text{SD}}{dt^{2}} = 1.83\cdot 0.83\,C\,t^{-0.17}, \qquad C = 1.25\,(S_g + 1.2) \]
+
+            <h3>Crosswind aerodynamic jump</h3>
+            <p>A purely <em>horizontal</em> crosswind produces a small <em>vertical</em> shift of impact. It is the same gyroscopic 90&deg; response, triggered as the bullet first meets the wind. Litz gives the size as a sensitivity (roughly 0.3&ndash;0.5&nbsp;MOA per 10&nbsp;mph at 1000&nbsp;yd). For a right-hand twist, wind from the right throws the strike high and wind from the left low:</p>
+            \[ \text{sens} = 0.01\,S_g - 0.0024\,\frac{L}{d} + 0.032 \quad[\text{MOA per mph}] \]
+
+            <figure class="diagram">
+                <svg viewBox="0 0 560 250" role="img" aria-label="A spinning bullet seen from behind: a crosswind's sideways twist is turned 90 degrees by the spin into a vertical jump">
+                    <text x="22" y="24" class="dgm-label-sm">looking downrange</text>
+                    <circle cx="285" cy="152" r="12" fill="#eef1f4" stroke="#b8c2cc"/>
+                    <circle cx="285" cy="152" r="2.5" fill="#2c3e50"/>
+                    <path d="M285,120 A32,32 0 1 1 259,172" fill="none" stroke="#95a5a6" stroke-width="1.8" marker-end="url(#ah-m)"/>
+                    <text x="285" y="218" class="dgm-label-sm" text-anchor="middle">right-hand spin (clockwise here)</text>
+                    <line x1="470" y1="152" x2="326" y2="152" class="dgm-arrow-wind" marker-end="url(#ah-w)"/>
+                    <text x="392" y="140" class="dgm-label" fill="#16a085">crosswind</text>
+                    <text x="392" y="176" class="dgm-label-sm" fill="#16a085">twists the nose sideways</text>
+                    <path d="M325,152 A40,40 0 0 1 285,112" fill="none" stroke="#6f42c1" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#ah-p)"/>
+                    <text x="318" y="120" class="dgm-label-sm" fill="#6f42c1">spin turns it 90&deg;</text>
+                    <line x1="285" y1="120" x2="285" y2="50" class="dgm-arrow-drag" marker-end="url(#ah-d)"/>
+                    <text x="285" y="38" class="dgm-label" fill="#e74c3c" text-anchor="middle">impact jumps HIGH</text>
+                </svg>
+                <figcaption>A horizontal crosswind makes the spinning bullet try to twist its nose sideways; the gyroscope answers a quarter-turn away, so the push comes out as a vertical kick (right twist: wind from the right strikes high, from the left low).</figcaption>
+            </figure>
+
+            <div class="caveat">
+                <strong>Important caveat:</strong> Litz's published formula describes the jump at the <em>muzzle</em> for a single constant crosswind. The engine generalizes it to wind <em>changes</em> met downrange, which is an <strong>engineering extension, not experimentally validated here</strong>. It is built so a constant wind reduces to the published muzzle jump; treat the downrange behavior as plausible and approximate, not established ballistics.
+            </div>
+
+            <p>With that understood: each step, the engine compares the crosswind the bullet sees to the previous step and fires an impulse proportional to the <em>change</em>, so a constant wind fires its whole jump at the muzzle while a gust met downrange fires there:</p>
+            \[ \Delta\theta = \text{sens}\cdot\Delta w_\perp \;\;(\text{MOA}\to\text{rad}), \qquad \Delta v_y = -V\,\Delta\theta\cdot \text{hand} \]
+            <p>This assumes the jump is effectively instantaneous, that the muzzle sensitivity still applies downrange, and that successive wind changes add up linearly, all approximations.</p>
+
+            <div class="takeaway">Spin drift and crosswind jump are empirical corrections layered onto the point-mass path, not a full simulation of the bullet's orientation.</div>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="zeroing">
+            <h2>Zeroing the rifle</h2>
+            <p>Before any table or shot, the engine sights in the virtual rifle: it finds the launch angles that put the bullet on the target center at the zero range in calm conditions. It is solved iteratively: fire a trial trajectory, measure the miss \(\varepsilon\) at the target plane, and correct the launch pitch and yaw toward it (with damping):</p>
+            \[ \Delta\text{pitch} = -\arctan\!\frac{\varepsilon_y}{R}, \qquad \Delta\text{yaw} = -\arctan\!\frac{\varepsilon_x}{R} \]
+            <p>A few iterations converge, and everything you then see, drop and drift, is measured relative to that zero.</p>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="simplex">
+            <h2>Smooth noise: the building block</h2>
+            <p>Two simulator features, the wind field and mirage, are built from the same source of smooth randomness: <strong>simplex noise</strong> (Ken Perlin's gradient noise). Unlike a table of independent random numbers it is continuous: nearby points return nearby values, with no grid and no sudden jumps, and it is cheap to evaluate and to differentiate. The toolkit always uses one axis as <em>time</em> so the pattern animates: the wind field samples it in 3D (two spatial axes plus time), mirage in 3D and 4D. On its own it is just smooth hills and valleys; the swirling appears later, when the wind takes its curl.</p>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="windgen">
+            <h2>The wind field (curl noise)</h2>
+            <p>The simulators do not blow one constant wind down the range; they generate a wind field that swirls, varies along the range, and evolves over time, so reading it (via mirage and flags) is a genuine skill. You can explore it in the <a href="wind-gen/wind-gen.html">Wind Generator</a> tool.</p>
+            <p>Real air is nearly <strong>incompressible</strong>: it does not pile up or vanish anywhere. A field of plain random vectors breaks that. The trick is to take a smooth scalar potential \(\psi\) (from simplex noise) and use its <em>curl</em> as the wind, which is mathematically divergence-free in this 2D model:</p>
+            \[ \mathbf{w} = \left(\frac{\partial\psi}{\partial y},\,-\frac{\partial\psi}{\partial x}\right), \qquad \nabla\cdot\mathbf{w} = 0 \]
+            <p>A helpful picture: read \(\psi\) like a topographic or weather map. The wind runs <em>along</em> the contour lines, circling the highs and lows, and is fastest where the lines bunch, the way wind tracks the isobars on a weather chart.</p>
+
+            <figure class="diagram">
+                <svg viewBox="0 0 560 250" role="img" aria-label="A topographic-style potential field whose curl is wind that flows along the contour lines">
+                    <g fill="none" stroke="#d8e0e8" stroke-width="1.4">
+                        <circle cx="165" cy="125" r="22"/><circle cx="165" cy="125" r="44"/><circle cx="165" cy="125" r="66"/><circle cx="165" cy="125" r="88"/>
+                        <circle cx="400" cy="125" r="20"/><circle cx="400" cy="125" r="40"/><circle cx="400" cy="125" r="60"/><circle cx="400" cy="125" r="80"/>
+                    </g>
+                    <text x="151" y="129" class="dgm-label-sm">+&#968;</text>
+                    <text x="386" y="129" class="dgm-label-sm">&minus;&#968;</text>
+                    <text x="120" y="32" class="dgm-label-sm">ridge (high)</text>
+                    <text x="362" y="32" class="dgm-label-sm">basin (low)</text>
+                    <g class="dgm-arrow-wind" marker-end="url(#ah-w)">
+                        <path d="M165,68 a57,57 0 0 1 49,28"/>
+                        <path d="M214,154 a57,57 0 0 1 -49,28"/>
+                        <path d="M108,154 a57,57 0 0 1 0,-58"/>
+                    </g>
+                    <g class="dgm-arrow-wind" marker-end="url(#ah-w)">
+                        <path d="M400,70 a55,55 0 0 0 -47,27"/>
+                        <path d="M353,153 a55,55 0 0 0 47,27"/>
+                        <path d="M447,153 a55,55 0 0 0 0,-56"/>
+                    </g>
+                </svg>
+                <figcaption>The wind blows along the contours of \(\psi\), circling each ridge and basin rather than crossing them, and is fastest where the rings crowd, the look of real eddies.</figcaption>
+            </figure>
+
+            <p>Why not simulate the air for real? True computational fluid dynamics would solve the Navier&ndash;Stokes equations on a fine grid, far too expensive for real time and dependent on inputs no shooter has (terrain, thermal layering). Curl noise gives coherent, plausible, divergence-free eddies cheaply. Several layers stack: a broad slow base wind, a medium gusting layer, and fine turbulence. Each is normalized and reshaped, and the whole field <strong>advects</strong> (drifts downwind) so eddies travel down the range.</p>
+            <div class="deep">
+                <strong>Under the hood:</strong> the curl is taken by central differences in the noise's scaled coordinates and converted back to world units by the chain rule; each layer's magnitude is normalized against an RMS estimated from ~1000 samples, then reshaped by an exponent and an optional gate. The 2D curl yields only horizontal wind.
+            </div>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="mirage">
+            <h2>Mirage and scope optics</h2>
+            <p><strong>What mirage is:</strong> on a warm day the ground heats the air just above it, and that warm air rises in shifting cells. Warm and cool air bend light by different amounts, so when you look through a scope at a distant target the image wavers and "boils." In wind the boil leans, or "runs," in the wind's direction and flattens as the wind builds, so reading it is one of the main ways shooters judge the wind downrange.</p>
+            <p><strong>How it is drawn:</strong> the mirage is a screen-space effect. Each pixel of the scope view is nudged up and down by simplex noise tied to the live wind, so it shows the cues a real shooter reads: which way the boil runs, how fast it churns, and how strong it is. It is a visual approximation, not a simulation of light actually bending.</p>
+            <p>The two 3D simulators handle it differently:</p>
+            <ul class="tech-list">
+                <li class="tech-item"><strong>F-Class Sim</strong> stacks several air layers down the line of sight, each reading the wind at its own distance. Near layers show as large soft features, far layers as small sharp ones.</li>
+                <li class="tech-item"><strong>Steel Sim</strong> uses a single averaged layer plus the scope's focus distance. Because it cannot know which distance you are watching, the focus distance tells it how far downrange to read the wind (the F-Class Sim instead knows you are looking down a fixed firing lane). The shimmer is stronger the more air the sight looks through, so nearby ground barely boils, and it fades as you zoom out and as the wind builds, gone by about 15&nbsp;mph.</li>
+            </ul>
+            <p>The Steel Sim scope also has a <strong>focus blur</strong> (depth of field), separate from the mirage: the scene is drawn with a depth map, and a lens model softens each pixel by how far it sits from the distance you are focused on, so only that range is sharp. The focus distance feeds both the blur and the mirage, but they are separate effects, and the shimmer itself is never blurred.</p>
+            <div class="deep">
+                <strong>Under the hood:</strong> the blur is a two-pass <strong>separable Gaussian</strong> (one horizontal pass, one vertical) whose radius grows with the lens aperture and with how far each pixel sits from the focused distance, read from the depth map.
+            </div>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="impact">
+            <h2>Impact detection</h2>
+            <p>A trajectory is a list of points; to register a hit the engine finds where the path crosses a target and whether it lands on the plate. It pulls the short segment that spans the target, transforms it into the target's frame (the plate lies at \(z=0\)), solves the crossing, and tests the point against the plate outline, a rectangle (\(|x|\le \tfrac{w}{2},\,|y|\le \tfrac{h}{2}\)) or an ellipse, expanded by the bullet radius so a round that just catches the edge still counts ("line breaks the plate"):</p>
+            \[ t = \frac{-\,z_{\text{start}}}{z_{\text{end}} - z_{\text{start}}}, \qquad \mathbf{p}_{\text{hit}} = \mathbf{p}_{\text{start}} + t\,(\mathbf{p}_{\text{end}} - \mathbf{p}_{\text{start}}) \]
+            <p>The same geometry scores paper targets: a hit is graded by its radial distance from center against each ring radius, expanded by the bullet radius.</p>
+            <p>How the crossing is found differs by app. The calculators and the F-Class Sim <strong>precompute the whole trajectory</strong>, then intersect that finished path with a stationary target. The Steel Sim <strong>integrates each bullet live</strong> as the game runs, advancing it a frame at a time and testing the short hop against every target's current pose, which is what lets it keep several bullets in flight and hit <strong>moving targets</strong>. With many plates, a spatial grid culls which ones to test, and the earliest crossing wins. A confirmed hit then draws a decal mark and a particle dust cloud, and in the Steel Sim it kicks off the plate's reaction.</p>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="steel">
+            <h2>Reactive steel targets</h2>
+            <p>On the steel range a confirmed hit doesn't just register: the plate <em>reacts</em> as a small rigid body, so it swings, twists and rings the way real steel does. Its mass comes from geometry (area &times; thickness &times; the density of steel, 7850&nbsp;kg/m&sup3;) and its moment of inertia from the thin-plate formula, so a tall plate and a wide plate of the same weight turn differently.</p>
+            <p>The hit applies the bullet's momentum, scaled by how square it is (\(\cos^2\) of the impact angle), as an impulse at the contact point. Because that point is usually off the center of mass, it splits into a push and a twist, so a center hit swings the plate and an edge hit spins it:</p>
+            \[ \Delta\mathbf{v} = \frac{\mathbf{J}}{m}, \qquad \boldsymbol\tau = \mathbf{r}\times\mathbf{J}, \qquad \dot{\boldsymbol\omega} = I^{-1}\boldsymbol\tau \]
+            <p>The plate hangs from chains modeled as stiff <em>one-way</em> springs (they pull but never push), and the whole thing is stepped with semi-implicit Euler under gravity, chain tension and damping until it settles. Orientation is carried as a <strong>quaternion</strong> (renormalized each step) so a tumbling plate avoids gimbal lock.</p>
+
+            <h3>Recording the hits in a texture</h3>
+            <p>Each plate keeps its own <strong>paint texture</strong>, a small RGBA image of its face (front and back stored in the two halves of one image), filled with the paint color to start. When a round lands, the engine maps the impact point onto the plate's local surface coordinates, converts that to a pixel in the texture, and draws a splatter there in C++: a patch of bare metal showing through the paint (blended soft at the edge) ringed with a few ragged spikes. The marks are written straight into the image and they <em>accumulate</em>, so the face builds up a record of every hit, the same paint-and-spatter you read on real steel.</p>
+            <p>To display it, the renderer reaches that texture as a typed-array view onto WebAssembly memory, so the engine never allocates a copy to hand it over, and then writes those bytes into a shared GPU texture atlas. That last step still copies the pixels into the atlas (and uploads them to the GPU), so it is not strictly zero-copy; the saving is just that reading the texture out of WebAssembly costs no extra allocation.</p>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="montecarlo">
+            <h2>Simulating groups and scores</h2>
+            <p>Real shooting isn't one perfect shot: muzzle velocity varies, the wind breathes, and no one holds a perfect zero. The Hit Simulator and Target Simulator fire the same shot many times with randomized inputs and study the spread, a <strong>Monte Carlo</strong> simulation. Every shot runs a full trajectory through the same engine, so second-order effects (a slow round spending longer in the wind, say) fall out on their own. Each shot draws:</p>
+            <table class="params">
+                <tr><th>Source</th><th>Distribution</th></tr>
+                <tr><td>Muzzle velocity</td><td>Gaussian about the nominal MV, with your SD</td></tr>
+                <tr><td>Wind (cross / head / vertical)</td><td>Gaussian about the mean wind, each with its own SD</td></tr>
+                <tr><td>Rifle accuracy</td><td>Uniform within a circle whose diameter is the group's MOA setting</td></tr>
+                <tr><td>Scope cant</td><td>Uniform within &plusmn; the cant setting</td></tr>
+            </table>
+            <p>Each Gaussian draw is clipped at three standard deviations so rare tail events can't dominate a run. The two apps ask different questions:</p>
+            <ul class="tech-list">
+                <li class="tech-item"><strong>Hit Simulator</strong> fires at a circle or rectangle you size and reports <em>dispersion</em> statistics: hit probability, mean radius, CEP, extreme spread.</li>
+                <li class="tech-item"><strong>Target Simulator</strong> fires at competition faces, scoring every shot by ring and running many complete matches to report <em>match-level</em> statistics: average score and X-count, spread and percentiles.</li>
+            </ul>
+        </div>
+
+        <!-- ================================================================ -->
+        <div class="content-section" id="extras">
+            <h2>AI opponents, moving targets, and remote play</h2>
+            <p>A few simulator features go beyond a single computed shot and are worth a mention.</p>
+
+            <h3>AI opponents (F-Class)</h3>
+            <p>In Pair Fire you can set your opponent to the computer. The interesting part is what the difficulty levels actually change: only the AI's <em>wind reading</em>. Every AI shooter fires through the same ballistics engine and the same rifle dispersion you do, holds for both wind drift and crosswind jump, and takes a realistic skill-based pause before each shot. An easy AI misjudges the wind badly, reading it flat and stale with a large percentage error; a hard AI reads it accurately, weights the near-muzzle wind by time of flight, and shoots near-clean. Beating the computer is a wind-reading contest, not a reflex one.</p>
+
+            <h3>Hunting and moving targets (Steel)</h3>
+            <p>The steel range has an optional hunting mode: prairie dogs that pop up and down, and boars that walk along the range. Because the Steel Sim integrates every bullet live, frame by frame (see Impact detection), moving targets are hit honestly: the bullet and the target both advance in real time, and the hit registers against wherever the target actually is when the round arrives.</p>
+
+            <h3>Remote Play (F-Class)</h3>
+            <p>The F-Class Sim can stream a live match to a friend, with no server of its own in the loop. It is <strong>host-authoritative</strong>: the host runs the one true simulation and sends a <strong>WebRTC video and audio stream</strong> of its view; the guest displays it and sends key and button presses back. A <strong>PeerJS broker and public STUN servers</strong> are used only to set up the connection, and there is no relay (TURN) in the media path unless one is configured. Because the link is direct, each participant's IP address is visible to the other, so it is meant for people you know.</p>
+        </div>
+
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        // Render the LaTeX once the page and KaTeX (deferred) are ready.
+        document.addEventListener('DOMContentLoaded', function ()
+        {
+            if (window.renderMathInElement)
+            {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        { left: '\\[', right: '\\]', display: true },
+                        { left: '\\(', right: '\\)', display: false }
+                    ],
+                    throwOnError: false
+                });
+            }
+        });
+    </script>
+</body>
+</html>

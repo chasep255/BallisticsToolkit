@@ -122,7 +122,7 @@ Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/
 Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis. Trajectories include crosswind jump effects.
 
 ### Hit Simulator
-Visit the [Hit Simulator](https://www.ballisticstoolkit.com/hit-prob/hit-prob.html) for dispersion analysis:
+Visit the [Hit Simulator](https://www.ballisticstoolkit.com/hit-sim/hit-sim.html) for dispersion analysis:
 
 1. **Bullet Parameters** - BC, drag function (G1/G7), muzzle velocity, weight, diameter, length, twist rate
 2. **Target Shape** - Circle (diameter in inches) or rectangle (width/height in inches)
@@ -191,7 +191,7 @@ The `-s` flag starts a local server at http://localhost:8001
 - **Language**: C++17 compiled to WebAssembly with Emscripten
 - **Frontend**: Vanilla JavaScript with modern CSS
 - **Performance**: Optimized C++ core with WebGL graphics
-- **Spin Aerodynamics**: Modified point-mass trajectory with spin drift and crosswind jump based on Bryan Litz's empirical formulas — applied continuously along the trajectory, with the varying-wind jump generalizing his muzzle-only figure — driven by the corrected Miller gyroscopic stability factor (SG); spin rate and SG from twist, muzzle velocity, and air density
+- **Spin Aerodynamics**: Modified point-mass trajectory with spin drift and crosswind jump from Bryan Litz's empirical (fitted) formulas, driven by the corrected Miller gyroscopic stability factor (SG). Spin drift is applied continuously along the trajectory; the crosswind jump generalizes Litz's muzzle figure to wind changes met downrange, an engineering approximation rather than an experimentally validated model. SG and spin rate come from twist, muzzle velocity, and air density
 - **Wind Module**: 2D curl‑noise wind field with presets; procedural, evolving patterns
 - **Match Scoring**: Competitive scoring system with statistics
 - **Deployment**: GitHub Actions auto‑deploys to GitHub Pages
