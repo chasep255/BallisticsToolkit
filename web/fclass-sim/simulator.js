@@ -1977,6 +1977,7 @@ class FClassSimulator
       laneX: 0,
       windWeights: windWeights
     });
+    this.aiShotPending = false;
   }
 
   // ===== UI & DISPLAY =====
@@ -2492,6 +2493,9 @@ class FClassSimulator
         dial: { h: 0, v: 0 }
       };
 
+      // Flag so onShotComplete feeds this impact back to the AI for chasing.
+      this.aiShotPending = true;
+
       this.ballistics.fireShot(aimOverride);
       this.ballistics.startBulletAnimation();
       return;
@@ -2611,6 +2615,17 @@ class FClassSimulator
     shotData.diag.isX = shotData.isX;
     shotData.diag.mvFps = shotData.mvFps;
     shotData.diag.impactVelocityFps = shotData.impactVelocityFps;
+
+    // Feed the AI opponent its own impact so it can chase (correct off the spotter).
+    // Impact is relative to target center in yards; convert to MOA at this range.
+    if (this.aiShotPending && this.aiOpponent)
+    {
+      const MOA_PER_RAD = 3437.746;
+      const windageMoa = (shotData.relativeX / this.distance) * MOA_PER_RAD;
+      const elevationMoa = (shotData.relativeY / this.distance) * MOA_PER_RAD;
+      this.aiOpponent.learnFromImpact(windageMoa, elevationMoa);
+      this.aiShotPending = false;
+    }
 
     // Classify and log the shot through the driver (handles phase/turn transitions)
     this.driver.onShotScored(shotData, ResourceManager.time.getElapsedTime());
