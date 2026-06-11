@@ -5,136 +5,117 @@
 #include <array>
 #include <cmath>
 #include <stdexcept>
-#include <tuple>
+#include <utility>
 
 namespace btk::ballistics
 {
 
-  // G7 drag function data: (velocity_fps, acceleration, mass)
-  constexpr std::array<std::tuple<float, float, float>, 9> G7_DRAG_DATA = {{{4200.0f, 1.29081656775919e-09f, 3.24121295355962f},
-                                                                            {3000.0f, 0.0171422231434847f, 1.27907168025204f},
-                                                                            {1470.0f, 2.33355948302505e-03f, 1.52693913274526f},
-                                                                            {1260.0f, 7.97592111627665e-04f, 1.67688974440324f},
-                                                                            {1110.0f, 5.71086414289273e-12f, 4.3212826264889f},
-                                                                            {960.0f, 3.02865108244904e-17f, 5.99074203776707f},
-                                                                            {670.0f, 7.52285155782535e-06f, 2.1738019851075f},
-                                                                            {540.0f, 1.31766281225189e-05f, 2.08774690257991f},
-                                                                            {0.0f, 1.34504843776525e-05f, 2.08702306738884f}}};
+  // Standard drag functions as drag coefficient (Cd) vs Mach number, from the
+  // McCoy / JBM "Modern Exterior Ballistics" tables
+  // (https://www.jbmballistics.com/ballistics/downloads). Drag is indexed by
+  // Mach using the local speed of sound, then Cd is linearly interpolated.
+  // Entries are {mach, cd}, ascending in Mach.
+  constexpr std::array<std::pair<float, float>, 84> G7_CD_DATA = {{
+    {0.0f, 0.1198f}, {0.05f, 0.1197f}, {0.1f, 0.1196f}, {0.15f, 0.1194f}, {0.2f, 0.1193f},
+    {0.25f, 0.1194f}, {0.3f, 0.1194f}, {0.35f, 0.1194f}, {0.4f, 0.1193f}, {0.45f, 0.1193f},
+    {0.5f, 0.1194f}, {0.55f, 0.1193f}, {0.6f, 0.1194f}, {0.65f, 0.1197f}, {0.7f, 0.1202f},
+    {0.725f, 0.1207f}, {0.75f, 0.1215f}, {0.775f, 0.1226f}, {0.8f, 0.1242f}, {0.825f, 0.1266f},
+    {0.85f, 0.1306f}, {0.875f, 0.1368f}, {0.9f, 0.1464f}, {0.925f, 0.1660f}, {0.95f, 0.2054f},
+    {0.975f, 0.2993f}, {1.0f, 0.3803f}, {1.025f, 0.4015f}, {1.05f, 0.4043f}, {1.075f, 0.4034f},
+    {1.1f, 0.4014f}, {1.125f, 0.3987f}, {1.15f, 0.3955f}, {1.2f, 0.3884f}, {1.25f, 0.3810f},
+    {1.3f, 0.3732f}, {1.35f, 0.3657f}, {1.4f, 0.3580f}, {1.5f, 0.3440f}, {1.55f, 0.3376f},
+    {1.6f, 0.3315f}, {1.65f, 0.3260f}, {1.7f, 0.3209f}, {1.75f, 0.3160f}, {1.8f, 0.3117f},
+    {1.85f, 0.3078f}, {1.9f, 0.3042f}, {1.95f, 0.3010f}, {2.0f, 0.2980f}, {2.05f, 0.2951f},
+    {2.1f, 0.2922f}, {2.15f, 0.2892f}, {2.2f, 0.2864f}, {2.25f, 0.2835f}, {2.3f, 0.2807f},
+    {2.35f, 0.2779f}, {2.4f, 0.2752f}, {2.45f, 0.2725f}, {2.5f, 0.2697f}, {2.55f, 0.2670f},
+    {2.6f, 0.2643f}, {2.65f, 0.2615f}, {2.7f, 0.2588f}, {2.75f, 0.2561f}, {2.8f, 0.2533f},
+    {2.85f, 0.2506f}, {2.9f, 0.2479f}, {2.95f, 0.2451f}, {3.0f, 0.2424f}, {3.1f, 0.2368f},
+    {3.2f, 0.2313f}, {3.3f, 0.2258f}, {3.4f, 0.2205f}, {3.5f, 0.2154f}, {3.6f, 0.2106f},
+    {3.7f, 0.2060f}, {3.8f, 0.2017f}, {3.9f, 0.1975f}, {4.0f, 0.1935f}, {4.2f, 0.1861f},
+    {4.4f, 0.1793f}, {4.6f, 0.1730f}, {4.8f, 0.1672f}, {5.0f, 0.1618f}
+  }};
 
-  // G1 drag function data: (velocity_fps, acceleration, mass)
-  constexpr std::array<std::tuple<float, float, float>, 41> G1_DRAG_DATA = {
-    {{4230.0f, 1.477404177730177e-04f, 1.9565f},
-     {3680.0f, 1.920339268755614e-04f, 1.925f},
-     {3450.0f, 2.894751026819746e-04f, 1.875f},
-     {3295.0f, 4.349905111115636e-04f, 1.825f},
-     {3130.0f, 6.520421871892662e-04f, 1.775f},
-     {2960.0f, 9.748073694078696e-04f, 1.725f},
-     {2830.0f, 1.453721560187286e-03f, 1.675f},
-     {2680.0f, 2.162887202930376e-03f, 1.625f},
-     {2460.0f, 3.209559783129881e-03f, 1.575f},
-     {2225.0f, 3.904368218691249e-03f, 1.55f},
-     {2015.0f, 3.222942271262336e-03f, 1.575f},
-     {1890.0f, 2.203329542297809e-03f, 1.625f},
-     {1810.0f, 1.511001028891904e-03f, 1.675f},
-     {1730.0f, 8.609957592468259e-04f, 1.75f},
-     {1595.0f, 4.086146797305117e-04f, 1.85f},
-     {1520.0f, 1.954473210037398e-04f, 1.95f},
-     {1420.0f, 5.431896266462351e-05f, 2.125f},
-     {1360.0f, 8.847742581674416e-06f, 2.375f},
-     {1315.0f, 1.456922328720298e-06f, 2.625f},
-     {1280.0f, 2.419485191895565e-07f, 2.875f},
-     {1220.0f, 1.657956321067612e-08f, 3.25f},
-     {1185.0f, 4.745469537157371e-10f, 3.75f},
-     {1150.0f, 1.379746590025088e-11f, 4.25f},
-     {1100.0f, 4.070157961147882e-13f, 4.75f},
-     {1060.0f, 2.938236954847331e-14f, 5.125f},
-     {1025.0f, 1.228597370774746e-14f, 5.25f},
-     {980.0f, 2.916938264100495e-14f, 5.125f},
-     {945.0f, 3.855099424807451e-13f, 4.75f},
-     {905.0f, 1.185097045689854e-11f, 4.25f},
-     {860.0f, 3.566129470974951e-10f, 3.75f},
-     {810.0f, 1.045513263966272e-08f, 3.25f},
-     {780.0f, 1.291159200846216e-07f, 2.875f},
-     {750.0f, 6.824429329105383e-07f, 2.625f},
-     {700.0f, 3.569169672385163e-06f, 2.375f},
-     {640.0f, 1.839015095899579e-05f, 2.125f},
-     {600.0f, 5.711174688734240e-05f, 1.95f},
-     {550.0f, 9.226557091973427e-05f, 1.875f},
-     {250.0f, 9.337991957131389e-05f, 1.875f},
-     {100.0f, 7.225247327590413e-05f, 1.925f},
-     {65.0f, 5.792684957074546e-05f, 1.975f},
-     {0.0f, 5.206214107320588e-05f, 2.0f}}};
+  constexpr std::array<std::pair<float, float>, 79> G1_CD_DATA = {{
+    {0.0f, 0.2629f}, {0.05f, 0.2558f}, {0.1f, 0.2487f}, {0.15f, 0.2413f}, {0.2f, 0.2344f},
+    {0.25f, 0.2278f}, {0.3f, 0.2214f}, {0.35f, 0.2155f}, {0.4f, 0.2104f}, {0.45f, 0.2061f},
+    {0.5f, 0.2032f}, {0.55f, 0.2020f}, {0.6f, 0.2034f}, {0.7f, 0.2165f}, {0.725f, 0.2230f},
+    {0.75f, 0.2313f}, {0.775f, 0.2417f}, {0.8f, 0.2546f}, {0.825f, 0.2706f}, {0.85f, 0.2901f},
+    {0.875f, 0.3136f}, {0.9f, 0.3415f}, {0.925f, 0.3734f}, {0.95f, 0.4084f}, {0.975f, 0.4448f},
+    {1.0f, 0.4805f}, {1.025f, 0.5136f}, {1.05f, 0.5427f}, {1.075f, 0.5677f}, {1.1f, 0.5883f},
+    {1.125f, 0.6053f}, {1.15f, 0.6191f}, {1.2f, 0.6393f}, {1.25f, 0.6518f}, {1.3f, 0.6589f},
+    {1.35f, 0.6621f}, {1.4f, 0.6625f}, {1.45f, 0.6607f}, {1.5f, 0.6573f}, {1.55f, 0.6528f},
+    {1.6f, 0.6474f}, {1.65f, 0.6413f}, {1.7f, 0.6347f}, {1.75f, 0.6280f}, {1.8f, 0.6210f},
+    {1.85f, 0.6141f}, {1.9f, 0.6072f}, {1.95f, 0.6003f}, {2.0f, 0.5934f}, {2.05f, 0.5867f},
+    {2.1f, 0.5804f}, {2.15f, 0.5743f}, {2.2f, 0.5685f}, {2.25f, 0.5630f}, {2.3f, 0.5577f},
+    {2.35f, 0.5527f}, {2.4f, 0.5481f}, {2.45f, 0.5438f}, {2.5f, 0.5397f}, {2.6f, 0.5325f},
+    {2.7f, 0.5264f}, {2.8f, 0.5211f}, {2.9f, 0.5168f}, {3.0f, 0.5133f}, {3.1f, 0.5105f},
+    {3.2f, 0.5084f}, {3.3f, 0.5067f}, {3.4f, 0.5054f}, {3.5f, 0.5040f}, {3.6f, 0.5030f},
+    {3.7f, 0.5022f}, {3.8f, 0.5016f}, {3.9f, 0.5010f}, {4.0f, 0.5006f}, {4.2f, 0.4998f},
+    {4.4f, 0.4995f}, {4.6f, 0.4992f}, {4.8f, 0.4990f}, {5.0f, 0.4988f}
+  }};
 
-  // Helper function to find drag coefficients via binary search
-  constexpr std::tuple<float, float> findDragCoefficients(float vp_fps, DragFunction drag_type)
+  // Linearly interpolate the standard Cd at a Mach number (clamped at the ends).
+  static float interpolateCd(float mach, DragFunction drag_type)
   {
-    const auto* data = (drag_type == DragFunction::G7) ? G7_DRAG_DATA.data() : G1_DRAG_DATA.data();
-    size_t data_size = (drag_type == DragFunction::G7) ? G7_DRAG_DATA.size() : G1_DRAG_DATA.size();
+    const auto* t = (drag_type == DragFunction::G7) ? G7_CD_DATA.data() : G1_CD_DATA.data();
+    const size_t n = (drag_type == DragFunction::G7) ? G7_CD_DATA.size() : G1_CD_DATA.size();
+    if(mach <= t[0].first)
+      return t[0].second;
+    if(mach >= t[n - 1].first)
+      return t[n - 1].second;
 
-    // Handle edge cases
-    if(vp_fps <= 0.0f)
+    size_t lo = 0, hi = n - 1;
+    while(hi - lo > 1)
     {
-      return {std::get<1>(data[data_size - 1]), std::get<2>(data[data_size - 1])};
-    }
-    if(vp_fps >= std::get<0>(data[0]))
-    {
-      return {std::get<1>(data[0]), std::get<2>(data[0])};
-    }
-
-    // Binary search
-    size_t left = 0, right = data_size - 1;
-    while(left <= right)
-    {
-      size_t mid = (left + right) / 2;
-      float mid_velocity = std::get<0>(data[mid]);
-
-      if(vp_fps > mid_velocity)
-      {
-        if(mid == 0 || vp_fps <= std::get<0>(data[mid - 1]))
-        {
-          return {std::get<1>(data[mid]), std::get<2>(data[mid])};
-        }
-        right = mid - 1;
-      }
+      const size_t mid = (lo + hi) / 2;
+      if(t[mid].first <= mach)
+        lo = mid;
       else
-      {
-        left = mid + 1;
-      }
+        hi = mid;
     }
-
-    // Fallback
-    return {std::get<1>(data[data_size - 1]), std::get<2>(data[data_size - 1])};
+    const float frac = (mach - t[lo].first) / (t[hi].first - t[lo].first);
+    return t[lo].second + frac * (t[hi].second - t[lo].second);
   }
+
+  // Standard retardation r(v) = Cd(v) * v^2 / k for a BC = 1 reference projectile
+  // at standard density (Cd = k * r / v^2, inverted). k is the BC-system constant
+  // for the 1 lb, 1 inch standard projectile at rho0 = 1.225 kg/m^3
+  // (k = 2*m_std/(rho0*A_std), slug/ft/s units), giving r in fps^2 for v in fps.
+  constexpr float RETARDATION_K = 4795.4f;
+
+  // Standard sea-level speed of sound (15 C) in fps, for the BC = 1 reference curve.
+  constexpr float STD_SOUND_FPS = 1116.45f;
 
   // Compute deceleration (drag retardation) for a specific bullet state
   float Simulator::computeDeceleration(const Bullet& s) const
   {
-    btk::math::Vector3D v_rel = s.getVelocity() - wind_;
+    btk::math::Vector3D v_rel = s.getVelocity() - wind_; // AIR-RELATIVE velocity
     float v_rel_mag = v_rel.magnitude();
-    float v_fps = btk::math::Conversions::mpsToFps(v_rel_mag); // use AIR-RELATIVE speed
-
-    auto [a, m] = findDragCoefficients(v_fps, s.getDragFunction());
-    if(a <= 0.0f || m <= 0.0f)
+    if(v_rel_mag <= 0.0f || s.getBc() <= 0.0f)
       return 0.0f;
 
+    // Index the standard drag curve by Mach (using the LOCAL speed of sound, so
+    // the transonic drag rise tracks temperature/altitude), then look up Cd.
+    float mach = v_rel_mag / atmosphere_.getSpeedOfSound();
+    float cd = interpolateCd(mach, s.getDragFunction());
+
+    float v_fps = btk::math::Conversions::mpsToFps(v_rel_mag);
     float density_ratio = atmosphere_.getAirDensity() / btk::physics::Constants::AIR_DENSITY_STANDARD;
-    float ret_fps_s = a * std::pow(v_fps, m) * density_ratio / s.getBc();
+    float ret_fps_s = cd * v_fps * v_fps * density_ratio / (RETARDATION_K * s.getBc());
     return btk::math::Conversions::fps2ToMps2(ret_fps_s);
   }
 
-  // Standard drag retardation r(v) = a·v^m for a BC = 1 reference projectile at
-  // standard density: the bare G1/G7 curve shape, with no specific bullet or
-  // atmosphere applied. Returns fps² (no unit conversion).
+  // Standard drag retardation r(v) = Cd(v) * v^2 / k for a BC = 1 reference
+  // projectile at standard density: the bare G1/G7 curve, with Mach referenced
+  // to the standard sea-level speed of sound. Returns fps^2 (no unit conversion).
   float Simulator::standardRetardation(DragFunction drag_function, float velocity_fps)
   {
     if(velocity_fps <= 0.0f)
       return 0.0f;
 
-    auto [a, m] = findDragCoefficients(velocity_fps, drag_function);
-    if(a <= 0.0f || m <= 0.0f)
-      return 0.0f;
-
-    return a * std::pow(velocity_fps, m);
+    float mach = velocity_fps / STD_SOUND_FPS;
+    float cd = interpolateCd(mach, drag_function);
+    return cd * velocity_fps * velocity_fps / RETARDATION_K;
   }
 
   // Helper function for safe normalization
