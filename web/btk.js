@@ -4,7 +4,7 @@
 // `await waitForBTK()` before using BTK, or call `getBTK()` and null-check it.
 // The module is also published on `window.btk` for code that reaches it via the
 // global (e.g. steel-sim's target modules).
-import BallisticsToolkit from '../ballistics_toolkit_wasm.js';
+import BallisticsToolkit from './ballistics_toolkit_wasm.js';
 
 let btk = null;
 const btkPromise = BallisticsToolkit().then(module =>

@@ -1,7 +1,7 @@
-// The WASM loader lives in the shared module; re-export it so this app's
-// modules keep importing waitForBTK/getBTK from here. The Three.js coordinate
-// helpers below are fclass-specific and stay local.
-import { waitForBTK, getBTK } from '../../shared/btk.js';
+// The WASM loader lives in the shared web/btk.js module; re-export it so this
+// app's modules keep importing waitForBTK/getBTK from here. The Three.js
+// coordinate helpers below are fclass-specific and stay local.
+import { waitForBTK, getBTK } from '../../btk.js';
 
 export { waitForBTK, getBTK };
 
