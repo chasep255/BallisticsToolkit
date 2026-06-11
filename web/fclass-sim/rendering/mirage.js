@@ -58,6 +58,21 @@ export class MirageEffect
   static SHADING_MAX_STRENGTH     = 0.85;   // clamp on the tint mix amount. Keep high enough that
                                             // heavier presets don't all saturate to the same tint.
 
+  // ---- Height / line-of-sight elevation falloff ----
+  // Mirage is densest near the ground and thins with height, so it should cover
+  // the whole target frame and then taper off in the gap above it, fading out
+  // around the number board that floats over the frame. Each pixel's view
+  // elevation (deg, relative to the level aim line) drives an exponential
+  // falloff: full at/below ELEV_FULL_DEG, then a gradual, edge-free taper with
+  // e-folding width ELEV_FALLOFF_DEG. Reference geometry at 1000yd (aim at frame
+  // center): frame top ≈ 0.086 deg up, number-board top ≈ 0.21 deg up — so FULL
+  // ≈ frame top keeps the whole frame boiling, and FALLOFF carries the fade up
+  // to the number. Closer targets subtend more, so the boil rides a bit lower on
+  // them. Raise FULL to push the full zone up; raise FALLOFF for a softer/taller
+  // tail (0.0167 deg = 1 MOA).
+  static ELEV_FULL_DEG            = 0.08;
+  static ELEV_FALLOFF_DEG         = 0.14;
+
   // ---- Motion ----
   static HEAT_RISE_SPEED          = 1.0;    // yards/sec — constant vertical advection (the boil)
   static WIND_SMOOTHING_ALPHA     = 0.01;   // per-frame EMA weight on new wind sample [0..1]
@@ -237,6 +252,8 @@ export class MirageEffect
       uniform float layerScales[NUM_LAYERS];      // viewport world width (yards) per layer
       uniform vec3  layerDrifts[NUM_LAYERS];      // accumulated wind drift (cross, vertical, head) yards
       uniform float layerIntensities[NUM_LAYERS]; // per-layer noise weight (zoom * fade / sqrt(N))
+      uniform float viewPitch;                    // elevation of view center (radians, +up)
+      uniform float vFovRad;                      // vertical field of view (radians)
 
       varying vec2 vUv;
 
@@ -264,6 +281,15 @@ export class MirageEffect
           float n = snoise(noisePos);
           totalDistortion += n * layerIntensities[i];
         }
+
+        // Height falloff: this pixel's line-of-sight elevation is the view-center
+        // pitch plus its vertical offset across the FOV. Mirage is full when the
+        // sight grazes the deck, then tapers off exponentially as it tilts up
+        // into the sky — a gradual fade with no hard edge, so the sky band above
+        // the target thins away smoothly instead of cutting off at a line.
+        float elevDeg = (viewPitch + (uv.y - 0.5) * vFovRad) * 57.2957795;
+        float elevAtten = exp(-max(elevDeg - ${MirageEffect.ELEV_FULL_DEG.toFixed(4)}, 0.0) / ${MirageEffect.ELEV_FALLOFF_DEG.toFixed(4)});
+        totalDistortion *= elevAtten;
 
         // Mirage refracts light vertically (rising hot air = vertical n-gradient).
         // Spatial and shading scales are independent so each can be tuned alone.
@@ -311,7 +337,9 @@ export class MirageEffect
         layerOffsets:     { value: layerOffsetsInit },
         layerScales:      { value: layerScalesInit },
         layerDrifts:      { value: layerDriftsInit },
-        layerIntensities: { value: layerIntensitiesInit }
+        layerIntensities: { value: layerIntensitiesInit },
+        viewPitch:        { value: 0 },
+        vFovRad:          { value: 0 }
       },
       vertexShader: vertexShader,
       fragmentShader: fragmentShader,
@@ -322,14 +350,20 @@ export class MirageEffect
 
   /**
    * Update mirage effect parameters
-   * @param {number} fov - Current field of view in degrees
+   * @param {number} fov - Current (vertical) field of view in degrees
    * @param {Object} windGenerator - Wind generator instance
    * @param {Object} intersection - Range box intersection {x, y, z, distance}
+   * @param {number} viewPitchRad - Elevation of the view center in radians (+up),
+   *        used to fade the shimmer out as the sight tilts up off the deck.
    */
-  update(fov, windGenerator, intersection)
+  update(fov, windGenerator, intersection, viewPitchRad = 0)
   {
     // Get delta time from TimeManager (already clamped and pause-aware)
     const dt = ResourceManager.time.getDeltaTime();
+
+    // Line-of-sight geometry for the height (elevation) falloff in the shader.
+    this.material.uniforms.viewPitch.value = viewPitchRad;
+    this.material.uniforms.vFovRad.value = fov * Math.PI / 180;
 
     // Advance the noise t-axis so the field morphs in place (boil even without
     // wind). Shared across layers; they stay decorrelated through their

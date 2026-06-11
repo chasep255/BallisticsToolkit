@@ -1013,7 +1013,11 @@ export class Scope
       }
 
       // Step 2: apply mirage from the intermediate target to the final target.
-      this.mirageEffect.update(this.currentFOV, windGenerator, intersection);
+      // Pass the center-ray elevation so the shimmer fades out as the sight
+      // tilts up off the deck (no mirage in the open sky above the mountains).
+      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+      const viewPitch = Math.asin(Math.max(-1, Math.min(1, fwd.y)));
+      this.mirageEffect.update(this.currentFOV, windGenerator, intersection, viewPitch);
       this.mirageEffect.apply(this.mirageTarget.texture, this.renderTarget);
     }
     else
