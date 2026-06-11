@@ -398,11 +398,15 @@
             <h2>Mirage and scope optics</h2>
             <p><strong>What mirage is:</strong> on a warm day the ground heats the air just above it, and that warm air rises in shifting cells. Warm and cool air bend light by different amounts, so when you look through a scope at a distant target the image wavers and "boils." In wind the boil leans, or "runs," in the wind's direction and flattens as the wind builds, so reading it is one of the main ways shooters judge the wind downrange.</p>
             <p><strong>How it is drawn:</strong> the mirage is a screen-space effect. Each pixel of the scope view is nudged up and down by simplex noise tied to the live wind, so it shows the cues a real shooter reads: which way the boil runs, how fast it churns, and how strong it is. It is a visual approximation, not a simulation of light actually bending.</p>
-            <p>The two 3D simulators handle it differently:</p>
-            <ul class="tech-list">
-                <li class="tech-item"><strong>F-Class Sim</strong> stacks several air layers down the line of sight, each reading the wind at its own distance. Near layers show as large soft features, far layers as small sharp ones.</li>
-                <li class="tech-item"><strong>Steel Sim</strong> uses a single averaged layer plus the scope's focus distance. Because it cannot know which distance you are watching, the focus distance tells it how far downrange to read the wind (the F-Class Sim instead knows you are looking down a fixed firing lane). The shimmer is stronger the more air the sight looks through, so nearby ground barely boils, and it fades as you zoom out and as the wind builds, gone by about 15&nbsp;mph.</li>
-            </ul>
+            <p>Both 3D simulators draw mirage, and in both the boil washes out as the wind builds, gone by about 15&nbsp;mph. They differ in how they sample the wind field, and the Steel Sim adds a separate lens blur on top. The three pieces below cover each in turn.</p>
+
+            <h3>F-Class Sim: layered down the line of sight</h3>
+            <p>The F-Class Sim stacks several air layers along the line of sight, each sampling the wind field at its own distance, so near layers show as large soft features and far layers as small sharp ones. The range is bounded and the target sits at a fixed, known distance, so the sample distance comes from geometry: the scope's view ray is intersected with the range's bounding box. The rifle scope, held on the target, samples at the target distance; the spotting scope, which you can pan around the range, samples wherever its ray meets the box. The boil sits low and fades into the open sky above the target.</p>
+
+            <h3>Steel Sim: one averaged layer plus focus distance</h3>
+            <p>The Steel Sim uses a single averaged layer plus the scope's focus distance. Because on an open range it cannot know which distance you are watching, the focus distance tells it how far downrange to sample the wind. The shimmer is stronger the more air the sight looks through, so nearby ground barely boils, and it fades as you zoom out.</p>
+
+            <h3>Focus blur (Steel Sim)</h3>
             <p>The Steel Sim scope also has a <strong>focus blur</strong> (depth of field), separate from the mirage: the scene is drawn with a depth map, and a lens model softens each pixel by how far it sits from the distance you are focused on, so only that range is sharp. The focus distance feeds both the blur and the mirage, but they are separate effects, and the shimmer itself is never blurred.</p>
             <div class="deep">
                 <strong>Under the hood:</strong> the blur is a two-pass <strong>separable Gaussian</strong> (one horizontal pass, one vertical) whose radius grows with the lens aperture and with how far each pixel sits from the focused distance, read from the depth map.
