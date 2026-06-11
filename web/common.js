@@ -237,7 +237,7 @@ function generateNavigation(currentPageName)
   const navHTML = `
         <div class="nav-content">
             <a href="${pathPrefix}index.html" class="nav-logo">
-                <img src="${pathPrefix}ballistics-toolkit-icon.png" alt="BallisticsToolkit" class="nav-logo-img">
+                <img src="${pathPrefix}images/ballistics-toolkit-icon.png" alt="BallisticsToolkit" class="nav-logo-img">
                 <span class="nav-logo-text">Ballistics Toolkit</span>
             </a>
             <button class="nav-hamburger" aria-label="Menu">&#9776;</button>
