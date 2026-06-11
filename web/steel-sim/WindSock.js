@@ -169,6 +169,12 @@ export class WindSockFactory
     const material = new THREE.LineBasicMaterial({ color: 0x333333 });
     this.stringLines = new THREE.LineSegments(geometry, material);
     this.stringLines.frustumCulled = false;
+    // Not interactive: lines use the raycaster's Line threshold (~1m), so at long
+    // range these thin strings catch the rangefinder/focus over a wide zone at
+    // the sock's height. Excluding them keeps the range reading through to the
+    // terrain/target. (The pole, a solid cylinder, is only hit when aimed at it.)
+    this.stringLines.raycast = () =>
+    {};
     scene.add(this.stringLines);
   }
 
