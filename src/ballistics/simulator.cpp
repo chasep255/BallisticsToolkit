@@ -171,7 +171,7 @@ namespace btk::ballistics
   // So the result is time-step independent and indifferent to the gradient's
   // shape (a 1 mph/yd ramp and an abrupt step give the same total jump, up to the
   // small change in V across the gradient). This relies on the impulse being
-  // LINEAR in Δw — do not refactor it into a rate × dt; that would reintroduce a
+  // LINEAR in Δw, do not refactor it into a rate × dt; that would reintroduce a
   // dt/profile dependence.
   void Simulator::applyCrosswindJump()
   {

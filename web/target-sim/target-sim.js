@@ -90,7 +90,7 @@ function normalizeTargetName(value, targetNames)
   }
 
   // Accept legacy cookies that accidentally stored the display label.
-  const stripped = value.split(' — ')[0];
+  const stripped = value.split(', ')[0];
   if (targetNames.includes(stripped))
   {
     return stripped;
@@ -121,7 +121,7 @@ function populateTargetDropdown(preferDefaults = false)
     t.delete();
     const option = document.createElement('option');
     option.value = targetName; // value is the C++ target key only
-    option.textContent = `${targetName} — ${desc}`; // description is display-only
+    option.textContent = `${targetName}, ${desc}`; // description is display-only
     targetSelect.appendChild(option);
   }
 

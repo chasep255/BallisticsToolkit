@@ -19,7 +19,7 @@ export function windMarkerAngle(windHoriz_mph, minAngle, maxAngle, flatSpeed, re
 
 // Step a marker's angle/direction toward the wind-driven target, rate-limited
 // by per-axis interpolation speeds (angle in deg/s, direction in rad/s).
-// Returns { angle, direction, windHoriz_mph } — the caller also tends to need
+// Returns { angle, direction, windHoriz_mph }, the caller also tends to need
 // the wind magnitude for its flap/sway animation.
 export function stepWindMarker(
 {

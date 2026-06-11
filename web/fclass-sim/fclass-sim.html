@@ -99,7 +99,7 @@
     <div id="remotePlayPanel" data-no-persist style="display: none; max-width: 640px; margin: 20px auto; padding: 14px 16px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; text-align: left;">
       <strong>Host Remote Play <span style="color:#b06000;">(Beta)</span></strong>
       <p style="font-size: 13px; color:#555; margin: 8px 0;">Set this up <em>before</em> pressing Start so the match clock doesn't run during setup. Uncheck <em>Host Remote Play</em> to cancel.</p>
-      <label style="font-size:12px; font-weight:bold;">Send this link to the other player &mdash; they open it and start playing.</label>
+      <label style="font-size:12px; font-weight:bold;">Send this link to the other player, they open it and start playing.</label>
       <div style="display:flex; gap:6px; align-items:center; margin:4px 0 10px;">
         <input id="remoteInviteLink" readonly style="flex:1; font-family:monospace; font-size:11px; padding:5px; box-sizing:border-box;" placeholder="Creating link...">
         <button id="remoteCopyOfferBtn" class="btn btn-secondary" style="white-space:nowrap;">Copy Link</button>
@@ -172,7 +172,7 @@
 
             <strong>Firing:</strong><br>
             - <kbd>Space</kbd> Fire shot (disabled while target is down)<br>
-            - With the <strong>Recoil</strong> parameter set, each shot kicks the aim up and settles to a small residual you must correct (hold or re-aim) before the next shot &mdash; set it to None to disable<br>
+            - With the <strong>Recoil</strong> parameter set, each shot kicks the aim up and settles to a small residual you must correct (hold or re-aim) before the next shot, set it to None to disable<br>
             - The <strong>Recoil</strong>, <strong>Show Bullet Trace</strong>, and <strong>Mirage</strong> parameters all take effect immediately, no restart needed
           </div>
         </div>
@@ -192,16 +192,16 @@
         <div class="help-section">
           <h3>Remote Play <span style="color:#b06000;">(Beta)</span></h3>
           <div class="param-help">
-            Stream the running sim to someone on another computer who can play it &mdash; useful for letting a friend take a turn, or playing pair fire across the internet. Your PC does all the rendering; they see a live video and their keystrokes control your sim (with slight input lag).<br><br>
+            Stream the running sim to someone on another computer who can play it, useful for letting a friend take a turn, or playing pair fire across the internet. Your PC does all the rendering; they see a live video and their keystrokes control your sim (with slight input lag).<br><br>
             <strong>To host:</strong><br>
             - Check <strong>Host Remote Play</strong> in the config bar <em>before</em> starting (so the match clock doesn't run during setup)<br>
             - Copy the <em>invite link</em> and send it to the other player (any way you like)<br>
             - They open that link in a browser; when it connects, they can play. Press <strong>Start Game</strong> when you're both ready<br>
             - The viewer can open the <strong>Scorecard</strong> on their end. Signaling goes through the free PeerJS broker; video, audio, and controls are peer-to-peer once connected<br><br>
-            <strong>Will it connect?</strong> Sometimes &mdash; there is no guarantee. Remote Play uses WebRTC with <strong>STUN only</strong> (no <strong>TURN relay</strong>). That means we only try a direct path between your machines. It often works on ordinary home Wi‑Fi, but success depends on both networks cooperating: strict NAT, corporate firewalls, <strong>VPNs</strong>, and <strong>cellular/mobile data</strong> frequently block or break the link, and we have nothing to fall back on. If it fails or drops, both players should try home Wi‑Fi with VPN off; if it still won't connect, Remote Play may simply not work on those networks.<br><br>
-            <strong>Reconnecting:</strong> if the player drops, your match keeps running &mdash; they reopen the same invite link to try again.<br><br>
-            <strong>Pair Fire:</strong> the host plays Player 1 (left) and the viewer plays Player 2 (right). Controls are active only for whoever's turn it is, and the viewer gets their own <em>Go For Record</em> button on their turn. If <em>Player 2 Is</em> set to an AI, the remote client plays the human side against the AI &mdash; firing on the human's turn just like a solo string&#8209;fire match.<br><br>
-            <strong>Audio &amp; quality:</strong> game audio (gunshots, wind, scope clicks) streams too &mdash; the viewer clicks <em>Enable sound</em> to hear it (browsers block autoplay audio until then). Video sharpness depends on the host's render resolution (window size + graphics preset) and the connection bandwidth.
+            <strong>Will it connect?</strong> Sometimes, there is no guarantee. Remote Play uses WebRTC with <strong>STUN only</strong> (no <strong>TURN relay</strong>). That means we only try a direct path between your machines. It often works on ordinary home Wi‑Fi, but success depends on both networks cooperating: strict NAT, corporate firewalls, <strong>VPNs</strong>, and <strong>cellular/mobile data</strong> frequently block or break the link, and we have nothing to fall back on. If it fails or drops, both players should try home Wi‑Fi with VPN off; if it still won't connect, Remote Play may simply not work on those networks.<br><br>
+            <strong>Reconnecting:</strong> if the player drops, your match keeps running, they reopen the same invite link to try again.<br><br>
+            <strong>Pair Fire:</strong> the host plays Player 1 (left) and the viewer plays Player 2 (right). Controls are active only for whoever's turn it is, and the viewer gets their own <em>Go For Record</em> button on their turn. If <em>Player 2 Is</em> set to an AI, the remote client plays the human side against the AI, firing on the human's turn just like a solo string&#8209;fire match.<br><br>
+            <strong>Audio &amp; quality:</strong> game audio (gunshots, wind, scope clicks) streams too, the viewer clicks <em>Enable sound</em> to hear it (browsers block autoplay audio until then). Video sharpness depends on the host's render resolution (window size + graphics preset) and the connection bandwidth.
           </div>
         </div>
 
@@ -230,7 +230,7 @@
             - Choose flags or wind socks with the Wind Markers setting<br>
             - Read marker angle/lift for wind strength: higher = stronger wind<br>
             - Flag tip (pointed end) / sock tail shows wind direction<br>
-            - Flags furl into a 3D shape as wind builds &mdash; read the curl and shaded belly to judge the head/tail (toward/away) component, not just left/right<br>
+            - Flags furl into a 3D shape as wind builds, read the curl and shaded belly to judge the head/tail (toward/away) component, not just left/right<br>
             - Sun is positioned at 3 o'clock (right side) so lit face vs. shadow face also indicates direction<br>
             - Watch multiple distances for wind shear and gradients<br><br>
 
@@ -240,7 +240,7 @@
             - Moderate wind: leaning shimmer<br>
             - Strong wind: mostly horizontal flow<br>
             - Modeled as independent slabs of air along the line of sight, each reading its own local wind and running at its own speed<br>
-            - Near-shooter columns appear large and soft; target-end columns appear small and crisp &mdash; same depth-of-field feel as a real spotting scope focused at the target<br>
+            - Near-shooter columns appear large and soft; target-end columns appear small and crisp, same depth-of-field feel as a real spotting scope focused at the target<br>
             - Head wind doesn't drag mirage around (heat columns sliding along your line of sight don't shift their apparent position), but cross and vertical wind do<br>
             - Set intensity (or turn it off) with the <strong>Mirage</strong> parameter; takes effect immediately<br><br>
 
@@ -266,7 +266,7 @@
             - Use "Go For Record" to end the sighters phase early<br>
             - A match ends at the record-shot count OR when time expires<br>
             - Acknowledge the match-complete dialog to start the next match<br>
-            - Between matches the wind field is fast-forwarded to simulate the break &mdash; the preset (overall conditions) stays the same, but the wind shifts to a fresh state, so re-read it for each new match<br>
+            - Between matches the wind field is fast-forwarded to simulate the break, the preset (overall conditions) stays the same, but the wind shifts to a fresh state, so re-read it for each new match<br>
             - The combined score across all matches is the aggregate<br><br>
 
             <strong>Pair Fire:</strong><br>
@@ -336,8 +336,8 @@
             - Each section has an expandable "Target" diagram showing the impacts on a scaled target (yellow = sighters, red = record shots)<br>
             - Available anytime (shows parameters even before first shot)<br><br>
             <strong>Per-Shot Analytics:</strong> click any scored shot cell to open a detail view for that shot:<br>
-            - <strong>Point of Aim vs Impact</strong> target face &mdash; green crosshair = your aim (including dial), red dot = the actual impact, with a connector showing the miss<br>
-            - <strong>Trajectory vs Crosswind</strong> plot &mdash; distance runs up the Y axis (shooter at the bottom, target center at the top); the bullet's lateral path (orange, with the axis spanning the target paper width) and the crosswind it flew through (cyan, on a fixed &plusmn;20 mph axis) are overlaid, with a straight dashed line marking the point of aim, so you can see the wind walk the bullet off the line of departure. The scoring-ring borders (X, 10, 9&hellip;) are ticked along the top edge so you can read which ring the path arrives in. Both axes stay constant shot to shot; a shot that drifts off the paper clips past the edge<br>
+            - <strong>Point of Aim vs Impact</strong> target face, green crosshair = your aim (including dial), red dot = the actual impact, with a connector showing the miss<br>
+            - <strong>Trajectory vs Crosswind</strong> plot, distance runs up the Y axis (shooter at the bottom, target center at the top); the bullet's lateral path (orange, with the axis spanning the target paper width) and the crosswind it flew through (cyan, on a fixed &plusmn;20 mph axis) are overlaid, with a straight dashed line marking the point of aim, so you can see the wind walk the bullet off the line of departure. The scoring-ring borders (X, 10, 9&hellip;) are ticked along the top edge so you can read which ring the path arrives in. Both axes stay constant shot to shot; a shot that drifts off the paper clips past the edge<br>
             - <strong>Stats</strong>: scope dial, aim + dial, and impact offset (in MOA), plus the muzzle and impact velocity for the shot (fps)<br>
             - A pre-recoil <strong>sight-picture screenshot</strong> taken the instant the shot broke (shown on the host; omitted for remote viewers to save bandwidth)<br>
             - Close the detail with its &times; button, or close the whole card with the &times; in the header

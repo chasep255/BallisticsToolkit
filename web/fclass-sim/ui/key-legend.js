@@ -1,5 +1,5 @@
 /**
- * Shared keyboard legend for the F-Class sim — rendered identically on the host
+ * Shared keyboard legend for the F-Class sim, rendered identically on the host
  * page and the Remote Play viewer so the controls guide stays in sync.
  * Inject as direct children of a `.quick-keys` flex container.
  */
@@ -18,7 +18,7 @@ export const KEY_LEGEND_HTML = `
           <strong>Fire:</strong> <kbd>Space</kbd>
         </div>`;
 
-/** Simulation disclaimer — shown under the legend on the host and the viewer. */
+/** Simulation disclaimer, shown under the legend on the host and the viewer. */
 export const SIM_DISCLAIMER_HTML = `
         <div class="quick-keys-disclaimer">
           Entertainment / educational simulation. Wind, mirage, and ballistics are simplified and may differ from real-world shooting. Do not use this to generate real-world firing solutions.

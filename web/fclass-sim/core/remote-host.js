@@ -82,7 +82,7 @@ export class RemoteHost
   /**
    * Push the latest scorecard to the viewer, bundled with the match params and
    * target geometry so the viewer renders the full card (params block + target
-   * grouping diagrams) identically — no separate metadata message to race.
+   * grouping diagrams) identically, no separate metadata message to race.
    */
   pushScorecard(model, matchParams, targetSpec)
   {
@@ -109,7 +109,7 @@ export class RemoteHost
 
   /**
    * Push a match-end popup (match complete / aggregate complete / pair winner)
-   * so the viewer can render the same overlay — these live in the DOM, not the
+   * so the viewer can render the same overlay, these live in the DOM, not the
    * captured canvas, so they aren't in the video stream.
    */
   pushNotification(notif)

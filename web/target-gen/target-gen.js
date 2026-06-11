@@ -196,7 +196,7 @@ function populateTargetDropdown()
     t.delete();
     const option = document.createElement('option');
     option.value = name;
-    option.textContent = `${name} — ${desc}`;
+    option.textContent = `${name}, ${desc}`;
     presetSelect.appendChild(option);
   }
   const customOption = document.createElement('option');
@@ -385,7 +385,7 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showInfo, targetLabelC
     targetCtx.clip();
 
     // Compute uniform label font size from the smallest gap between scoring rings.
-    // The center ring's own radius isn't a constraint -- if it's too tiny for a
+    // The center ring's own radius isn't a constraint, if it's too tiny for a
     // label (e.g. IBS X dot), we just skip the center label below.
     let labelFontSize = 0;
     if (rings.some(r => r.showLabel !== false) && rings.length > 0)
@@ -485,7 +485,7 @@ function drawTarget(targetCtx, paper, margin, layoutGrid, showInfo, targetLabelC
     }
   }
 
-  // Watermark — bottom-right corner of the page
+  // Watermark, bottom-right corner of the page
   targetCtx.fillStyle = '#888888';
   targetCtx.font = `${Math.max(0.09 * scale, 5)}px Arial`;
   targetCtx.textAlign = 'right';

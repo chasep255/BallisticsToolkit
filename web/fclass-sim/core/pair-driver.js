@@ -270,8 +270,8 @@ export class PairFireDriver extends MatchDriver
 
   // ===== Sighter controls =====
 
-  // A player may end their sighters early at any time — including while the
-  // other player is shooting — so this targets a specific player, defaulting to
+  // A player may end their sighters early at any time, including while the
+  // other player is shooting, so this targets a specific player, defaulting to
   // whoever is active (local hotseat / single-screen use).
   goForRecord(playerId = this.active)
   {

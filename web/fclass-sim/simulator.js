@@ -257,7 +257,7 @@ function applyRemoteInput(input)
   document.dispatchEvent(event);
 }
 
-// Key codes the sim uses for aiming/firing/spotting — the only ones the pair-fire
+// Key codes the sim uses for aiming/firing/spotting, the only ones the pair-fire
 // turn gate blocks (so browser shortcuts still work for the spectating player).
 const GAME_KEY_CODES = new Set([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
@@ -265,7 +265,7 @@ const GAME_KEY_CODES = new Set([
   'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract'
 ]);
 
-// The trigger. Against an AI opponent only this is turn-gated — the player can
+// The trigger. Against an AI opponent only this is turn-gated, the player can
 // still pan/zoom/dial their own scope while the AI is shooting.
 const FIRE_KEY_CODES = new Set(['Space']);
 
@@ -393,7 +393,7 @@ function setupRemotePlayUI()
     return `${arrow} ${mbps} Mbps · ${total} · ${CONN_LABEL[s.connType] || s.connType}`;
   };
 
-  // remote.html?room=<id> — one link the host sends; the client opens it and
+  // remote.html?room=<id>, one link the host sends; the client opens it and
   // connects automatically via the PeerJS broker. The same link reconnects.
   const inviteLinkFor = (roomId) =>
     new URL('remote.html', window.location.href).href + '?room=' + encodeURIComponent(roomId);
@@ -426,7 +426,7 @@ function setupRemotePlayUI()
         remoteHost.link.startStatsMonitor((s) => { if (bwEl) bwEl.textContent = showBandwidth(s, '↑'); });
       };
       remoteHost.onClose = () =>
-        setStatus('Player disconnected — they can reopen the same link to rejoin. Your match keeps running.');
+        setStatus('Player disconnected, they can reopen the same link to rejoin. Your match keeps running.');
       remoteHost.onError = (err) =>
         setStatus('Connection error: ' + (err && err.type ? err.type : err && err.message || err));
 
@@ -437,7 +437,7 @@ function setupRemotePlayUI()
       // If a match is already running, attach the live video + state now.
       if (webglGame) webglGame.attachRemoteHost(remoteHost);
 
-      setStatus('Link ready — send it to the other player. They open it and start playing.');
+      setStatus('Link ready, send it to the other player. They open it and start playing.');
     }
     catch (e)
     {
@@ -2238,7 +2238,7 @@ class FClassSimulator
    */
   showSegmentNotification(event)
   {
-    // Mirror the popup to a remote viewer — it's a DOM overlay, not in the
+    // Mirror the popup to a remote viewer, it's a DOM overlay, not in the
     // captured canvas, so it won't otherwise appear in the video stream.
     if (this.remoteHost) this.remoteHost.pushNotification(this.buildNotificationModel(event));
 
@@ -2524,7 +2524,7 @@ class FClassSimulator
     // Start bullet animation
     this.ballistics.startBulletAnimation();
 
-    // Kick the aim — deferred to the end of the next rendered frame so the
+    // Kick the aim, deferred to the end of the next rendered frame so the
     // sight-picture screenshot (captured that frame) shows the pre-recoil
     // picture. The recoil still uses the pre-recoil aim, and the one-frame delay
     // is imperceptible.
@@ -2763,7 +2763,7 @@ class FClassSimulator
    * - vs a human over Remote Play: host is p1, viewer is p2; block whichever
    *   source's turn it isn't (they share the rifle, so all controls are gated).
    * - vs an AI: the human is p1 and keeps their own scope, so only the trigger
-   *   is gated — local and remote both drive p1 (sharing the lone shooter like
+   *   is gated, local and remote both drive p1 (sharing the lone shooter like
    *   string fire) and can pan/zoom/dial freely; neither can fire on the AI's turn.
    */
   setupInputGate()
@@ -2800,7 +2800,7 @@ class FClassSimulator
 
   /**
    * Apply a "Go For Record" request. In pair fire over Remote Play (host = p1,
-   * viewer = p2) it targets the requesting player — who may end their sighters
+   * viewer = p2) it targets the requesting player, who may end their sighters
    * early even while the other player is shooting.
    * @param {'local'|'remote'} source
    */
@@ -2833,8 +2833,8 @@ class FClassSimulator
     const activePlayer = this.driver.getActivePlayerId ? this.driver.getActivePlayerId() : null;
 
     // Each screen shows its own player's Go For Record. A player may go for
-    // record whenever they still have sighters to skip — even during the other
-    // player's turn — so the button is gated by that player's sighter state, not
+    // record whenever they still have sighters to skip, even during the other
+    // player's turn, so the button is gated by that player's sighter state, not
     // by whose turn it is. With a remote viewer or an AI playing p2, the host
     // (the human) is p1.
     const pairSplit = this.mode === 'pair' && (!!this.remoteHost || !!this.aiOpponent);

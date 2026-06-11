@@ -57,7 +57,7 @@ export class Scope
     this.zeroOffsetPitch = 0; // Vertical dial (U/D)
 
     // Recoil effect state. Recoil kicks the aim (yaw/pitch) on fire and settles
-    // to a residual offset the shooter must correct — same model as Steel Sim.
+    // to a residual offset the shooter must correct, same model as Steel Sim.
     this.recoilPreset = config.recoilPreset || 'None';
     this.recoilT = Infinity; // time since trigger (Infinity = inactive)
     this.recoilAppliedYaw = 0;   // recoil offset currently applied this shot (rad)
@@ -608,7 +608,7 @@ export class Scope
   }
 
   /**
-   * Trigger recoil — call right after firing so the shot's ballistics use the
+   * Trigger recoil, call right after firing so the shot's ballistics use the
    * pre-kick aim. Kicks the aim in a random cone around "up". The kick rises
    * from zero (see applyRecoilTransition) rather than snapping.
    */
@@ -633,7 +633,7 @@ export class Scope
     this.recoilSettleYaw = yawDir * settleRad;
     this.recoilSettlePitch = pitchDir * settleRad;
 
-    // Start from zero offset and rise — no instant kick.
+    // Start from zero offset and rise, no instant kick.
     this.recoilAppliedYaw = 0;
     this.recoilAppliedPitch = 0;
     this.recoilT = 0.0;
@@ -1090,7 +1090,7 @@ export class Scope
 
   /**
    * Set mirage strength (0 = disabled, skips the pass; >0 = strength multiplier).
-   * Takes effect on the next render — supports live changes from the UI.
+   * Takes effect on the next render, supports live changes from the UI.
    */
   setMirageIntensity(scale)
   {

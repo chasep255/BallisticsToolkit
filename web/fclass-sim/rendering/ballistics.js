@@ -236,7 +236,7 @@ export class BallisticsEngine
 
     // Make bullet and glow visible for new animation. The glow sprite is created
     // once and reused, so gate its visibility on the current toggle (not just its
-    // existence) — otherwise unchecking the trace mid-match wouldn't stick on the
+    // existence), otherwise unchecking the trace mid-match wouldn't stick on the
     // next shot.
     this.bulletMesh.visible = true;
     if (this.bulletGlowSprite) this.bulletGlowSprite.visible = this.showBulletTrace;

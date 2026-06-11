@@ -15,7 +15,7 @@
     .rp-stage { display: none; position: relative; }
     .rp-stage.active { display: block; }
     /* Show at the host's captured resolution (centered); only scale down to fit
-       the viewport — don't stretch to fill the window. */
+       the viewport, don't stretch to fill the window. */
     #remoteVideo { display: inline-block; max-width: 100%; max-height: calc(100vh - 150px); background: #000; border-radius: 6px; }
     .rp-status { font-size: 14px; font-weight: bold; color: #333; }
     .rp-bar { display:flex; gap:10px; align-items:center; justify-content:center; margin: 10px 0; flex-wrap: wrap; }
@@ -50,7 +50,7 @@
           <video id="remoteVideo" autoplay playsinline muted></video>
           <!-- Slim, non-darkening notice. The same invite link reconnects you. -->
           <div id="dcBanner" style="display:none; position:absolute; top:0; left:0; right:0; background:rgba(176,96,0,0.92); color:#fff; padding:8px 12px; font-size:14px; text-align:center; border-radius:6px 6px 0 0;">
-            Connection lost — reopen your invite link to rejoin.
+            Connection lost, reopen your invite link to rejoin.
           </div>
         </div>
       </div>
@@ -127,7 +127,7 @@
 
       document.body.appendChild(el);
 
-      // "Start Match" advances the match — host-authoritative, so relay it and
+      // "Start Match" advances the match, host-authoritative, so relay it and
       // clear locally (the host also pushes a dismiss once it advances).
       const nextBtn = $('rpNextMatchBtn');
       if (nextBtn)
@@ -138,7 +138,7 @@
           clearRemoteNotifications();
         });
       }
-      // "View Scorecard" is purely local — the viewer has its own pushed card.
+      // "View Scorecard" is purely local, the viewer has its own pushed card.
       const scBtn = $('rpViewScorecardBtn');
       if (scBtn)
       {
@@ -196,7 +196,7 @@
       else if (msg.type === 'controls')
       {
         // The host pushes this viewer's own player (p2) Go For Record
-        // availability, gated only by whether p2 still has sighters to skip —
+        // availability, gated only by whether p2 still has sighters to skip,
         // not by whose turn it is, so the player can decide while the other
         // shoots. (String fire has no active player id.)
         const btn = $('rpGoForRecordBtn');
@@ -238,19 +238,19 @@
       $('rpSoundBtn').textContent = v.muted ? '🔊 Enable sound' : '🔇 Mute';
     });
 
-    // ---- Wind HUD — toggled on the host (its overlay shows in the stream) ----
+    // ---- Wind HUD, toggled on the host (its overlay shows in the stream) ----
     $('rpWindHudBtn').addEventListener('click', () =>
     {
       if (link.isOpen) link.send({ type: 'windHud' });
     });
 
-    // ---- Go For Record (end sighters early) — sent to the host ----
+    // ---- Go For Record (end sighters early), sent to the host ----
     $('rpGoForRecordBtn').addEventListener('click', () =>
     {
       if (link.isOpen) link.send({ type: 'goForRecord' });
     });
 
-    // ---- Pause/Resume — toggled on the host (label syncs via 'paused') ----
+    // ---- Pause/Resume, toggled on the host (label syncs via 'paused') ----
     $('rpPauseBtn').addEventListener('click', () =>
     {
       if (link.isOpen) link.send({ type: 'pause' });

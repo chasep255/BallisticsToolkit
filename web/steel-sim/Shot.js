@@ -107,7 +107,7 @@ export class Shot
     // way above the horizon and never coming down). We use wall-clock rather
     // than trajectory.getTotalTime() because the BTK simulator early-exits
     // once the bullet passes max_distance, after which trajectory time only
-    // advances by one integration step per frame -- effectively never reaching
+    // advances by one integration step per frame, effectively never reaching
     // a flight-time threshold.
     if (performance.now() - this.createdAtMs >= Config.MAX_BULLET_FLIGHT_TIME_S * 1000)
     {

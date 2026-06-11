@@ -2,7 +2,7 @@
  * PeerJSLink - Remote Play transport over the PeerJS broker.
  *
  * The host registers a room id and shares one link (remote.html?room=<id>); the
- * client opens it and connects automatically — no copy/paste, no answer code.
+ * client opens it and connects automatically, no copy/paste, no answer code.
  * A reliable data channel carries control messages both ways, and the host
  * streams its canvas (video + game audio) to the client.
  *
@@ -23,17 +23,17 @@ import * as PeerJS from 'https://esm.sh/peerjs@1.5.4';
 const Peer = PeerJS.Peer || PeerJS.default;
 
 // STUN only. STUN lets each peer discover its public address so ICE can negotiate
-// a DIRECT peer-to-peer path — it works whenever at least one side's NAT is
+// a DIRECT peer-to-peer path, it works whenever at least one side's NAT is
 // cooperative (the common case). It cannot relay: if a peer sits behind a
 // symmetric NAT or a firewall that blocks direct connections, the link fails and
 // there is no fallback. A TURN relay would cover that case, but free anonymous
-// TURN no longer exists — every provider (Metered Open Relay, ExpressTURN,
+// TURN no longer exists, every provider (Metered Open Relay, ExpressTURN,
 // Cloudflare) now requires a signed-up account + credentials. We deliberately
 // don't ship the old `openrelay.metered.ca` anonymous endpoint: Metered retired
 // it, so it only produces "ICE failed, your TURN server appears to be broken"
 // errors and slows ICE discovery without ever relaying. To add a relay fallback,
 // drop a TURN entry here with real credentials (see core/peer-link README notes).
-// Kept under five servers — more than that slows ICE candidate gathering.
+// Kept under five servers, more than that slows ICE candidate gathering.
 const DEFAULT_ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
@@ -180,7 +180,7 @@ export class PeerJSLink
     peer.on('error', (err) => { if (this.onError) this.onError(err); });
     // The free broker drops idle registrations; reconnect so the room link
     // stays joinable over long sessions. (An already-connected P2P session is
-    // unaffected — it doesn't use the broker once established.)
+    // unaffected, it doesn't use the broker once established.)
     peer.on('disconnected', () =>
     {
       try { peer.reconnect(); } catch { /* destroyed */ }
@@ -198,7 +198,7 @@ export class PeerJSLink
   }
 
   // Host sender: cap encoded resolution to ~1080p (preserving the host's aspect)
-  // and prefer framerate over resolution under load — consistent quality + low
+  // and prefer framerate over resolution under load, consistent quality + low
   // latency, without re-encoding oversized high-DPI frames.
   _tuneSender(call, videoTrack)
   {

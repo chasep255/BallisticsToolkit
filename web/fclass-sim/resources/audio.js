@@ -98,7 +98,7 @@ export class AudioManager
       this.audioContext = new(window.AudioContext || window.webkitAudioContext)();
       console.log(`${LOG_PREFIX} Audio context created (sample rate: ${this.audioContext.sampleRate}Hz)`);
       // All sounds connect to this master node, which feeds the speakers and
-      // (when Remote Play is hosting) a capture stream — see getCaptureStream().
+      // (when Remote Play is hosting) a capture stream, see getCaptureStream().
       this.masterGain = this.audioContext.createGain();
       this.masterGain.connect(this.audioContext.destination);
     }

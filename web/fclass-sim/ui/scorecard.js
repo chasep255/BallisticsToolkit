@@ -512,9 +512,9 @@ export class Scorecard
   /**
    * Down-range view of the shot: distance runs up the Y axis (shooter at bottom,
    * target center at top). The horizontal direction carries two overlaid scales
-   * — the bullet's lateral position (orange, top axis), with the axis spanning
+   *, the bullet's lateral position (orange, top axis), with the axis spanning
    * the target paper width, and the crosswind it flew through in mph (cyan,
-   * bottom axis), with the axis fixed at ±20 mph (ticked every 5) — so you can
+   * bottom axis), with the axis fixed at ±20 mph (ticked every 5), so you can
    * read how the wind walked the bullet off line. Both axes are constant across
    * shots; a shot that drifts off the paper clips past the axis edge.
    */

@@ -8,17 +8,17 @@
  *
  * Each layer's world scale is `layer_distance * tan(fov/2) * 2`, so a
  * fixed-physical-size noise feature appears 1/t larger in the viewport at
- * shallower layers — near columns read as big soft blobs, far columns as
+ * shallower layers, near columns read as big soft blobs, far columns as
  * crisp small features without any explicit blur.
  *
  * The four noise axes (each with its own frequency, NOISE_FREQ_X/Y/Z/T) are
  * advected by independent drivers:
  *   x  ← crosswind            (translates the pattern left/right on screen)
- *   y  ← vertical wind + heat rise (translates it up — the boil)
+ *   y  ← vertical wind + heat rise (translates it up, the boil)
  *   z  ← headwind             (downrange; low frequency so it churns slowly)
  *   t  ← constant clock       (plumes form and dissipate in place over time)
  *
- * Anisotropy (X higher than Y) makes the features taller than wide — the
+ * Anisotropy (X higher than Y) makes the features taller than wide, the
  * vertical structure the eye reads as a "column". Head wind doesn't translate the
  * pattern on screen (columns slide along the line of sight), so it only churns
  * the z-axis; with NOISE_FREQ_Z small, the column refreshes gradually. Head
@@ -42,7 +42,7 @@ from '../core/btk.js';
 export class MirageEffect
 {
   // ===========================================================================
-  // Tuning hyperparameters — edit anything below to tweak the mirage look/feel.
+  // Tuning hyperparameters, edit anything below to tweak the mirage look/feel.
   // ===========================================================================
 
   // ---- Reference / zoom ----
@@ -53,7 +53,7 @@ export class MirageEffect
   static ZOOM_INTENSITY_CAP       = 2.0;    // ceiling on the zoom-driven intensity growth. Mirage wobble
                                             // scales with magnification; this caps it so the UV warp can't
                                             // sample absurdly far off-pixel at extreme zoom.
-  static SPATIAL_DISTORTION_SCALE = 0.003;  // UV displacement scale — how far the image warbles
+  static SPATIAL_DISTORTION_SCALE = 0.003;  // UV displacement scale, how far the image warbles
   static SHADING_INTENSITY_SCALE  = 1.0;    // chromatic edge-tint multiplier
   static SHADING_MAX_STRENGTH     = 0.85;   // clamp on the tint mix amount. Keep high enough that
                                             // heavier presets don't all saturate to the same tint.
@@ -65,7 +65,7 @@ export class MirageEffect
   // elevation (deg, relative to the level aim line) drives an exponential
   // falloff: full at/below ELEV_FULL_DEG, then a gradual, edge-free taper with
   // e-folding width ELEV_FALLOFF_DEG. Reference geometry at 1000yd (aim at frame
-  // center): frame top ≈ 0.086 deg up, number-board top ≈ 0.21 deg up — so FULL
+  // center): frame top ≈ 0.086 deg up, number-board top ≈ 0.21 deg up, so FULL
   // ≈ frame top keeps the whole frame boiling, and FALLOFF carries the fade up
   // to the number. Closer targets subtend more, so the boil rides a bit lower on
   // them. Raise FULL to push the full zone up; raise FALLOFF for a softer/taller
@@ -74,18 +74,18 @@ export class MirageEffect
   static ELEV_FALLOFF_DEG         = 0.14;
 
   // ---- Motion ----
-  static HEAT_RISE_SPEED          = 1.0;    // yards/sec — constant vertical advection (the boil)
+  static HEAT_RISE_SPEED          = 1.0;    // yards/sec, constant vertical advection (the boil)
   static WIND_SMOOTHING_ALPHA     = 0.01;   // per-frame EMA weight on new wind sample [0..1]
 
   // ---- 4D noise frequencies ----
   // The shimmer is a single 4D simplex field sampled at (x, y, z, t). Each axis
-  // is advected by its own driver — crosswind→x, vertical wind + heat rise→y,
-  // headwind→z, constant clock→t — and each frequency below converts that
+  // is advected by its own driver, crosswind→x, vertical wind + heat rise→y,
+  // headwind→z, constant clock→t, and each frequency below converts that
   // axis's units into noise space. Higher frequency = smaller/faster features.
   //   X (1/yd): horizontal feature size. Higher → narrower features.
   //   Y (1/yd): vertical feature size.   Lower than X → taller than wide (columns).
   //   Z (1/yd): downrange. Low, so the air column along the line of sight is
-  //             nearly uniform — headwind churns it only slowly, and the
+  //             nearly uniform, headwind churns it only slowly, and the
   //             per-layer slabs stay decorrelated by their distinct depth.
   //   T (1/s):  in-place evolution rate (plumes form and dissipate). Lower is
   //             slower; without it a calm-wind scope view would freeze.
@@ -98,7 +98,7 @@ export class MirageEffect
   // Each slab covers the depth range from the previous fraction to its own
   // (the first spans 0→first). Each frame the slab samples wind at one random
   // point in that range and mixes it into the EMA, which converges on the
-  // slab's average wind — full coverage of the range, one sample per frame.
+  // slab's average wind, full coverage of the range, one sample per frame.
   static LAYER_FRACS              = [0.5, 0.8, 1.0]; // far-edge depth fraction of each slab
   static WIND_FADE_SPEED_MPH      = 15.0;             // per-layer attenuation: layer fades to 0 by this horizontal wind speed
 
@@ -285,7 +285,7 @@ export class MirageEffect
         // Height falloff: this pixel's line-of-sight elevation is the view-center
         // pitch plus its vertical offset across the FOV. Mirage is full when the
         // sight grazes the deck, then tapers off exponentially as it tilts up
-        // into the sky — a gradual fade with no hard edge, so the sky band above
+        // into the sky, a gradual fade with no hard edge, so the sky band above
         // the target thins away smoothly instead of cutting off at a line.
         float elevDeg = (viewPitch + (uv.y - 0.5) * vFovRad) * 57.2957795;
         float elevAtten = exp(-max(elevDeg - ${MirageEffect.ELEV_FULL_DEG.toFixed(4)}, 0.0) / ${MirageEffect.ELEV_FALLOFF_DEG.toFixed(4)});
@@ -433,7 +433,7 @@ export class MirageEffect
       drift.y += sw.y * yardsPerSecPerMph * dt + heatRiseDelta;
       drift.z += sw.z * yardsPerSecPerMph * dt;
 
-      // Attenuate the slab by its horizontal wind magnitude — strong wind mixes
+      // Attenuate the slab by its horizontal wind magnitude, strong wind mixes
       // the air and washes the shimmer out.
       const horizSpeed = Math.hypot(sw.x, sw.z);
       const fade = Math.max(0, Math.min(1, 1 - horizSpeed / fadeSpeed));
@@ -472,7 +472,7 @@ export class MirageEffect
   }
 
   /**
-   * Get current crosswind for HUD display (target-end layer — what the eye
+   * Get current crosswind for HUD display (target-end layer, what the eye
    * actually reads off the in-focus part of the mirage).
    * @returns {number} Crosswind in mph (positive = right, negative = left)
    */
@@ -482,7 +482,7 @@ export class MirageEffect
   }
 
   /**
-   * Get current smoothed wind vector (cross, head) in mph at the target layer —
+   * Get current smoothed wind vector (cross, head) in mph at the target layer,
    * the two horizontal components a shooter reads (vertical is ~0 in this field).
    */
   getSmoothedWindVector()

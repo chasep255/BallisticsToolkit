@@ -231,7 +231,7 @@ function calculateTrajectory()
 
   // Miller stability factor. We show both the base factor (standard sea-level
   // conditions) and the factor corrected to actual muzzle conditions (velocity +
-  // air density) — the corrected one matches the SG definition Litz's spin-drift
+  // air density), the corrected one matches the SG definition Litz's spin-drift
   // and aerodynamic-jump formulas are fit against, and is what drives the model.
   const twistRateInches = parseFloat(document.getElementById('twistRate').value);
   const millerStabilityFactorBase = bullet.computeMillerStabilityFactor(twistRateInches);
