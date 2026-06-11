@@ -94,7 +94,7 @@
         .caveat strong:first-child { color: #b06a16; }
 
         figure.diagram { margin: 22px 0; text-align: center; }
-        figure.diagram svg {
+        figure.diagram svg, figure.diagram img {
             max-width: 100%;
             height: auto;
             background: #fff;
@@ -189,35 +189,19 @@
             \[ \frac{d\mathbf{x}}{dt} = \mathbf{v}, \qquad \frac{d\mathbf{v}}{dt} = \mathbf{a} = \mathbf{a}_{\text{drag}} + \mathbf{g} + \mathbf{a}_{\text{spin}}, \qquad \mathbf{g} = (0,\,-9.80665,\,0)\ \tfrac{\text{m}}{\text{s}^2} \]
 
             <figure class="diagram">
-                <svg viewBox="0 0 560 250" role="img" aria-label="Side view of a bullet's trajectory showing velocity, drag and gravity vectors">
-                    <line x1="30" y1="210" x2="540" y2="210" class="dgm-axis"/>
-                    <text x="40" y="228" class="dgm-label-sm">muzzle</text>
-                    <text x="470" y="228" class="dgm-label-sm">target (downrange, &minus;z)</text>
-                    <path d="M40,205 Q280,40 520,150" class="dgm-curve"/>
-                    <circle cx="386" cy="110" r="5" fill="#2c3e50"/>
-                    <line x1="386" y1="110" x2="460" y2="120" class="dgm-arrow-v" marker-end="url(#ah-v)"/>
-                    <text x="466" y="124" class="dgm-label">v</text>
-                    <line x1="386" y1="110" x2="312" y2="100" class="dgm-arrow-drag" marker-end="url(#ah-d)"/>
-                    <text x="264" y="96" class="dgm-label" fill="#e74c3c">drag</text>
-                    <line x1="386" y1="110" x2="386" y2="166" class="dgm-arrow-grav" marker-end="url(#ah-g)"/>
-                    <text x="392" y="156" class="dgm-label" fill="#2980b9">g</text>
-                    <g transform="translate(498,60)">
-                        <line x1="0" y1="0" x2="0" y2="-34" class="dgm-muted" marker-end="url(#ah-m)"/>
-                        <line x1="0" y1="0" x2="34" y2="0" class="dgm-muted" marker-end="url(#ah-m)"/>
-                        <text x="4" y="-30" class="dgm-label-sm">y (up)</text>
-                        <text x="20" y="14" class="dgm-label-sm">x</text>
-                    </g>
-                    <defs>
-                        <marker id="ah-v" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2c3e50"/></marker>
-                        <marker id="ah-d" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e74c3c"/></marker>
-                        <marker id="ah-g" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2980b9"/></marker>
-                        <marker id="ah-m" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#cbd3da"/></marker>
-                        <marker id="ah-w" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#16a085"/></marker>
-                        <marker id="ah-p" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6f42c1"/></marker>
-                    </defs>
-                </svg>
+                <img src="images/bullet-forces.png" alt="A bullet's trajectory arcing from a prone shooter at the muzzle to a distant target, with velocity, drag and gravity vectors drawn at the apex">
                 <figcaption>Forces on the bullet in flight. Drag always opposes motion <em>through the air</em>; gravity is constant; the spin effects (not shown) act sideways and vertically. Coordinate system: <strong>x</strong> = crossrange (right +), <strong>y</strong> = vertical (up +), downrange is <strong>&minus;z</strong>.</figcaption>
             </figure>
+
+            <!-- Shared arrowhead markers referenced by the SVG diagrams further down -->
+            <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0">
+                <defs>
+                    <marker id="ah-d" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e74c3c"/></marker>
+                    <marker id="ah-m" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#cbd3da"/></marker>
+                    <marker id="ah-w" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#16a085"/></marker>
+                    <marker id="ah-p" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6f42c1"/></marker>
+                </defs>
+            </svg>
 
             <p>This is a <strong>3-DOF</strong> translational model: position and velocity are integrated, the bullet's orientation is not. The effects that really depend on the spin axis are folded back in as extra accelerations and impulses (see Spin corrections), which is what "modified" point-mass means.</p>
 
@@ -229,7 +213,7 @@
             <h2>Drag and ballistic coefficient</h2>
             <p>Drag is the main force slowing the bullet, and it changes sharply with speed, especially near the sound barrier. Rather than one drag number, the engine pairs a <strong>standard drag function</strong> (a reference curve for a typical bullet shape) with your <strong>ballistic coefficient (BC)</strong>, which says how your bullet compares to that reference. A higher BC means the bullet holds speed better, so less drop and less wind drift.</p>
             <ul class="tech-list">
-                <li class="tech-item"><strong>G1</strong> is a flat-based reference shape, a good match for older flat-based bullets. It fits modern boat-tail bullets poorly, so a G1 BC effectively drifts with velocity.</li>
+                <li class="tech-item"><strong>G1</strong> is a flat-based reference shape, a good match for older flat-based bullets. It fits modern boat-tail bullets poorly, so no single G1 BC holds across the speed range: the value needed to match the real drag changes with velocity, which is why G1 BCs are often published in velocity bands.</li>
                 <li class="tech-item"><strong>G7</strong> is a boat-tail reference shape that matches modern long-range boat-tail bullets, giving a more constant BC across the supersonic range. G7 is the engine default.</li>
             </ul>
             <p>Each drag function is a small table indexed by speed (fps). Every velocity band carries a fitted pair \((a, m)\) so the <em>retardation</em> (deceleration, fps per second) is a clean power law, picked by a binary search on the air-relative speed:</p>
