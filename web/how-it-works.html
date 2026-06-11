@@ -110,7 +110,7 @@
             font: 13px 'Segoe UI', sans-serif;
             color: #2c3e50;
         }
-        figure.diagram .chart-controls input,
+        figure.diagram .chart-controls input[type="number"],
         figure.diagram .chart-controls select {
             margin-left: 4px;
             padding: 3px 6px;
@@ -118,8 +118,9 @@
             border-radius: 5px;
             font: inherit;
         }
-        figure.diagram .chart-controls input { width: 80px; }
-        figure.diagram .chart-controls input:disabled { background: #f1f3f5; color: #aab2b9; }
+        figure.diagram .chart-controls input[type="number"] { width: 80px; }
+        figure.diagram .chart-controls input[type="number"]:disabled { background: #f1f3f5; color: #aab2b9; }
+        figure.diagram .chart-controls input[type="checkbox"] { margin: 0 4px 0 4px; vertical-align: middle; }
         figure.diagram .chart-wrap { position: relative; }
         figure.diagram canvas {
             display: block;
@@ -273,6 +274,7 @@
                     </select></label>
                     <label>G1 BC <input type="number" id="bcG1" value="0.607" step="0.001" min="0.001" max="2"></label>
                     <label>G7 BC <input type="number" id="bcG7" value="0.311" step="0.001" min="0.001" max="2"></label>
+                    <label><input type="checkbox" id="logY">Log y</label>
                 </div>
                 <div class="chart-wrap">
                     <canvas id="dragCurveChart"></canvas>
@@ -573,6 +575,7 @@
             const inG1 = document.getElementById('bcG1');
             const inG7 = document.getElementById('bcG7');
             const modeSel = document.getElementById('chartMode');
+            const logYCb = document.getElementById('logY');
 
             // Standard drag coefficient Cd(v) = K * r(v) / v². K is the BC-system
             // reference constant for a 1 lb, 1 inch standard projectile at
@@ -580,7 +583,7 @@
             // K * a*v^(m-2) recovers the standard G1/G7 Cd. Cd does not depend on BC.
             const CD_K = 4795.4;
 
-            let mode = 'decel', g1 = [], g7 = [], yMax = 1;
+            let mode = 'decel', logY = false, g1 = [], g7 = [], yMax = 1, dataMax = 1, dataMinPos = 1;
 
             function applyData()
             {
@@ -597,7 +600,10 @@
                     g1 = g1Raw.map(r => r / bc1);
                     g7 = g7Raw.map(r => r / bc7);
                 }
-                yMax = niceMax(Math.max(...g1, ...g7));
+                dataMax = Math.max(...g1, ...g7);
+                const pos = [...g1, ...g7].filter(x => x > 0);
+                dataMinPos = pos.length ? Math.min(...pos) : 1;
+                yMax = niceMax(dataMax);
             }
 
             const fmtY = (r) => mode === 'cd' ? r.toFixed(2) : Math.round(r).toLocaleString();
@@ -620,15 +626,31 @@
 
                 const x0 = PAD.l, x1 = cssW - PAD.r, y0 = cssH - PAD.b, y1 = PAD.t;
                 const xOf = v => x0 + (v / V_MAX) * (x1 - x0);
-                const yOf = r => y0 - (r / yMax) * (y0 - y1);
+
+                // y scale: linear with even ticks, or log with decade ticks
+                let yOf, yTickVals;
+                if (logY)
+                {
+                    const top = Math.pow(10, Math.ceil(Math.log10(dataMax)));
+                    const bot = Math.max(Math.pow(10, Math.floor(Math.log10(dataMinPos))), top / 1e4);
+                    const lb = Math.log10(bot), lt = Math.log10(top);
+                    yOf = r => y0 - (Math.log10(Math.max(r, bot)) - lb) / (lt - lb) * (y0 - y1);
+                    yTickVals = [];
+                    for (let e = Math.round(lb); e <= Math.round(lt); e++) yTickVals.push(Math.pow(10, e));
+                }
+                else
+                {
+                    yOf = r => y0 - (r / yMax) * (y0 - y1);
+                    yTickVals = [];
+                    for (let i = 0; i <= 5; i++) yTickVals.push((yMax / 5) * i);
+                }
                 plot = { x0, x1, xOf, yOf };
 
                 // y grid + labels
                 ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#777';
-                const yTicks = 5;
-                for (let i = 0; i <= yTicks; i++)
+                for (const r of yTickVals)
                 {
-                    const r = (yMax / yTicks) * i, y = yOf(r);
+                    const y = yOf(r);
                     ctx.strokeStyle = '#eef1f4';
                     ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
                     ctx.fillText(fmtY(r), x0 - 8, y);
@@ -727,6 +749,7 @@
                 inG1.disabled = inG7.disabled = (mode === 'cd');
                 refresh();
             });
+            logYCb.addEventListener('change', () => { logY = logYCb.checked; draw(null); tip.style.display = 'none'; });
             let rt;
             window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => draw(null), 150); });
             applyData();
