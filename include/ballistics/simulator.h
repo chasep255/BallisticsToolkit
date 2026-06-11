@@ -161,6 +161,17 @@ namespace btk::ballistics
      */
     float getDeceleration(const Bullet& bullet) const;
 
+    /**
+     * @brief Standard drag retardation r(v) = a·v^m for a BC = 1 reference
+     *        projectile at standard air density: the bare shape of the G1 or G7
+     *        drag curve, independent of any specific bullet or atmosphere.
+     *
+     * @param drag_function G1 or G7
+     * @param velocity_fps Air-relative speed in feet per second
+     * @return Retardation (deceleration) in feet per second squared (fps²)
+     */
+    static float standardRetardation(DragFunction drag_function, float velocity_fps);
+
     private:
     // Physics helpers
     float computeDeceleration(const Bullet& s) const;

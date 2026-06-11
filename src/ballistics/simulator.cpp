@@ -122,6 +122,21 @@ namespace btk::ballistics
     return btk::math::Conversions::fps2ToMps2(ret_fps_s);
   }
 
+  // Standard drag retardation r(v) = a·v^m for a BC = 1 reference projectile at
+  // standard density: the bare G1/G7 curve shape, with no specific bullet or
+  // atmosphere applied. Returns fps² (no unit conversion).
+  float Simulator::standardRetardation(DragFunction drag_function, float velocity_fps)
+  {
+    if(velocity_fps <= 0.0f)
+      return 0.0f;
+
+    auto [a, m] = findDragCoefficients(velocity_fps, drag_function);
+    if(a <= 0.0f || m <= 0.0f)
+      return 0.0f;
+
+    return a * std::pow(velocity_fps, m);
+  }
+
   // Helper function for safe normalization
   static inline btk::math::Vector3D safe_norm(const btk::math::Vector3D& v, const btk::math::Vector3D& fb)
   {
