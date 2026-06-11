@@ -53,41 +53,41 @@ export const AI_PROFILES = {
   easy: {
     label: 'Easy',
     windReadFraction: 1.0, // no systematic under/over-hold
-    windReadErrorPct: 0.3,
-    blownReadProb: 0.12,
-    blownReadPct: 0.50,
-    readLagTauSec: 8, // stale read - lags switches
+    windReadErrorPct: 0.5,
+    blownReadProb: 0.20,
+    blownReadPct: 0.3,
+    readLagTauSec: 12, // stale read - lags switches
     nearWeightedWind: false, // flat average across the flags
     chaseGain: 0.55, // over-chases: corrects too hard off a single shot
     chaseDecay: 0.85,
-    pairDelayRange: [2, 5], // seconds, uniform
+    pairDelayRange: [1, 3], // seconds, uniform
     conditionWaitMph: null
   },
   medium: {
     label: 'Medium',
     windReadFraction: 1.0,
-    windReadErrorPct: 0.2,
-    blownReadProb: 0.06,
-    blownReadPct: 0.40,
-    readLagTauSec: 4, // somewhat stale read
+    windReadErrorPct: 0.3,
+    blownReadProb: 0.15,
+    blownReadPct: 0.2,
+    readLagTauSec: 8, // somewhat stale read
     nearWeightedWind: true, // hears "the first flag matters" but reads a flat average
     chaseGain: 0.38,
     chaseDecay: 0.88,
-    pairDelayRange: [2, 5],
+    pairDelayRange: [1, 3],
     conditionWaitMph: null
   },
   hard: {
     label: 'Hard',
     windReadFraction: 1.0, // reads the full value - no systematic under-hold
-    windReadErrorPct: 0.1,
-    blownReadProb: 0.03, // drops a point on a missed switch now and then
-    blownReadPct: 0.35,
-    readLagTauSec: 2, // fresh read, tracks switches quickly
+    windReadErrorPct: 0.2,
+    blownReadProb: 0.15, // drops a point on a missed switch now and then
+    blownReadPct: 0.1,
+    readLagTauSec: 4, // fresh read, tracks switches quickly
     nearWeightedWind: true, // weights near wind by time-of-flight remaining (expert skill)
     chaseGain: 0.22, // measured corrections - doesn't chase single shots
     chaseDecay: 0.90,
-    pairDelayRange: [2, 5],
-    conditionWaitMph: 1.5 // waits if the wind moved off his last-shot read
+    pairDelayRange: [1, 3],
+    conditionWaitMph: null
   }
 };
 
