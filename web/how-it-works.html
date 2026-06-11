@@ -101,6 +101,50 @@
             border: 1px solid #e5e8ec;
             border-radius: 8px;
         }
+        figure.diagram .chart-controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+            font: 13px 'Segoe UI', sans-serif;
+            color: #2c3e50;
+        }
+        figure.diagram .chart-controls input,
+        figure.diagram .chart-controls select {
+            margin-left: 4px;
+            padding: 3px 6px;
+            border: 1px solid #cbd3da;
+            border-radius: 5px;
+            font: inherit;
+        }
+        figure.diagram .chart-controls input { width: 80px; }
+        figure.diagram .chart-controls input:disabled { background: #f1f3f5; color: #aab2b9; }
+        figure.diagram .chart-wrap { position: relative; }
+        figure.diagram canvas {
+            display: block;
+            width: 100%;
+            height: 340px;
+            background: #fff;
+            border: 1px solid #e5e8ec;
+            border-radius: 8px;
+        }
+        .chart-tip {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+            background: rgba(255, 255, 255, 0.97);
+            border: 1px solid #cbd3da;
+            border-radius: 6px;
+            padding: 6px 9px;
+            font: 12px 'Segoe UI', sans-serif;
+            color: #2c3e50;
+            line-height: 1.4;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            white-space: nowrap;
+            z-index: 5;
+            transform: translate(-50%, -100%);
+        }
         figure.diagram figcaption {
             color: #666;
             font-size: 0.9em;
@@ -219,6 +263,23 @@
             <p>Each drag function is a small table indexed by speed (fps). Every velocity band carries a fitted pair \((a, m)\) so the <em>retardation</em> (deceleration, fps per second) is a clean power law, picked by a binary search on the air-relative speed:</p>
             \[ r(v) = a\,v^{m}, \qquad \mathbf{a}_{\text{drag}} = -\,\frac{a\,v_r^{\,m}}{\text{BC}}\cdot\frac{\rho}{\rho_0}\;\hat{\mathbf{v}}_r, \qquad v_r = \lVert \mathbf{v}-\mathbf{w}\rVert \]
             <p>Here \(\mathbf{w}\) is the local wind, \(\rho\) is the current air density and \(\rho_0 = 1.225\ \text{kg/m}^3\) is the reference density. Within this point-mass model, once the drag function and BC are fixed, bullet diameter and weight do <em>not</em> separately affect drag; they re-enter later through the spin and stability corrections, where mass, caliber and length matter.</p>
+
+            <p>You can see this directly below. Enter a bullet's G1 and G7 BC and the chart draws its actual deceleration under each model (the standard drag curve divided by the BC you give). For a properly matched pair (the same bullet's published G1 and G7 numbers) the two curves nearly coincide over the supersonic band the BCs were fit for, then split apart through the transonic region and out at the speed extremes, where the single-number G1 fit can no longer track the boat-tail's true drag. That gap is exactly why one bullet needs two different BC numbers.</p>
+            <figure class="diagram">
+                <div class="chart-controls">
+                    <label>Show <select id="chartMode">
+                        <option value="decel">Deceleration</option>
+                        <option value="cd">Drag coefficient</option>
+                    </select></label>
+                    <label>G1 BC <input type="number" id="bcG1" value="0.607" step="0.001" min="0.001" max="2"></label>
+                    <label>G7 BC <input type="number" id="bcG7" value="0.311" step="0.001" min="0.001" max="2"></label>
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="dragCurveChart"></canvas>
+                    <div id="dragCurveTip" class="chart-tip"></div>
+                </div>
+                <figcaption>Switch the y-axis between the bullet's deceleration r(v) = a&middot;v<sup>m</sup> &divide; BC (feet per second squared, set by the G1 and G7 BCs you enter; defaults are a 6.5&nbsp;mm 140&nbsp;gr Hybrid) and the standard drag coefficient C<sub>d</sub> (the dimensionless reference shape, independent of BC). Hover to read values. Through the transonic region near Mach&nbsp;1 (about 1116&nbsp;fps), C<sub>d</sub> rises to a peak and then falls, while the deceleration keeps climbing.</figcaption>
+            </figure>
             <div class="caveat">
                 <strong>Approximation:</strong> G1 and G7 are standard drag curves measured for reference projectile shapes. The table is indexed by raw speed in fps and is not re-scaled for the local speed of sound, so there is no separate Mach correction.
             </div>
@@ -470,6 +531,207 @@
                 });
             }
         });
+    </script>
+
+    <!-- Interactive G1/G7 drag-curve chart. Loads the WASM core and samples its
+         own standard-retardation function, so the curves are the real tables. -->
+    <script type="module">
+        import { waitForBTK } from './btk.js';
+
+        (async () =>
+        {
+            const canvas = document.getElementById('dragCurveChart');
+            const tip = document.getElementById('dragCurveTip');
+            if (!canvas) return;
+
+            let btk;
+            try { btk = await waitForBTK(); } catch (e) { return; }
+            const Sim = btk.BallisticsSimulator;
+            // Needs a WASM build that includes the standardRetardation binding.
+            if (!Sim || typeof Sim.standardRetardation !== 'function') return;
+
+            // Sample the standard retardation r(v) = a*v^m once, straight from the
+            // engine's G1/G7 tables (BC = 1). The displayed curves are these scaled
+            // by 1/BC, recomputed whenever the user edits a BC field.
+            const V_MAX = 3500, STEP = 5, MACH1 = 1116;
+            const vs = [], g1Raw = [], g7Raw = [];
+            for (let v = 0; v <= V_MAX; v += STEP)
+            {
+                vs.push(v);
+                g1Raw.push(Sim.standardRetardation(btk.DragFunction.G1, v));
+                g7Raw.push(Sim.standardRetardation(btk.DragFunction.G7, v));
+            }
+
+            const niceMax = (x) =>
+            {
+                const p = Math.pow(10, Math.floor(Math.log10(x)));
+                const f = x / p;
+                const n = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+                return n * p;
+            };
+
+            const inG1 = document.getElementById('bcG1');
+            const inG7 = document.getElementById('bcG7');
+            const modeSel = document.getElementById('chartMode');
+
+            // Standard drag coefficient Cd(v) = K * r(v) / v². K is the BC-system
+            // reference constant for a 1 lb, 1 inch standard projectile at
+            // rho0 = 1.225 kg/m³ (K = 2*m_std/(rho0*A_std) in slug/ft/s units), so
+            // K * a*v^(m-2) recovers the standard G1/G7 Cd. Cd does not depend on BC.
+            const CD_K = 4795.4;
+
+            let mode = 'decel', g1 = [], g7 = [], yMax = 1;
+
+            function applyData()
+            {
+                if (mode === 'cd')
+                {
+                    g1 = vs.map((v, i) => v > 0 ? CD_K * g1Raw[i] / (v * v) : 0);
+                    g7 = vs.map((v, i) => v > 0 ? CD_K * g7Raw[i] / (v * v) : 0);
+                    g1[0] = g1[1]; g7[0] = g7[1]; // v = 0 limit
+                }
+                else
+                {
+                    const bc1 = Math.max(0.001, parseFloat(inG1.value) || 0.001);
+                    const bc7 = Math.max(0.001, parseFloat(inG7.value) || 0.001);
+                    g1 = g1Raw.map(r => r / bc1);
+                    g7 = g7Raw.map(r => r / bc7);
+                }
+                yMax = niceMax(Math.max(...g1, ...g7));
+            }
+
+            const fmtY = (r) => mode === 'cd' ? r.toFixed(2) : Math.round(r).toLocaleString();
+            const axisTitle = () => mode === 'cd' ? 'drag coefficient (Cd)' : 'deceleration (fps²)';
+
+            const PAD = { l: 64, r: 18, t: 16, b: 40 };
+            const C_G1 = '#e74c3c', C_G7 = '#2980b9';
+            let plot = null;
+
+            function draw(hoverIdx)
+            {
+                const dpr = window.devicePixelRatio || 1;
+                const cssW = canvas.clientWidth, cssH = canvas.clientHeight;
+                canvas.width = Math.round(cssW * dpr);
+                canvas.height = Math.round(cssH * dpr);
+                const ctx = canvas.getContext('2d');
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.clearRect(0, 0, cssW, cssH);
+                ctx.font = "12px 'Segoe UI', sans-serif";
+
+                const x0 = PAD.l, x1 = cssW - PAD.r, y0 = cssH - PAD.b, y1 = PAD.t;
+                const xOf = v => x0 + (v / V_MAX) * (x1 - x0);
+                const yOf = r => y0 - (r / yMax) * (y0 - y1);
+                plot = { x0, x1, xOf, yOf };
+
+                // y grid + labels
+                ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#777';
+                const yTicks = 5;
+                for (let i = 0; i <= yTicks; i++)
+                {
+                    const r = (yMax / yTicks) * i, y = yOf(r);
+                    ctx.strokeStyle = '#eef1f4';
+                    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+                    ctx.fillText(fmtY(r), x0 - 8, y);
+                }
+                // x grid + labels
+                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                for (let v = 0; v <= V_MAX; v += 500)
+                {
+                    const x = xOf(v);
+                    ctx.strokeStyle = '#eef1f4';
+                    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+                    ctx.fillStyle = '#777'; ctx.fillText(v, x, y0 + 6);
+                }
+                // axes
+                ctx.strokeStyle = '#b8c2cc'; ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
+
+                // axis titles
+                ctx.fillStyle = '#2c3e50'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                ctx.fillText('velocity (fps)', (x0 + x1) / 2, cssH);
+                ctx.save();
+                ctx.translate(13, (y0 + y1) / 2); ctx.rotate(-Math.PI / 2);
+                ctx.textBaseline = 'top'; ctx.fillText(axisTitle(), 0, 0);
+                ctx.restore();
+
+                // Mach 1 marker
+                const xm = xOf(MACH1);
+                ctx.strokeStyle = '#cbd3da'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(xm, y0); ctx.lineTo(xm, y1); ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#999'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+                ctx.fillText('Mach 1', xm + 4, y1 + 1);
+
+                // curves (G7 under G1)
+                const line = (arr, color) =>
+                {
+                    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+                    for (let i = 0; i < vs.length; i++)
+                    {
+                        const x = xOf(vs[i]), y = yOf(arr[i]);
+                        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+                    }
+                    ctx.stroke();
+                };
+                line(g7, C_G7);
+                line(g1, C_G1);
+
+                // legend
+                const lx = x0 + 14, ly = y1 + 8;
+                ctx.lineWidth = 2; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.strokeStyle = C_G1; ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + 22, ly); ctx.stroke();
+                ctx.fillStyle = '#2c3e50'; ctx.fillText('G1 (flat-base)', lx + 28, ly);
+                ctx.strokeStyle = C_G7; ctx.beginPath(); ctx.moveTo(lx, ly + 17); ctx.lineTo(lx + 22, ly + 17); ctx.stroke();
+                ctx.fillText('G7 (boat-tail)', lx + 28, ly + 17);
+
+                // hover crosshair + points
+                if (hoverIdx != null)
+                {
+                    const x = xOf(vs[hoverIdx]);
+                    ctx.strokeStyle = '#9aa7b2'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+                    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+                    ctx.setLineDash([]);
+                    const dot = (r, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, yOf(r), 3.5, 0, Math.PI * 2); ctx.fill(); };
+                    dot(g7[hoverIdx], C_G7); dot(g1[hoverIdx], C_G1);
+                }
+            }
+
+            function onMove(ev)
+            {
+                if (!plot) return;
+                const rect = canvas.getBoundingClientRect();
+                let v = ((ev.clientX - rect.left - plot.x0) / (plot.x1 - plot.x0)) * V_MAX;
+                v = Math.max(0, Math.min(V_MAX, v));
+                const idx = Math.round(v / STEP);
+                draw(idx);
+                const unit = mode === 'cd' ? '' : ' fps²';
+                const fmt = (x) => mode === 'cd' ? x.toFixed(3) : Math.round(x).toLocaleString();
+                tip.innerHTML = `<strong>${vs[idx].toLocaleString()} fps</strong><br>` +
+                    `<span style="color:${C_G1}">G1</span> ${fmt(g1[idx])}${unit}<br>` +
+                    `<span style="color:${C_G7}">G7</span> ${fmt(g7[idx])}${unit}`;
+                tip.style.display = 'block';
+                tip.style.left = plot.xOf(vs[idx]) + 'px';
+                tip.style.top = (Math.min(plot.yOf(g1[idx]), plot.yOf(g7[idx])) - 12) + 'px';
+            }
+            function onLeave() { draw(null); tip.style.display = 'none'; }
+
+            canvas.addEventListener('mousemove', onMove);
+            canvas.addEventListener('mouseleave', onLeave);
+            const refresh = () => { applyData(); draw(null); tip.style.display = 'none'; };
+            inG1.addEventListener('input', refresh);
+            inG7.addEventListener('input', refresh);
+            modeSel.addEventListener('change', () =>
+            {
+                mode = modeSel.value;
+                // Cd is the standard reference curve, independent of the bullet's BC.
+                inG1.disabled = inG7.disabled = (mode === 'cd');
+                refresh();
+            });
+            let rt;
+            window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => draw(null), 150); });
+            applyData();
+            draw(null);
+        })();
     </script>
 </body>
 </html>
