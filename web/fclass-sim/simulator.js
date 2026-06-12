@@ -764,10 +764,6 @@ class FClassSimulator
   // scales with the paper face), so they are computed in start() as
   // this.frameSize / this.targetCenterHeight rather than fixed here.
 
-  // Pair fire: pause after the target is back up before switching shooters,
-  // so the shooter who just fired can see their impact.
-  static TURN_SWITCH_DELAY_MS = 500;
-
   // Ground/scenery
   static GROUND_EXTENSION_BEYOND_TARGETS = 2500; // yards (extends to mountains)
 
@@ -891,9 +887,6 @@ class FClassSimulator
     // Per-player scope state (pair fire only): { p1, p2 }
     this.scopeStates = {};
     this.activeScopePlayer = this.driver.getActivePlayerId();
-
-    // Pending pair-fire turn-switch timer (impact-viewing delay)
-    this.turnSwitchTimeout = null;
 
     // Scorecard
     this.scorecard = new Scorecard();
@@ -1837,13 +1830,6 @@ class FClassSimulator
       this.animationId = null;
     }
 
-    // Cancel any pending pair-fire turn switch
-    if (this.turnSwitchTimeout)
-    {
-      clearTimeout(this.turnSwitchTimeout);
-      this.turnSwitchTimeout = null;
-    }
-
     // Stop ambient audio loops
     ResourceManager.audio.stopLoop('background_noise');
     ResourceManager.audio.stopLoop('wind');
@@ -2733,16 +2719,14 @@ class FClassSimulator
   /**
    * Handle target animation completion (called when target finishes raising).
    *
-   * In pair fire the turn switch (HUD + scope swap) is held back briefly so the
-   * shooter who just fired can see their impact on the raised target. Firing
-   * stays blocked (driver.canFire() is false while the switch is pending) until
-   * the switch completes.
+   * In pair fire the turn switches to the next shooter (HUD + scope swap) the
+   * instant the target is back up, so the next shooter can fire immediately.
    */
   onTargetAnimationComplete()
   {
     if (this.mode === 'pair')
     {
-      this.turnSwitchTimeout = setTimeout(() => this.completeTurnSwitch(), FClassSimulator.TURN_SWITCH_DELAY_MS);
+      this.completeTurnSwitch();
       return;
     }
 
@@ -2753,11 +2737,10 @@ class FClassSimulator
 
   /**
    * Pair fire: advance the turn, swap to the new shooter's scopes, and refresh
-   * the HUD/controls. Runs after the impact-viewing delay.
+   * the HUD/controls. Runs as soon as the target is back up.
    */
   completeTurnSwitch()
   {
-    this.turnSwitchTimeout = null;
     if (!this.isRunning)
     {
       return;
