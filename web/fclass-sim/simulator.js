@@ -1356,7 +1356,14 @@ class FClassSimulator
     this.updateSpottingScopeCamera();
     this.updateRifleScopeCamera();
 
-    // 3-pass rendering architecture:
+    // 3-pass rendering architecture. Refresh the shadow map once here; the
+    // first render() below regenerates it and the two scope passes reuse it
+    // (shadowMap.autoUpdate is off, see the renderer setup).
+    if (this.renderer.shadowMap.enabled)
+    {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
+
     // 1) Render main scene to texture
     this.renderer.setRenderTarget(this.mainSceneRenderTarget);
     this.renderer.clear();
@@ -1455,7 +1462,11 @@ class FClassSimulator
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.shadowMap.enabled = this.graphicsConfig.shadowsEnabled;
     this.renderer.shadowMap.type = this.graphicsConfig.shadowType;
-    this.renderer.shadowMap.autoUpdate = true;
+    // Manual shadow updates: with autoUpdate on, the shadow map is regenerated
+    // on every renderer.render() call, i.e. three times per frame (main scene +
+    // both scopes) for one static sun. Instead we flag needsUpdate once per
+    // frame (see render()), so the map renders once and the scope passes reuse it.
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.shadowMap.needsUpdate = true;
     this.renderer.setSize(this.canvasWidth, this.canvasHeight);
     this.renderer.setPixelRatio(Math.min(this.graphicsConfig.pixelRatio, window.devicePixelRatio));
