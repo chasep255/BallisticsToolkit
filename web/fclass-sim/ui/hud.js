@@ -39,6 +39,16 @@ export class HudOverlay
     this.bottomCells = [];
     this.bottomTexWidth = 480;
     this.bottomTexHeight = 80;
+
+    // FPS counter (top-left). A standalone cell outside the panel pool, so the
+    // periodic panel re-render doesn't disturb it. Redrawn only when the text
+    // changes; the mesh itself is composited every frame like the rest of the HUD.
+    this.fpsCell = null;
+    this.fpsText = null;
+    this.fpsDispWidth = 14;
+    this.fpsDispHeight = 5;
+    this.fpsTexWidth = 128;
+    this.fpsTexHeight = 44;
   }
 
   ensureRow(index)
@@ -95,8 +105,16 @@ export class HudOverlay
       if (panel.title !== null && panel.title !== undefined)
       {
         const row = this.ensureRow(index++);
-        this.drawHeader(row.canvas, panel.title, panel.active);
-        row.texture.needsUpdate = true;
+        // Redraw + re-upload the texture only when the content changes; this
+        // runs every frame, so an unconditional canvas redraw per row is a real
+        // per-frame cost (worse in pair fire, which has two panels).
+        const key = `H\x00${panel.title}\x00${panel.active}`;
+        if (row.key !== key)
+        {
+          this.drawHeader(row.canvas, panel.title, panel.active);
+          row.texture.needsUpdate = true;
+          row.key = key;
+        }
         row.mesh.position.set(centerX, y, 3);
         row.mesh.visible = this.visible;
         y -= this.rowHeight;
@@ -105,8 +123,13 @@ export class HudOverlay
       panel.rows.forEach(r =>
       {
         const row = this.ensureRow(index++);
-        this.drawRow(row.canvas, r.label, r.value, r.color, panel.active);
-        row.texture.needsUpdate = true;
+        const key = `R\x00${r.label}\x00${r.value}\x00${r.color || ''}\x00${panel.active}`;
+        if (row.key !== key)
+        {
+          this.drawRow(row.canvas, r.label, r.value, r.color, panel.active);
+          row.texture.needsUpdate = true;
+          row.key = key;
+        }
         row.mesh.position.set(centerX, y, 3);
         row.mesh.visible = this.visible;
         y -= this.rowHeight;
@@ -193,8 +216,13 @@ export class HudOverlay
       row.cells.forEach(cell =>
       {
         const slot = this.ensureBottomCell(cellIndex++);
-        this.drawBottomCell(slot.canvas, cell.text, cell.active, fontPx);
-        slot.texture.needsUpdate = true;
+        const key = `${cell.text}\x00${cell.active}\x00${fontPx}`;
+        if (slot.key !== key)
+        {
+          this.drawBottomCell(slot.canvas, cell.text, cell.active, fontPx);
+          slot.texture.needsUpdate = true;
+          slot.key = key;
+        }
         this.configureBottomCellMesh(slot, cell.dispWidth, row.height);
         const cx = cursor + cell.dispWidth / 2;
         slot.mesh.position.set(cx, rowCenterY, 3);
@@ -276,6 +304,80 @@ export class HudOverlay
     ctx.fillText(text, w / 2, h / 2);
   }
 
+  /**
+   * Update the top-left FPS readout. Pass the text to show (e.g. "60 FPS").
+   * The cell's canvas is only redrawn when the text actually changes.
+   */
+  updateFps(text)
+  {
+    const cell = this.ensureFpsCell();
+    if (text !== this.fpsText)
+    {
+      this.drawFps(cell.canvas, text);
+      cell.texture.needsUpdate = true;
+      this.fpsText = text;
+    }
+    cell.mesh.visible = this.visible;
+  }
+
+  ensureFpsCell()
+  {
+    if (this.fpsCell)
+    {
+      return this.fpsCell;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = this.fpsTexWidth;
+    canvas.height = this.fpsTexHeight;
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    const geometry = new THREE.PlaneGeometry(this.fpsDispWidth, this.fpsDispHeight);
+    const material = new THREE.MeshBasicMaterial(
+    {
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    // Top-left corner, mirroring the right-edge panel margin.
+    mesh.position.set(
+      VC.fromLeft(this.margin + this.fpsDispWidth / 2),
+      VC.fromTop(this.margin + this.fpsDispHeight / 2),
+      3
+    );
+    mesh.renderOrder = 3;
+    mesh.frustumCulled = false;
+    mesh.visible = false;
+    this.compositionScene.add(mesh);
+
+    this.fpsCell = { canvas, texture, mesh };
+    return this.fpsCell;
+  }
+
+  drawFps(canvas, text)
+  {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.font = 'bold 26px monospace';
+    ctx.fillStyle = '#66ff66';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, w / 2, h / 2);
+  }
+
   show()
   {
     this.visible = true;
@@ -287,6 +389,10 @@ export class HudOverlay
     {
       this.bottomCells[i].mesh.visible = true;
     }
+    if (this.fpsCell)
+    {
+      this.fpsCell.mesh.visible = true;
+    }
   }
 
   hide()
@@ -294,6 +400,10 @@ export class HudOverlay
     this.visible = false;
     this.rows.forEach(row => row.mesh.visible = false);
     this.bottomCells.forEach(cell => cell.mesh.visible = false);
+    if (this.fpsCell)
+    {
+      this.fpsCell.mesh.visible = false;
+    }
   }
 
   dispose()
@@ -314,6 +424,11 @@ export class HudOverlay
 
     this.rows.forEach(row => disposeMesh(row.mesh));
     this.bottomCells.forEach(cell => disposeMesh(cell.mesh));
+    if (this.fpsCell)
+    {
+      disposeMesh(this.fpsCell.mesh);
+      this.fpsCell = null;
+    }
     this.rows = [];
     this.bottomCells = [];
     this.usedCount = 0;

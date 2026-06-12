@@ -461,14 +461,3 @@
   color: #333;
   text-align: right;
 }
-
-.shot-detail-shot {
-  margin-top: 10px;
-  text-align: center;
-}
-
-.shot-detail-shot img {
-  max-width: 100%;
-  border-radius: 6px;
-  border: 1px solid #d0dcec;
-}

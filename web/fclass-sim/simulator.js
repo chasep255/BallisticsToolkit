@@ -825,6 +825,13 @@ class FClassSimulator
     this.isPaused = false;
     this.animationId = null;
 
+    // FPS counter: an exponential moving average of per-frame time (smoothed so
+    // the readout doesn't jitter), drawn into the HUD overlay (top-left) and
+    // refreshed twice a second.
+    this.fpsEmaMs = 0;        // smoothed frame time (ms); 0 = not yet seeded
+    this.fpsPrevFrame = 0;    // timestamp of the previous frame
+    this.fpsLastUpdate = 0;   // timestamp of the last on-screen refresh
+
     // Game parameters
     this.distance = params.distance;
     this.targetType = params.target;
@@ -1257,6 +1264,26 @@ class FClassSimulator
   {
     const frameStartTime = performance.now();
 
+    // FPS readout: fold this frame's time into an EMA (heavy weight on history
+    // for a steady number), then refresh the HUD text every 500ms.
+    if (this.hud)
+    {
+      if (this.fpsPrevFrame !== 0)
+      {
+        const dt = frameStartTime - this.fpsPrevFrame;
+        // Smoothing factor: lower = steadier but slower to react to drops.
+        const alpha = 0.05;
+        this.fpsEmaMs = this.fpsEmaMs === 0 ? dt : this.fpsEmaMs + alpha * (dt - this.fpsEmaMs);
+      }
+      this.fpsPrevFrame = frameStartTime;
+
+      if (frameStartTime - this.fpsLastUpdate >= 500 && this.fpsEmaMs > 0)
+      {
+        this.hud.updateFps(`${Math.round(1000 / this.fpsEmaMs)} FPS`);
+        this.fpsLastUpdate = frameStartTime;
+      }
+    }
+
     // Mark frame start for render stats
     if (this.renderStats)
     {
@@ -1365,23 +1392,6 @@ class FClassSimulator
     else
     {
       this.renderer.render(this.compositionScene, this.compositionCamera);
-    }
-
-    // Grab the sight-picture screenshot requested at the last trigger break.
-    // Must run here, right after compositing to the default framebuffer, while
-    // its drawing buffer is still valid (the renderer is created without
-    // preserveDrawingBuffer).
-    if (this.captureShotScreenshot)
-    {
-      this.captureShotScreenshot = false;
-      try
-      {
-        this.lastShotScreenshot = this.canvas.toDataURL('image/jpeg', 0.5);
-      }
-      catch (err)
-      {
-        this.lastShotScreenshot = null;
-      }
     }
 
     // Fire the deferred recoil now that this (pre-recoil) frame has been
@@ -2449,7 +2459,7 @@ class FClassSimulator
    *
    * @param {Object|null} aimOverride - {yaw, pitch, isAI} radians; when set
    *   (pair-fire AI opponent) the shot uses this aim instead of the player's
-   *   rifle scope, takes no screenshot, and doesn't kick the player's aim.
+   *   rifle scope and doesn't kick the player's aim.
    */
   fireShot(aimOverride = null)
   {
@@ -2505,15 +2515,13 @@ class FClassSimulator
     const aim = this.rifleScope.getAim();
 
     // Capture per-shot diagnostics inputs (aim hold + scope dial) at trigger
-    // break, and request a sight-picture screenshot on the next composed frame.
-    // The trajectory/wind profile and the screenshot are folded in once the shot
-    // is scored (see onShotComplete).
+    // break. The trajectory/wind profile is folded in once the shot is scored
+    // (see onShotComplete).
     const dial = this.rifleScope.getDialPosition();
     this.pendingShotDiag = {
       aim: { yaw: aim.yaw, pitch: aim.pitch },
       dial: { h: dial.horizontal, v: dial.vertical }
     };
-    this.captureShotScreenshot = true;
 
     // Update ballistics system with current rifle scope aim
     this.ballistics.setRifleScopeAim(aim.yaw, aim.pitch);
@@ -2524,10 +2532,10 @@ class FClassSimulator
     // Start bullet animation
     this.ballistics.startBulletAnimation();
 
-    // Kick the aim, deferred to the end of the next rendered frame so the
-    // sight-picture screenshot (captured that frame) shows the pre-recoil
-    // picture. The recoil still uses the pre-recoil aim, and the one-frame delay
-    // is imperceptible.
+    // Kick the aim, deferred to the end of the next rendered frame so the firing
+    // frame renders with the pre-recoil sight picture and the muzzle climbs after
+    // the shot reads. The recoil still uses the pre-recoil aim, and the one-frame
+    // delay is imperceptible.
     this.pendingRecoil = true;
   }
 
@@ -2607,8 +2615,8 @@ class FClassSimulator
     }
 
     // Assemble per-shot diagnostics (aim + dial captured at trigger break, plus
-    // the down-range trajectory/wind profile and sight-picture screenshot) and
-    // attach them so the driver records them with the shot.
+    // the down-range trajectory/wind profile) and attach them so the driver
+    // records them with the shot.
     shotData.diag = this.buildShotDiagnostics();
     shotData.diag.impact = { x: shotData.relativeX, y: shotData.relativeY };
     shotData.diag.score = shotData.score;
@@ -2647,8 +2655,7 @@ class FClassSimulator
   /**
    * Assemble the per-shot diagnostics record for the scorecard's shot-detail
    * view. Combines the aim/dial captured at trigger break with the down-range
-   * trajectory and wind profile sampled from this shot's flight, plus the
-   * sight-picture screenshot grabbed on the firing frame.
+   * trajectory and wind profile sampled from this shot's flight.
    *
    * Geometry note: the bullet is zeroed to the target center for hold == 0, so a
    * non-zero hold (yaw, pitch) projects to the no-wind "commanded" impact at the
@@ -2662,8 +2669,6 @@ class FClassSimulator
     this.pendingShotDiag = null;
 
     diag.distance = this.distance;
-    diag.screenshot = this.lastShotScreenshot || null;
-    this.lastShotScreenshot = null;
 
     // Commanded point of aim (incl. dial) at the target plane, in yards from
     // center. Small-angle projection of the hold onto the target distance.
@@ -2886,38 +2891,8 @@ class FClassSimulator
     this.scorecard.update(model);
     if (this.remoteHost)
     {
-      this.remoteHost.pushScorecard(
-        FClassSimulator.stripScreenshots(model),
-        this.scorecard.matchParams,
-        this.scorecard.targetSpec
-      );
+      this.remoteHost.pushScorecard(model, this.scorecard.matchParams, this.scorecard.targetSpec);
     }
-  }
-
-  /**
-   * Return a copy of a scorecard model with per-shot screenshots removed. The
-   * sight-picture JPEGs are large and would bloat the WebRTC data channel; the
-   * rest of the diagnostics (aim, dial, trajectory, wind) ride along.
-   */
-  static stripScreenshots(model)
-  {
-    const scrub = shot =>
-    {
-      if (shot && shot.diag && shot.diag.screenshot)
-      {
-        return { ...shot, diag: { ...shot.diag, screenshot: null } };
-      }
-      return shot;
-    };
-    return {
-      ...model,
-      sections: model.sections.map(section => ({
-        ...section,
-        sighters: section.sighters.map(scrub),
-        records: section.records.map(scrub),
-        suddenDeath: section.suddenDeath ? section.suddenDeath.map(scrub) : section.suddenDeath
-      }))
-    };
   }
 
   /**
@@ -2948,7 +2923,7 @@ class FClassSimulator
     if (audioTrack) stream.addTrack(audioTrack);
     if (stream.getTracks().length) host.setMediaStream(stream);
 
-    host.pushScorecard(FClassSimulator.stripScreenshots(this.driver.getScorecardModel()), this.scorecard.matchParams, this.scorecard.targetSpec);
+    host.pushScorecard(this.driver.getScorecardModel(), this.scorecard.matchParams, this.scorecard.targetSpec);
     host.pushPaused(this.isPaused);
     host.pushWindHud(!!this.windFieldHUDVisible);
     this.pushControlsNow();
@@ -2957,7 +2932,7 @@ class FClassSimulator
   /** Push the current scorecard to the viewer (e.g. right after it connects). */
   pushScorecardNow()
   {
-    if (this.remoteHost) this.remoteHost.pushScorecard(FClassSimulator.stripScreenshots(this.driver.getScorecardModel()), this.scorecard.matchParams, this.scorecard.targetSpec);
+    if (this.remoteHost) this.remoteHost.pushScorecard(this.driver.getScorecardModel(), this.scorecard.matchParams, this.scorecard.targetSpec);
   }
 
   /** Push the current controls model + active player to the viewer. */

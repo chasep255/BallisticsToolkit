@@ -391,12 +391,6 @@ export class Scorecard
 
     html += this.renderShotStats(diag);
 
-    if (diag.screenshot)
-    {
-      html += `<div class="shot-detail-panel-title">Sight Picture</div>`;
-      html += `<div class="shot-detail-shot"><img src="${diag.screenshot}" alt="Sight picture at shot" /></div>`;
-    }
-
     html += `</div>`;
 
     this.detailOverlay.innerHTML = html;
