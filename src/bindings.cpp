@@ -11,6 +11,7 @@
 #include "match/targets.h"
 #include "math/conversions.h"
 #include "math/quaternion.h"
+#include "math/simplex_noise.h"
 #include "math/vector.h"
 #include "physics/atmosphere.h"
 #include "physics/wind_generator.h"
@@ -312,6 +313,14 @@ EMSCRIPTEN_BINDINGS(ballistics_toolkit)
     .class_function("getPreset", &WindPresets::getPreset)
     .class_function("listPresets", &WindPresets::listPresets)
     .class_function("hasPreset", &WindPresets::hasPreset);
+
+  // Simplex noise: the smooth gradient noise that underlies the wind field and
+  // mirage. Exposed so explainer pages can render the actual engine noise.
+  class_<btk::math::SimplexNoise>("SimplexNoise")
+    .constructor<>()
+    .function("noise2D", &btk::math::SimplexNoise::noise2D)
+    .function("noise3D", &btk::math::SimplexNoise::noise3D)
+    .function("noise4D", &btk::math::SimplexNoise::noise4D);
 
   // Steel Target - Chain Anchor
   value_object<btk::rendering::SteelTarget::ChainAnchor>("ChainAnchor")

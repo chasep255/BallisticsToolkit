@@ -311,7 +311,7 @@
                     <circle cx="515" cy="67" r="4.5" fill="#16a085"/>
                     <text x="452" y="62" class="dgm-label" fill="#16a085">RK2 step</text>
                 </svg>
-                <figcaption>RK2 takes a half-step along the start slope to a midpoint (on the naive line), samples the steeper slope there, and uses it for the whole step, parallel to the tick, landing closer to the true path than the start-tangent step.</figcaption>
+                <figcaption>RK2 takes a half-step along the start slope to a midpoint (on the naive line), samples the steeper slope there, and applies that slope across the whole step (the green RK2 line is drawn parallel to the purple midpoint slope), landing closer to the true path than the start-tangent step.</figcaption>
             </figure>
 
             <p>The simulation marches until the bullet passes the requested distance (or a time cap); values at exact distances are interpolated between the two stored points that bracket them.</p>
@@ -399,42 +399,34 @@
         <!-- ================================================================ -->
         <div class="content-section" id="simplex">
             <h2>Smooth noise: the building block</h2>
-            <p>Two simulator features, the wind field and mirage, are built from the same source of smooth randomness: <strong>simplex noise</strong> (Ken Perlin's gradient noise). Unlike a table of independent random numbers it is continuous: nearby points return nearby values, with no grid and no sudden jumps, and it is cheap to evaluate and to differentiate. The toolkit always uses one axis as <em>time</em> so the pattern animates: the wind field samples it in 3D (two spatial axes plus time), mirage in 3D and 4D. On its own it is just smooth hills and valleys; the swirling appears later, when the wind takes its curl.</p>
+            <p>Two simulator features, the wind field and mirage, are built from the same source of smooth randomness: <strong>simplex noise</strong> (Ken Perlin's gradient noise). Unlike a table of independent random numbers it is continuous: nearby points return nearby values, with no grid and no sudden jumps, and it is cheap to evaluate and to differentiate.</p>
+            <p>It works by pinning a random direction (a <em>gradient</em>) at each point of a coarse lattice and smoothly blending their pull: the value climbs toward some neighbors and dips toward others, giving the rolling hills and valleys below. It also varies on a single scale, changing gradually from place to place with no fine jitter, which is what lets it read as a coherent gust pattern rather than random static. One smooth number comes out at every point, and the wind field calls that number the <strong>potential</strong> \(\psi\).</p>
+            <div class="deep">
+                <strong>Under the hood:</strong> the &ldquo;simplex&rdquo; part is an efficiency trick. Plain Perlin noise interpolates the corners of a square (in 3D, a cube) grid cell, which costs \(2^n\) corners per sample and leaves faint axis-aligned streaks. Simplex noise instead tiles space with <em>simplexes</em> (triangles in 2D, tetrahedra in 3D, and a 5-vertex pentatope in 4D), so each sample blends only \(n+1\) corners and favors no direction. Each corner adds its gradient dotted with the offset to the sample point, weighted by a kernel that falls to zero at the cell edge. That cheap scaling matters because the toolkit evaluates noise in <strong>3D and 4D</strong> (two spatial axes plus time for the wind, and a fourth axis for mirage), so the pattern also animates.
+            </div>
+
+            <figure class="diagram">
+                <div class="chart-wrap">
+                    <canvas id="simplexSurface" style="height:400px" role="img" aria-label="An animated 3D surface of the engine's simplex noise: smooth rolling hills and valleys, shaded by height, slowly evolving as the noise's time axis advances"></canvas>
+                </div>
+                <figcaption>The engine's simplex noise as a height field; this surface <em>is</em> the potential \(\psi\). Two coordinates in, one smooth value out: rolling hills and valleys, no grid or jumps. Here the third noise axis is time, so it drifts slowly. Take its curl and it becomes the wind field below.</figcaption>
+            </figure>
         </div>
 
         <!-- ================================================================ -->
         <div class="content-section" id="windgen">
             <h2>The wind field (curl noise)</h2>
             <p>The simulators do not blow one constant wind down the range; they generate a wind field that swirls, varies along the range, and evolves over time, so reading it (via mirage and flags) is a genuine skill. You can explore it in the <a href="wind-gen/wind-gen.html">Wind Generator</a> tool.</p>
-            <p>Real air is nearly <strong>incompressible</strong>: it does not pile up or vanish anywhere. A field of plain random vectors breaks that. The trick is to take a smooth scalar potential \(\psi\) (from simplex noise) and use its <em>curl</em> as the wind, which is mathematically divergence-free in this 2D model:</p>
+            <p>Air itself compresses readily, but at the low speeds of wind, far below the speed of sound, the <em>flow</em> behaves as nearly <strong>incompressible</strong>: it does not measurably pile up or thin out as it moves, so as much air flows out of any region as into it. A field of plain random vectors breaks that. The trick is to take that smooth potential \(\psi\) (the simplex-noise height from the previous section) and use its <em>curl</em> as the wind: the curl rotates the slope of \(\psi\) by a quarter turn, so the wind runs <em>along</em> the hills&rsquo; contour lines instead of up or down them. The divergence of a curl is identically zero, so a field built this way can never make air accumulate or disappear: it is <strong>divergence-free by construction</strong> (in this 2D model):</p>
             \[ \mathbf{w} = \left(\frac{\partial\psi}{\partial y},\,-\frac{\partial\psi}{\partial x}\right), \qquad \nabla\cdot\mathbf{w} = 0 \]
             <p>A helpful picture: read \(\psi\) like a topographic or weather map. The wind runs <em>along</em> the contour lines, circling the highs and lows, and is fastest where the lines bunch, the way wind tracks the isobars on a weather chart.</p>
 
             <figure class="diagram">
-                <svg viewBox="0 0 560 250" role="img" aria-label="A topographic-style potential field whose curl is wind that flows along the contour lines">
-                    <g fill="none" stroke="#d8e0e8" stroke-width="1.4">
-                        <circle cx="165" cy="125" r="22"/><circle cx="165" cy="125" r="44"/><circle cx="165" cy="125" r="66"/><circle cx="165" cy="125" r="88"/>
-                        <circle cx="400" cy="125" r="20"/><circle cx="400" cy="125" r="40"/><circle cx="400" cy="125" r="60"/><circle cx="400" cy="125" r="80"/>
-                    </g>
-                    <text x="151" y="129" class="dgm-label-sm">+&#968;</text>
-                    <text x="386" y="129" class="dgm-label-sm">&minus;&#968;</text>
-                    <text x="120" y="32" class="dgm-label-sm">ridge (high)</text>
-                    <text x="362" y="32" class="dgm-label-sm">basin (low)</text>
-                    <g class="dgm-arrow-wind" marker-end="url(#ah-w)">
-                        <path d="M165,68 a57,57 0 0 1 49,28"/>
-                        <path d="M214,154 a57,57 0 0 1 -49,28"/>
-                        <path d="M108,154 a57,57 0 0 1 0,-58"/>
-                    </g>
-                    <g class="dgm-arrow-wind" marker-end="url(#ah-w)">
-                        <path d="M400,70 a55,55 0 0 0 -47,27"/>
-                        <path d="M353,153 a55,55 0 0 0 47,27"/>
-                        <path d="M447,153 a55,55 0 0 0 0,-56"/>
-                    </g>
-                </svg>
-                <figcaption>The wind blows along the contours of \(\psi\), circling each ridge and basin rather than crossing them, and is fastest where the rings crowd, the look of real eddies.</figcaption>
+                <img src="images/curl-noise-field.svg" alt="A curl-noise wind field built from the engine's simplex noise: streamlines forming closed-loop eddies, colored from blue (slow) to red (fast), the flow circling each eddy and crowding fastest where the loops bunch">
+                <figcaption>The wind as the <em>curl</em> of one layer of the engine's simplex noise (blue = slow, red = fast). Being divergence-free, the flow forms <em>closed loops</em>: it circles each eddy, calm at the cores and fastest where the loops crowd.</figcaption>
             </figure>
 
-            <p>Why not simulate the air for real? True computational fluid dynamics would solve the Navier&ndash;Stokes equations on a fine grid, far too expensive to run live in a browser. It would not buy much realism here anyway: a real solve still needs boundary conditions, the gusty inflow that drives the whole field, and those are effectively random, so the important randomness has to be invented either way. Curl noise gives the same coherent, plausible, divergence-free eddies directly and cheaply. Several layers stack: a broad slow base wind, a medium gusting layer, and fine turbulence. Each is normalized and reshaped, and the whole field <strong>advects</strong> (drifts downwind) so eddies travel down the range.</p>
+            <p>Why not simulate the air for real? True computational fluid dynamics would solve the Navier&ndash;Stokes equations on a fine grid, far too expensive to run live in a browser. It would not buy much realism here anyway: a real solve still needs boundary conditions, the gusty inflow that drives the whole field, and those are effectively random, so the important randomness has to be invented either way. Curl noise gives the same coherent, plausible, divergence-free eddies directly and cheaply. Several layers stack: a broad slow base wind, a medium gusting layer, and fine turbulence. Each is normalized and reshaped, and the whole field <strong>advects</strong>: it drifts bodily along an estimate of its own average wind, so the eddies travel down the range instead of sitting in place.</p>
             <div class="deep">
                 <strong>Under the hood:</strong> the curl is taken by central differences in the noise's scaled coordinates and converted back to world units by the chain rule; each layer's magnitude is normalized against an RMS estimated from ~1000 samples, then reshaped by an exponent and an optional gate. The 2D curl yields only horizontal wind.
             </div>
@@ -754,6 +746,121 @@
             window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => draw(null), 150); });
             applyData();
             draw(null);
+        })();
+    </script>
+
+    <!-- Animated 3D surface of the engine's real simplex noise. Samples the
+         WASM SimplexNoise.noise3D(x, y, t), advancing t slowly as the time axis. -->
+    <script type="module">
+        import { waitForBTK } from './btk.js';
+
+        (async () =>
+        {
+            const canvas = document.getElementById('simplexSurface');
+            if (!canvas) return;
+
+            let btk;
+            try { btk = await waitForBTK(); } catch (e) { return; }
+            if (!btk.SimplexNoise) return;
+            const noise = new btk.SimplexNoise();
+
+            const NX = 88, NY = 34, AR = 2.7, SPAN = 2.4, HZ = 0.46, TIMESCALE = 0.07;
+            const NVX = NX + 1, NVY = NY + 1;
+            const AZ = 26 * Math.PI / 180, EL = 47 * Math.PI / 180;
+            const ca = Math.cos(AZ), sa = Math.sin(AZ), ce = Math.cos(EL), se = Math.sin(EL);
+            const VLO = -0.62, VHI = 0.62;
+            // muted topographic ramp (low to high); kept off pure white to avoid blowout
+            const STOPS = [[0, [78, 100, 124]], [0.35, [104, 140, 146]], [0.55, [140, 164, 130]], [0.78, [186, 180, 148]], [1, [206, 198, 168]]];
+            const ramp = (t) =>
+            {
+                t = Math.max(0, Math.min(1, t));
+                for (let s = 1; s < STOPS.length; s++) if (t <= STOPS[s][0])
+                {
+                    const a = STOPS[s - 1], b = STOPS[s], f = (t - a[0]) / (b[0] - a[0]);
+                    return [a[1][0] + f * (b[1][0] - a[1][0]), a[1][1] + f * (b[1][1] - a[1][1]), a[1][2] + f * (b[1][2] - a[1][2])];
+                }
+                return STOPS[STOPS.length - 1][1];
+            };
+            const Ln = (() => { const v = [-0.45, -0.55, 0.85], n = Math.hypot(v[0], v[1], v[2]); return [v[0] / n, v[1] / n, v[2] / n]; })();
+
+            const wxA = new Float32Array(NVX), wyA = new Float32Array(NVY);  // world x/y per grid index
+            for (let i = 0; i < NVX; i++) wxA[i] = (i / NX) * 2 * AR - AR;
+            for (let j = 0; j < NVY; j++) wyA[j] = (j / NY) * 2 - 1;
+            const hgt = new Float32Array(NVX * NVY);
+            const sx = new Float32Array(NVX * NVY), sy = new Float32Array(NVX * NVY), dep = new Float32Array(NVX * NVY);
+            const cells = [];
+            for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) cells.push([i, j, 0]);
+
+            // projected bounding box of the (static) footprint, including height swing
+            let bminx = 1e9, bmaxx = -1e9, bminy = 1e9, bmaxy = -1e9;
+            for (const hh of [-HZ, HZ]) for (let j = 0; j < NVY; j++) for (let i = 0; i < NVX; i++)
+            {
+                const x1 = wxA[i] * ca - wyA[j] * sa, y1 = wxA[i] * sa + wyA[j] * ca;
+                const syp = -(y1 * se + hh * ce);
+                if (x1 < bminx) bminx = x1; if (x1 > bmaxx) bmaxx = x1;
+                if (syp < bminy) bminy = syp; if (syp > bmaxy) bmaxy = syp;
+            }
+            const BW = bmaxx - bminx, BH = bmaxy - bminy, MARGIN = 10, HMAX = 560;
+
+            let scale = 1, ox = 0, oy = 0, cssW = 0, dpr = 1;
+            function fit(W)
+            {
+                // scale to fill the width, then let the canvas grow to suit (capped)
+                const sw = (W - 2 * MARGIN) / BW;
+                const Hcss = Math.max(200, Math.min(HMAX, BH * sw + 2 * MARGIN));
+                scale = Math.min(sw, (Hcss - 2 * MARGIN) / BH);
+                ox = (W - BW * scale) / 2 - bminx * scale;
+                oy = (Hcss - BH * scale) / 2 - bminy * scale;
+                canvas.style.height = Hcss + 'px';
+            }
+
+            const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            function frame(ts)
+            {
+                const t = ts * 0.001 * TIMESCALE;
+                const w = canvas.clientWidth, d = window.devicePixelRatio || 1;
+                if (w !== cssW || d !== dpr) { cssW = w; dpr = d; fit(w); }
+                const h = canvas.clientHeight;
+                if (canvas.width !== Math.round(w * d) || canvas.height !== Math.round(h * d)) { canvas.width = Math.round(w * d); canvas.height = Math.round(h * d); }
+                const ctx = canvas.getContext('2d');
+                ctx.setTransform(d, 0, 0, d, 0, 0);
+                ctx.clearRect(0, 0, w, h);
+
+                for (let j = 0; j < NVY; j++)
+                {
+                    const y = (j / NY) * SPAN;
+                    for (let i = 0; i < NVX; i++)
+                    {
+                        const val = noise.noise3D((i / NX) * SPAN * AR, y, t);
+                        const idx = j * NVX + i; hgt[idx] = val;
+                        const z1 = val * HZ;
+                        const x1 = wxA[i] * ca - wyA[j] * sa, y1 = wxA[i] * sa + wyA[j] * ca;
+                        sx[idx] = x1 * scale + ox; sy[idx] = -(y1 * se + z1 * ce) * scale + oy; dep[idx] = y1 * ce - z1 * se;
+                    }
+                }
+                for (const c of cells) { const i = c[0], j = c[1]; c[2] = dep[j * NVX + i] + dep[j * NVX + i + 1] + dep[(j + 1) * NVX + i] + dep[(j + 1) * NVX + i + 1]; }
+                cells.sort((a, b) => b[2] - a[2]);
+
+                for (const c of cells)
+                {
+                    const i = c[0], j = c[1];
+                    const a = j * NVX + i, b = a + 1, cc = (j + 1) * NVX + i + 1, e = (j + 1) * NVX + i;
+                    const e1z = (hgt[b] - hgt[a]) * HZ, e2z = (hgt[e] - hgt[a]) * HZ;
+                    const dx = wxA[i + 1] - wxA[i], dy = wyA[j + 1] - wyA[j];
+                    let nx = -dy * e1z, ny = -dx * e2z, nz = dx * dy;  // (e1 x e2), e1=(dx,0,e1z) e2=(0,dy,e2z)
+                    const nn = Math.hypot(nx, ny, nz) || 1;
+                    const diff = Math.max(0, (nx * Ln[0] + ny * Ln[1] + nz * Ln[2]) / nn);
+                    const br = 0.62 + 0.42 * diff;
+                    const col = ramp(((hgt[a] + hgt[b] + hgt[cc] + hgt[e]) * 0.25 - VLO) / (VHI - VLO));
+                    const r = Math.min(255, col[0] * br) | 0, g = Math.min(255, col[1] * br) | 0, bl = Math.min(255, col[2] * br) | 0;
+                    ctx.beginPath();
+                    ctx.moveTo(sx[a], sy[a]); ctx.lineTo(sx[b], sy[b]); ctx.lineTo(sx[cc], sy[cc]); ctx.lineTo(sx[e], sy[e]); ctx.closePath();
+                    ctx.fillStyle = ctx.strokeStyle = `rgb(${r},${g},${bl})`; ctx.lineWidth = 0.6; ctx.fill(); ctx.stroke();
+                }
+                if (!reduce) requestAnimationFrame(frame);
+            }
+            requestAnimationFrame(frame);
         })();
     </script>
 </body>
