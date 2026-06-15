@@ -216,7 +216,6 @@
                 <li><a href="#atmosphere">Air density and atmosphere</a></li>
                 <li><a href="#wind">How wind enters the model</a></li>
                 <li><a href="#spin">Spin corrections</a></li>
-                <li><a href="#zeroing">Zeroing the rifle</a></li>
                 <li><a href="#simplex">Smooth noise: the building block</a></li>
                 <li><a href="#windgen">The wind field (curl noise)</a></li>
                 <li><a href="#mirage">Mirage and scope optics</a></li>
@@ -386,14 +385,6 @@
             <p>This assumes the jump is effectively instantaneous, that the muzzle sensitivity still applies downrange, and that successive wind changes add up linearly, all approximations.</p>
 
             <div class="takeaway">Spin drift and crosswind jump are empirical corrections layered onto the point-mass path, not a full simulation of the bullet's orientation.</div>
-        </div>
-
-        <!-- ================================================================ -->
-        <div class="content-section" id="zeroing">
-            <h2>Zeroing the rifle</h2>
-            <p>Before any table or shot, the engine sights in the virtual rifle: it finds the launch angles that put the bullet on the target center at the zero range in calm conditions. It is solved iteratively: fire a trial trajectory, measure the miss \(\varepsilon\) at the target plane, and correct the launch pitch and yaw toward it (with damping):</p>
-            \[ \Delta\text{pitch} = -\arctan\!\frac{\varepsilon_y}{R}, \qquad \Delta\text{yaw} = -\arctan\!\frac{\varepsilon_x}{R} \]
-            <p>A few iterations converge, and everything you then see, drop and drift, is measured relative to that zero.</p>
         </div>
 
         <!-- ================================================================ -->
