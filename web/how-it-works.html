@@ -299,16 +299,6 @@
                 <figcaption>Forces on the bullet in flight. Drag always opposes motion <em>through the air</em>; gravity is constant; the spin effects (not shown) act sideways and vertically. Coordinate system: <strong>x</strong> = crossrange (right +), <strong>y</strong> = vertical (up +), downrange is <strong>&minus;z</strong>.</figcaption>
             </figure>
 
-            <!-- Shared arrowhead markers referenced by the SVG diagrams further down -->
-            <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0">
-                <defs>
-                    <marker id="ah-d" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e74c3c"/></marker>
-                    <marker id="ah-m" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#cbd3da"/></marker>
-                    <marker id="ah-w" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#16a085"/></marker>
-                    <marker id="ah-p" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6f42c1"/></marker>
-                </defs>
-            </svg>
-
             <p>This is a <strong>3-DOF</strong> translational model: position and velocity are integrated, the bullet's orientation is not. The effects that really depend on the spin axis are folded back in as extra accelerations and impulses (see Spin corrections), which is what "modified" point-mass means.</p>
 
             <div class="takeaway">Following the curve step by step is more flexible than any single drop-and-drift formula: drag, wind, atmosphere and spin all enter through the same integration path.</div>
@@ -402,52 +392,37 @@
         <!-- ================================================================ -->
         <div class="content-section" id="spin">
             <h2>Spin corrections</h2>
-            <p>Rifling spins the bullet to keep it pointed forward. A spin-stabilized bullet's center of pressure sits ahead of its center of mass, so without spin it would tumble; the spin holds it nose-forward. That spin also produces two small effects at long range, <strong>spin drift</strong> and <strong>crosswind jump</strong>. Both are real gyroscopic effects, but here they are modeled with formulas from Bryan Litz (Applied Ballistics): <strong>fitted approximations</strong>, physics-motivated curves with empirically fitted constants, rather than derived from first principles or integrated as full orientation dynamics. They are adapted here to run inside the step-by-step integrator.</p>
-            <p>A useful way to think about it: a spinning bullet behaves like a gyroscope, so a force on it shows up as motion about a perpendicular axis, the way a spinning top leans and circles instead of falling. That 90&deg; response is where both effects come from.</p>
+            <p>Rifling spins the bullet so it stays pointed forward. Its center of pressure sits ahead of its center of mass, so left to itself the bullet would tumble; the spin is what holds it nose-first.</p>
+            <p>A spinning bullet also behaves like a gyroscope. Its spin is captured by the <strong>angular-momentum vector</strong> \(\mathbf{L}\), which lies along the bullet's axis: by the right-hand rule, curl your right fingers the way the bullet is turning and your thumb points along \(\mathbf{L}\). A right-hand twist therefore points \(\mathbf{L}\) forward, downrange; a left-hand twist points it back toward the shooter. The gyroscopic part is that a sideways force on a spinning body is answered a quarter-turn away (a spinning top leans and circles instead of toppling over), and that 90&deg; response is the source of two small deflections that grow with range, <strong>spin drift</strong> and <strong>crosswind jump</strong>.</p>
+            <p>Both are genuine gyroscopic effects, but the engine does not track the bullet's orientation to find them. Instead it uses <strong>empirical formulas</strong> from Bryan Litz (Applied Ballistics), physics-motivated curves with constants fitted to measured data, adapted to run inside the step-by-step integration.</p>
 
             <h3>Gyroscopic stability (Miller)</h3>
             <p>A stability factor \(S_g\) measures the spin margin, starting from the Miller twist rule and corrected to the actual velocity and air conditions:</p>
             \[ S_{g,0} = \frac{30\,m}{t^{2}\,d^{3}\,l\,(1+l^{2})}, \qquad S_g = S_{g,0}\left(\frac{V}{2800}\right)^{1/3}\frac{T_R}{519}\cdot\frac{29.92}{P_{\text{inHg}}} \]
-            <p>with \(m\) in grains, \(d\) in inches, \(l = L/d\) the length in calibers, \(t\) the twist in calibers per turn, \(V\) in fps, \(T_R\) in &deg;Rankine and \(P_{\text{inHg}}\) in inches of mercury. As a rule of thumb \(S_g > 1.4\) is stable. The Miller rule assumes a roughly uniform bullet density, so it is approximate and can under-estimate <strong>plastic-tipped</strong> bullets; a tip-corrected form fits those better.</p>
+            <p>with \(m\) in grains, \(d\) in inches, \(l = L/d\) the length in calibers, \(t\) the twist in calibers per turn, \(V\) in fps, \(T_R\) in &deg;Rankine and \(P_{\text{inHg}}\) in inches of mercury. As a rule of thumb \(S_g > 1.5\) is stable. The Miller rule assumes a roughly uniform bullet density, so it is approximate and can under-estimate <strong>plastic-tipped</strong> bullets; a tip-corrected form fits those better.</p>
 
             <h3>Spin drift</h3>
-            <p>Litz fits the net sideways displacement as a function of time of flight (for a right-hand twist the bullet drifts right, roughly 0.8&ndash;0.9&nbsp;MOA at 1000&nbsp;yd for a typical match load):</p>
+            <p>As the bullet flies, gravity steadily bends its path downward. The spin makes the bullet's axis gyroscopically stiff, so the nose cannot quite follow that curve: it lags, and rides slightly <em>above</em> the path. The oncoming air then meets the nose at a small angle, and the same quarter-turn response leans that to one side: the nose takes up a small sideways lean, its <strong>yaw of repose</strong>. Because the nose points a little to the side throughout the flight, the bullet is continually nudged that way, and the drift accumulates with range, to the right for a right-hand twist.</p>
+            <p>Litz gives an empirical fit for that sideways displacement as a function of time of flight:</p>
             \[ \text{SD}(t) = 1.25\,(S_g + 1.2)\;t^{1.83}\quad[\text{inches}] \]
             <p>A point-mass integrator cannot simply add a displacement on top of its path, so the engine differentiates the law twice and injects it as a sideways acceleration, letting the same RK2 step reproduce the curve:</p>
             \[ a_{\text{spin}}(t) = \frac{d^{2}\text{SD}}{dt^{2}} = 1.83\cdot 0.83\,C\,t^{-0.17}, \qquad C = 1.25\,(S_g + 1.2) \]
 
             <h3>Crosswind aerodynamic jump</h3>
-            <p>A purely <em>horizontal</em> crosswind produces a small <em>vertical</em> shift of impact. It is the same gyroscopic 90&deg; response, triggered as the bullet first meets the wind. Litz gives the size as a sensitivity (roughly 0.3&ndash;0.5&nbsp;MOA per 10&nbsp;mph at 1000&nbsp;yd). For a right-hand twist, wind from the right throws the strike high and wind from the left low:</p>
+            <p>A horizontal crosswind shifts the shot <em>vertically</em>, the <strong>crosswind jump</strong>, through the same gyroscopic response. The wind pushes on the bullet's <strong>center of pressure</strong>, which sits ahead of its <strong>center of mass</strong>, and that yaws the nose to the side. But a gyroscope answers a sideways push a quarter-turn away, so most of that yaw is turned into the vertical: the shot lands high or low even though the wind is purely horizontal. This is not the same as wind drift. Drift builds up over the whole flight, while the jump is a single angular kick, delivered as the bullet first meets the wind (at the muzzle for a steady crosswind). Apply a crosswind in the demo below to see it.</p>
+            <p>Litz gives the size as a sensitivity (roughly 0.3&ndash;0.5&nbsp;MOA per 10&nbsp;mph at 1000&nbsp;yd). For a right-hand twist, wind from the right makes the shot land high and wind from the left low; a left-hand twist reverses it:</p>
             \[ \text{sens} = 0.01\,S_g - 0.0024\,\frac{L}{d} + 0.032 \quad[\text{MOA per mph}] \]
-
-            <figure class="diagram">
-                <svg viewBox="0 0 560 250" role="img" aria-label="A spinning bullet seen from behind: a crosswind's sideways twist is turned 90 degrees by the spin into a vertical jump">
-                    <text x="22" y="24" class="dgm-label-sm">looking downrange</text>
-                    <circle cx="285" cy="152" r="12" fill="#eef1f4" stroke="#b8c2cc"/>
-                    <circle cx="285" cy="152" r="2.5" fill="#2c3e50"/>
-                    <path d="M285,120 A32,32 0 1 1 259,172" fill="none" stroke="#95a5a6" stroke-width="1.8" marker-end="url(#ah-m)"/>
-                    <text x="285" y="218" class="dgm-label-sm" text-anchor="middle">right-hand spin (clockwise here)</text>
-                    <line x1="470" y1="152" x2="326" y2="152" class="dgm-arrow-wind" marker-end="url(#ah-w)"/>
-                    <text x="392" y="140" class="dgm-label" fill="#16a085">crosswind</text>
-                    <text x="392" y="176" class="dgm-label-sm" fill="#16a085">twists the nose sideways</text>
-                    <path d="M325,152 A40,40 0 0 1 285,112" fill="none" stroke="#6f42c1" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#ah-p)"/>
-                    <text x="318" y="120" class="dgm-label-sm" fill="#6f42c1">spin turns it 90&deg;</text>
-                    <line x1="285" y1="120" x2="285" y2="50" class="dgm-arrow-drag" marker-end="url(#ah-d)"/>
-                    <text x="285" y="38" class="dgm-label" fill="#e74c3c" text-anchor="middle">impact jumps HIGH</text>
-                </svg>
-                <figcaption>A horizontal crosswind makes the spinning bullet try to twist its nose sideways; the gyroscope answers a quarter-turn away, so the push comes out as a vertical kick (right twist: wind from the right strikes high, from the left low).</figcaption>
-            </figure>
 
             <div class="caveat">
                 <strong>Important caveat:</strong> Litz's published formula describes the jump at the <em>muzzle</em> for a single constant crosswind. The engine generalizes it to wind <em>changes</em> met downrange, which is an <strong>engineering extension, not experimentally validated here</strong>. It is built so a constant wind reduces to the published muzzle jump; treat the downrange behavior as plausible and approximate, not established ballistics.
             </div>
 
-            <p>With that understood: each step, the engine compares the crosswind the bullet sees to the previous step and fires an impulse proportional to the <em>change</em> \(\Delta w_\perp\), so a constant wind fires its whole jump at the muzzle while a gust met downrange fires there. That change sets a small jump angle \(\Delta\theta = \text{sens}\cdot\Delta w_\perp\) (with \(\text{sens}\) in MOA per mph, converted to radians), applied as a kick to the bullet's vertical velocity, where \(\text{hand}=\pm1\) sets the sign from the twist direction:</p>
+            <p>With that understood: each step, the engine compares the crosswind the bullet sees to the previous step and fires an impulse proportional to the <em>change</em> \(\Delta w_\perp\), so a constant wind fires its whole jump at the muzzle while a gust met downrange fires there. That change sets a small jump angle \(\Delta\theta = \text{sens}\cdot\Delta w_\perp\), applied as a kick to the bullet's vertical velocity, where \(\text{hand}=\pm1\) sets the sign from the twist direction:</p>
             \[ \Delta v_y = -\,V\,\Delta\theta\cdot \text{hand} \]
             <p>This assumes the jump is effectively instantaneous, that the muzzle sensitivity still applies downrange, and that successive wind changes add up linearly, all approximations.</p>
 
             <h3>See it for yourself</h3>
-            <p>The bullet below spins about its long axis, the angular-momentum vector <strong>L</strong>, slowed right down so you can read the rifling turning. Switch between the two spin effects: in <strong>Crosswind jump</strong>, a crosswind pushes on the centre of pressure (ahead of the centre of mass), so the lever yaws the nose sideways and the spin redirects that push a quarter-turn into a vertical jump. In <strong>Spin drift</strong>, gravity bends the path, the spinning nose lags above it, and the spin leans that into a steady sideways drift. Flip the twist and the directions (and the rifling) reverse. Drag to orbit the view.</p>
+            <p>The bullet below spins about its long axis, the angular-momentum vector <strong>L</strong>, slowed right down so you can read the rifling turning. Use the <strong>Effect</strong> buttons to switch between the <strong>crosswind jump</strong> just described and <strong>spin drift</strong>, its gravity-driven cousin: gravity bends the path, the spinning nose lags above it, and the same quarter-turn response leans that into a steady sideways drift. Flip the twist to reverse the directions (and the rifling), and drag to orbit the view.</p>
             <figure class="diagram" id="spinDemo">
                 <div class="spin-controls">
                     <div class="spin-ctl-group">
