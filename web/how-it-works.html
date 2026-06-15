@@ -30,6 +30,16 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
+    <!-- Three.js for the interactive spin-effects demo (same version as the sims) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+            }
+        }
+    </script>
+
     <style>
         /* Page-specific styling for the explainer. Scoped to this page. */
         .hiw-toc {
@@ -151,6 +161,58 @@
             font-size: 0.9em;
             margin-top: 8px;
             padding: 0 10px;
+        }
+
+        /* Interactive spin-effects demo (Three.js). */
+        .spin-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 22px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 12px;
+            font: 13px 'Segoe UI', sans-serif;
+            color: #2c3e50;
+        }
+        .spin-ctl-group { display: flex; align-items: center; gap: 6px; }
+        .spin-ctl-label { font-weight: 600; color: #5a6b7b; margin-right: 2px; }
+        .spin-btn {
+            padding: 4px 10px;
+            border: 1px solid #cbd3da;
+            border-radius: 6px;
+            background: #fff;
+            color: #2c3e50;
+            cursor: pointer;
+            font: inherit;
+        }
+        .spin-btn:hover { background: #f1f5f9; }
+        .spin-btn.is-on { background: #007bff; border-color: #007bff; color: #fff; }
+        .spin-btn:disabled { opacity: 0.4; cursor: default; }
+        .spin-btn:disabled:hover { background: #fff; }
+        .spin-btn.is-on:disabled:hover { background: #007bff; }
+        .spin-controls label { display: inline-flex; align-items: center; gap: 4px; }
+        .spin-controls input[type="range"] { width: 92px; vertical-align: middle; }
+        .spin-controls input[type="checkbox"] { margin: 0 4px; vertical-align: middle; }
+        #spinCanvas {
+            display: block;
+            width: 100%;
+            height: 440px;
+            background: #fff;
+            border: 1px solid #e5e8ec;
+            border-radius: 8px;
+            cursor: grab;
+            touch-action: none;
+        }
+        #spinCanvas:active { cursor: grabbing; }
+        .spin-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .spin-lab {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            font: 600 12px 'Segoe UI', sans-serif;
+            white-space: nowrap;
+            padding: 1px 6px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.82);
         }
 
         table.params { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.95em; }
@@ -383,6 +445,37 @@
             <p>With that understood: each step, the engine compares the crosswind the bullet sees to the previous step and fires an impulse proportional to the <em>change</em> \(\Delta w_\perp\), so a constant wind fires its whole jump at the muzzle while a gust met downrange fires there. That change sets a small jump angle \(\Delta\theta = \text{sens}\cdot\Delta w_\perp\) (with \(\text{sens}\) in MOA per mph, converted to radians), applied as a kick to the bullet's vertical velocity, where \(\text{hand}=\pm1\) sets the sign from the twist direction:</p>
             \[ \Delta v_y = -\,V\,\Delta\theta\cdot \text{hand} \]
             <p>This assumes the jump is effectively instantaneous, that the muzzle sensitivity still applies downrange, and that successive wind changes add up linearly, all approximations.</p>
+
+            <h3>See it for yourself</h3>
+            <p>The bullet below spins about its long axis, the angular-momentum vector <strong>L</strong>, slowed right down so you can read the rifling turning. Switch between the two spin effects: in <strong>Crosswind jump</strong>, a crosswind pushes on the centre of pressure (ahead of the centre of mass), so the lever yaws the nose sideways and the spin redirects that push a quarter-turn into a vertical jump. In <strong>Spin drift</strong>, gravity bends the path, the spinning nose lags above it, and the spin leans that into a steady sideways drift. Flip the twist and the directions (and the rifling) reverse. Drag to orbit the view.</p>
+            <figure class="diagram" id="spinDemo">
+                <div class="spin-controls">
+                    <div class="spin-ctl-group">
+                        <span class="spin-ctl-label">Effect</span>
+                        <button type="button" class="spin-btn is-on" data-mode="jump">Crosswind jump</button>
+                        <button type="button" class="spin-btn" data-mode="drift">Spin drift</button>
+                    </div>
+                    <div class="spin-ctl-group">
+                        <span class="spin-ctl-label">Twist</span>
+                        <button type="button" class="spin-btn is-on" data-twist="R">Right-hand</button>
+                        <button type="button" class="spin-btn" data-twist="L">Left-hand</button>
+                    </div>
+                    <div class="spin-ctl-group">
+                        <span class="spin-ctl-label">Crosswind</span>
+                        <button type="button" class="spin-btn" data-wind="L">From left</button>
+                        <button type="button" class="spin-btn" data-wind="0">Off</button>
+                        <button type="button" class="spin-btn is-on" data-wind="R">From right</button>
+                    </div>
+                    <div class="spin-ctl-group">
+                        <label><input type="checkbox" id="spinVectors" checked>Axes &amp; vectors</label>
+                    </div>
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="spinCanvas" role="img" aria-label="A slowly spinning rifled bullet showing two spin effects: a crosswind yawing the nose and the spin redirecting it into a vertical jump, and gravity-driven yaw of repose producing sideways spin drift"></canvas>
+                    <div id="spinLabels" class="spin-labels"></div>
+                </div>
+                <figcaption id="spinCaption">Right-hand twist. The bullet spins about its long axis (the angular-momentum vector L). Choose an effect and drag to orbit.</figcaption>
+            </figure>
 
             <div class="takeaway">Spin drift and crosswind jump are empirical corrections layered onto the point-mass path, not a full simulation of the bullet's orientation.</div>
         </div>
@@ -854,5 +947,8 @@
             requestAnimationFrame(frame);
         })();
     </script>
+
+    <!-- Interactive spin-effects demo (Three.js): crosswind jump + spin drift. -->
+    <script type="module" src="how-it-works-spin.js"></script>
 </body>
 </html>
