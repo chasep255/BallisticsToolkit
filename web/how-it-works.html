@@ -559,10 +559,52 @@
         <!-- ================================================================ -->
         <div class="content-section" id="steel">
             <h2>Reactive steel targets</h2>
-            <p>On the steel range a confirmed hit doesn't just register: the plate <em>reacts</em> as a small rigid body, so it swings, twists and rings the way real steel does. Its mass comes from geometry (area &times; thickness &times; the density of steel, 7850&nbsp;kg/m&sup3;) and its moment of inertia from the thin-plate formula, so a tall plate and a wide plate of the same weight turn differently.</p>
-            <p>The hit applies the bullet's momentum, scaled by how square it is (\(\cos^2\) of the impact angle, with a 0.1 floor so a grazing hit still moves the plate), as an impulse at the contact point. Because that point is usually off the center of mass, it splits into a push and a twist, so a center hit swings the plate and an edge hit spins it:</p>
+            <p>On the steel range a confirmed hit doesn't just register: the plate <em>reacts</em> as a small rigid body, swinging, twisting and settling the way real steel does. It carries a full 3D state, a position and a quaternion orientation (a compact, four-number way to record which way it faces) plus linear and angular velocity, stepped under gravity, the bullet's blow, and the pull of its chains.</p>
+
+            <h3>Mass and inertia from the plate's shape</h3>
+            <p>A plate's mass is just its geometry: face area times thickness times the density of steel (7850&nbsp;kg/m&sup3;), with a 2&nbsp;kg floor so a very small plate can't go numerically unstable. How it <em>turns</em> depends on its <strong>moment of inertia</strong>, how stubbornly it resists being spun about each of its three axes. For a thin plate these are</p>
+            \[ I_x = \tfrac{1}{12}\,m\,h^2, \qquad I_y = \tfrac{1}{12}\,m\,w^2, \qquad I_z = \tfrac{1}{12}\,m\,(w^2 + h^2) \]
+            <p>for a rectangle of width \(w\) and height \(h\) (an oval uses the ellipse version, \(\tfrac14 m b^2\) and so on). The two in-plane axes differ, so a tall plate and a wide plate of the same weight resist turning differently, which is why they swing and spin with distinct character. These are just three numbers, one for each axis, tracked in the plate's own frame so they stay simple even as it tumbles.</p>
+
+            <h3>The hit: one impulse, two effects</h3>
+            <figure class="diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 300" role="img" aria-label="A hanging steel plate, seen edge-on, struck by a bullet above its center of mass. The impulse at the contact point splits into a linear swing of the whole plate and a rotation about its center of mass, with the lever arm setting how much of each.">
+                    <rect width="560" height="300" fill="#ffffff"/>
+                    <rect x="160" y="30" width="140" height="7" rx="2" fill="#9aa4ad"/>
+                    <circle cx="230" cy="37" r="4" fill="#5a6b7b"/>
+                    <line x1="230" y1="37" x2="234" y2="118" stroke="#8a8a8a" stroke-width="3" stroke-dasharray="2 3"/>
+                    <line x1="156" y1="82" x2="231" y2="82" stroke="#ccc" stroke-width="1"/>
+                    <text x="150" y="86" text-anchor="end" font-family="'Segoe UI',sans-serif" font-size="13" fill="#2c3e50">chain (pulls only)</text>
+                    <rect x="226" y="118" width="16" height="152" fill="#dfe4e8" stroke="#5a6b7b" stroke-width="1.5"/>
+                    <text x="234" y="288" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="12" fill="#7a8691">plate, edge-on</text>
+                    <path d="M262,140 Q234,98 202,126" fill="none" stroke="#2e8b57" stroke-width="2.4"/>
+                    <polygon points="202,126 207,115 213,122" fill="#2e8b57"/>
+                    <text x="262" y="114" font-family="'Segoe UI',sans-serif" font-size="13" fill="#2e8b57">d&#969;/dt = I&#8315;&#185;(r &#215; J)  (twist)</text>
+                    <text x="300" y="146" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="12" fill="#7a8691">contact point</text>
+                    <line x1="366" y1="158" x2="258" y2="158" stroke="#c0392b" stroke-width="3"/>
+                    <polygon points="247,158 259,152 259,164" fill="#c0392b"/>
+                    <text x="372" y="154" font-family="'Segoe UI',sans-serif" font-size="13" fill="#c0392b">impulse J</text>
+                    <text x="372" y="170" font-family="'Segoe UI',sans-serif" font-size="12" fill="#a04a40">= p &#215; cos&#178;&#952;</text>
+                    <circle cx="242" cy="158" r="3.5" fill="#c0392b"/>
+                    <line x1="234" y1="196" x2="242" y2="158" stroke="#888" stroke-width="1.4" stroke-dasharray="3 3"/>
+                    <text x="250" y="182" font-family="'Segoe UI',sans-serif" font-size="14" font-style="italic" fill="#555">r</text>
+                    <circle cx="234" cy="196" r="4" fill="#2c3e50"/>
+                    <line x1="234" y1="196" x2="138" y2="196" stroke="#2c6fb3" stroke-width="2.6"/>
+                    <polygon points="127,196 139,190 139,202" fill="#2c6fb3"/>
+                    <text x="234" y="212" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="12" fill="#2c3e50">center of mass</text>
+                    <text x="178" y="230" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="13" fill="#2c6fb3">&#916;v = J / m  (swing)</text>
+                </svg>
+                <figcaption>A plate struck above its center of mass, seen edge-on. The bullet's impulse \(\mathbf{J}\) at the contact point splits into a linear swing of the whole plate (\(\Delta\mathbf{v} = \mathbf{J}/m\)) and a rotation about the center of mass (\(\dot{\boldsymbol\omega} = I^{-1}\,\mathbf{r}\times\mathbf{J}\)); the lever arm \(\mathbf{r}\) sets how much of each.</figcaption>
+            </figure>
+            <p>The bullet delivers its momentum \(\mathbf{p} = m_b\mathbf{v}\), scaled by how squarely it struck, \(\cos^2\theta\) of the angle to the face, with a 0.1 floor so even a grazing hit nudges the plate. That impulse \(\mathbf{J}\) is applied at the contact point, and because the contact is usually off the center of mass it does two things at once, a push and a twist:</p>
             \[ \Delta\mathbf{v} = \frac{\mathbf{J}}{m}, \qquad \boldsymbol\tau = \mathbf{r}\times\mathbf{J}, \qquad \dot{\boldsymbol\omega} = I^{-1}\boldsymbol\tau \]
-            <p>The plate hangs from chains modeled as stiff <em>one-way</em> springs (they pull but never push), and the whole thing is stepped with semi-implicit Euler under gravity, chain tension and damping until it settles. Orientation is carried as a <strong>quaternion</strong> (renormalized each step) so a tumbling plate avoids gimbal lock.</p>
+            <p>The push is shared by the whole plate; the twist depends on the lever arm \(\mathbf{r}\) from the center of mass to the contact, so a center hit mostly swings the plate while an edge hit sets it spinning. Those three inertia numbers only stay simple in the plate's own frame, so the lever arm and impulse are first rotated into that frame, each axis is divided by its inertia number, and the result is rotated back out, rather than tracking how the inertia looks from the outside as the plate tumbles.</p>
+
+            <h3>Hanging on chains</h3>
+            <p>Each plate hangs from one or more chains, modeled as stiff <em>one-way</em> springs: a chain pulls only when it is stretched past its rest length and never pushes, so a slack chain does nothing at all. When stretched it draws the attachment point back toward its fixed anchor with a Hooke force \(F = k\,x\) (a high \(k\) of 10000&nbsp;N/m, near rigid), plus a damping force that acts only while the chain is lengthening, set so the chain bleeds off energy and stops rather than bouncing. The force is applied at the attachment point, not the center of mass, so the chains both hold the plate up and torque it as it swings.</p>
+
+            <h3>Stepping it forward</h3>
+            <p>Each frame is integrated in substeps of at most 1&nbsp;ms for stability. A substep adds gravity and the chain forces, applies velocity damping (an exponential decay, about half the speed bled off per second), and advances with semi-implicit Euler, velocity first, then position. Orientation is the interesting part: the angular velocity becomes a small rotation, axis \(\boldsymbol\omega/|\boldsymbol\omega|\) through angle \(|\boldsymbol\omega|\,\Delta t\), built as a quaternion \(\Delta q\) and composed onto the orientation, \(q \leftarrow \Delta q\,q\), which is renormalized every step. Carrying orientation as a quaternion avoids gimbal lock (the orientation glitch simpler angle schemes hit when a plate tips straight over) and stays easy to keep valid; the surface normal is read back out of \(q\) afterward. The plate is declared at rest only once it stays under 0.2&nbsp;m/s and 0.2&nbsp;rad/s for a full second, so the instant of zero speed at the top of a swing doesn't fool it into settling early.</p>
 
             <h3>Recording the hits in a texture</h3>
             <p>Each plate keeps its own <strong>paint texture</strong>, a small RGBA image of its face (front and back stored in the two halves of one image), filled with the paint color to start. When a round lands, the engine maps the impact point onto the plate's local surface coordinates, converts that to a pixel in the texture, and draws a splatter there in C++: a patch of bare metal showing through the paint (blended soft at the edge) ringed with a few ragged spikes. The marks are written straight into the image and they <em>accumulate</em>, so the face builds up a record of every hit, the same paint-and-spatter you read on real steel.</p>
