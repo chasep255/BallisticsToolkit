@@ -103,6 +103,23 @@
         }
         .caveat strong:first-child { color: #b06a16; }
 
+        /* Numbered procedural steps, not .tech-list (that flex-wraps into columns). */
+        ol.hiw-steps {
+            margin: 14px 0 18px;
+            padding-left: 1.5em;
+            list-style: decimal;
+        }
+        ol.hiw-steps > li {
+            margin: 0 0 12px;
+            padding-left: 0.4em;
+            line-height: 1.55;
+        }
+        ol.hiw-steps > li::marker {
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        ol.hiw-steps > li:last-child { margin-bottom: 0; }
+
         figure.diagram { margin: 22px 0; text-align: center; }
         figure.diagram svg, figure.diagram img {
             max-width: 100%;
@@ -468,46 +485,80 @@
                 <div class="chart-wrap">
                     <canvas id="simplexSurface" style="height:400px" role="img" aria-label="An animated 3D surface of the engine's simplex noise: smooth rolling hills and valleys, shaded by height, slowly evolving as the noise's time axis advances"></canvas>
                 </div>
-                <figcaption>The engine's simplex noise as a height field; this surface <em>is</em> the potential \(\psi\). Two coordinates in, one smooth value out: rolling hills and valleys, no grid or jumps. Here the third noise axis is time, so it drifts slowly. Take its curl and it becomes the wind field below.</figcaption>
+                <figcaption>The engine's simplex noise as a height field; this surface <em>is</em> the potential \(\psi\). Two coordinates in, one smooth value out: rolling hills and valleys, no grid or jumps. Here the third noise axis is time, so it drifts slowly. The curl of \(\psi\) is the starting point for the wind field; post-processing then reshapes it into the speeds and gusts the simulators use.</figcaption>
             </figure>
         </div>
 
         <!-- ================================================================ -->
         <div class="content-section" id="windgen">
-            <h2>The wind field (curl noise)</h2>
-            <p>The simulators do not blow one constant wind down the range; they generate a wind field that swirls, varies along the range, and evolves over time, so reading it (via mirage and flags) is a genuine skill. You can explore it in the <a href="wind-gen/wind-gen.html">Wind Generator</a> tool.</p>
-            <p>Air itself compresses readily, but at the low speeds of wind, far below the speed of sound, the <em>flow</em> behaves as nearly <strong>incompressible</strong>: it does not measurably pile up or thin out as it moves, so as much air flows out of any region as into it. A field of plain random vectors breaks that. The trick is to take that smooth potential \(\psi\) (the simplex-noise height from the previous section) and use its <em>curl</em> as the wind: the curl rotates the slope of \(\psi\) by a quarter turn, so the wind runs <em>along</em> the hills&rsquo; contour lines instead of up or down them. The divergence of a curl is identically zero, so a field built this way can never make air accumulate or disappear: it is <strong>divergence-free by construction</strong> (in this 2D model):</p>
-            \[ \mathbf{w} = \left(\frac{\partial\psi}{\partial y},\,-\frac{\partial\psi}{\partial x}\right), \qquad \nabla\cdot\mathbf{w} = 0 \]
-            <p>A helpful picture: read \(\psi\) like a topographic or weather map. The wind runs <em>along</em> the contour lines, circling the highs and lows, and is fastest where the lines bunch, the way wind tracks the isobars on a weather chart.</p>
+            <h2>The wind generator</h2>
+            <p>The simulators do not blow one constant wind down the range; they generate a wind field that swirls, varies along the range, and evolves over time. You can explore it in the <a href="wind-gen/wind-gen.html">Wind Generator</a> tool.</p>
+
+            <h3>From \(\psi\) to wind</h3>
+            <p>Simplex noise gives a smooth height \(\psi\) over the range. Horizontal wind is the curl of \(\psi\) in the downrange/crossrange plane:</p>
+            \[ \mathbf{w}_{\text{raw}} = \left(\frac{\partial\psi}{\partial y},\,-\frac{\partial\psi}{\partial x}\right) \]
+            <p>Wind follows the contour lines of \(\psi\), circling its highs and lows rather than running up or down the noise surface. The field is non-diverging: because \(\mathbf{w}_{\text{raw}}\) is a curl, \(\nabla\cdot\mathbf{w}_{\text{raw}} = 0\), so streamlines form closed loops instead of starting or stopping in place. Speed is greatest where \(\psi\) changes fastest.</p>
 
             <figure class="diagram">
                 <img src="images/curl-noise-field.svg" alt="A curl-noise wind field built from the engine's simplex noise: streamlines forming closed-loop eddies, colored from blue (slow) to red (fast), the flow circling each eddy and crowding fastest where the loops bunch">
-                <figcaption>The wind as the <em>curl</em> of one layer of the engine's simplex noise (blue = slow, red = fast). Being divergence-free, the flow forms <em>closed loops</em>: it circles each eddy, calm at the cores and fastest where the loops crowd.</figcaption>
+                <figcaption>The <em>raw</em> curl of one layer of simplex noise (blue = slow, red = fast). At this stage the flow forms closed loops. The field the bullet actually flies through is reshaped by the steps below.</figcaption>
             </figure>
 
-            <p>Why not simulate the air for real? True computational fluid dynamics would solve the Navier&ndash;Stokes equations on a fine grid, far too expensive to run live in a browser. It would not buy much realism here anyway: a real solve still needs boundary conditions, the gusty inflow that drives the whole field, and those are effectively random, so the important randomness has to be invented either way. Curl noise gives the same coherent, plausible, divergence-free eddies directly and cheaply. Several layers stack: a broad slow base wind, a medium gusting layer, and fine turbulence. Each is normalized and reshaped, and the whole field <strong>advects</strong>: it drifts bodily along an estimate of its own average wind, so the eddies travel down the range instead of sitting in place.</p>
-            <div class="deep">
-                <strong>Under the hood:</strong> the curl is taken by central differences in the noise's scaled coordinates and converted back to world units by the chain rule; each layer's magnitude is normalized against an RMS estimated from ~1000 samples, then reshaped by an exponent and an optional gate. The 2D curl yields only horizontal wind.
-            </div>
+            <h3>Post-processing: from curl to the wind you feel</h3>
+            <p>The bullet and mirage sample the post-processed field, not \(\mathbf{w}_{\text{raw}}\). The curl supplies eddy structure and direction; the pipeline below sets how strong each layer blows, how calm or gusty it feels, and how layers add up before they are summed. It reshapes speed along the curl direction only; it never rotates the flow. The steps, in order:</p>
+            <ol class="hiw-steps">
+                <li><strong>Curl.</strong> Sample \(\psi\) with 3D simplex noise (downrange, crossrange, and time) and estimate its slope with small finite differences. Each layer uses its own stretch along downrange and crossrange (a 10,000-yard layer vs a 100-yard layer), so the same noise feature can represent a broad shift or a tight gust; those stretches are undone when converting the curl back to real range coordinates. The result is a horizontal vector only (crossrange and downrange; no vertical wind from this step).</li>
+                <li><strong>Polar split.</strong> Convert the curl vector to magnitude and direction. All later steps rescale the speed along that fixed direction; they never rotate the flow or inject unrelated vectors.</li>
+                <li><strong>RMS normalization.</strong> Divide the magnitude by a constant RMS estimated once at startup from ~1000 random samples of that component. This makes each layer's energy stable before the preset's strength knob is applied.</li>
+                <li><strong>Exponent.</strong> Raise the normalized magnitude to a power \(p\). Values \(p &lt; 1\) even out the layer toward a steadier average; \(p &gt; 1\) would make it mostly calm with occasional surges (presets usually keep \(p \le 1\)).</li>
+                <li><strong>Strength scale.</strong> Multiply by the component strength. This sets the layer's nominal speed.</li>
+                <li><strong>Sigmoid gate (optional).</strong> Some layers pass the magnitude through a logistic gate so the component stays quiet below a threshold and switches on above it, producing distinct gust events rather than always-on turbulence.</li>
+                <li><strong>Clip.</strong> Cap the magnitude at \(2S\) (twice the component strength) so a single sample cannot run away.</li>
+                <li><strong>Sum.</strong> Rebuild a Cartesian vector from the final magnitude and the saved direction, map into BTK coordinates \((x=\) crossrange, \(y=0\), \(z=-\) downrange), and add all components at the query point.</li>
+            </ol>
+            <p>Constant-factor steps (RMS normalization and strength scale) keep the field non-diverging. Nonlinear steps (exponent when \(p \ne 1\), sigmoid gate, and clip) break that on purpose: they trade the non-diverging guarantee for calmer averages, sharper gusts, and hard speed limits. Directions still come from the curl throughout, so the finished field remains visibly eddy-like.</p>
+
+            <h3>Layering, presets, and advection</h3>
+            <p>Several components stack: a broad slow base wind, a medium gusting layer, and fine turbulence, each with its own spatial scales (downrange and crossrange), temporal scale, strength, exponent, and optional gate. Named presets (<em>Zero</em>, <em>Dead</em>, <em>Calm</em>, <em>Moderate</em>, <em>Strong</em>, <em>Extra Strong</em>, <em>Switchy</em>, <em>Turbulent</em>, <em>Gusty</em>, and <em>Shear</em>) are different recipes of those layers. The <em>Moderate</em> preset, for example:</p>
+            <table class="params">
+                <tr><th>Layer</th><th>Strength</th><th>Scale (down × cross)</th><th>Time</th><th>Exponent</th><th>Role</th></tr>
+                <tr><td>Base</td><td>3&nbsp;mph</td><td>10000 × 10000 yd</td><td>10 min</td><td>0.5</td><td>Slow overall condition</td></tr>
+                <tr><td>Gust</td><td>3&nbsp;mph</td><td>1000 × 1000 yd</td><td>1 min</td><td>0.75 (gated)</td><td>Gusts &amp; switches</td></tr>
+                <tr><td>Turbulence</td><td>1&nbsp;mph</td><td>100 × 100 yd</td><td>0.5 min</td><td>1.0</td><td>Fine jitter</td></tr>
+            </table>
+            <p>On top of that, the whole pattern <strong>advects</strong>: it drifts bodily down the range instead of sitting in place. Each frame the generator averages the composite wind at several random points inside the range, smooths that average with an exponential moving average, and integrates it into a global offset that is subtracted from the sampling coordinates when the curl is evaluated. Eddies therefore travel downrange with the prevailing flow rather than merely morphing in place.</p>
+            \[ \mathbf{U} \leftarrow (1-\alpha)\,\mathbf{U} + \alpha\,g\,\langle\mathbf{w}\rangle, \qquad \mathbf{o} \mathrel{+}= \mathbf{U}\,\Delta t \]
+
+            <p>Why not simulate the air for real? True computational fluid dynamics would solve the Navier&ndash;Stokes equations on a fine grid, far too expensive to run live in a browser. It would not buy much realism here anyway: a real solve still needs boundary conditions and gusty inflow that are effectively unknown, so the important randomness has to be invented either way. Curl noise plus the shaping pipeline above gives coherent, plausible, cheap eddies directly.</p>
         </div>
 
         <!-- ================================================================ -->
         <div class="content-section" id="mirage">
             <h2>Mirage and scope optics</h2>
             <p><strong>What mirage is:</strong> on a warm day the ground heats the air just above it, and that warm air rises in shifting cells. Warm and cool air bend light by different amounts, so when you look through a scope at a distant target the image wavers and "boils." In wind the boil leans, or "runs," in the wind's direction and flattens as the wind builds, so reading it is one of the main ways shooters judge the wind downrange.</p>
-            <p><strong>How it is drawn:</strong> the mirage is a screen-space effect. Each pixel of the scope view is nudged up and down by simplex noise tied to the live wind, so it shows the cues a real shooter reads: which way the boil runs, how fast it churns, and how strong it is. It is a visual approximation, not a simulation of light actually bending.</p>
-            <p>Both 3D simulators draw mirage, and in both the boil washes out as the wind builds, gone by about 15&nbsp;mph. They differ in how they sample the wind field, and the Steel Sim adds a separate lens blur on top. The three pieces below cover each in turn.</p>
+            <p><strong>How it is drawn:</strong> both simulators fake this with a <strong>screen-space post-process</strong>, not a ray-traced heat shimmer. The 3D scene is rendered to an off-screen buffer first; a full-screen shader then nudges each pixel (mostly vertically) by simplex noise tied to the live wind field. It is a visual approximation that preserves the cues a shooter reads (run direction, boil rate, strength), not a simulation of light actually bending.</p>
+            <p>In both sims the boil washes out as wind builds and is gone by about 15&nbsp;mph. They differ in how many depth layers they use, how they sample the wind field, and whether a separate lens blur runs as well. The pipelines below are the actual render order.</p>
 
-            <h3>F-Class Sim: layered down the line of sight</h3>
-            <p>The F-Class Sim stacks several air layers along the line of sight, each sampling the wind field at its own distance, so near layers show as large soft features and far layers as small sharp ones. The range is bounded and the target sits at a fixed, known distance, so the sample distance comes from geometry: the scope's view ray is intersected with the range's bounding box. The rifle scope, held on the target, samples at the target distance; the spotting scope, which you can pan around the range, samples wherever its ray meets the box. The boil sits low and fades into the open sky above the target.</p>
+            <h3>F-Class Sim: two-pass scope render</h3>
+            <ol class="hiw-steps">
+                <li><strong>Scene pass.</strong> Render the range through the scope camera into an intermediate texture (rifle scope on the target, or spotting scope wherever it is aimed).</li>
+                <li><strong>Wind sampling.</strong> Cast the scope's center ray into the range bounding box. Each of three atmospheric <strong>slabs</strong> along the line of sight picks a random point in its depth band, samples the wind generator there, and smooths the result with an exponential moving average. Near slabs use a wider world scale in the shader so they read as large soft features; far slabs read as small sharp ones.</li>
+                <li><strong>Mirage pass.</strong> A full-screen shader sums one <strong>4D simplex-noise</strong> sample per slab (three spatial axes plus time), advected by that slab's smoothed wind (crosswind shifts the pattern sideways, vertical wind and a constant heat rise shift it up, headwind churns the downrange axis slowly). The layers add into a vertical UV offset; the scene texture is resampled at the warped coordinates. A chromatic edge tint and an elevation falloff (mirage full when the sight grazes the deck, tapering into the sky above the target) finish the look. Zoom scales intensity, capped so extreme magnification cannot sample absurdly far off-pixel.</li>
+            </ol>
+            <p>There is no depth-of-field blur in F-Class; the soft-near / crisp-far look comes only from the slab scaling. Mirage can be turned off entirely (preset <em>None</em>), which skips the second pass and draws the scene straight to the scope output.</p>
 
-            <h3>Steel Sim: one averaged layer plus focus distance</h3>
-            <p>The Steel Sim uses a single averaged layer plus the scope's focus distance. Because on an open range it cannot know which distance you are watching, the focus distance tells it how far downrange to sample the wind. The shimmer is stronger the more air the sight looks through, so nearby ground barely boils, and it fades as you zoom out.</p>
+            <h3>Steel Sim: blur, then mirage</h3>
+            <ol class="hiw-steps">
+                <li><strong>Scene + depth pass.</strong> Render the range into a buffer that carries a <strong>depth texture</strong> (distance per pixel).</li>
+                <li><strong>Focus blur (optional).</strong> A thin-lens model turns each pixel's depth and the scope's focal distance into a blur radius (growing with objective diameter and with distance from the focal plane). A <strong>separable Gaussian blur</strong> runs in two passes, horizontal then vertical, so only the focused range stays sharp.</li>
+                <li><strong>Wind sampling.</strong> Because the shooter can look anywhere, the scope's <strong>focus distance</strong> sets how far downrange to sample the wind generator: seven points from 50% to 110% of that distance along the line of sight, averaged into one vector. Perpendicular wind and a constant heat rise advect the noise coordinates over time so the boil drifts and runs.</li>
+                <li><strong>Mirage pass.</strong> A single-layer shader blends fast and slow <strong>3D simplex noise</strong> (not the wind generator's curl field). Each pixel's UV is shifted vertically by the noise amount, then scaled by four attenuations read from the depth buffer and uniforms: distance along the line of sight (near ground barely boils; full strength by the focal distance), magnification (none at wide field of view), focal path length, and total wind speed (fade to zero by ~15&nbsp;mph). A brightness ripple keyed to noise magnitude adds a subtle smoke-like shading.</li>
+                <li><strong>Reticle composite.</strong> The warped (and possibly blurred) scene is drawn into the final scope view; the reticle is overlaid on top so it stays crisp and unaffected by mirage or recoil kick on the underlying image.</li>
+            </ol>
+            <p>Blur and mirage are independent effects, but they run in that order: depth-of-field softens the geometry first; mirage then warps the result. The noise displacement itself is never run through the Gaussian blur.</p>
 
-            <h3>Focus blur (Steel Sim)</h3>
-            <p>The Steel Sim scope also has a <strong>focus blur</strong> (depth of field), separate from the mirage: the scene is drawn with a depth map, and a lens model softens each pixel by how far it sits from the distance you are focused on, so only that range is sharp. The focus distance feeds both the blur and the mirage, but they are separate effects, and the shimmer itself is never blurred.</p>
             <div class="deep">
-                <strong>Under the hood:</strong> the blur is a two-pass <strong>separable Gaussian</strong> (one horizontal pass, one vertical) whose radius grows with the lens aperture and with how far each pixel sits from the focused distance, read from the depth map.
+                <strong>Under the hood:</strong> F-Class mirage lives in <code>fclass-sim/rendering/mirage.js</code> (4D noise, three slabs, wind-coupled advection). Steel mirage and focus blur live in <code>steel-sim/Scope.js</code> (3D noise mirage, two-pass DOF). Both displace vertically only. The wind field the mirage reads is the same post-processed field the bullet integrates through (see The wind field), so what you see and what the round flies through stay aligned, even though the shimmer shader is a separate approximation from the curl-noise physics.
             </div>
         </div>
 
