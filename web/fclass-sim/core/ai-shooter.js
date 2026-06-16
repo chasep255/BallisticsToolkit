@@ -27,10 +27,9 @@
 // Skill levels:
 //  - easy:   poor reader - noisy, stale flat read, and over-chases its own misses,
 //            so it swings around chasing the wind.
-//  - medium: decent reader - moderate noise and a measured chase.
-//  - hard:   disciplined reader - low noise, fresh near-weighted read, small
-//            corrections, and waits for his condition; still caught out by a fast
-//            switch or a blown read now and then.
+//  - medium: decent reader - moderate noise, near-weighted read, and a measured chase.
+//  - hard:   disciplined reader - low noise, fresh near-weighted read, and small
+//            corrections; still caught out by a fast switch or a blown read now and then.
 
 import
 {
@@ -52,44 +51,39 @@ export const WIND_READ_STATIONS = 5;
 export const AI_PROFILES = {
   easy: {
     label: 'Easy',
-    windReadFraction: 1.0, // no systematic under/over-hold
     windReadErrorPct: 0.5,
-    blownReadProb: 0.20,
-    blownReadPct: 0.3,
+    blownReadProb: 0.4,
+    blownReadPct: 0.40,
     readLagTauSec: 12, // stale read - lags switches
     nearWeightedWind: false, // flat average across the flags
-    chaseGain: 0.55, // over-chases: corrects too hard off a single shot
-    chaseDecay: 0.85,
-    pairDelayRange: [1, 3], // seconds, uniform
-    conditionWaitMph: null
+    chaseGain: 0.5, // big bite off a single shot - over-reacts
+    chaseDecay: 0.5 // short memory: corrects off the last shot or two (~1x a steady miss)
   },
   medium: {
     label: 'Medium',
-    windReadFraction: 1.0,
     windReadErrorPct: 0.3,
-    blownReadProb: 0.15,
-    blownReadPct: 0.2,
+    blownReadProb: 0.3,
+    blownReadPct: 0.30,
     readLagTauSec: 8, // somewhat stale read
-    nearWeightedWind: true, // hears "the first flag matters" but reads a flat average
-    chaseGain: 0.38,
-    chaseDecay: 0.88,
-    pairDelayRange: [1, 3],
-    conditionWaitMph: null
+    nearWeightedWind: true, // weights near wind, but less aggressively read than Hard
+    chaseGain: 0.3, // moderate single-shot reaction
+    chaseDecay: 0.5 // short memory (~0.6x a steady miss)
   },
   hard: {
     label: 'Hard',
-    windReadFraction: 1.0, // reads the full value - no systematic under-hold
     windReadErrorPct: 0.2,
     blownReadProb: 0.15, // drops a point on a missed switch now and then
     blownReadPct: 0.1,
     readLagTauSec: 4, // fresh read, tracks switches quickly
     nearWeightedWind: true, // weights near wind by time-of-flight remaining (expert skill)
-    chaseGain: 0.22, // measured corrections - doesn't chase single shots
-    chaseDecay: 0.90,
-    pairDelayRange: [1, 3],
-    conditionWaitMph: null
+    chaseGain: 0.15, // small bite - barely reacts to a single shot
+    chaseDecay: 0.5 // short memory (~0.3x a steady miss)
   }
 };
+
+// Pair-fire pacing: seconds before the shooter breaks the shot (uniform). The same
+// for every level - skill lives in the wind read, not the clock.
+const PAIR_DELAY_RANGE = [1, 3];
 
 // Hold clamps (roughly the rifle scope's dial range) so a bad read can't send
 // the hold absurdly far off the frame.
@@ -153,10 +147,6 @@ export class AIShooter
     // Updated in learnFromImpact(); added to the wind call in planShot().
     this.chaseX = 0;
     this.chaseY = 0;
-
-    // Wind read the last shot was fired on (for Hard's condition waiting)
-    this.windAtLastShotMph = 0;
-    this.hasFired = false;
   }
 
   /**
@@ -209,7 +199,7 @@ export class AIShooter
     // switching wind, which is the main systematic error.
     let errFrac = gaussian(p.windReadErrorPct);
     if (Math.random() < p.blownReadProb) errFrac += gaussian(p.blownReadPct);
-    const estimateMph = this.windEma * p.windReadFraction * (1 + errFrac);
+    const estimateMph = this.windEma * (1 + errFrac);
 
     // The same estimate drives both holds: windage drift and the vertical crosswind
     // jump. On top sits the chase correction the shooter has learned from its own
@@ -218,9 +208,6 @@ export class AIShooter
     let holdY = -this.jumpMoaPerMph * estimateMph + this.chaseY;
     holdX = clamp(holdX, -MAX_WINDAGE_HOLD_MOA, MAX_WINDAGE_HOLD_MOA);
     holdY = clamp(holdY, -MAX_ELEVATION_HOLD_MOA, MAX_ELEVATION_HOLD_MOA);
-
-    this.windAtLastShotMph = this.windEma;
-    this.hasFired = true;
 
     return {
       holdXMoa: holdX,
@@ -251,15 +238,7 @@ export class AIShooter
    */
   decideDelaySeconds(turnRemainingSec)
   {
-    const p = this.profile;
-    let delay = uniform(p.pairDelayRange[0], p.pairDelayRange[1]);
-
-    // A disciplined shooter waits for his condition to come back
-    if (p.conditionWaitMph !== null && this.hasFired &&
-      Math.abs(this.windEma - this.windAtLastShotMph) > p.conditionWaitMph)
-    {
-      delay += uniform(0, 8);
-    }
+    let delay = uniform(PAIR_DELAY_RANGE[0], PAIR_DELAY_RANGE[1]);
 
     if (turnRemainingSec !== null && Number.isFinite(turnRemainingSec))
     {

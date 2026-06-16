@@ -267,7 +267,7 @@
                 <li><a href="#impact">Impact detection</a></li>
                 <li><a href="#steel">Reactive steel targets</a></li>
                 <li><a href="#montecarlo">Simulating groups and scores</a></li>
-                <li><a href="#extras">AI opponents, moving targets, and remote play</a></li>
+                <li><a href="#ai">The AI opponent</a></li>
             </ul>
         </div>
 
@@ -560,18 +560,20 @@
         </div>
 
         <!-- ================================================================ -->
-        <div class="content-section" id="extras">
-            <h2>AI opponents, moving targets, and remote play</h2>
-            <p>A few simulator features go beyond a single computed shot and are worth a mention.</p>
+        <div class="content-section" id="ai">
+            <h2>The AI opponent</h2>
+            <p>In the F-Class Sim's Pair Fire you can set your opponent to the computer. The AI fires through the exact same ballistics engine and inherits the same mechanical dispersion (muzzle-velocity spread and the rifle's accuracy cone) as your own shots. It is mechanically your equal, not your better: like you, it aims with a perfectly steady hold (neither you nor it has any modeled sway or wobble; you nudge the reticle with the keys, it computes its aim point), and the shot then scatters by the same rifle dispersion. The one thing that differs is how well it reads the wind. Everything that separates a strong AI from a weak one lives in that single place: <strong>how well it reads and manages the wind</strong>. Beating it is a wind-reading contest, not a reflex one.</p>
 
-            <h3>AI opponents (F-Class)</h3>
-            <p>In Pair Fire you can set your opponent to the computer. Every AI uses the same ballistics engine and rifle dispersion as you and holds for wind drift and crosswind jump. Difficulty mainly changes wind reading: how large and stale the estimate is, how often it blows a switch, how aggressively it chases corrections off the last impact, and (at Medium and Hard) whether near flags are weighted by time of flight. Easy reads a flat, laggy average with big error; Hard tracks switches quickly with small error and measured chase. Beating the computer is mostly a wind-reading contest, not a reflex one.</p>
+            <h3>Reading the flags</h3>
+            <p>Several times a second the AI samples the same curl-noise wind field at five stations spread down its lane, and combines them into a single crosswind estimate. Two things make that estimate human rather than perfect. <strong>The read lags:</strong> it is an exponential moving average of the flags, not their instantaneous value, so in a switching wind it <em>trails</em> the truth, a real, time-varying error; a short time constant (Hard) tracks switches quickly while a long one (Easy) stays stale and reacts late. And <strong>where the wind matters is weighted:</strong> a skilled reader knows the near wind deflects the bullet for the rest of its flight, so it weights the closer stations more heavily by the time of flight still remaining, while a poor reader takes a flat average across the flags and misjudges which flag counts.</p>
 
-            <h3>Hunting and moving targets (Steel)</h3>
-            <p>The steel range has an optional hunting mode: prairie dogs that pop up and down, and boars that walk along the range. Because the Steel Sim integrates every bullet live, frame by frame (see Impact detection), moving targets are hit honestly: the bullet and the target both advance in real time, and the hit registers against wherever the target actually is when the round arrives.</p>
+            <h3>From wind to a hold</h3>
+            <p>The AI calibrates the rifle's sensitivity once, in MOA of drift (and vertical crosswind jump, when spin effects are on) per mph of crosswind, then turns its wind estimate into an aim point. On top of the raw read sit two error sources applied per shot. <strong>Read jitter</strong> is a Gaussian error expressed as a <em>percent</em> of the actual wind, so misjudging a strong wind costs far more than the same percentage on a light breeze, exactly as it does for a person. <strong>A blown read</strong> is an occasional larger error, the shooter catching a switch the wrong way and dropping a point: it happens with a small per-shot probability and adds a second, bigger jolt to the estimate.</p>
 
-            <h3>Remote Play (F-Class)</h3>
-            <p>The F-Class Sim can stream a live match to a friend. Ballistics still run on the host; a <strong>PeerJS broker and public STUN servers</strong> are used only to set up the WebRTC link. It is <strong>host-authoritative</strong>: the host runs the one true simulation and sends a <strong>WebRTC video and audio stream</strong> of its view; the guest displays it and sends key and button presses back. There is no relay (TURN) in the media path unless one is configured. Because the link is direct, each participant's IP address is visible to the other, so it is meant for people you know.</p>
+            <h3>Chasing the spotter</h3>
+            <p>The most human part is what the AI does <em>after</em> each shot. It is told where its round landed (the impact offset from center, in MOA) and folds a fraction of that miss into a running correction it carries to the next shot, the way you correct off your spotter. Writing \(c\) for that correction, \(g\) for the chase gain and \(\lambda\) for how much of it carries over, each impact \(m\) updates it as</p>
+            \[ c \leftarrow \lambda\,c - g\,m \]
+            <p>and the next hold is the fresh wind call plus \(c\). The catch is that \(c\) is built from a <em>past</em> impact: when the wind has since moved, correcting off the last shot over-corrects, the classic wind-chasing mistake. A disciplined shooter uses a small gain and barely chases; an undisciplined one uses a large gain and swings back and forth around the condition, often making things worse. This is the centerpiece of the personality difference, and it is fully active at every level.</p>
         </div>
 
     </div>
