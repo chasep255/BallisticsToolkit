@@ -73,26 +73,6 @@
             font-size: 0.96em;
         }
 
-        /* "In plain terms" callout. */
-        .plain {
-            background: #eef6ff;
-            border-left: 4px solid #2196f3;
-            border-radius: 6px;
-            padding: 12px 16px;
-            margin: 14px 0;
-        }
-        .plain strong:first-child { color: #1565c0; }
-
-        /* "Under the hood" callout. */
-        .deep {
-            background: #f6f5fb;
-            border-left: 4px solid #6f42c1;
-            border-radius: 6px;
-            padding: 12px 16px;
-            margin: 14px 0;
-        }
-        .deep strong:first-child { color: #5a32a3; }
-
         /* Caveat callout. */
         .caveat {
             background: #fff7ed;
@@ -261,29 +241,15 @@
 
         <div class="content-section">
             <div class="highlight-box">
-                <p>Ballistics Toolkit is built on one shared <strong>trajectory engine</strong>, a small C++ core compiled to WebAssembly that runs in your browser with no backend. Every calculator and simulator calls it, so results stay consistent across the suite.</p>
-                <p>The engine integrates a bullet's flight step by step under gravity, aerodynamic drag, the local atmosphere and wind, with optional empirical corrections for spin. The result is a single trajectory: drop, drift, velocity and time of flight to any range.</p>
-                <p style="margin-bottom:0;">The simulators put that trajectory into a live setting: you read the wind through mirage and flags and shoot at scored F-Class paper targets, or reactive steel that swings when hit. The statistical tools instead fire a load many times over, varying velocity, wind and aim, to show the group and scores it would produce.</p>
-            </div>
-        </div>
-
-        <div class="content-section">
-            <div class="highlight-box">
-                <h2 style="margin-top:0;">The quick version</h2>
-                <ul style="margin:0;padding-left:22px;line-height:1.7;">
-                    <li>Bullet motion is <strong>numerically integrated</strong> step by step, not solved from one formula.</li>
-                    <li>Drag uses <strong>G1/G7 lookup tables</strong> scaled by your ballistic coefficient and the air density.</li>
-                    <li>Wind enters through the bullet's <strong>velocity relative to the air</strong>, not a separate drift formula.</li>
-                    <li><strong>Spin drift</strong> and <strong>crosswind jump</strong> are empirical corrections, not full orientation physics.</li>
-                    <li>The simulators add a <strong>dynamic wind field, mirage, target interaction</strong>, and randomized shot dispersion.</li>
-                </ul>
+                <p>Ballistics Toolkit runs entirely in your browser. A single C++ trajectory core, compiled to WebAssembly, drives every calculator and simulator on the site with no backend.</p>
+                <p style="margin-bottom:0;">Gravity, drag, air density, and wind advance each shot in small time steps, with spin drift and crosswind jump when spin effects are enabled. Some apps tabulate drop, drift, and time of flight; others put you on a range with mirage and live targets; still others fire the same load many times with randomized inputs to show dispersion and theoretical scores.</p>
             </div>
         </div>
 
         <div class="content-section">
             <h2>What this model is, and is not</h2>
-            <p><strong>It is</strong> a <strong>modified point-mass</strong> trajectory engine: the bullet is treated as a point with mass and a drag profile, integrated through time, with empirical corrections layered on for spin drift and crosswind jump. It is built for education, comparing loads, simulation and planning.</p>
-            <p><strong>It is not</strong> a full 6-degree-of-freedom model of the spinning bullet, and it does not capture every real-world effect. Deliberately left out: <strong>Coriolis and Eötvös</strong> drift from the Earth's rotation, <strong>powder temperature sensitivity</strong> (the muzzle velocity you enter is used as-is, so enter a value chronographed at your conditions), <strong>bore and rifle imperfections</strong>, and your own <strong>measurement error</strong> in wind, range and atmosphere. Treat the output as a planning estimate, not a guarantee.</p>
+            <p><strong>It is</strong> a <strong>modified point-mass</strong> model: the bullet is treated as a point with mass and a drag profile, stepped through time rather than solved in one formula. Spin drift and crosswind jump are empirical add-ons, not full orientation physics. Use it to compare loads and practice reading wind.</p>
+            <p><strong>It is not</strong> a promise of what your rifle will do on a given day. Coriolis and Eötvös drift, powder-temperature effects on muzzle velocity, bore and rifle imperfections, and error in your wind, range, and atmosphere inputs are outside the model. Enter a chronographed muzzle velocity and treat the numbers as an estimate.</p>
         </div>
 
         <div class="hiw-toc">
@@ -296,12 +262,12 @@
                 <li><a href="#wind">How wind enters the model</a></li>
                 <li><a href="#spin">Spin corrections</a></li>
                 <li><a href="#simplex">Smooth noise: the building block</a></li>
-                <li><a href="#windgen">The wind field (curl noise)</a></li>
+                <li><a href="#windgen">The wind generator</a></li>
                 <li><a href="#mirage">Mirage and scope optics</a></li>
                 <li><a href="#impact">Impact detection</a></li>
                 <li><a href="#steel">Reactive steel targets</a></li>
                 <li><a href="#montecarlo">Simulating groups and scores</a></li>
-                <li><a href="#extras">AI, moving targets &amp; remote play</a></li>
+                <li><a href="#extras">AI opponents, moving targets, and remote play</a></li>
             </ul>
         </div>
 
@@ -316,9 +282,9 @@
                 <figcaption>Forces on the bullet in flight. Drag always opposes motion <em>through the air</em>; gravity is constant; the spin effects (not shown) act sideways and vertically. Coordinate system: <strong>x</strong> = crossrange (right +), <strong>y</strong> = vertical (up +), downrange is <strong>&minus;z</strong>.</figcaption>
             </figure>
 
-            <p>This is a <strong>3-DOF</strong> translational model: position and velocity are integrated, the bullet's orientation is not. The effects that really depend on the spin axis are folded back in as extra accelerations and impulses (see Spin corrections), which is what "modified" point-mass means.</p>
+            <p>This is a <strong>3-DOF</strong> translational model: position and velocity are integrated, the bullet's orientation is not. Spin drift enters as an extra acceleration each step; crosswind jump enters as a vertical velocity kick when crosswind changes. Both apply only when spin effects are enabled (see Spin corrections). That is what "modified" point-mass means.</p>
 
-            <div class="takeaway">Following the curve step by step is more flexible than any single drop-and-drift formula: drag, wind, atmosphere and spin all enter through the same integration path.</div>
+            <div class="takeaway">Following the curve step by step is more flexible than any single drop-and-drift formula: drag and wind enter through acceleration each RK2 step; spin drift the same way; crosswind jump as a velocity kick when crosswind changes.</div>
         </div>
 
         <!-- ================================================================ -->
@@ -360,7 +326,7 @@
         <div class="content-section" id="integration">
             <h2>Stepping the bullet through time</h2>
             <p>Because drag depends on speed and speed keeps changing, there is no closed-form path; it is computed step by step. The engine uses a <strong>second-order Runge&ndash;Kutta (RK2) midpoint</strong> step. A naive step trusts the slope at the <em>start</em> and overshoots; RK2 instead samples the slope at the <em>middle</em> of the step and uses that for the whole step. That costs a second acceleration evaluation per step (two instead of one), but it is accurate enough to allow much larger steps for the same error, so it is a good trade overall.</p>
-            \[ \mathbf{v}_{1/2} = \mathbf{v}_0 + \tfrac{1}{2}\mathbf{a}_0\,\Delta t, \qquad \mathbf{a}_{1/2} = \mathbf{a}\!\left(\mathbf{x}_{1/2},\,\mathbf{v}_{1/2},\,t_0+\tfrac{1}{2}\Delta t\right) \]
+            \[ \mathbf{v}_{1/2} = \mathbf{v}_0 + \tfrac{1}{2}\mathbf{a}_0\,\Delta t, \qquad \mathbf{x}_{1/2} = \mathbf{x}_0 + \tfrac{1}{2}\mathbf{v}_{1/2}\,\Delta t, \qquad \mathbf{a}_{1/2} = \mathbf{a}\!\left(\mathbf{x}_{1/2},\,\mathbf{v}_{1/2},\,t_0+\tfrac{1}{2}\Delta t\right) \]
             \[ \boxed{\;\mathbf{v}_{1} = \mathbf{v}_0 + \mathbf{a}_{1/2}\,\Delta t, \qquad \mathbf{x}_{1} = \mathbf{x}_0 + \mathbf{v}_{1/2}\,\Delta t\;} \]
 
             <figure class="diagram">
@@ -392,9 +358,7 @@
             \[ \rho = \frac{P - 0.378\,e}{R_{\text{air}}\,T}, \qquad R_{\text{air}} \approx 287.05\ \tfrac{\text{J}}{\text{kg}\cdot\text{K}}, \qquad e = \text{RH}\cdot 611.2\,\exp\!\left(\frac{17.67\,T_c}{T_c + 243.5}\right) \]
             <p>Pressure follows the International Standard Atmosphere power law from altitude \(h\):</p>
             \[ P = P_0\left(1 + \frac{L\,h}{T_0}\right)^{-g/(R_{\text{air}} L)}, \qquad P_0 = 101325\ \text{Pa},\; T_0 = 288.15\ \text{K},\; L = -0.0065\ \text{K/m} \]
-            <div class="deep">
-                <strong>Under the hood:</strong> air density enters the trajectory only as the ratio \(\rho/\rho_0\) in the drag term, a single scaling on retardation. It also enters the gyroscopic stability factor (see Spin corrections), which is why a cold, dense, high-pressure day lowers stability.
-            </div>
+            <p>In the integrator, density scales drag through the ratio \(\rho/\rho_0\). The Miller stability factor is corrected separately with muzzle temperature and pressure (see Spin corrections), so a cold, high-pressure day slows the bullet more and can also lower gyroscopic stability.</p>
         </div>
 
         <!-- ================================================================ -->
@@ -416,7 +380,7 @@
             <h3>Gyroscopic stability (Miller)</h3>
             <p>A stability factor \(S_g\) measures the spin margin, starting from the Miller twist rule and corrected to the actual velocity and air conditions:</p>
             \[ S_{g,0} = \frac{30\,m}{t^{2}\,d^{3}\,l\,(1+l^{2})}, \qquad S_g = S_{g,0}\left(\frac{V}{2800}\right)^{1/3}\frac{T_R}{519}\cdot\frac{29.92}{P_{\text{inHg}}} \]
-            <p>with \(m\) in grains, \(d\) in inches, \(l = L/d\) the length in calibers, \(t\) the twist in calibers per turn, \(V\) in fps, \(T_R\) in &deg;Rankine and \(P_{\text{inHg}}\) in inches of mercury. As a rule of thumb \(S_g > 1.5\) is stable. The Miller rule assumes a roughly uniform bullet density, so it is approximate and can under-estimate <strong>plastic-tipped</strong> bullets; a tip-corrected form fits those better.</p>
+            <p>with \(m\) in grains, \(d\) in inches, \(l = L/d\) the length in calibers, \(t\) the twist in calibers per turn, \(V\) in fps, \(T_R\) in &deg;Rankine and \(P_{\text{inHg}}\) in inches of mercury. As a rule of thumb \(S_g > 1.5\) is stable. The Miller rule assumes roughly uniform bullet density; the engine uses the standard form only.</p>
 
             <h3>Spin drift</h3>
             <p>As the bullet flies, gravity steadily bends its path downward. The spin makes the bullet's axis gyroscopically stiff, so the nose cannot quite follow that curve: it lags, and rides slightly <em>above</em> the path. The oncoming air then meets the nose at a small angle, and the same quarter-turn response leans that to one side: the nose takes up a small sideways lean, its <strong>yaw of repose</strong>. Because the nose points a little to the side throughout the flight, the bullet is continually nudged that way, and the drift accumulates with range, to the right for a right-hand twist.</p>
@@ -434,7 +398,7 @@
                 <strong>Important caveat:</strong> Litz's published formula describes the jump at the <em>muzzle</em> for a single constant crosswind. The engine generalizes it to wind <em>changes</em> met downrange, which is an <strong>engineering extension, not experimentally validated here</strong>. It is built so a constant wind reduces to the published muzzle jump; treat the downrange behavior as plausible and approximate, not established ballistics.
             </div>
 
-            <p>With that understood: each step, the engine compares the crosswind the bullet sees to the previous step and fires an impulse proportional to the <em>change</em> \(\Delta w_\perp\), so a constant wind fires its whole jump at the muzzle while a gust met downrange fires there. That change sets a small jump angle \(\Delta\theta = \text{sens}\cdot\Delta w_\perp\), applied as a kick to the bullet's vertical velocity, where \(\text{hand}=\pm1\) sets the sign from the twist direction:</p>
+            <p>With that understood: each step, the engine compares the crosswind the bullet sees to the previous step and fires an impulse proportional to the <em>change</em> \(\Delta w_\perp\) (in mph), so a constant wind fires its whole jump at the muzzle while a gust met downrange fires there. That change sets a small jump angle \(\Delta\theta = \text{sens}\cdot\Delta w_\perp\), applied as a kick to the bullet's vertical velocity before the RK2 step, where \(\text{hand}=\pm1\) sets the sign from the twist direction:</p>
             \[ \Delta v_y = -\,V\,\Delta\theta\cdot \text{hand} \]
             <p>This assumes the jump is effectively instantaneous, that the muzzle sensitivity still applies downrange, and that successive wind changes add up linearly, all approximations.</p>
 
@@ -469,17 +433,14 @@
                 <figcaption id="spinCaption">Right-hand twist. The bullet spins about its long axis (the angular-momentum vector L). Choose an effect and drag to orbit.</figcaption>
             </figure>
 
-            <div class="takeaway">Spin drift and crosswind jump are empirical corrections layered onto the point-mass path, not a full simulation of the bullet's orientation.</div>
+            <div class="takeaway">Spin drift and crosswind jump are empirical corrections layered onto the point-mass path, not a full simulation of the bullet's orientation. With spin effects off, both are skipped.</div>
         </div>
 
         <!-- ================================================================ -->
         <div class="content-section" id="simplex">
             <h2>Smooth noise: the building block</h2>
-            <p>Two simulator features, the wind field and mirage, are built from the same source of smooth randomness: <strong>simplex noise</strong> (Ken Perlin's gradient noise). Unlike a table of independent random numbers it is continuous: nearby points return nearby values, with no grid and no sudden jumps, and it is cheap to evaluate and to differentiate.</p>
-            <p>It works by pinning a random direction (a <em>gradient</em>) at each point of a coarse lattice and smoothly blending their pull: the value climbs toward some neighbors and dips toward others, giving the rolling hills and valleys below. It also varies on a single scale, changing gradually from place to place with no fine jitter, which is what lets it read as a coherent gust pattern rather than random static. One smooth number comes out at every point, and the wind field calls that number the <strong>potential</strong> \(\psi\).</p>
-            <div class="deep">
-                <strong>Under the hood:</strong> the &ldquo;simplex&rdquo; part is an efficiency trick. Plain Perlin noise interpolates the corners of a square (in 3D, a cube) grid cell, which costs \(2^n\) corners per sample and leaves faint axis-aligned streaks. Simplex noise instead tiles space with <em>simplexes</em> (triangles in 2D, tetrahedra in 3D, and a 5-vertex pentatope in 4D), so each sample blends only \(n+1\) corners and favors no direction. Each corner adds its gradient dotted with the offset to the sample point, weighted by a kernel that falls to zero at the cell edge. That cheap scaling matters because the toolkit evaluates noise in <strong>3D and 4D</strong> (two spatial axes plus time for the wind, and a fourth axis for mirage), so the pattern also animates.
-            </div>
+            <p>The wind field and mirage both use <strong>simplex noise</strong> (Ken Perlin's gradient noise), but separate instances: each wind layer curls its own potential \(\psi\), while mirage shaders warp the scope with their own samples (Steel mirage does not read the curl field at all). Unlike a table of independent random numbers, simplex noise is continuous: nearby points return nearby values, with no grid and no sudden jumps, and it is cheap to evaluate and to differentiate.</p>
+            <p>It works by pinning a random direction (a <em>gradient</em>) at each point of a coarse lattice and smoothly blending their pull: the value climbs toward some neighbors and dips toward others, giving the rolling hills and valleys below. It also varies on a single scale, changing gradually from place to place with no fine jitter, which is what lets it read as a coherent gust pattern rather than random static. One smooth number comes out at every point, and the wind field calls that number the <strong>potential</strong> \(\psi\). The simulators sample it in three or four dimensions (downrange, crossrange, and time for wind; F-Class mirage adds another spatial axis), so the pattern evolves smoothly rather than flickering frame to frame.</p>
 
             <figure class="diagram">
                 <div class="chart-wrap">
@@ -509,8 +470,8 @@
             <ol class="hiw-steps">
                 <li><strong>Curl.</strong> Sample \(\psi\) with 3D simplex noise (downrange, crossrange, and time) and estimate its slope with small finite differences. Each layer uses its own stretch along downrange and crossrange (a 10,000-yard layer vs a 100-yard layer), so the same noise feature can represent a broad shift or a tight gust; those stretches are undone when converting the curl back to real range coordinates. The result is a horizontal vector only (crossrange and downrange; no vertical wind from this step).</li>
                 <li><strong>Polar split.</strong> Convert the curl vector to magnitude and direction. All later steps rescale the speed along that fixed direction; they never rotate the flow or inject unrelated vectors.</li>
-                <li><strong>RMS normalization.</strong> Divide the magnitude by a constant RMS estimated once at startup from ~1000 random samples of that component. This makes each layer's energy stable before the preset's strength knob is applied.</li>
-                <li><strong>Exponent.</strong> Raise the normalized magnitude to a power \(p\). Values \(p &lt; 1\) even out the layer toward a steadier average; \(p &gt; 1\) would make it mostly calm with occasional surges (presets usually keep \(p \le 1\)).</li>
+                <li><strong>RMS normalization.</strong> Divide the magnitude by a constant RMS estimated on the first tick of the wind clock from ~1000 random samples of that component. This makes each layer's energy stable before the preset's strength knob is applied.</li>
+                <li><strong>Exponent.</strong> Raise the normalized magnitude to a power \(p\). Values \(p &lt; 1\) even out the layer toward a steadier average; \(p &gt; 1\) make it mostly calm with occasional surges. Most presets keep \(p \le 1\); the Turbulent preset uses \(p = 1.2\) on its finest layer.</li>
                 <li><strong>Strength scale.</strong> Multiply by the component strength. This sets the layer's nominal speed.</li>
                 <li><strong>Sigmoid gate (optional).</strong> Some layers pass the magnitude through a logistic gate so the component stays quiet below a threshold and switches on above it, producing distinct gust events rather than always-on turbulence.</li>
                 <li><strong>Clip.</strong> Cap the magnitude at \(2S\) (twice the component strength) so a single sample cannot run away.</li>
@@ -536,8 +497,8 @@
         <div class="content-section" id="mirage">
             <h2>Mirage and scope optics</h2>
             <p><strong>What mirage is:</strong> on a warm day the ground heats the air just above it, and that warm air rises in shifting cells. Warm and cool air bend light by different amounts, so when you look through a scope at a distant target the image wavers and "boils." In wind the boil leans, or "runs," in the wind's direction and flattens as the wind builds, so reading it is one of the main ways shooters judge the wind downrange.</p>
-            <p><strong>How it is drawn:</strong> both simulators fake this with a <strong>screen-space post-process</strong>, not a ray-traced heat shimmer. The 3D scene is rendered to an off-screen buffer first; a full-screen shader then nudges each pixel (mostly vertically) by simplex noise tied to the live wind field. It is a visual approximation that preserves the cues a shooter reads (run direction, boil rate, strength), not a simulation of light actually bending.</p>
-            <p>In both sims the boil washes out as wind builds and is gone by about 15&nbsp;mph. They differ in how many depth layers they use, how they sample the wind field, and whether a separate lens blur runs as well. The pipelines below are the actual render order.</p>
+            <p><strong>How it is drawn:</strong> both simulators fake this with a <strong>screen-space post-process</strong>, not a ray-traced heat shimmer. The 3D scene is rendered to an off-screen buffer first; a full-screen shader then nudges each pixel by simplex noise advected by the same post-processed wind field the bullet integrates through. It is a visual approximation that preserves the cues a shooter reads (which way the boil runs and how strong it is), not a simulation of light actually bending.</p>
+            <p>Mirage fades as wind builds and is gone by about 15&nbsp;mph in both sims: F-Class keys the fade to horizontal wind speed, Steel to total wind speed. They differ in how many depth layers they use, how they sample the wind field, and whether a separate lens blur runs as well. The pipelines below are the actual render order.</p>
 
             <h3>F-Class Sim: two-pass scope render</h3>
             <ol class="hiw-steps">
@@ -555,27 +516,23 @@
                 <li><strong>Mirage pass.</strong> A single-layer shader blends fast and slow <strong>3D simplex noise</strong> (not the wind generator's curl field). Each pixel's UV is shifted vertically by the noise amount, then scaled by four attenuations read from the depth buffer and uniforms: distance along the line of sight (near ground barely boils; full strength by the focal distance), magnification (none at wide field of view), focal path length, and total wind speed (fade to zero by ~15&nbsp;mph). A brightness ripple keyed to noise magnitude adds a subtle smoke-like shading.</li>
                 <li><strong>Reticle composite.</strong> The warped (and possibly blurred) scene is drawn into the final scope view; the reticle is overlaid on top so it stays crisp and unaffected by mirage or recoil kick on the underlying image.</li>
             </ol>
-            <p>Blur and mirage are independent effects, but they run in that order: depth-of-field softens the geometry first; mirage then warps the result. The noise displacement itself is never run through the Gaussian blur.</p>
-
-            <div class="deep">
-                <strong>Under the hood:</strong> F-Class mirage lives in <code>fclass-sim/rendering/mirage.js</code> (4D noise, three slabs, wind-coupled advection). Steel mirage and focus blur live in <code>steel-sim/Scope.js</code> (3D noise mirage, two-pass DOF). Both displace vertically only. The wind field the mirage reads is the same post-processed field the bullet integrates through (see The wind field), so what you see and what the round flies through stay aligned, even though the shimmer shader is a separate approximation from the curl-noise physics.
-            </div>
         </div>
 
         <!-- ================================================================ -->
         <div class="content-section" id="impact">
             <h2>Impact detection</h2>
-            <p>A trajectory is a list of points; to register a hit the engine finds where the path crosses a target and whether it lands on the plate. It pulls the short segment that spans the target, transforms it into the target's frame (the plate lies at \(z=0\)), solves the crossing, and tests the point against the plate outline, a rectangle (\(|x|\le \tfrac{w}{2},\,|y|\le \tfrac{h}{2}\)) or an ellipse, expanded by the bullet radius so a round that just catches the edge still counts ("line breaks the plate"):</p>
+            <p>A trajectory is a list of points. On the steel range, a hit registers where a short flight segment crosses a plate: the segment is transformed into the target's frame (the plate lies at \(z=0\)), the crossing is solved, and the point is tested against the plate outline, a rectangle (\(|x|\le \tfrac{w}{2},\,|y|\le \tfrac{h}{2}\)) or an ellipse, expanded by the bullet radius so a round that just catches the edge still counts ("line breaks the plate"):</p>
             \[ t = \frac{-\,z_{\text{start}}}{z_{\text{end}} - z_{\text{start}}}, \qquad \mathbf{p}_{\text{hit}} = \mathbf{p}_{\text{start}} + t\,(\mathbf{p}_{\text{end}} - \mathbf{p}_{\text{start}}) \]
-            <p>The same geometry scores paper targets: a hit is graded by its radial distance from center against each ring radius, expanded by the bullet radius.</p>
-            <p>How the crossing is found differs by app. The calculators and the F-Class Sim <strong>precompute the whole trajectory</strong>, then intersect that finished path with a stationary target. The Steel Sim <strong>integrates each bullet live</strong> as the game runs, advancing it a frame at a time and testing the short hop against every target's current pose, which is what lets it keep several bullets in flight and hit <strong>moving targets</strong>. With many plates, a spatial grid culls which ones to test, and the earliest crossing wins. A confirmed hit then draws a decal mark and a particle dust cloud, and in the Steel Sim it kicks off the plate's reaction.</p>
+            <p>Paper targets use the same radial idea without segment intersection: after the trajectory is integrated, the engine reads the point at the target distance and scores by distance from center against each ring radius, expanded by the bullet radius.</p>
+            <p>Calculators and the F-Class Sim integrate the full trajectory first, then read the bullet state at the target distance.</p>
+            <p>The Steel Sim advances each bullet every frame and tests each hop with the segment crossing above against every plate's current pose. That is what allows several bullets in flight and <strong>moving targets</strong>. With many plates, a spatial grid culls which ones to test, and the earliest crossing wins. A confirmed hit draws a decal on the plate, a dust cloud, and kicks off the plate's physical reaction.</p>
         </div>
 
         <!-- ================================================================ -->
         <div class="content-section" id="steel">
             <h2>Reactive steel targets</h2>
             <p>On the steel range a confirmed hit doesn't just register: the plate <em>reacts</em> as a small rigid body, so it swings, twists and rings the way real steel does. Its mass comes from geometry (area &times; thickness &times; the density of steel, 7850&nbsp;kg/m&sup3;) and its moment of inertia from the thin-plate formula, so a tall plate and a wide plate of the same weight turn differently.</p>
-            <p>The hit applies the bullet's momentum, scaled by how square it is (\(\cos^2\) of the impact angle), as an impulse at the contact point. Because that point is usually off the center of mass, it splits into a push and a twist, so a center hit swings the plate and an edge hit spins it:</p>
+            <p>The hit applies the bullet's momentum, scaled by how square it is (\(\cos^2\) of the impact angle, with a 0.1 floor so a grazing hit still moves the plate), as an impulse at the contact point. Because that point is usually off the center of mass, it splits into a push and a twist, so a center hit swings the plate and an edge hit spins it:</p>
             \[ \Delta\mathbf{v} = \frac{\mathbf{J}}{m}, \qquad \boldsymbol\tau = \mathbf{r}\times\mathbf{J}, \qquad \dot{\boldsymbol\omega} = I^{-1}\boldsymbol\tau \]
             <p>The plate hangs from chains modeled as stiff <em>one-way</em> springs (they pull but never push), and the whole thing is stepped with semi-implicit Euler under gravity, chain tension and damping until it settles. Orientation is carried as a <strong>quaternion</strong> (renormalized each step) so a tumbling plate avoids gimbal lock.</p>
 
@@ -608,13 +565,13 @@
             <p>A few simulator features go beyond a single computed shot and are worth a mention.</p>
 
             <h3>AI opponents (F-Class)</h3>
-            <p>In Pair Fire you can set your opponent to the computer. The interesting part is what the difficulty levels actually change: only the AI's <em>wind reading</em>. Every AI shooter fires through the same ballistics engine and the same rifle dispersion you do, holds for both wind drift and crosswind jump, and takes a realistic skill-based pause before each shot. An easy AI misjudges the wind badly, reading it flat and stale with a large percentage error; a hard AI reads it accurately, weights the near-muzzle wind by time of flight, and shoots near-clean. Beating the computer is a wind-reading contest, not a reflex one.</p>
+            <p>In Pair Fire you can set your opponent to the computer. Every AI uses the same ballistics engine and rifle dispersion as you and holds for wind drift and crosswind jump. Difficulty mainly changes wind reading: how large and stale the estimate is, how often it blows a switch, how aggressively it chases corrections off the last impact, and (at Medium and Hard) whether near flags are weighted by time of flight. Easy reads a flat, laggy average with big error; Hard tracks switches quickly with small error and measured chase. Beating the computer is mostly a wind-reading contest, not a reflex one.</p>
 
             <h3>Hunting and moving targets (Steel)</h3>
             <p>The steel range has an optional hunting mode: prairie dogs that pop up and down, and boars that walk along the range. Because the Steel Sim integrates every bullet live, frame by frame (see Impact detection), moving targets are hit honestly: the bullet and the target both advance in real time, and the hit registers against wherever the target actually is when the round arrives.</p>
 
             <h3>Remote Play (F-Class)</h3>
-            <p>The F-Class Sim can stream a live match to a friend, with no server of its own in the loop. It is <strong>host-authoritative</strong>: the host runs the one true simulation and sends a <strong>WebRTC video and audio stream</strong> of its view; the guest displays it and sends key and button presses back. A <strong>PeerJS broker and public STUN servers</strong> are used only to set up the connection, and there is no relay (TURN) in the media path unless one is configured. Because the link is direct, each participant's IP address is visible to the other, so it is meant for people you know.</p>
+            <p>The F-Class Sim can stream a live match to a friend. Ballistics still run on the host; a <strong>PeerJS broker and public STUN servers</strong> are used only to set up the WebRTC link. It is <strong>host-authoritative</strong>: the host runs the one true simulation and sends a <strong>WebRTC video and audio stream</strong> of its view; the guest displays it and sends key and button presses back. There is no relay (TURN) in the media path unless one is configured. Because the link is direct, each participant's IP address is visible to the other, so it is meant for people you know.</p>
         </div>
 
     </div>
