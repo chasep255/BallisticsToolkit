@@ -628,9 +628,8 @@
             <p>The Gaussian draws (velocity and wind) are clipped to three standard deviations so a freak tail value can't dominate a run. The wind here is a single uniform vector per shot, zero-mean because the rifle was zeroed in calm air, not the range-and-time-varying curl field the 3D sims fly through.</p>
 
             <h3>What the two apps measure</h3>
-            <p>Both build the group's centroid (the mean impact) and each shot's distance from it, then ask different questions:</p>
             <ul class="tech-list">
-                <li class="tech-item"><strong>Hit Simulator</strong> fires at a circle or rectangle you size and reports <em>dispersion</em>: hit probability (the fraction landing inside the shape), horizontal and vertical spread, mean radius and its standard deviation, CEP (the median distance from center, the circle holding half the shots), and extreme spread (the largest distance between any two shots, the classic group measurement).</li>
+                <li class="tech-item"><strong>Hit Simulator</strong> fires at a circular or rectangular target you size, builds the group's centroid (the mean impact) and each shot's distance from it, and reports <em>dispersion</em>: hit probability (the fraction landing inside the shape), horizontal and vertical spread, mean radius and its standard deviation, CEP (the median distance from center, the circle holding half the shots), and extreme spread (the largest distance between any two shots, the classic group measurement; approximated by the bounding-box diagonal for very large runs).</li>
                 <li class="tech-item"><strong>Target Simulator</strong> fires at competition targets, scoring every shot by ring, and runs many complete matches to report <em>match-level</em> statistics: average score and X-count, their spread and percentiles.</li>
             </ul>
         </div>

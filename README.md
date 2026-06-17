@@ -30,9 +30,9 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 
 ### 🎯 Target Simulator
 - **Monte Carlo Simulation** - Statistical analysis of shooting precision
-- **Target Library** - 14 competitive targets to choose from
+- **Target Library** - 17 competitive targets to choose from
 - **Realistic Variability** - Muzzle velocity, wind, and rifle accuracy modeling
-- **Spin Effects** - Crosswind jump included in analysis
+- **Spin Effects** - Spin drift and crosswind jump included in analysis
 - **Interactive Visualization** - Zoom, pan, and detailed shot impact display
 - **Match Scoring** - Competitive scoring with X-counts, line breaking, and group size analysis
 
@@ -74,7 +74,7 @@ Client-side web-based ballistics calculator and simulation suite for long-range 
 - **Audio Feedback** - Shot sounds play immediately; impact sounds (ping) play with distance-based delay and volume attenuation.
 
 ### 🖨️ Target Generator
-- **Competition Presets** - 14 standard competition target configurations (SR, MR, LR, F-Class) with correct ring diameters
+- **Competition Presets** - 17 standard competition target configurations (SR, MR, LR, F-Class, and IBS Benchrest) with correct ring diameters
 - **Ring Editor** - Customize ring labels, diameters, fill colors, and line colors; add or remove rings for fully custom targets
 - **Tiling Layouts** - Print 1, 2, 4, or 6 targets per page with automatic centering and clipping
 - **1:1 Scale** - Rings are generated at their actual physical dimensions and print true-to-size at 100% (Actual Size); uses browser print with 300 DPI rendering. Verify with a ruler before use
@@ -119,7 +119,7 @@ Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/
 3. **Variability** - MV standard deviation, wind variability, rifle accuracy
 4. **Environment** - Altitude, temperature, humidity (pressure derived)
 
-Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis. Trajectories include crosswind jump effects.
+Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis. Trajectories include spin drift and crosswind jump effects.
 
 ### Hit Simulator
 Visit the [Hit Simulator](https://www.ballisticstoolkit.com/hit-sim/hit-sim.html) for dispersion analysis:
@@ -157,7 +157,7 @@ Shoot reactive steel targets with physics-based ballistics, dust effects, and au
 ### 🖨️ Target Generator
 Visit the [Target Generator](https://www.ballisticstoolkit.com/target-gen/target-gen.html) to create printable targets:
 
-1. **Target Selection** - 14 competition target presets (SR, MR, LR, F-Class) or fully custom ring definitions
+1. **Target Selection** - 17 competition target presets (SR, MR, LR, F-Class, and IBS Benchrest) or fully custom ring definitions
 2. **Ring Editor** - Edit ring diameters, fill colors, and line colors; add or remove rings
 3. **Print Settings** - Paper size (Letter, Legal, Tabloid, A4, A3, custom), orientation, margins, tiling layouts (1-up, 2-up, 4-up, 6-up)
 4. **Display Options** - Ring labels, target info text, label/info colors, ring line thickness, custom target label

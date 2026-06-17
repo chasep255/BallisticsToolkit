@@ -207,7 +207,7 @@ namespace btk::physics
     // Compute raw curl vector (curl_x, curl_y) at a specific position and time
     btk::math::Vector3D computeCurl(int octave_index, const btk::math::Vector3D& position, float time) const;
 
-    // Initialize normalization by sampling 1000 (x,y,t) locations and computing magnitude std_dev
+    // Initialize normalization by sampling 1000 (x,y,t) locations and computing the magnitude RMS
     void initializeRMS();
 
     struct WindComponent

@@ -151,7 +151,7 @@ export function initConfig()
   // ===== LANDSCAPE CONFIGURATION =====
   Config.LANDSCAPE_CONFIG = {
     groundWidth: btk.Conversions.yardsToMeters(70), // 70 yards
-    groundLength: btk.Conversions.yardsToMeters(1800), // 2000 yards
+    groundLength: btk.Conversions.yardsToMeters(1800), // 1800 yards
     brownGroundWidth: btk.Conversions.yardsToMeters(1000), // 1000 yards
     brownGroundLength: btk.Conversions.yardsToMeters(2500) // 2500 yards
   };
@@ -162,7 +162,7 @@ export function initConfig()
     modelPath: '../models/prairie dog.glb',
     scatterWidth: Config.LANDSCAPE_CONFIG.groundWidth * 0.75, // 80% of ground width
     minRange: btk.Conversions.yardsToMeters(100), // Minimum range (100 yards)
-    maxRange: btk.Conversions.yardsToMeters(1000), // Maximum range (600 yards)
+    maxRange: btk.Conversions.yardsToMeters(1000), // Maximum range (1000 yards)
     raisedHeight: 0.3, // Height when raised (meters)
     loweredHeight: -0.5, // Height when down (meters, negative = underground)
     animationSpeed: 0.5, // Raise/lower speed (m/s)
