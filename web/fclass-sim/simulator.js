@@ -225,7 +225,14 @@ const FCLASS_DISTANCE_TO_TARGET = {
   600: 'MR-1FCA',
   800: 'LR-FCA',
   900: 'LR-FCA',
-  1000: 'LR-FCA'
+  1000: 'LR-FCA',
+  // 1200 yd is not an NRA championship distance and has no dedicated target; clubs that
+  // shoot it use the standard Long Range F-Class target, so reuse LR-FCA here. At 1200 yd
+  // its 10-ring subtends ~0.8 MOA and the X ~0.4 MOA, so it simply plays harder than 1000.
+  1200: 'LR-FCA',
+  // 1 mile (1760 yd): fictional. MILE-FCA is the LR-FCA face with every ring doubled (round
+  // inch sizes, 20-inch 10-ring ~1.08 MOA, X ~0.54 MOA at a mile).
+  1760: 'MILE-FCA'
 };
 
 // WebGL game instance
@@ -662,7 +669,7 @@ function getGameParams()
   const targetType = FCLASS_DISTANCE_TO_TARGET[distanceYards];
   if (!targetType)
   {
-    throw new Error(`Invalid F-Class distance: ${distanceYards} yards. Valid distances are: 300, 500, 600, 800, 900, 1000`);
+    throw new Error(`Invalid F-Class distance: ${distanceYards} yards. Valid distances are: 300, 500, 600, 800, 900, 1000, 1200, 1760`);
   }
 
   const turnTimeValue = document.getElementById('turnTime').value;

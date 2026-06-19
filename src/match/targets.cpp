@@ -116,6 +116,14 @@ namespace btk::match
                                       btk::math::Conversions::inchesToMeters(44.00f), btk::math::Conversions::inchesToMeters(60.00f), btk::math::Conversions::inchesToMeters(72.00f),
                                       btk::math::Conversions::inchesToMeters(5.00f), "800/900/1000 yd F-Class repair center", 7));
 
+    // Fictional 1-mile (1760 yd) F-Class target. Not an NRA target: it is the LR-FCA
+    // long-range F-Class face with every ring doubled, giving round inch sizes and a 20-inch
+    // 10-ring (~1.08 MOA at a mile; X 10 inch ~0.54 MOA). Roughly the 1000 yd F-Class sight
+    // picture, a mile out, with clean numbers.
+    targets_.emplace("MILE-FCA", Target("MILE-FCA", btk::math::Conversions::inchesToMeters(20.00f), btk::math::Conversions::inchesToMeters(40.00f), btk::math::Conversions::inchesToMeters(60.00f),
+                                        btk::math::Conversions::inchesToMeters(88.00f), btk::math::Conversions::inchesToMeters(120.00f), btk::math::Conversions::inchesToMeters(144.00f),
+                                        btk::math::Conversions::inchesToMeters(10.00f), "1760 yd (1 mile) F-Class (fictional, LR-FCA doubled)", 7, btk::math::Conversions::inchesToMeters(144.00f)));
+
     // IBS Benchrest Hunter Rifle / Varmint For Score targets (no aiming black)
     targets_.emplace("IBS-100", Target("IBS-100", btk::math::Conversions::inchesToMeters(0.50f), btk::math::Conversions::inchesToMeters(1.00f), btk::math::Conversions::inchesToMeters(1.50f),
                                        btk::math::Conversions::inchesToMeters(2.00f), btk::math::Conversions::inchesToMeters(2.50f), btk::math::Conversions::inchesToMeters(3.00f),
