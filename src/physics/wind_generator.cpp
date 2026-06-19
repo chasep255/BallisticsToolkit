@@ -65,7 +65,7 @@ namespace btk::physics
     avg_wind /= static_cast<float>(num_samples);
 
     // Update global advection velocity with EMA
-    global_advection_velocity_ = global_advection_velocity_ * (1.0f - advection_alpha_) + avg_wind * advection_gain_ * advection_alpha_;
+    global_advection_velocity_ = global_advection_velocity_ * (1.0f - advection_alpha_) + avg_wind * advection_multiplier_ * advection_alpha_;
 
     // Integrate global offset
     global_advection_offset_ += global_advection_velocity_ * dt;
@@ -77,9 +77,9 @@ namespace btk::physics
     sample_corners_[1] = max_corner;
   }
 
-  void WindGenerator::setAdvectionGain(float gain) { advection_gain_ = std::max(0.0f, gain); }
+  void WindGenerator::setAdvectionMultiplier(float multiplier) { advection_multiplier_ = std::max(0.0f, multiplier); }
 
-  float WindGenerator::getAdvectionGain() const { return advection_gain_; }
+  float WindGenerator::getAdvectionMultiplier() const { return advection_multiplier_; }
 
   void WindGenerator::setAdvectionAlpha(float alpha) { advection_alpha_ = std::clamp(alpha, 0.0f, 1.0f); }
 
@@ -330,7 +330,7 @@ namespace btk::physics
     presets_["Dead"] = []()
     {
       WindGenerator w;
-      w.setAdvectionGain(5.0);
+      w.setAdvectionMultiplier(5.0);
       w.addComponent(0.5_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
       w.addComponent(0.25_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f);
 
@@ -340,7 +340,7 @@ namespace btk::physics
     presets_["Calm"] = []()
     {
       WindGenerator w;
-      w.setAdvectionGain(5.0);
+      w.setAdvectionMultiplier(5.0);
       w.addComponent(1.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
       w.addComponent(1.0_mph, 1000.0_yd, 1000.0_yd, 3.0_min, 0.5f);
       w.addComponent(0.3_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
@@ -352,7 +352,7 @@ namespace btk::physics
     presets_["Moderate"] = []()
     {
       WindGenerator w;
-      w.setAdvectionGain(5.0);
+      w.setAdvectionMultiplier(5.0);
       w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
       w.addComponent(3.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.75f, 1.0f);
       w.addComponent(1.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
@@ -362,7 +362,7 @@ namespace btk::physics
     presets_["Strong"] = []()
     {
       WindGenerator w;
-      w.setAdvectionGain(5.0);
+      w.setAdvectionMultiplier(5.0);
       w.addComponent(6.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
       w.addComponent(6.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.75f, 1.0f);
       w.addComponent(1.5_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
@@ -372,7 +372,7 @@ namespace btk::physics
     presets_["Extra Strong"] = []()
     {
       WindGenerator w;
-      w.setAdvectionGain(5.0);
+      w.setAdvectionMultiplier(5.0);
       w.addComponent(10.0_mph, 10000.0_yd, 10000.0_yd, 10.0_min, 0.5f);
       w.addComponent(10.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 0.75f, 1.0f);
       w.addComponent(2.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
@@ -383,7 +383,7 @@ namespace btk::physics
     presets_["Switchy"] = []()
     {
       WindGenerator w;
-      w.setAdvectionGain(5.0);
+      w.setAdvectionMultiplier(5.0);
       w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 2.5_min, 0.5f);
       w.addComponent(1.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
 
@@ -393,7 +393,7 @@ namespace btk::physics
     presets_["Turbulent"] = []()
     {
       WindGenerator w;
-      w.setAdvectionGain(5.0);
+      w.setAdvectionMultiplier(5.0);
       w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 5.0_min, 1.0f);
       w.addComponent(3.0_mph, 300.0_yd, 300.0_yd, 1.0_min, 1.0f);
       w.addComponent(2.0_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);
@@ -406,7 +406,7 @@ namespace btk::physics
     presets_["Shear"] = []()
     {
       WindGenerator w;
-      w.setAdvectionGain(5.0);
+      w.setAdvectionMultiplier(5.0);
       w.addComponent(2.0_mph, 10000.0_yd, 10000.0_yd, 20.0_min, 0.5f);       // steady base
       w.addComponent(4.0_mph, 500.0_yd, 2000.0_yd, 5.0_min, 0.5f);            // downrange shear (tight along-range, broad crossrange)
       w.addComponent(0.5_mph, 100.0_yd, 100.0_yd, 0.5_min, 1.0f);           // fine turbulence
@@ -417,7 +417,7 @@ namespace btk::physics
     presets_["Gusty"] = []()
     {
       WindGenerator w;
-      w.setAdvectionGain(5.0);
+      w.setAdvectionMultiplier(5.0);
       w.addComponent(3.0_mph, 10000.0_yd, 10000.0_yd, 5.0_min, 0.5f);
       w.addComponent(3.0_mph, 1000.0_yd, 1000.0_yd, 1.0_min, 1.0f, 1.0f);
       w.addComponent(3.0_mph, 500.0_yd, 500.0_yd, 0.5_min, 1.0f, 1.0f);

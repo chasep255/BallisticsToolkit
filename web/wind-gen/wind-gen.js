@@ -675,7 +675,7 @@ function updateComponentDetails()
 
   const simulationTimeEl = document.getElementById('simulationTime');
   const activeComponentsEl = document.getElementById('activeComponents');
-  const advectionGainEl = document.getElementById('advectionGain');
+  const advectionMultiplierEl = document.getElementById('advectionMultiplier');
 
   // Update global state in top stats panel
   if (activeComponentsEl)
@@ -690,10 +690,10 @@ function updateComponentDetails()
     simulationTimeEl.textContent = currentTime.toFixed(1);
   }
 
-  if (advectionGainEl)
+  if (advectionMultiplierEl)
   {
-    const advectionGain = wind.getAdvectionGain();
-    advectionGainEl.textContent = advectionGain.toFixed(1);
+    const advectionMultiplier = wind.getAdvectionMultiplier();
+    advectionMultiplierEl.textContent = advectionMultiplier.toFixed(1);
   }
 
   // Update global advection display

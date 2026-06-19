@@ -73,18 +73,24 @@ namespace btk::physics
     void setSampleCorners(const btk::math::Vector3D& min_corner, const btk::math::Vector3D& max_corner);
 
     /**
-     * @brief Set the advection gain (multiplier for advection speed)
+     * @brief Set the advection multiplier (scales advection speed relative to the mean wind)
      *
-     * @param gain Advection gain multiplier (higher = faster advection)
+     * The turbulence pattern is carried downrange by the mean wind, loosely following Taylor's
+     * frozen-turbulence hypothesis. This multiplier scales that transport speed without changing
+     * the wind speed the bullet feels. Values > 1 have a rough physical rationale (wind tends to
+     * increase with height and a turbulent eddy is tall, so it may be carried somewhat faster than
+     * the wind sampled near the deck), but in practice it is mainly a tuning knob.
+     *
+     * @param multiplier Advection speed multiplier (higher = faster advection)
      */
-    void setAdvectionGain(float gain);
+    void setAdvectionMultiplier(float multiplier);
 
     /**
-     * @brief Get the advection gain
+     * @brief Get the advection multiplier
      *
-     * @return Current advection gain multiplier
+     * @return Current advection speed multiplier
      */
-    float getAdvectionGain() const;
+    float getAdvectionMultiplier() const;
 
     /**
      * @brief Set the advection EMA smoothing factor
@@ -227,7 +233,7 @@ namespace btk::physics
     float current_time_;
     bool rms_initialized_ = false;                  // Track if RMS has been initialized
     btk::math::Vector3D sample_corners_[2];         // corners of the sample area to create advection
-    float advection_gain_ = 1.0f;                   // Multiplier for advection speed (higher = faster advection)
+    float advection_multiplier_ = 1.0f;             // Multiplier for advection speed (higher = faster advection)
     float advection_alpha_ = 0.01f;                 // EMA smoothing factor for advection velocity
     btk::math::Vector3D global_advection_offset_;   // single offset for all components
     btk::math::Vector3D global_advection_velocity_; // EMA-smoothed global velocity

@@ -115,9 +115,9 @@
         <div style="font-size: 10px; color: #999;">octaves</div>
       </div>
       <div class="stat-item" style="text-align: center;">
-        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Advection Gain</div>
-        <div id="advectionGain" style="font-size: 18px; font-weight: bold; color: #6f42c1;">1.0</div>
-        <div style="font-size: 10px; color: #999;">multiplier</div>
+        <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Advection Multiplier</div>
+        <div id="advectionMultiplier" style="font-size: 18px; font-weight: bold; color: #6f42c1;">1.0</div>
+        <div style="font-size: 10px; color: #999;">× mean wind</div>
       </div>
       <div class="stat-item" style="text-align: center;">
         <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Global Advection Offset</div>
@@ -226,7 +226,7 @@
           <div class="param-help">
             <strong>Active Components:</strong> Number of wind components in the current preset. Each component adds a layer of variation at different spatial and temporal scales.<br><br>
             <strong>Min/Max/Avg Speed:</strong> Statistics computed across the entire visible wind field. Updates in real-time as the field evolves. These values help you understand the overall wind conditions.<br><br>
-            <strong>Advection Gain:</strong> Multiplier that controls how quickly wind patterns drift across the range. Set by the preset (5.0 in the built-in presets). Higher values make patterns move faster without changing the instantaneous wind speeds. This simulates the transport of wind patterns by larger-scale flows.<br><br>
+            <strong>Advection Multiplier:</strong> Scales how fast the wind pattern drifts across the range, relative to the mean wind that carries it (loosely following Taylor's frozen-turbulence hypothesis). Set by the preset. It is greater than 1 without changing the instantaneous wind speeds; the rough rationale is that eddies are tall and may be carried by the faster wind higher up, so the pattern can drift downrange somewhat faster than the wind near the deck. In practice it is mainly a tuning knob.<br><br>
             <strong>Simulation Time:</strong> Elapsed simulation time in seconds, advancing according to the Time Speed multiplier.<br><br>
             <strong>Global Advection Offset (yards):</strong> Cumulative distance the entire wind field has drifted from its origin due to advection.<br><br>
             <strong>Global Advection Speed (mph):</strong> Current drift velocity of the whole wind field, the speed at which the patterns move across the range.
