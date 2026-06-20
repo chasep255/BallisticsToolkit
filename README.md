@@ -116,7 +116,7 @@ Navigate to the [Target Simulator](https://www.ballisticstoolkit.com/target-sim/
 
 1. **Bullet Parameters** - Weight (grains), length (inches), diameter (inches), BC, muzzle velocity, twist rate (inches per turn), drag function
 2. **Match Setup** - Target selection, range, shots per match, number of matches
-3. **Variability** - MV standard deviation, wind variability, rifle accuracy
+3. **Variability** - MV standard deviation, BC standard deviation (% of BC), wind variability, rifle accuracy
 4. **Environment** - Altitude, temperature, humidity (pressure derived)
 
 Watch realistic shot impacts on competitive targets with detailed logging and statistical analysis. Trajectories include spin drift and crosswind jump effects.
@@ -126,7 +126,7 @@ Visit the [Hit Simulator](https://www.ballisticstoolkit.com/hit-sim/hit-sim.html
 
 1. **Bullet Parameters** - BC, drag function (G1/G7), muzzle velocity, weight, diameter, length, twist rate
 2. **Target Shape** - Circle (diameter in inches) or rectangle (width/height in inches)
-3. **Range & Variability** - Target range, MV σ, wind σ (cross/head-tail/vertical), rifle accuracy (MOA)
+3. **Range & Variability** - Target range, MV σ, BC σ (% of BC), wind σ (cross/head-tail/vertical), rifle accuracy (MOA)
 4. **Environment** - Altitude, temperature, humidity
 
 Run the Monte Carlo simulation and view hit probability, group spreads, extreme spread, mean radius, CEP, and radial standard deviation with a visual impact plot.

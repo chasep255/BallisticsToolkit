@@ -71,6 +71,7 @@
             <div class="param-item" id="rectHeightItem" style="display:none;"><label for="rectHeight" title="Rectangle height in inches">Height (in)</label><input type="number" id="rectHeight" value="20" step="0.5" min="0.5" max="120"></div>
             <div class="param-item"><label for="numShots" title="Total shots to simulate">Shots</label><input type="number" id="numShots" value="1000" step="100" min="100" max="50000"></div>
             <div class="param-item"><label for="mvSd" title="MV standard deviation in fps">MV &sigma; (fps)</label><input type="number" id="mvSd" value="7.0" step="0.5" min="0" max="50"></div>
+            <div class="param-item"><label for="bcSd" title="Shot-to-shot ballistic coefficient SD, as a percent of BC (normally distributed). Match-grade: 0.4-0.6%, typical: 0.8-1.2%, poor lots: 1.5-2%+.">BC &sigma; (%)</label><input type="number" id="bcSd" value="0.8" step="0.1" min="0" max="5"></div>
             <div class="param-item"><label for="windSd" title="Crosswind SD in mph">Cross Wind &sigma; (mph)</label><input type="number" id="windSd" value="1.0" step="0.1" min="0" max="20"></div>
             <div class="param-item"><label for="headwindSd" title="Head/tail wind SD in mph">H/T Wind &sigma; (mph)</label><input type="number" id="headwindSd" value="0.0" step="0.1" min="0" max="20"></div>
             <div class="param-item"><label for="updraftSd" title="Vertical wind SD in mph">Vert Wind &sigma; (mph)</label><input type="number" id="updraftSd" value="0.0" step="0.1" min="0" max="20"></div>
@@ -175,6 +176,7 @@
                     <h3>Variability Parameters (Standard Deviations)</h3>
                     <div class="param-help">
                         <strong>MV σ (fps):</strong> Spread in muzzle velocity (lower = more consistent).<br><br>
+                        <strong>BC σ (%):</strong> Shot-to-shot ballistic coefficient spread, as a percent of BC, sampled from a normal distribution. Drives vertical dispersion at long range. Match-grade ≈ 0.4–0.6%, typical ≈ 0.8–1.2%, poor lots 1.5–2%+.<br><br>
                         <strong>Cross Wind σ (mph):</strong> Side-to-side wind variability (main driver of horizontal spread).<br><br>
                         <strong>H/T Wind σ (mph):</strong> Head/tail variability (small influence on drop).<br><br>
                         <strong>Vert Wind σ (mph):</strong> Up/down air movement (usually minor).<br><br>

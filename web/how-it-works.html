@@ -615,18 +615,19 @@
         <!-- ================================================================ -->
         <div class="content-section" id="montecarlo">
             <h2>Simulating groups and scores</h2>
-            <p>A single trajectory shows where one perfect shot lands. Real shots aren't perfect: muzzle velocity, the wind, and the rifle's own accuracy all vary from shot to shot, so a group scatters. The Hit Simulator and Target Simulator measure that scatter by firing the same shot many times, drawing those inputs at random for each, a <strong>Monte Carlo</strong> simulation. Every shot flies a full trajectory through the same engine, so each error ends up where the physics puts it: velocity spread shows up mostly as vertical dispersion (a slower round drops more), while the shot-to-shot wind drives the horizontal spread. The more shots, the closer the measured spread gets to the truth.</p>
+            <p>A single trajectory shows where one perfect shot lands. Real shots aren't perfect: muzzle velocity, the bullet's ballistic coefficient, the wind, and the rifle's own accuracy all vary from shot to shot, so a group scatters. The Hit Simulator and Target Simulator measure that scatter by firing the same shot many times, drawing those inputs at random for each, a <strong>Monte Carlo</strong> simulation. Every shot flies a full trajectory through the same engine, so each error ends up where the physics puts it: velocity and BC spread show up mostly as vertical dispersion (a slower or higher-drag round drops more), while the shot-to-shot wind drives the horizontal spread. The more shots, the closer the measured spread gets to the truth.</p>
 
             <h3>What each shot draws</h3>
-            <p>Four independent error sources are sampled per shot:</p>
+            <p>Five independent error sources are sampled per shot:</p>
             <table class="params">
                 <tr><th>Source</th><th>How it is drawn</th></tr>
                 <tr><td>Muzzle velocity</td><td>Gaussian about the nominal MV with your SD, clipped at &plusmn;3&sigma;; scales the whole velocity vector</td></tr>
+                <tr><td>Ballistic coefficient</td><td>Gaussian about the nominal BC with an SD given as a percent of BC, clipped at &plusmn;3&sigma;; the shot flies that drag function for its whole flight</td></tr>
                 <tr><td>Wind (cross / head / vertical)</td><td>Three independent <strong>zero-mean</strong> Gaussians, each with its own SD, clipped at &plusmn;3&sigma;, held constant over the shot's flight</td></tr>
                 <tr><td>Rifle dispersion</td><td>A launch-angle offset drawn <strong>uniformly over a disk</strong> whose diameter is your group's MOA: the angle uniform in \([0, 2\pi)\) and the radius \(\tfrac{\text{MOA}}{2}\sqrt{U}\), so shots spread evenly by area instead of bunching at the center</td></tr>
                 <tr><td>Scope cant</td><td>A roll about the bore, uniform in &plusmn; the cant setting, which rotates some elevation into windage</td></tr>
             </table>
-            <p>The Gaussian draws (velocity and wind) are clipped to three standard deviations so a freak tail value can't dominate a run. The wind here is a single uniform vector per shot, zero-mean because the rifle was zeroed in calm air, not the range-and-time-varying curl field the 3D sims fly through.</p>
+            <p>The Gaussian draws (velocity, BC, and wind) are clipped to three standard deviations so a freak tail value can't dominate a run. The wind here is a single uniform vector per shot, zero-mean because the rifle was zeroed in calm air, not the range-and-time-varying curl field the 3D sims fly through.</p>
 
             <h3>What the two apps measure</h3>
             <ul class="tech-list">

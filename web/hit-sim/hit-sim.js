@@ -26,6 +26,7 @@ const DEFAULT_PARAMS = {
   rectHeight: '20',
   numShots: '1000',
   mvSd: '7.0',
+  bcSd: '0.8',
   windSd: '1.0',
   headwindSd: '0.0',
   updraftSd: '0.0',
@@ -203,6 +204,7 @@ class HitProbCalculator
     const twistMeters = enableSpin ? btk.Conversions.inchesToMeters(twistRate) : 0.0;
     const range = btk.Conversions.yardsToMeters(parseFloat(document.getElementById('range').value));
     const mvSd = btk.Conversions.fpsToMps(parseFloat(document.getElementById('mvSd').value));
+    const bcSd = parseFloat(document.getElementById('bcSd').value) / 100.0; // percent -> fraction of BC
     const windSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('windSd').value));
     const headwindSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('headwindSd').value));
     const updraftSd = btk.Conversions.mphToMps(parseFloat(document.getElementById('updraftSd').value));
@@ -225,7 +227,7 @@ class HitProbCalculator
     const scopeCantRad = btk.Conversions.degreesToRadians(parseFloat(document.getElementById('scopeCant').value));
     this.simulator = new btk.MatchSimulator(
       this.bullet, mv, this.dummyTarget, range, this.atmosphere,
-      mvSd, windSd, headwindSd, updraftSd,
+      mvSd, bcSd, windSd, headwindSd, updraftSd,
       rifleAccuracyRad, scopeCantRad, 0.001, twistMeters
     );
   }

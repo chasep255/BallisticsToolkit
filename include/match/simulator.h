@@ -60,6 +60,7 @@ namespace btk::match
      * @param target_range Distance to target in m
      * @param atmosphere Atmospheric conditions
      * @param mv_sd Muzzle velocity standard deviation in m/s
+     * @param bc_sd Ballistic coefficient standard deviation as a fraction of the nominal BC (e.g. 0.008 = 0.8%)
      * @param wind_speed_sd Crosswind speed standard deviation in m/s
      * @param headwind_sd Head/tail wind speed standard deviation in m/s
      * @param updraft_sd Up/down draft speed standard deviation in m/s
@@ -68,7 +69,7 @@ namespace btk::match
      * @param timestep Simulation timestep in seconds
      * @param twist_rate Twist rate in m/turn (positive for RH, negative for LH). Default 0 (no spin).
      */
-    Simulator(const btk::ballistics::Bullet& bullet, float nominal_mv, const btk::match::Target& target, float target_range, const btk::physics::Atmosphere& atmosphere, float mv_sd,
+    Simulator(const btk::ballistics::Bullet& bullet, float nominal_mv, const btk::match::Target& target, float target_range, const btk::physics::Atmosphere& atmosphere, float mv_sd, float bc_sd,
               float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float scope_cant, float timestep = 0.001f, float twist_rate = 0.0f);
 
     /**
@@ -130,6 +131,7 @@ namespace btk::match
     float target_range_; // m
     btk::physics::Atmosphere atmosphere_;
     float mv_sd_;          // m/s
+    float bc_sd_;          // fraction of nominal BC
     float wind_speed_sd_;  // m/s
     float headwind_sd_;    // m/s
     float updraft_sd_;     // m/s

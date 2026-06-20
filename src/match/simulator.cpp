@@ -18,10 +18,10 @@ namespace btk::match
   {
   }
 
-  Simulator::Simulator(const btk::ballistics::Bullet& bullet, float nominal_mv, const btk::match::Target& target, float target_range, const btk::physics::Atmosphere& atmosphere, float mv_sd,
+  Simulator::Simulator(const btk::ballistics::Bullet& bullet, float nominal_mv, const btk::match::Target& target, float target_range, const btk::physics::Atmosphere& atmosphere, float mv_sd, float bc_sd,
                        float wind_speed_sd, float headwind_sd, float updraft_sd, float rifle_accuracy, float scope_cant, float timestep, float twist_rate)
-    : bullet_(bullet), nominal_mv_(nominal_mv), target_(target), target_range_(target_range), atmosphere_(atmosphere), mv_sd_(mv_sd), wind_speed_sd_(wind_speed_sd), headwind_sd_(headwind_sd),
-      updraft_sd_(updraft_sd), rifle_accuracy_(rifle_accuracy), scope_cant_(scope_cant), timestep_(timestep), zeroed_bullet_(bullet)
+    : bullet_(bullet), nominal_mv_(nominal_mv), target_(target), target_range_(target_range), atmosphere_(atmosphere), mv_sd_(mv_sd), bc_sd_(bc_sd), wind_speed_sd_(wind_speed_sd),
+      headwind_sd_(headwind_sd), updraft_sd_(updraft_sd), rifle_accuracy_(rifle_accuracy), scope_cant_(scope_cant), timestep_(timestep), zeroed_bullet_(bullet)
   {
     // Set up the simulator with bullet and atmosphere
     simulator_.setInitialBullet(bullet);
@@ -56,6 +56,12 @@ namespace btk::match
     float scale = (nominal_mv_ > 1e-6f) ? (mv_mps / nominal_mv_) : 1.0f;
     btk::math::Vector3D scaled_velocity = zeroed_velocity * scale;
 
+    // Apply ballistic coefficient variation (clipped to 3-sigma). bc_sd_ is a
+    // fraction of the nominal BC, matching how shooters quote BC SD as a percent.
+    float nominal_bc = initial_bullet.getBc();
+    float bc_sd_abs = nominal_bc * bc_sd_;
+    float actual_bc = clipToThreeSigma(btk::math::Random::normal(nominal_bc, bc_sd_abs), nominal_bc, bc_sd_abs);
+
     // Apply rifle accuracy (uniform distribution within circle of given diameter)
     float angle = btk::math::Random::uniform(0.0f, 2.0f * M_PI_F);
     float radius_rad = (rifle_accuracy_ / 2.0f) * std::sqrt(btk::math::Random::uniform(0.0f, 1.0f));
@@ -85,8 +91,10 @@ namespace btk::match
     float vy_canted = modified_velocity.x * cant_sin + modified_velocity.y * cant_cos;
     float vz_canted = modified_velocity.z;
 
+    // Rebuild the static bullet properties with the per-shot BC, then attach the flight state.
+    btk::ballistics::Bullet varied_bullet(modified_bullet.getWeight(), modified_bullet.getDiameter(), modified_bullet.getLength(), actual_bc, modified_bullet.getDragFunction());
     btk::math::Vector3D canted_velocity(vx_canted, vy_canted, vz_canted);
-    btk::ballistics::Bullet canted_bullet = btk::ballistics::Bullet(modified_bullet, modified_bullet.getPosition(), canted_velocity, modified_bullet.getSpinRate());
+    btk::ballistics::Bullet canted_bullet = btk::ballistics::Bullet(varied_bullet, modified_bullet.getPosition(), canted_velocity, modified_bullet.getSpinRate());
 
     // Generate 3D wind components
     float crosswind_sd_mps = wind_speed_sd_;
@@ -114,7 +122,7 @@ namespace btk::match
     if(!impact_point)
     {
       // Shouldn't happen, but handle gracefully
-      SimulatedShot simulatedShot(999.0f, 999.0f, 0, false, mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps,
+      SimulatedShot simulatedShot(999.0f, 999.0f, 0, false, mv_mps, actual_bc, headwind_mps, crosswind_mps,
                                   updraft_mps, release_angle_h, release_angle_v, 0.0f, cant_rad);
       shots_.push_back(simulatedShot);
       return simulatedShot;
@@ -128,8 +136,7 @@ namespace btk::match
     // Score the shot and add to match
     const Hit& hit = match_.addHit(impact_x, impact_y, target_, bullet_.getDiameter());
 
-    SimulatedShot simulatedShot(impact_x, impact_y, hit.getScore(), hit.isX(), mv_mps, bullet_.getBc(), headwind_mps, crosswind_mps, updraft_mps, release_angle_h, release_angle_v, impact_velocity,
-                                cant_rad);
+    SimulatedShot simulatedShot(impact_x, impact_y, hit.getScore(), hit.isX(), mv_mps, actual_bc, headwind_mps, crosswind_mps, updraft_mps, release_angle_h, release_angle_v, impact_velocity, cant_rad);
 
     // Store shot result for diagnostics
     shots_.push_back(simulatedShot);
