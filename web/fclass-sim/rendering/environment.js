@@ -268,11 +268,20 @@ export class EnvironmentRenderer
     // Create mountain peaks in the distance using instanced rendering
     this.mountainData = [];
 
+    // Mountains must sit beyond the target line, never between the shooter and
+    // the targets. At long ranges (notably the 1760 yd mile) the default band
+    // (1500-2400 yd) straddles the target, so a peak could randomly spawn in
+    // front of the frame and hide it on some restarts. Push the near edge back
+    // far enough that even the widest peak's base clears the target line.
+    const maxRadius = this.cfg.mountainHeightMax * 1.8;
+    const distMin = Math.max(this.cfg.mountainDistanceMin, this.rangeDistance + maxRadius + 100);
+    const distMax = Math.max(this.cfg.mountainDistanceMax, distMin + 300);
+
     for (let i = 0; i < this.cfg.mountainCount; i++)
     {
       const x = (Math.random() - 0.5) * 3000;
       const y = this.cfg.mountainHeightMin + Math.random() * (this.cfg.mountainHeightMax - this.cfg.mountainHeightMin);
-      const z = -(this.cfg.mountainDistanceMin + Math.random() * (this.cfg.mountainDistanceMax - this.cfg.mountainDistanceMin));
+      const z = -(distMin + Math.random() * (distMax - distMin));
 
       this.mountainData.push(
       {
