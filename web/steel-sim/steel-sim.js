@@ -568,7 +568,7 @@ class SteelSimulator
       targetPos,
       0.001, // dt (1ms)
       1000, // max_iterations (increased for spin effects)
-      0.001, // tolerance (1mm)
+      1e-6, // tolerance (m): 1mm left ~0.038 MOA of residual at a 100yd zero
       spinRate // spin_rate
     );
 

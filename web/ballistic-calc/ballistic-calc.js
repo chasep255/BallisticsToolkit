@@ -149,7 +149,7 @@ function calculateTrajectory()
     targetPos,
     0.001, // dt (time step)
     20, // max_iterations
-    0.001, // tolerance
+    1e-6, // tolerance (m): 1mm was too loose (~0.038 MOA of residual at a 100yd zero)
     spinRate // spin_rate calculated from twist
   );
   targetPos.delete(); // Dispose Vector3D to prevent memory leak

@@ -98,11 +98,12 @@ namespace btk::ballistics
      * @param target_position Target position as 3D vector (x=crossrange, y=vertical, z=downrange) in m
      * @param dt Time step for zeroing calculation in s (default: 0.001f)
      * @param max_iterations Maximum iterations for zeroing (default: 50)
-     * @param tolerance Convergence tolerance for zeroing in m (default: 0.001f)
+     * @param tolerance Convergence tolerance for zeroing in m (default: 1e-6f). 1mm subtends
+     *                  ~0.038 MOA at 100yd, so a looser tolerance leaves a visible zero residual.
      * @param spin_rate Bullet spin rate in rad/s (default: 0.0f)
      * @return Const reference to the zeroed initial bullet
      */
-    const Bullet& computeZero(float muzzle_velocity, const btk::math::Vector3D& target_position, float dt = 0.001f, int max_iterations = 20, float tolerance = 0.001f, float spin_rate = 0.0f);
+    const Bullet& computeZero(float muzzle_velocity, const btk::math::Vector3D& target_position, float dt = 0.001f, int max_iterations = 20, float tolerance = 1e-6f, float spin_rate = 0.0f);
 
     /**
      * @brief Simulate trajectory from current state to maximum distance

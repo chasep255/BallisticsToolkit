@@ -144,7 +144,7 @@ export class ShotSolver
 
       // Use C++ zeroing routine (returns raw BTK bullet)
       const zeroStartTime = performance.now();
-      this.zeroedBullet = this.ballisticSimulator.computeZero(mvMps, targetPos, 0.001, 1000, 0.001, spinRate);
+      this.zeroedBullet = this.ballisticSimulator.computeZero(mvMps, targetPos, 0.001, 1000, 1e-6, spinRate);
       const zeroTimeMs = performance.now() - zeroStartTime;
       targetPos.delete();
       targetPos = null;
