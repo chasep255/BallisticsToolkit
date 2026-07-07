@@ -182,6 +182,7 @@ import
 }
 from './core/remote-host.js';
 import { KEY_LEGEND_HTML, SIM_DISCLAIMER_HTML } from './ui/key-legend.js';
+import { GamepadController } from './core/gamepad.js';
 import
 {
   WindFieldHUD
@@ -1641,6 +1642,11 @@ class FClassSimulator
     this.setupShotFiringControls();
     this.setupInputGate();
 
+    // Optional gamepad: re-emits the sim's own keys, so it rides on top of the
+    // handlers above (including the pair-fire gate) and needs no other wiring.
+    this.gamepad = new GamepadController();
+    this.gamepad.start();
+
     // Create targets (requires BTK to be loaded)
     try
     {
@@ -2981,6 +2987,13 @@ class FClassSimulator
     // Detach from the Remote Play host (its lifecycle is owned by the config
     // checkbox at module scope, so the connection survives restarts).
     this.remoteHost = null;
+
+    // Stop gamepad polling before the key handlers go away.
+    if (this.gamepad)
+    {
+      this.gamepad.stop();
+      this.gamepad = null;
+    }
 
     if (this.inputGateHandler)
     {

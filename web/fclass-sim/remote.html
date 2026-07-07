@@ -68,6 +68,7 @@
     import { PeerJSLink } from './core/peer-link.js';
     import { Scorecard } from './ui/scorecard.js';
     import { KEY_LEGEND_HTML, SIM_DISCLAIMER_HTML } from './ui/key-legend.js';
+    import { GamepadController } from './core/gamepad.js';
 
     const link = new PeerJSLink();
     const scorecard = new Scorecard();
@@ -277,6 +278,13 @@
     }
     document.addEventListener('keydown', forwardKey);
     document.addEventListener('keyup', forwardKey);
+
+    // ---- Gamepad support: the controller emits the sim's own keys as synthetic
+    // events on `document`, so they ride the forwardKey path above straight to
+    // the host, exactly like the keyboard. forwardKey drops them until the link
+    // is open, so polling before connect is harmless. ----
+    const gamepad = new GamepadController();
+    gamepad.start();
 
     // ---- Join the host's room from ?room=<id> ----
     const roomId = new URLSearchParams(window.location.search).get('room');

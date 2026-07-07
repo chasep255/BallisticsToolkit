@@ -16,6 +16,12 @@ export const KEY_LEGEND_HTML = `
         </div>
         <div class="quick-keys-section">
           <strong>Fire:</strong> <kbd>Space</kbd>
+        </div>
+        <div class="quick-keys-section">
+          <strong>Gamepad:</strong><br>
+          <kbd>L Stick</kbd> Pan • <kbd>R Stick</kbd> Aim • <kbd>D-pad</kbd> Dial<br>
+          <kbd>LB</kbd><kbd>LT</kbd> Spotting zoom • <kbd>RB</kbd><kbd>RT</kbd> Rifle zoom<br>
+          <kbd>Y</kbd> Reset • <kbd>R Stick</kbd>/<kbd>A</kbd> Fire
         </div>`;
 
 /** Simulation disclaimer, shown under the legend on the host and the viewer. */
