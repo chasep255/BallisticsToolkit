@@ -592,17 +592,22 @@ function setupUI()
 /**
  * The host's match actions for a gamepad. Each one clicks the page's real
  * button, so it keeps that button's handler, availability, and label logic, and
- * keyboard play is untouched (none of this is bound to a key). 'fire' resolves
- * only while a match-end popup is up, which is what makes the trigger confirm
- * the popup instead of shooting at it.
+ * keyboard play is untouched (none of this is bound to a key).
+ *
+ * 'fire' and 'confirm' both resolve to the match-end popup, and only while one
+ * is up: that is what makes the trigger confirm the popup instead of shooting at
+ * it, and lets A proceed the way a console player expects. The rest of the time
+ * 'fire' falls back to its key and A does nothing at all.
  */
 function gamepadClicks()
 {
+  const matchEndPrimary = () => document.querySelector('.match-end-notification .match-end-primary');
   return {
     scorecard: () => document.getElementById('scorecardBtn'),
     record: () => document.getElementById('goForRecordBtn'),
     windhud: () => document.getElementById('windHUDBtn'),
-    fire: () => document.querySelector('.match-end-notification .match-end-primary')
+    fire: matchEndPrimary,
+    confirm: matchEndPrimary
   };
 }
 

@@ -288,6 +288,7 @@
     // already relays to the host where the action is host-authoritative. Go For
     // Record especially has to stay ours: the host's button would go for record
     // as p1, not us. ----
+    const matchEndPrimary = () => document.querySelector('.match-end-notification .match-end-primary');
     const gamepad = new GamepadController(
     {
       clicks:
@@ -295,7 +296,10 @@
         scorecard: () => $('rpScorecardBtn'),
         record: () => $('rpGoForRecordBtn'),
         windhud: () => $('rpWindHudBtn'),
-        fire: () => document.querySelector('.match-end-notification .match-end-primary')
+        // Both reach the popup, and only while one is up: RT confirms it rather
+        // than shooting at it, and A proceeds the way a console player expects.
+        fire: matchEndPrimary,
+        confirm: matchEndPrimary
       }
     });
     gamepad.start();

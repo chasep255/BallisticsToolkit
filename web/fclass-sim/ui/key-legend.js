@@ -22,6 +22,7 @@ export const KEY_LEGEND_HTML = `
           <kbd>L Stick</kbd> Pan • <kbd>R Stick</kbd> Aim • <kbd>D-pad</kbd> Dial<br>
           Hold <kbd>LT</kbd> to zoom with the sticks (L spotting, R rifle)<br>
           <kbd>RT</kbd> Fire • <kbd>Y</kbd> Reset<br>
+          <kbd>A</kbd>/<kbd>RT</kbd> Start the next match (at the popup)<br>
           <kbd>Start</kbd> Scorecard • <kbd>B</kbd> Go For Record<br>
           <kbd>Back</kbd>/<kbd>View</kbd> Wind HUD
         </div>`;

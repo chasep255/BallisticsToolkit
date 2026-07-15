@@ -39,6 +39,9 @@
  *   RT               -> 'fire', resolved only while the match-end popup is up, so
  *                       the trigger confirms it instead of shooting at it, and
  *                       falls back to firing the rest of the time
+ *   A                -> 'confirm', the same popup: A is where a console player's
+ *                       thumb goes to proceed. It has no key to fall back on, so
+ *                       it stays inert the rest of the time and cannot fire.
  * No pause on the pad, by choice: it stays a mouse/keyboard action.
  *
  * If no gamepad is connected the poll is a cheap no-op, so this is inert until
@@ -207,6 +210,10 @@ export class GamepadController
 
     // Fire (one shot) - the trigger, and only the trigger.
     add(this._pressedBtn(gp, B.RT), 'fire', 'Space', ' ', 'shot');
+
+    // Confirm (one shot) - A, click-only. It has no key, so it reaches the
+    // match-end popup and nothing else: A can never send a round.
+    add(this._pressedBtn(gp, B.A), 'confirm', null, null, 'shot');
 
     // Match actions (one shot each), click-only: no code/key, so each does
     // nothing unless the page bound a resolver for it.
