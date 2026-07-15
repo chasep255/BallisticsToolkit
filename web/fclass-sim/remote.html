@@ -109,21 +109,21 @@
         el.innerHTML = `
           <div style="margin-bottom: 12px;">⏱️ Match ${notif.matchIndex} Complete!</div>
           <div style="font-size: 14px; margin-bottom: 16px;">${notif.recordShots} record shots fired<br>Ready for Match ${notif.matchIndex + 1}</div>
-          <button id="rpNextMatchBtn" style="${btnStyle}">Start Match ${notif.matchIndex + 1}</button>`;
+          <button id="rpNextMatchBtn" class="match-end-primary" style="${btnStyle}">Start Match ${notif.matchIndex + 1}</button>`;
       }
       else if (notif.kind === 'aggregateComplete')
       {
         el.innerHTML = `
           <div style="margin-bottom: 12px;">🎯 Aggregate Complete!</div>
           <div style="font-size: 14px; margin-bottom: 16px;">All ${notif.numMatches} matches finished<br>Check scorecard for final results</div>
-          <button id="rpViewScorecardBtn" style="${btnStyle}">View Scorecard</button>`;
+          <button id="rpViewScorecardBtn" class="match-end-primary" style="${btnStyle}">View Scorecard</button>`;
       }
       else // pairResult
       {
         el.innerHTML = `
           <div style="font-size: 24px; margin-bottom: 10px;">🏆 ${notif.winnerName} Wins!</div>
           <div style="font-size: 14px; margin-bottom: 16px;">Check scorecard for the full breakdown</div>
-          <button id="rpViewScorecardBtn" style="${btnStyle}">View Scorecard</button>`;
+          <button id="rpViewScorecardBtn" class="match-end-primary" style="${btnStyle}">View Scorecard</button>`;
       }
 
       document.body.appendChild(el);
@@ -282,8 +282,22 @@
     // ---- Gamepad support: the controller emits the sim's own keys as synthetic
     // events on `document`, so they ride the forwardKey path above straight to
     // the host, exactly like the keyboard. forwardKey drops them until the link
-    // is open, so polling before connect is harmless. ----
-    const gamepad = new GamepadController();
+    // is open, so polling before connect is harmless.
+    //
+    // Its match actions click our own buttons rather than the host's, since each
+    // already relays to the host where the action is host-authoritative. Go For
+    // Record especially has to stay ours: the host's button would go for record
+    // as p1, not us. ----
+    const gamepad = new GamepadController(
+    {
+      clicks:
+      {
+        scorecard: () => $('rpScorecardBtn'),
+        record: () => $('rpGoForRecordBtn'),
+        windhud: () => $('rpWindHudBtn'),
+        fire: () => document.querySelector('.match-end-notification .match-end-primary')
+      }
+    });
     gamepad.start();
 
     // ---- Join the host's room from ?room=<id> ----

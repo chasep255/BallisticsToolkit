@@ -20,8 +20,10 @@ export const KEY_LEGEND_HTML = `
         <div class="quick-keys-section">
           <strong>Gamepad:</strong><br>
           <kbd>L Stick</kbd> Pan • <kbd>R Stick</kbd> Aim • <kbd>D-pad</kbd> Dial<br>
-          <kbd>LB</kbd><kbd>LT</kbd> Spotting zoom • <kbd>RB</kbd><kbd>RT</kbd> Rifle zoom<br>
-          <kbd>Y</kbd> Reset • <kbd>R Stick</kbd>/<kbd>A</kbd> Fire
+          Hold <kbd>LT</kbd> to zoom with the sticks (L spotting, R rifle)<br>
+          <kbd>RT</kbd> Fire • <kbd>Y</kbd> Reset<br>
+          <kbd>Start</kbd> Scorecard • <kbd>B</kbd> Go For Record<br>
+          <kbd>Back</kbd>/<kbd>View</kbd> Wind HUD
         </div>`;
 
 /** Simulation disclaimer, shown under the legend on the host and the viewer. */

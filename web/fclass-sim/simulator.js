@@ -43,6 +43,7 @@ const DEFAULT_PARAMS = {
   windPreset: 'Moderate',
   mirageLevel: 'Medium',
   focalPlane: 'SFP',
+  reticleColor: DEFAULT_RETICLE_COLOR,
   mvSd: '7.0',
   rifleAccuracy: '0.25',
   bc: '0.311',
@@ -168,6 +169,7 @@ import
 from './rendering/ballistics.js';
 import
 {
+  DEFAULT_RETICLE_COLOR,
   Scope
 }
 from './rendering/scope.js';
@@ -534,6 +536,16 @@ function setupUI()
     });
   }
 
+  // Reticle color takes effect live (no restart needed)
+  const reticleColorEl = document.getElementById('reticleColor');
+  if (reticleColorEl)
+  {
+    reticleColorEl.addEventListener('change', () =>
+    {
+      if (webglGame) webglGame.setReticleColor(reticleColorEl.value);
+    });
+  }
+
   // Recoil preset takes effect live (no restart needed)
   const recoilPresetEl = document.getElementById('recoilPreset');
   if (recoilPresetEl)
@@ -575,6 +587,23 @@ function setupUI()
       }
     }
   });
+}
+
+/**
+ * The host's match actions for a gamepad. Each one clicks the page's real
+ * button, so it keeps that button's handler, availability, and label logic, and
+ * keyboard play is untouched (none of this is bound to a key). 'fire' resolves
+ * only while a match-end popup is up, which is what makes the trigger confirm
+ * the popup instead of shooting at it.
+ */
+function gamepadClicks()
+{
+  return {
+    scorecard: () => document.getElementById('scorecardBtn'),
+    record: () => document.getElementById('goForRecordBtn'),
+    windhud: () => document.getElementById('windHUDBtn'),
+    fire: () => document.querySelector('.match-end-notification .match-end-primary')
+  };
 }
 
 function startGame()
@@ -683,6 +712,7 @@ function getGameParams()
     windMarker: document.getElementById('windMarker').value,
     mirageLevel: document.getElementById('mirageLevel').value,
     focalPlane: document.getElementById('focalPlane').value,
+    reticleColor: document.getElementById('reticleColor').value,
     fclassMode: fclassMode,
     // Match format
     mode: document.getElementById('matchMode').value,
@@ -846,6 +876,7 @@ class FClassSimulator
     this.mirageLevel = params.mirageLevel || 'Medium';
     this.mirageIntensity = FClassSimulator.MIRAGE_LEVEL_SCALE[this.mirageLevel] ?? 1.0;
     this.focalPlane = params.focalPlane || 'SFP';
+    this.reticleColor = params.reticleColor || DEFAULT_RETICLE_COLOR;
 
     // Bullet parameters
     this.mv = params.mv;
@@ -1632,6 +1663,7 @@ class FClassSimulator
       maxFOV: FClassSimulator.RIFLE_SCOPE_MAX_FOV / 60.0,
       reticle: true,
       focalPlane: this.focalPlane, // SFP: reticle stays fixed size, FFP: reticle scales with zoom
+      reticleColor: this.reticleColor, // also colors the dial readout
       maxDialMOA: FClassSimulator.RIFLE_SCOPE_MAX_DIAL_MOA, // Maximum dial adjustment
       recoilPreset: this.recoilPreset // recoil kicks the rifle aim on fire
     });
@@ -1644,7 +1676,8 @@ class FClassSimulator
 
     // Optional gamepad: re-emits the sim's own keys, so it rides on top of the
     // handlers above (including the pair-fire gate) and needs no other wiring.
-    this.gamepad = new GamepadController();
+    // Its match actions click the page's own buttons instead, see gamepadClicks.
+    this.gamepad = new GamepadController({ clicks: gamepadClicks() });
     this.gamepad.start();
 
     // Create targets (requires BTK to be loaded)
@@ -1786,6 +1819,13 @@ class FClassSimulator
     this.mirageIntensity = FClassSimulator.MIRAGE_LEVEL_SCALE[level] ?? 1.0;
     if (this.spottingScope) this.spottingScope.setMirageIntensity(this.mirageIntensity);
     if (this.rifleScope) this.rifleScope.setMirageIntensity(this.mirageIntensity);
+  }
+
+  /** Set the reticle color live on the rifle scope (the only one with a reticle). */
+  setReticleColor(name)
+  {
+    this.reticleColor = name;
+    if (this.rifleScope) this.rifleScope.setReticleColor(name);
   }
 
   /** Set recoil preset (None/Light/Medium/Heavy) live on the rifle scope. */
@@ -2377,7 +2417,7 @@ class FClassSimulator
           All ${event.numMatches} matches finished<br>
           Check scorecard for final results
         </div>
-        <button id="viewScorecardBtn" style="
+        <button id="viewScorecardBtn" class="match-end-primary" style="
           background: white; color: #ff9800; border: none; padding: 8px 16px;
           border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;
         ">View Scorecard</button>
@@ -2391,7 +2431,7 @@ class FClassSimulator
           ${event.recordShots} record shots fired<br>
           Ready for Match ${event.matchIndex + 1}
         </div>
-        <button id="nextMatchBtn" style="
+        <button id="nextMatchBtn" class="match-end-primary" style="
           background: white; color: #ff9800; border: none; padding: 8px 16px;
           border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;
         ">Start Match ${event.matchIndex + 1}</button>
@@ -2445,7 +2485,7 @@ class FClassSimulator
     notification.innerHTML = `
       <div style="font-size: 24px; margin-bottom: 10px;">🏆 ${event.winnerName} Wins!</div>
       <div style="font-size: 14px; margin-bottom: 16px;">Check scorecard for the full breakdown</div>
-      <button id="viewScorecardBtn" style="
+      <button id="viewScorecardBtn" class="match-end-primary" style="
         background: white; color: #1e7e34; border: none; padding: 8px 16px;
         border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;
       ">View Scorecard</button>

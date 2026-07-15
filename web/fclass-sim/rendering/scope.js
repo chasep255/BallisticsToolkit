@@ -20,6 +20,29 @@ import
 }
 from '../core/virtual-coords.js';
 
+/**
+ * Reticle color choices. Values are raw framebuffer RGB (0..1): the reticle is
+ * drawn by a ShaderMaterial that writes gl_FragColor directly, with no tone
+ * mapping or color-space conversion on the way out, so these are literally what
+ * lands on screen. DullRed is the long-standing default.
+ */
+export const RETICLE_COLORS = {
+  Grey: [0.7, 0.7, 0.7],
+  DullRed: [0.8, 0.0, 0.0],
+  BrightRed: [1.0, 0.0, 0.0],
+  BrightGreen: [0.0, 1.0, 0.0],
+  BrightYellow: [1.0, 1.0, 0.0]
+};
+
+export const DEFAULT_RETICLE_COLOR = 'DullRed';
+
+const isReticleColor = (name) => Object.prototype.hasOwnProperty.call(RETICLE_COLORS, name);
+
+const reticleRGB = (name) => (isReticleColor(name) ? RETICLE_COLORS[name] : RETICLE_COLORS[DEFAULT_RETICLE_COLOR]);
+
+/** The reticle color as a CSS color, for the canvas-drawn dial readout. */
+const reticleCSS = (name) => `rgb(${reticleRGB(name).map((c) => Math.round(c * 255)).join(', ')})`;
+
 export class Scope
 {
   constructor(config)
@@ -33,6 +56,7 @@ export class Scope
     this.rangeDistance = config.rangeDistance;
     this.reticle = config.reticle || false;
     this.focalPlane = config.focalPlane || 'SFP'; // 'FFP' or 'SFP'
+    this.reticleColor = isReticleColor(config.reticleColor) ? config.reticleColor : DEFAULT_RETICLE_COLOR;
     this.maxDialMOA = config.maxDialMOA || 10; // Maximum dial adjustment in MOA (±10 MOA default)
     this.msaaSamples = config.msaaSamples ?? 4;
 
@@ -240,6 +264,10 @@ export class Scope
         hasReticle:
         {
           value: this.reticle ? 1.0 : 0.0
+        },
+        reticleColor:
+        {
+          value: new THREE.Vector3(...reticleRGB(this.reticleColor))
         }
       },
       vertexShader: `
@@ -255,11 +283,10 @@ export class Scope
         uniform float reticleFOV; // For reticle scaling: current FOV for FFP, initial FOV for SFP
         uniform float scopeRadius;
         uniform float hasReticle;
-        
+        uniform vec3 reticleColor; // player's choice, see RETICLE_COLORS
+
         varying vec2 vUv;
-        
-        // Red color for reticle (slightly dimmed from pure red)
-        const vec3 reticleColor = vec3(0.8, 0.0, 0.0);
+
         const vec3 borderColor = vec3(0.0, 0.0, 0.0);
         
         void main() {
@@ -498,9 +525,9 @@ export class Scope
     const vStr = `${Math.abs(vertical).toFixed(3)}${vertical <= 0 ? 'U' : 'D'}`;
     const hStr = `${Math.abs(horizontal).toFixed(3)}${horizontal <= 0 ? 'R' : 'L'}`;
 
-    // Draw text in red like the reticle - elevation on top, windage below
+    // Draw text in the reticle color - elevation on top, windage below
     ctx.font = 'bold 36px monospace';
-    ctx.fillStyle = '#ff0000'; // Red like the reticle
+    ctx.fillStyle = reticleCSS(this.reticleColor);
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
 
@@ -593,6 +620,22 @@ export class Scope
     Medium: { boostDeg: 0.05, settleDeg: 0.012 },
     Heavy: { boostDeg: 0.09, settleDeg: 0.022 }
   };
+
+  /**
+   * Set the reticle color (a RETICLE_COLORS key). Live-safe: it repaints the
+   * shader uniform and the dial readout, which is drawn in the same color.
+   */
+  setReticleColor(name)
+  {
+    this.reticleColor = isReticleColor(name) ? name : DEFAULT_RETICLE_COLOR;
+
+    const uniforms = this.crosshairMesh?.material?.uniforms;
+    if (uniforms?.reticleColor)
+    {
+      uniforms.reticleColor.value.set(...reticleRGB(this.reticleColor));
+    }
+    this.updateScopeDialDisplay();
+  }
 
   /**
    * Set recoil preset ('None' | 'Light' | 'Medium' | 'Heavy'). Live-safe.

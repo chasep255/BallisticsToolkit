@@ -15,11 +15,31 @@
  * Standard mapping (https://w3c.github.io/gamepad/#remapping):
  *   Left stick       -> W/A/S/D    pan the spotting scope (held, threshold)
  *   Right stick      -> arrows     aim the rifle scope (0.1 MOA clicks, repeat)
+ *   LT (held)        -> zoom mode: the sticks zoom instead of pan/aim, so each
+ *                       scope keeps its own side of the pad:
+ *                         left stick up/down  -> E / Q  spotting zoom (held)
+ *                         right stick up/down -> + / -  rifle zoom (repeat)
  *   D-pad            -> Shift+arrows   dial the turrets (1/8 MOA clicks, repeat)
- *   LB / LT          -> E / Q      zoom the spotting scope in / out (held)
- *   RB / RT          -> + / -      zoom the rifle scope in / out (repeat)
+ *   RT               -> Space      fire (one shot per press)
  *   Y                -> R          reset the rifle scope
- *   Right stick click / A -> Space   fire (one shot per press)
+ *
+ * RT fires because that is what a trigger is for; the zoom it used to carry moved
+ * onto the LT modifier, which is the only way to fit four zoom directions (two
+ * scopes, in and out) plus the trigger into the four shoulder inputs. Nothing
+ * else fires: a stick click or a face button used to, and that only ever cost
+ * people a round they didn't mean to send.
+ *
+ * The match actions have no key of their own, and rather than invent keyboard
+ * shortcuts for them (keyboard play is left exactly as it was), the page hands
+ * us a resolver per action and the pad clicks the real button, inheriting its
+ * handler, availability, and label logic:
+ *   Start            -> 'scorecard'
+ *   B                -> 'record'     go for record
+ *   Back / View      -> 'windhud'
+ *   RT               -> 'fire', resolved only while the match-end popup is up, so
+ *                       the trigger confirms it instead of shooting at it, and
+ *                       falls back to firing the rest of the time
+ * No pause on the pad, by choice: it stays a mouse/keyboard action.
  *
  * If no gamepad is connected the poll is a cheap no-op, so this is inert until
  * a controller is actually used and never interferes with the keyboard.
@@ -48,6 +68,8 @@ export class GamepadController
     RB: 5,
     LT: 6,
     RT: 7,
+    BACK: 8, // "View" on an Xbox One/Series pad
+    START: 9, // "Menu" on an Xbox One/Series pad
     L3: 10, // left stick click
     R3: 11, // right stick click
     DPAD_UP: 12,
@@ -56,11 +78,22 @@ export class GamepadController
     DPAD_RIGHT: 15
   };
 
-  constructor()
+  /**
+   * @param {Object} [config]
+   * @param {Object} [config.clicks] - action id -> () => Element|null, for the
+   *   ids listed in the header ('scorecard', 'record', 'windhud', 'fire'). On
+   *   press, a resolver that returns a visible element wins and the pad clicks
+   *   it instead of emitting that input's key. An action with no key of its own
+   *   simply does nothing when its resolver comes up empty or hidden. Each page
+   *   passes its own buttons, so the host drives the host's and the Remote Play
+   *   viewer drives its own (which relay to the host themselves).
+   */
+  constructor(config = {})
   {
+    this._clicks = config.clicks || {};
     this._running = false;
     this._raf = null;
-    // id -> { meta, startedAt, lastFire } for currently-held virtual inputs.
+    // id -> { meta, startedAt, lastFire, consumed } for currently-held inputs.
     this._pressed = new Map();
   }
 
@@ -115,7 +148,9 @@ export class GamepadController
    * Read the pad into a Map of active virtual inputs:
    *   id -> { code, key, shiftKey, type }
    * type is 'held' (pan/zoom, stays down until released), 'pulse' (arrows /
-   * rifle zoom, auto-repeats) or 'shot' (fire / reset, one edge per press).
+   * rifle zoom, auto-repeats) or 'shot' (fire / reset / match actions, one edge
+   * per press). A null code means the input has no key: it is click-only and
+   * does nothing unless the page bound a resolver for its id.
    */
   _readInputs(gp)
   {
@@ -132,21 +167,33 @@ export class GamepadController
     const rx = gp.axes[2] || 0;
     const ry = gp.axes[3] || 0;
 
-    // Spotting scope pan (held) - left stick.
-    add(ly < -dz, 'w', 'KeyW', 'w', 'held');
-    add(ly > dz, 's', 'KeyS', 's', 'held');
-    add(lx < -dz, 'a', 'KeyA', 'a', 'held');
-    add(lx > dz, 'd', 'KeyD', 'd', 'held');
+    // Left trigger is a modifier: it turns both sticks into zoom controls. Pan
+    // and aim are suppressed while it is held, so the sticks do exactly one
+    // thing at a time ("hold LT and the sticks zoom").
+    if (this._pressedBtn(gp, B.LT))
+    {
+      // Each scope zooms on the stick that normally drives it: left stick for
+      // the spotting scope (held, like E/Q), right stick for the rifle scope
+      // (pulsed, like +/-).
+      add(ly < -dz, 'e', 'KeyE', 'e', 'held');
+      add(ly > dz, 'q', 'KeyQ', 'q', 'held');
+      add(ry < -dz, 'rzin', 'Equal', '+', 'pulse');
+      add(ry > dz, 'rzout', 'Minus', '-', 'pulse');
+    }
+    else
+    {
+      // Spotting scope pan (held) - left stick.
+      add(ly < -dz, 'w', 'KeyW', 'w', 'held');
+      add(ly > dz, 's', 'KeyS', 's', 'held');
+      add(lx < -dz, 'a', 'KeyA', 'a', 'held');
+      add(lx > dz, 'd', 'KeyD', 'd', 'held');
 
-    // Spotting scope zoom (held) - left bumper (in) / left trigger (out).
-    add(this._pressedBtn(gp, B.LB), 'e', 'KeyE', 'e', 'held');
-    add(this._pressedBtn(gp, B.LT), 'q', 'KeyQ', 'q', 'held');
-
-    // Rifle scope aim / hold-over (pulse) - right stick, plain arrows.
-    add(ry < -dz, 'aimup', 'ArrowUp', 'ArrowUp', 'pulse');
-    add(ry > dz, 'aimdown', 'ArrowDown', 'ArrowDown', 'pulse');
-    add(rx < -dz, 'aimleft', 'ArrowLeft', 'ArrowLeft', 'pulse');
-    add(rx > dz, 'aimright', 'ArrowRight', 'ArrowRight', 'pulse');
+      // Rifle scope aim / hold-over (pulse) - right stick, plain arrows.
+      add(ry < -dz, 'aimup', 'ArrowUp', 'ArrowUp', 'pulse');
+      add(ry > dz, 'aimdown', 'ArrowDown', 'ArrowDown', 'pulse');
+      add(rx < -dz, 'aimleft', 'ArrowLeft', 'ArrowLeft', 'pulse');
+      add(rx > dz, 'aimright', 'ArrowRight', 'ArrowRight', 'pulse');
+    }
 
     // Rifle scope dial (pulse) - D-pad emits Shift+arrows (1/8 MOA clicks). The
     // aim and dial ids are distinct so the two controls track independently.
@@ -155,16 +202,17 @@ export class GamepadController
     add(this._pressedBtn(gp, B.DPAD_LEFT), 'dialleft', 'ArrowLeft', 'ArrowLeft', 'pulse', true);
     add(this._pressedBtn(gp, B.DPAD_RIGHT), 'dialright', 'ArrowRight', 'ArrowRight', 'pulse', true);
 
-    // Rifle scope zoom (pulse) - right bumper (in) / right trigger (out).
-    add(this._pressedBtn(gp, B.RB), 'rzin', 'Equal', '+', 'pulse');
-    add(this._pressedBtn(gp, B.RT), 'rzout', 'Minus', '-', 'pulse');
-
     // Reset (one shot) - Y.
     add(this._pressedBtn(gp, B.Y), 'reset', 'KeyR', 'r', 'shot');
 
-    // Fire (one shot) - right stick click or A. Unified so pressing both, or
-    // releasing one while holding the other, never double-fires.
-    add(this._pressedBtn(gp, B.R3) || this._pressedBtn(gp, B.A), 'fire', 'Space', ' ', 'shot');
+    // Fire (one shot) - the trigger, and only the trigger.
+    add(this._pressedBtn(gp, B.RT), 'fire', 'Space', ' ', 'shot');
+
+    // Match actions (one shot each), click-only: no code/key, so each does
+    // nothing unless the page bound a resolver for it.
+    add(this._pressedBtn(gp, B.START), 'scorecard', null, null, 'shot');
+    add(this._pressedBtn(gp, B.B), 'record', null, null, 'shot');
+    add(this._pressedBtn(gp, B.BACK), 'windhud', null, null, 'shot');
 
     return active;
   }
@@ -181,13 +229,13 @@ export class GamepadController
       const st = this._pressed.get(id);
       if (!st)
       {
-        this._pressed.set(id, { meta, startedAt: now, lastFire: now });
-        this._dispatch(true, meta);
+        const consumed = this._press(id, meta);
+        this._pressed.set(id, { meta, startedAt: now, lastFire: now, consumed });
       }
       else
       {
         st.meta = meta;
-        if (meta.type === 'pulse' && now - st.startedAt >= GamepadController.REPEAT_DELAY_MS && now - st.lastFire >= GamepadController.REPEAT_INTERVAL_MS)
+        if (!st.consumed && meta.type === 'pulse' && now - st.startedAt >= GamepadController.REPEAT_DELAY_MS && now - st.lastFire >= GamepadController.REPEAT_INTERVAL_MS)
         {
           st.lastFire = now;
           this._dispatch(true, meta);
@@ -200,17 +248,47 @@ export class GamepadController
     {
       if (!active.has(id))
       {
-        this._dispatch(false, st.meta);
+        if (!st.consumed && st.meta.code) this._dispatch(false, st.meta);
         this._pressed.delete(id);
       }
     }
+  }
+
+  /**
+   * Act on a press: click the page element bound to this id if there is one and
+   * it is available, else emit the key. Returns whether the press was spent on a
+   * click, in which case its release is swallowed too.
+   */
+  _press(id, meta)
+  {
+    if (this._tryClick(id)) return true;
+    if (meta.code) this._dispatch(true, meta);
+    return false;
+  }
+
+  /**
+   * Click this action's page element, if the page bound one and it is available
+   * right now. offsetParent is null for an element hidden by itself or by an
+   * ancestor, which is what keeps an action the page isn't currently offering
+   * (Go For Record before sighters are done, anything before the match starts,
+   * every button on the viewer until it connects) a no-op rather than a
+   * surprise, exactly like the button it stands in for.
+   */
+  _tryClick(id)
+  {
+    const resolve = this._clicks[id];
+    if (typeof resolve !== 'function') return false;
+    const el = resolve();
+    if (!el || el.offsetParent === null) return false;
+    el.click();
+    return true;
   }
 
   _releaseAll()
   {
     for (const [, st] of this._pressed)
     {
-      this._dispatch(false, st.meta);
+      if (!st.consumed && st.meta.code) this._dispatch(false, st.meta);
     }
     this._pressed.clear();
   }
