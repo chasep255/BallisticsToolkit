@@ -214,18 +214,18 @@ function compareLoads()
   // Get max range
   const maxRange = parseFloat(document.getElementById('maxRange').value);
 
-  // Validate inputs
-  if (bullet1.weight <= 0 || bullet1.bc <= 0 || bullet1.mv <= 0)
+  // Validate inputs (positive assertions so a blank field's NaN also fails)
+  if (!(bullet1.weight > 0) || !(bullet1.bc > 0) || !(bullet1.mv > 0))
   {
     showError('Bullet 1 has invalid values. Please check weight, BC, and MV.');
     return;
   }
-  if (bullet2.weight <= 0 || bullet2.bc <= 0 || bullet2.mv <= 0)
+  if (!(bullet2.weight > 0) || !(bullet2.bc > 0) || !(bullet2.mv > 0))
   {
     showError('Bullet 2 has invalid values. Please check weight, BC, and MV.');
     return;
   }
-  if (maxRange < 100)
+  if (!(maxRange >= 100))
   {
     showError('Max range must be at least 100 yards.');
     return;

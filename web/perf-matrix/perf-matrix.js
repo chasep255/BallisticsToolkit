@@ -92,6 +92,27 @@ function getInputValues()
  */
 function validateInputs(params)
 {
+  // A blank field parses to NaN, which slips through every comparison below
+  // (all false for NaN) and would silently produce an empty grid.
+  // Temperature and altitude are legitimately negative.
+  for (const [key, value] of Object.entries(params))
+  {
+    if (typeof value === 'number' && isNaN(value))
+    {
+      showError(`Invalid input for "${key}". Please enter a number.`);
+      return false;
+    }
+  }
+  if (params.bulletWeight <= 0)
+  {
+    showError('Bullet weight must be positive');
+    return false;
+  }
+  if (params.humidity < 0)
+  {
+    showError('Humidity cannot be negative');
+    return false;
+  }
   if (params.bcStart >= params.bcEnd)
   {
     showError('Start BC must be less than End BC');

@@ -193,6 +193,22 @@ class HitProbCalculator
     if (this.atmosphere) { this.atmosphere.delete(); this.atmosphere = null; }
     if (this.dummyTarget) { this.dummyTarget.delete(); this.dummyTarget = null; }
 
+    // Validate before building anything: a blank field parses to NaN and would
+    // otherwise run a full simulation producing silent garbage. Temperature,
+    // altitude, and cant are legitimately negative.
+    const numericFields = ['bc', 'mv', 'diameter', 'weight', 'length', 'twistRate',
+      'range', 'mvSd', 'bcSd', 'windSd', 'headwindSd', 'updraftSd',
+      'rifleAccuracy', 'scopeCant', 'altitude', 'temperature', 'humidity'];
+    const allowNegative = new Set(['temperature', 'altitude', 'scopeCant']);
+    for (const id of numericFields)
+    {
+      const value = parseFloat(document.getElementById(id).value);
+      if (isNaN(value) || (value < 0 && !allowNegative.has(id)))
+      {
+        throw new Error(`invalid input for ${id}`);
+      }
+    }
+
     const bc = parseFloat(document.getElementById('bc').value);
     const dragFunction = document.getElementById('dragFunction').value;
     const mv = btk.Conversions.fpsToMps(parseFloat(document.getElementById('mv').value));

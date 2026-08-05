@@ -79,6 +79,23 @@ function calculateTrajectory()
 
   hideError();
 
+  // Reject blank/NaN fields up front: a NaN max range would otherwise run the
+  // simulation to its full 60 s time cap and produce an empty table.
+  // Temperature and altitude are legitimately negative.
+  const numericFields = ['weight', 'diameter', 'bc', 'length', 'twistRate',
+    'temperature', 'humidity', 'altitude', 'muzzleVelocity', 'zeroRange',
+    'scopeHeight', 'maxRange', 'step', 'windSpeed', 'windDirection'];
+  const allowNegative = new Set(['temperature', 'altitude']);
+  for (const id of numericFields)
+  {
+    const value = parseFloat(document.getElementById(id).value);
+    if (isNaN(value) || (value < 0 && !allowNegative.has(id)))
+    {
+      showError(`Invalid input for "${id}". Please enter a number.`);
+      return;
+    }
+  }
+
   // Get form values and convert to proper units
   const weight = btk.Conversions.grainsToKg(parseFloat(document.getElementById('weight').value));
   const diameter = btk.Conversions.inchesToMeters(parseFloat(document.getElementById('diameter').value));

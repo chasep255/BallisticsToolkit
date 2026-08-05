@@ -285,6 +285,9 @@ class TargetSimulator
       bc: parseFloat(document.getElementById('bc').value),
       mv: parseFloat(document.getElementById('mv').value),
       diameter: parseFloat(document.getElementById('diameter').value),
+      weight: parseFloat(document.getElementById('weight').value),
+      length: parseFloat(document.getElementById('length').value),
+      twistRate: parseFloat(document.getElementById('twistRate').value),
       range: parseFloat(document.getElementById('range').value),
       shots: parseInt(document.getElementById('shots').value),
       matches: parseInt(document.getElementById('matches').value),
@@ -300,16 +303,18 @@ class TargetSimulator
       humidity: parseFloat(document.getElementById('humidity').value) / 100.0
     };
 
-    // Validate all inputs
+    // Signed quantities: a winter temperature, below-sea-level range, or
+    // left-leaning cant are all legitimate negative inputs.
+    const allowNegative = new Set(['temperature', 'altitude', 'scopeCant']);
+
     for (const [key, value] of Object.entries(inputs))
     {
-      if (isNaN(value) || value < 0)
+      if (isNaN(value) || (value < 0 && !allowNegative.has(key)))
       {
         alert(`Invalid input for ${key}: ${value}`);
         return false;
       }
     }
-
 
     return true;
   }
