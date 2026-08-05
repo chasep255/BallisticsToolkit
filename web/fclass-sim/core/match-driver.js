@@ -63,8 +63,12 @@ export class MatchDriver
 
   // ===== Progression (optional) =====
 
-  /** Proceed past a completed segment (e.g. start the next match). @param {number} now seconds */
-  advance(now) {}
+  /**
+   * Proceed past a completed segment (e.g. start the next match).
+   * @param {number} now seconds
+   * @returns {boolean} true if the driver actually advanced
+   */
+  advance(now) { return false; }
 
   // ===== Queries (abstract / optional) =====
 

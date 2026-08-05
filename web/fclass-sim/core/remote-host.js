@@ -75,6 +75,17 @@ export class RemoteHost
    */
   setMediaStream(stream)
   {
+    // Stop the old canvas capture track so restarts don't leave orphaned video
+    // encoders running against the same canvas. Audio is left alone: that track
+    // is the audio manager's persistent capture-node stream, shared across
+    // streams, and a stopped MediaStreamTrack is dead for good.
+    if (this.mediaStream && this.mediaStream !== stream)
+    {
+      for (const t of this.mediaStream.getVideoTracks())
+      {
+        try { t.stop(); } catch { /* ignore */ }
+      }
+    }
     this.mediaStream = stream;
     if (this.isOpen) this.link.setMediaStream(stream);
   }
@@ -130,5 +141,13 @@ export class RemoteHost
       try { this.link.send({ type: 'bye' }); } catch { /* ignore */ }
     }
     this.link.close();
+    if (this.mediaStream)
+    {
+      for (const t of this.mediaStream.getVideoTracks())
+      {
+        try { t.stop(); } catch { /* ignore */ }
+      }
+      this.mediaStream = null;
+    }
   }
 }

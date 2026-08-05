@@ -3,6 +3,20 @@
  */
 export class Scorecard
 {
+  /**
+   * Escape a value for interpolation into scorecard HTML. Labels, match params,
+   * and scores can arrive over the Remote Play link, so treat them as untrusted.
+   */
+  static esc(value)
+  {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   constructor()
   {
     this.modal = null;
@@ -174,7 +188,7 @@ export class Scorecard
     if (model.footer)
     {
       html += `<div class="scorecard-footer">`;
-      html += `<div class="match-total">${model.footer.text}</div>`;
+      html += `<div class="match-total">${Scorecard.esc(model.footer.text)}</div>`;
       html += `</div>`;
     }
 
@@ -188,19 +202,20 @@ export class Scorecard
       return '';
     }
 
+    const esc = Scorecard.esc;
     let html = '<div class="match-params"><div class="match-params-grid">';
-    html += `<div class="param-item"><span class="param-label">Distance:</span> <span class="param-value">${this.matchParams.distance} yards</span></div>`;
-    html += `<div class="param-item"><span class="param-label">Target:</span> <span class="param-value">${this.matchParams.target}</span></div>`;
-    html += `<div class="param-item"><span class="param-label">Wind:</span> <span class="param-value">${this.matchParams.windPreset}</span></div>`;
-    html += `<div class="param-item"><span class="param-label">Focal Plane:</span> <span class="param-value">${this.matchParams.focalPlane}</span></div>`;
-    html += `<div class="param-item"><span class="param-label">BC:</span> <span class="param-value">${this.matchParams.bc} ${this.matchParams.dragFunction}</span></div>`;
-    html += `<div class="param-item"><span class="param-label">Muzzle Velocity:</span> <span class="param-value">${this.matchParams.mv} fps</span></div>`;
-    html += `<div class="param-item"><span class="param-label">MV SD:</span> <span class="param-value">${this.matchParams.mvSd} fps</span></div>`;
-    html += `<div class="param-item"><span class="param-label">Rifle Accuracy:</span> <span class="param-value">${this.matchParams.rifleAccuracy} MOA</span></div>`;
-    html += `<div class="param-item"><span class="param-label">Bullet:</span> <span class="param-value">${this.matchParams.diameter}" / ${this.matchParams.weight}gr / ${this.matchParams.length}"</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Distance:</span> <span class="param-value">${esc(this.matchParams.distance)} yards</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Target:</span> <span class="param-value">${esc(this.matchParams.target)}</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Wind:</span> <span class="param-value">${esc(this.matchParams.windPreset)}</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Focal Plane:</span> <span class="param-value">${esc(this.matchParams.focalPlane)}</span></div>`;
+    html += `<div class="param-item"><span class="param-label">BC:</span> <span class="param-value">${esc(this.matchParams.bc)} ${esc(this.matchParams.dragFunction)}</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Muzzle Velocity:</span> <span class="param-value">${esc(this.matchParams.mv)} fps</span></div>`;
+    html += `<div class="param-item"><span class="param-label">MV SD:</span> <span class="param-value">${esc(this.matchParams.mvSd)} fps</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Rifle Accuracy:</span> <span class="param-value">${esc(this.matchParams.rifleAccuracy)} MOA</span></div>`;
+    html += `<div class="param-item"><span class="param-label">Bullet:</span> <span class="param-value">${esc(this.matchParams.diameter)}" / ${esc(this.matchParams.weight)}gr / ${esc(this.matchParams.length)}"</span></div>`;
     if (this.matchParams.twist > 0)
     {
-      html += `<div class="param-item"><span class="param-label">Twist:</span> <span class="param-value">1:${this.matchParams.twist}"</span></div>`;
+      html += `<div class="param-item"><span class="param-label">Twist:</span> <span class="param-value">1:${esc(this.matchParams.twist)}"</span></div>`;
     }
     html += '</div></div>';
     return html;
@@ -212,11 +227,11 @@ export class Scorecard
    */
   renderSection(section, key)
   {
-    const totalText = `${section.total}-${section.xCount}X`;
+    const totalText = `${Scorecard.esc(section.total)}-${Scorecard.esc(section.xCount)}X`;
     const winnerClass = section.isWinner ? ' winner' : '';
 
     let html = `<div class="scorecard-section${winnerClass}">`;
-    html += `<div class="section-header">${section.label}${section.isWinner ? ' \u2605' : ''}</div>`;
+    html += `<div class="section-header">${Scorecard.esc(section.label)}${section.isWinner ? ' \u2605' : ''}</div>`;
 
     // Sighters row
     html += `<div class="scorecard-row"><div class="row-label">Sighters</div><div class="shot-cells">`;
@@ -355,7 +370,7 @@ export class Scorecard
    */
   shotCell(shot, kind, label)
   {
-    const face = shot.isX ? 'X' : shot.score;
+    const face = shot.isX ? 'X' : Scorecard.esc(shot.score);
     if (!shot.diag)
     {
       return `<div class="shot-cell ${kind}">${face}</div>`;
@@ -376,10 +391,10 @@ export class Scorecard
     if (!this.detailOverlay) return;
     const diag = entry.diag || {};
 
-    const scoreText = entry.isX ? 'X' : `${entry.score}`;
+    const scoreText = entry.isX ? 'X' : Scorecard.esc(entry.score);
     let html = `<div class="shot-detail-content">`;
     html += `<div class="shot-detail-header">`;
-    html += `<span class="shot-detail-title">${entry.label}</span>`;
+    html += `<span class="shot-detail-title">${Scorecard.esc(entry.label)}</span>`;
     html += `<span class="shot-detail-score">${scoreText}</span>`;
     html += `<button class="shot-detail-close" title="Back to scorecard">&times;</button>`;
     html += `</div>`;
@@ -692,6 +707,14 @@ export class Scorecard
     {
       this.modal.removeEventListener('click', this.clickHandler);
       this.clickHandler = null;
+    }
+    if (this.modal && this.cellClickHandler)
+    {
+      // The scorecard-content element outlives this instance; without this
+      // removal every restart stacks another handler that pins the old
+      // instance (and all its per-shot diagnostics) in memory.
+      const content = this.modal.querySelector('.scorecard-content');
+      if (content) content.removeEventListener('click', this.cellClickHandler);
     }
     if (this.detailOverlay)
     {

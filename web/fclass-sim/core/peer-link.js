@@ -88,6 +88,8 @@ export class PeerJSLink
     // Receive the host's media (it calls us once it has a live canvas).
     this.peer.on('call', (call) =>
     {
+      // A rehosted stream arrives as a fresh call; drop the stale one first.
+      try { if (this.mediaCall) this.mediaCall.close(); } catch { /* ignore */ }
       this.mediaCall = call;
       call.answer(); // client sends no media of its own
       call.on('stream', (stream) =>
@@ -103,6 +105,8 @@ export class PeerJSLink
   setMediaStream(stream)
   {
     if (!this.peer || !this.conn) return;
+    // Close the previous call so restarts/reconnects don't stack live encoders.
+    try { if (this.mediaCall) this.mediaCall.close(); } catch { /* ignore */ }
     this.mediaCall = this.peer.call(this.conn.peer, stream);
     const videoTrack = stream.getVideoTracks()[0];
     if (videoTrack) this._tuneSender(this.mediaCall, videoTrack);
@@ -253,10 +257,18 @@ export class PeerJSLink
 
   _bindConn(conn)
   {
+    // A rejoin can arrive before the old connection's ICE timeout fires its
+    // close event; close the superseded conn and ignore its late events so a
+    // stale close can't flip _open back to false on the live connection.
+    const old = this.conn;
     this.conn = conn;
-    conn.on('open', () => { this._open = true; if (this.onOpen) this.onOpen(); });
-    conn.on('data', (data) => { if (this.onMessage) this.onMessage(data); });
-    conn.on('close', () => { this._open = false; if (this.onClose) this.onClose(); });
-    conn.on('error', (err) => { if (this.onError) this.onError(err); });
+    if (old && old !== conn)
+    {
+      try { old.close(); } catch { /* ignore */ }
+    }
+    conn.on('open', () => { if (this.conn !== conn) return; this._open = true; if (this.onOpen) this.onOpen(); });
+    conn.on('data', (data) => { if (this.conn !== conn) return; if (this.onMessage) this.onMessage(data); });
+    conn.on('close', () => { if (this.conn !== conn) return; this._open = false; if (this.onClose) this.onClose(); });
+    conn.on('error', (err) => { if (this.conn !== conn) return; if (this.onError) this.onError(err); });
   }
 }

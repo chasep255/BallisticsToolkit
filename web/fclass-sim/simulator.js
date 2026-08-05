@@ -2339,6 +2339,14 @@ class FClassSimulator
    */
   advanceToNextMatch()
   {
+    // The driver refuses to advance unless a match just completed, so a
+    // duplicate click (host + remote viewer) or a stray remote message
+    // can't skip a match or touch host state mid-match.
+    if (!this.driver.advance(ResourceManager.time.getElapsedTime()))
+    {
+      return;
+    }
+
     document.querySelectorAll('.match-end-notification').forEach(n => n.remove());
 
     // Real matches have a break between them while targets are scored and squads
@@ -2346,7 +2354,6 @@ class FClassSimulator
     // preset, evolved state) to mimic that passage of time.
     this.advanceWindBetweenMatches();
 
-    this.driver.advance(ResourceManager.time.getElapsedTime());
     this.updateControls();
     this.updateHUD();
     if (this.remoteHost) this.remoteHost.pushNotificationDismiss();
@@ -2488,7 +2495,7 @@ class FClassSimulator
     `;
 
     notification.innerHTML = `
-      <div style="font-size: 24px; margin-bottom: 10px;">🏆 ${event.winnerName} Wins!</div>
+      <div style="font-size: 24px; margin-bottom: 10px;">🏆 ${Scorecard.esc(event.winnerName)} Wins!</div>
       <div style="font-size: 14px; margin-bottom: 16px;">Check scorecard for the full breakdown</div>
       <button id="viewScorecardBtn" class="match-end-primary" style="
         background: white; color: #1e7e34; border: none; padding: 8px 16px;

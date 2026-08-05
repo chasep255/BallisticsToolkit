@@ -87,6 +87,18 @@
       document.querySelectorAll('.match-end-notification').forEach(n => n.remove());
     }
 
+    // Escape host-supplied values before HTML interpolation; everything in a
+    // notification arrives over the data channel and is untrusted.
+    function escapeHtml(value)
+    {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function showRemoteNotification(notif)
     {
       if (!notif) return;
@@ -107,21 +119,21 @@
       if (notif.kind === 'matchComplete')
       {
         el.innerHTML = `
-          <div style="margin-bottom: 12px;">⏱️ Match ${notif.matchIndex} Complete!</div>
-          <div style="font-size: 14px; margin-bottom: 16px;">${notif.recordShots} record shots fired<br>Ready for Match ${notif.matchIndex + 1}</div>
-          <button id="rpNextMatchBtn" class="match-end-primary" style="${btnStyle}">Start Match ${notif.matchIndex + 1}</button>`;
+          <div style="margin-bottom: 12px;">⏱️ Match ${escapeHtml(notif.matchIndex)} Complete!</div>
+          <div style="font-size: 14px; margin-bottom: 16px;">${escapeHtml(notif.recordShots)} record shots fired<br>Ready for Match ${escapeHtml(notif.matchIndex + 1)}</div>
+          <button id="rpNextMatchBtn" class="match-end-primary" style="${btnStyle}">Start Match ${escapeHtml(notif.matchIndex + 1)}</button>`;
       }
       else if (notif.kind === 'aggregateComplete')
       {
         el.innerHTML = `
           <div style="margin-bottom: 12px;">🎯 Aggregate Complete!</div>
-          <div style="font-size: 14px; margin-bottom: 16px;">All ${notif.numMatches} matches finished<br>Check scorecard for final results</div>
+          <div style="font-size: 14px; margin-bottom: 16px;">All ${escapeHtml(notif.numMatches)} matches finished<br>Check scorecard for final results</div>
           <button id="rpViewScorecardBtn" class="match-end-primary" style="${btnStyle}">View Scorecard</button>`;
       }
       else // pairResult
       {
         el.innerHTML = `
-          <div style="font-size: 24px; margin-bottom: 10px;">🏆 ${notif.winnerName} Wins!</div>
+          <div style="font-size: 24px; margin-bottom: 10px;">🏆 ${escapeHtml(notif.winnerName)} Wins!</div>
           <div style="font-size: 14px; margin-bottom: 16px;">Check scorecard for the full breakdown</div>
           <button id="rpViewScorecardBtn" class="match-end-primary" style="${btnStyle}">View Scorecard</button>`;
       }

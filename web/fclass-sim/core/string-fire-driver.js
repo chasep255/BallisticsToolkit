@@ -38,6 +38,7 @@ export class StringFireMatchDriver extends MatchDriver
     this.timerStartTime = null;
     this.recordShotsFired = 0;
     this.sightersFired = 0;
+    this.firedPhase = null; // phase latched at trigger pull for the shot in flight
     this.isTimerRunning = false;
 
     console.log(`${LOG_PREFIX} ${this.numMatches} matches, ${this.maxRecordShots} shots, ${this.timerDuration}s each`);
@@ -92,9 +93,18 @@ export class StringFireMatchDriver extends MatchDriver
     return this.phase !== 'ended';
   }
 
+  onShotFired(now)
+  {
+    // Latch the phase at trigger pull: a shot legally fired before the clock
+    // expires must score in the phase it was fired in, even when it lands
+    // after the match ends (time of flight is seconds at the long ranges).
+    this.firedPhase = this.phase;
+  }
+
   onShotScored(shotData, now)
   {
-    const isRecord = this.phase === 'record';
+    const isRecord = (this.firedPhase ?? this.phase) === 'record';
+    this.firedPhase = null;
 
     if (isRecord)
     {
@@ -121,8 +131,10 @@ export class StringFireMatchDriver extends MatchDriver
       suddenDeath: false
     });
 
-    // Auto-switch to record on matches after the first once the sighter cap is met.
-    if (!isRecord && this.matchIndex > 1 && this.sightersFired >= this.laterMatchSighters)
+    // Auto-switch to record on matches after the first once the sighter cap is
+    // met (phase-guarded so a sighter landing after the clock expires can't
+    // pull an ended match back into record).
+    if (!isRecord && this.phase === 'sighters' && this.matchIndex > 1 && this.sightersFired >= this.laterMatchSighters)
     {
       this.phase = 'record';
     }
@@ -167,17 +179,24 @@ export class StringFireMatchDriver extends MatchDriver
 
   advance(now)
   {
-    if (this.matchIndex < this.numMatches)
+    // Only a completed match can be advanced past; without this, a duplicate
+    // click (host + remote viewer) or a stray remote advanceMatch message
+    // would wipe an in-progress match.
+    if (this.phase !== 'ended' || this.matchIndex >= this.numMatches)
     {
-      this.matchIndex++;
-      this.phase = 'sighters';
-      this.timeRemaining = this.timerDuration;
-      this.timerStartTime = null;
-      this.recordShotsFired = 0;
-      this.sightersFired = 0;
-      this.isTimerRunning = false;
-      this.startTimerIfNeeded(now);
+      return false;
     }
+
+    this.matchIndex++;
+    this.phase = 'sighters';
+    this.timeRemaining = this.timerDuration;
+    this.timerStartTime = null;
+    this.recordShotsFired = 0;
+    this.sightersFired = 0;
+    this.firedPhase = null;
+    this.isTimerRunning = false;
+    this.startTimerIfNeeded(now);
+    return true;
   }
 
   // ===== Queries =====
