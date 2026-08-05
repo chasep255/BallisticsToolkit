@@ -3,7 +3,6 @@
 #include "match/target.h"
 #include "math/conversions.h"
 #include "math/vector.h"
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -114,7 +113,7 @@ namespace btk::match
     /**
      * @brief Get group size (extreme spread)
      *
-     * @return Group size in m (diagonal of bounding box)
+     * @return Group size in m (largest center-to-center distance between any two hits)
      */
     float getGroupSize() const;
 
@@ -126,16 +125,16 @@ namespace btk::match
     std::pair<float, float> getCenter() const;
 
     /**
-     * @brief Get mean radius from center
+     * @brief Get mean radius from the group center
      *
-     * @return Mean radius in m
+     * @return Mean distance of hits from the group center in m
      */
     float getMeanRadius() const;
 
     /**
      * @brief Get radial standard deviation
      *
-     * @return Radial standard deviation in m
+     * @return Sample standard deviation of hit radii about the group center in m
      */
     float getRadialStandardDeviation() const;
 
@@ -164,14 +163,8 @@ namespace btk::match
     std::vector<Hit> hits_;
 
     // Accumulated metrics
-    float sumX_ = 0.0f;                                    // m
-    float sumY_ = 0.0f;                                    // m
-    float sumX2_ = 0.0f;                                   // sum of (x/meter)^2 - dimensionless
-    float sumY2_ = 0.0f;                                   // sum of (y/meter)^2 - dimensionless
-    float minX_ = std::numeric_limits<float>::quiet_NaN(); // m
-    float maxX_ = std::numeric_limits<float>::quiet_NaN(); // m
-    float minY_ = std::numeric_limits<float>::quiet_NaN(); // m
-    float maxY_ = std::numeric_limits<float>::quiet_NaN(); // m
+    float sumX_ = 0.0f; // m
+    float sumY_ = 0.0f; // m
     int totalScore_ = 0;
     int xCount_ = 0;
 

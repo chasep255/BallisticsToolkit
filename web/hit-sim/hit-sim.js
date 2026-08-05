@@ -303,32 +303,45 @@ class HitProbCalculator
     }
 
     const meanR = sumR / n;
-    const rsd = Math.sqrt(Math.max(0, sumR2 / n - meanR * meanR));
+    const rsd = n > 1 ? Math.sqrt(Math.max(0, (sumR2 - n * meanR * meanR) / (n - 1))) : 0;
 
     const sorted = Array.from(radii).sort((a, b) => a - b);
     const cep = sorted[Math.floor(n * 0.5)];
 
-    let es;
-    if (n <= 5000)
+    // Extreme spread is the diameter of the point set, which only depends on
+    // the convex hull: build the hull (monotone chain), then take the max
+    // pairwise distance over hull points. Exact at any shot count.
+    let es = 0;
+    if (n >= 2)
     {
-      es = 0;
-      for (let i = 0; i < n; i++)
+      const pts = this.impacts.map(p => [p.x_m, p.y_m]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      const lower = [];
+      for (const p of pts)
       {
-        for (let j = i + 1; j < n; j++)
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+        lower.push(p);
+      }
+      const upper = [];
+      for (let i = pts.length - 1; i >= 0; i--)
+      {
+        const p = pts[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+        upper.push(p);
+      }
+      const hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+      let es2 = 0;
+      for (let i = 0; i < hull.length; i++)
+      {
+        for (let j = i + 1; j < hull.length; j++)
         {
-          const dx = this.impacts[j].x_m - this.impacts[i].x_m;
-          const dy = this.impacts[j].y_m - this.impacts[i].y_m;
+          const dx = hull[j][0] - hull[i][0];
+          const dy = hull[j][1] - hull[i][1];
           const d = dx * dx + dy * dy;
-          if (d > es) es = d;
+          if (d > es2) es2 = d;
         }
       }
-      es = Math.sqrt(es);
-    }
-    else
-    {
-      const dx = maxX - minX;
-      const dy = maxY - minY;
-      es = Math.sqrt(dx * dx + dy * dy);
+      es = Math.sqrt(es2);
     }
 
     const toIn = (m) => btk.Conversions.metersToInches(m);
