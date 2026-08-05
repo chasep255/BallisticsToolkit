@@ -173,13 +173,17 @@ export class SteelTarget
         const instanceIndex = this.chainInstanceIndices[i];
         if (instanceIndex === null) continue;
 
+        // anchor's Vector3D fields materialize as owning WASM handles and must
+        // be deleted alongside the localToWorld result
         const anchor = anchors.get(i);
-        const attachWorld = this.steelTarget.localToWorld(anchor.localAttachment);
+        const localAttachment = anchor.localAttachment;
+        const worldFixed = anchor.worldFixed;
+        const attachWorld = this.steelTarget.localToWorld(localAttachment);
 
         const fixed = new THREE.Vector3(
-          anchor.worldFixed.x,
-          anchor.worldFixed.y,
-          anchor.worldFixed.z
+          worldFixed.x,
+          worldFixed.y,
+          worldFixed.z
         );
         const attach = new THREE.Vector3(
           attachWorld.x,
@@ -203,6 +207,8 @@ export class SteelTarget
         SteelTargetFactory.chainMesh.setMatrixAt(instanceIndex, instanceMatrix);
 
         attachWorld.delete();
+        localAttachment.delete();
+        worldFixed.delete();
       }
 
       SteelTargetFactory.chainMesh.instanceMatrix.needsUpdate = true;

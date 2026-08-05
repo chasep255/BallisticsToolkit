@@ -2964,8 +2964,14 @@ function populateWindPresetDropdown()
   }
 }
 
+// Serializes startGame/restartGame: a second click while a start is in flight
+// would otherwise destroy the simulator mid-await and leave a zombie instance.
+let gameStartInProgress = false;
+
 async function startGame()
 {
+  if (gameStartInProgress) return;
+  gameStartInProgress = true;
   try
   {
     // BTK should already be loaded from DOMContentLoaded, but check just in case
@@ -3009,10 +3015,16 @@ async function startGame()
     console.error('Failed to start game:', error);
     showError('Failed to start simulator. Please check the console for details.');
   }
+  finally
+  {
+    gameStartInProgress = false;
+  }
 }
 
 async function restartGame()
 {
+  if (gameStartInProgress) return;
+  gameStartInProgress = true;
   try
   {
     // Explicitly save current UI values to cookies (in case auto-save didn't fire)
@@ -3036,6 +3048,10 @@ async function restartGame()
   {
     console.error('Failed to restart game:', error);
     showError('Failed to restart simulator. Please check the console for details.');
+  }
+  finally
+  {
+    gameStartInProgress = false;
   }
 }
 

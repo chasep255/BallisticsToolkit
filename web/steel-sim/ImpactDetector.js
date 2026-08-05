@@ -123,8 +123,9 @@ export class ImpactDetector
     // Retrieve user data associated with this object
     const userData = this.userData.get(result.objectId);
 
-    // Convert to plain JS object for easier use
-    return {
+    // Convert to plain JS object for easier use; the position/normal fields
+    // are owning WASM handles and must be deleted after copying
+    const impact = {
       position:
       {
         x: result.position.x,
@@ -140,6 +141,9 @@ export class ImpactDetector
       time: result.time,
       userData: userData
     };
+    result.position.delete();
+    result.normal.delete();
+    return impact;
   }
 
   /**
