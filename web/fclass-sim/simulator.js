@@ -29,6 +29,7 @@ const SettingsCookies = createSettingsCookies('fclass_sim_');
 
 const DEFAULT_PARAMS = {
   graphicsPreset: 'Medium',
+  gameSize: 'auto',
   windMarker: 'flags',
   matchMode: 'string',
   matches: '3',
@@ -288,11 +289,30 @@ function canvasVideoTrack()
   return tracks[0] || null;
 }
 
-// Lock canvas size once on page load
-function lockCanvasSize()
+/**
+ * Undo what lockCanvasSize pinned, so the canvas falls back to its stylesheet
+ * sizing (width: 100%, capped at 85vh) and can be measured against the page again.
+ */
+function clearLockedCanvasSize(canvas, wrap)
 {
-  const canvas = document.getElementById('gameCanvas');
+  for (const prop of ['width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight', 'aspectRatio'])
+  {
+    canvas.style[prop] = '';
+  }
+  if (wrap)
+  {
+    wrap.style.width = '';
+    wrap.style.maxWidth = '';
+    wrap.style.marginLeft = '';
+  }
+}
 
+/**
+ * One-shot device warnings on load. Kept out of lockCanvasSize, which runs again
+ * on every Start / Restart and would stack up a banner each time.
+ */
+function checkDeviceCompatibility()
+{
   // Detect mobile devices and small screens
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const isTouchOnly = !window.matchMedia('(hover: hover)').matches;
@@ -310,34 +330,76 @@ function lockCanvasSize()
     console.warn(`Screen too narrow: ${screenWidth}px (recommended: ${minRecommendedWidth}px+)`);
     showWarning('Screen Too Small', `Please maximize your browser window. Current: ${screenWidth}px, Recommended: ${minRecommendedWidth}px+`);
   }
+}
 
-  // Calculate canvas size respecting both width and height constraints
-  // Target aspect ratio: 4:3
+/**
+ * Pin the canvas to one size and keep it there: the sim reads it once when it is
+ * built (scopes, render targets and the HUD are all sized off it) and never
+ * resizes, so the size has to be settled before a game starts. Called again from
+ * Start / Restart, which is where a changed Game Size or a window resize lands.
+ */
+function lockCanvasSize()
+{
+  const canvas = document.getElementById('gameCanvas');
+  if (!canvas) return;
+
+  // Target aspect ratio: 4:3, so a size is just a width, the height follows.
   const aspectRatio = 4 / 3;
   const maxWidth = 1200;
   const maxHeightVh = 0.85; // 85vh
 
-  // Get available dimensions
-  const availableWidth = Math.min(canvas.clientWidth, maxWidth);
-  const availableHeight = window.innerHeight * maxHeightVh;
+  // A previous lock left its own size pinned on the element, drop it before
+  // measuring or clientWidth just reports that old size straight back.
+  const wrap = canvas.parentElement;
+  clearLockedCanvasSize(canvas, wrap);
 
-  // Calculate dimensions maintaining 4:3 aspect ratio
+  const wrapWidth = wrap ? wrap.clientWidth : canvas.clientWidth;
+
   let canvasWidth, canvasHeight;
+  const fixedWidth = parseInt(document.getElementById('gameSize')?.value, 10);
 
-  // Try width-constrained first
-  canvasWidth = availableWidth;
-  canvasHeight = canvasWidth / aspectRatio;
-
-  // If height exceeds available space, constrain by height instead
-  if (canvasHeight > availableHeight)
+  if (fixedWidth > 0)
   {
-    canvasHeight = availableHeight;
-    canvasWidth = canvasHeight * aspectRatio;
+    // An explicit pick wins over the measurement, which is the whole point of
+    // the setting: some browsers (TV / console ones) report a window the
+    // auto-fit turns into an unusably small view. Only the window width is
+    // enforced, a canvas running off the side is unreachable where there is no
+    // horizontal scrolling.
+    canvasWidth = Math.min(fixedWidth, document.documentElement.clientWidth - 16);
+    canvasHeight = canvasWidth / aspectRatio;
+  }
+  else
+  {
+    // Default: fit the page, respecting both width and height constraints.
+    const availableWidth = Math.min(canvas.clientWidth, maxWidth);
+    const availableHeight = window.innerHeight * maxHeightVh;
+
+    // Try width-constrained first
+    canvasWidth = availableWidth;
+    canvasHeight = canvasWidth / aspectRatio;
+
+    // If height exceeds available space, constrain by height instead
+    if (canvasHeight > availableHeight)
+    {
+      canvasHeight = availableHeight;
+      canvasWidth = canvasHeight * aspectRatio;
+    }
   }
 
   // Round to integers for clean rendering
   canvasWidth = Math.floor(canvasWidth);
   canvasHeight = Math.floor(canvasHeight);
+
+  // A fixed size can be wider than the page's content column. Let the wrap span
+  // that much and pull it back by half the overhang, so the view stays centered
+  // on the page instead of spilling off one side.
+  if (wrap)
+  {
+    const overhang = canvasWidth - wrapWidth;
+    wrap.style.width = overhang > 0 ? canvasWidth + 'px' : '';
+    wrap.style.maxWidth = overhang > 0 ? canvasWidth + 'px' : '';
+    wrap.style.marginLeft = overhang > 0 ? -Math.floor(overhang / 2) + 'px' : '';
+  }
 
   // Lock canvas size permanently - no resizing allowed
   canvas.width = canvasWidth;
@@ -497,6 +559,18 @@ function setupUI()
     }
   });
 
+  // Game Size takes effect right away while nothing is running. Once a sim is
+  // live the canvas is baked into it (scopes, render targets, HUD), so a change
+  // has to wait for the rebuild that Start / Restart does.
+  const gameSizeEl = document.getElementById('gameSize');
+  if (gameSizeEl)
+  {
+    gameSizeEl.addEventListener('change', () =>
+    {
+      if (!webglGame) lockCanvasSize();
+    });
+  }
+
   // Inject the shared keyboard legend + disclaimer (also used by the viewer).
   const keyLegend = document.getElementById('keyLegend');
   if (keyLegend) keyLegend.innerHTML = KEY_LEGEND_HTML + SIM_DISCLAIMER_HTML;
@@ -624,6 +698,10 @@ function startGame()
     // Get current parameters
     const params = getGameParams();
 
+    // Re-size the canvas first: the sim reads it in its constructor, so this is
+    // where a changed Game Size or a resized window gets picked up.
+    lockCanvasSize();
+
     // Create new Three.js game instance (constructor handles all init)
     const canvas = document.getElementById('gameCanvas');
     webglGame = new FClassSimulator(canvas, params);
@@ -672,6 +750,9 @@ function restartGame()
       }
       webglGame.destroy();
     }
+
+    // Pick up a changed Game Size / window size before the sim reads the canvas.
+    lockCanvasSize();
 
     // Create new Three.js game instance with updated parameters
     const canvas = document.getElementById('gameCanvas');
@@ -3225,12 +3306,16 @@ async function initializeApp()
     setDefaultValues();
 
     setupUI();
-    lockCanvasSize();
     populateWindPresetDropdown();
 
     SettingsCookies.loadAll();
     SettingsCookies.attachAutoSave();
     updateModeVisibility();
+
+    checkDeviceCompatibility();
+
+    // After loadAll, so a saved Game Size is in place before the canvas is sized.
+    lockCanvasSize();
 
     const resetBtn = document.getElementById('resetDefaults');
     if (resetBtn)
@@ -3242,6 +3327,7 @@ async function initializeApp()
         populateWindPresetDropdown();
         updateModeVisibility();
         SettingsCookies.saveAll();
+        if (!webglGame) lockCanvasSize();
       });
     }
 

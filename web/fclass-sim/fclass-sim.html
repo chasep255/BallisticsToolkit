@@ -65,6 +65,7 @@
     <!-- Parameters -->
     <div class="params-bar">
       <div class="param-item"><label for="graphicsPreset" title="Graphics quality preset">Graphics</label><select id="graphicsPreset" title="Graphics quality preset"><option value="Low">Low</option><option value="Medium" selected>Medium</option><option value="High">High</option></select></div>
+      <div class="param-item"><label for="gameSize" title="Size of the game view, always 4:3. Default fits it to the page; a fixed size is there for browsers that report a window the auto-fit can't use (TV and console browsers). Bigger costs performance. Applies on Start or Restart.">Game Size</label><select id="gameSize" title="Size of the game view, always 4:3. Default fits it to the page; a fixed size is there for browsers that report a window the auto-fit can't use (TV and console browsers). Bigger costs performance. Applies on Start or Restart."><option value="auto" selected>Default (Fit Page)</option><option value="800">800 &times; 600</option><option value="1024">1024 &times; 768</option><option value="1280">1280 &times; 960</option><option value="1440">1440 &times; 1080</option><option value="1600">1600 &times; 1200</option><option value="1920">1920 &times; 1440</option></select></div>
       <div class="param-item"><label for="matchMode" title="Match format: String Fire (matches) or Pair Fire (two players, alternating)">Mode</label><select id="matchMode" title="Match format"><option value="string" selected>String Fire</option><option value="pair">Pair Fire</option></select></div>
       <div class="param-item string-config"><label for="matches" title="Number of matches in the aggregate">Matches</label><input type="number" id="matches" value="3" step="1" min="1" max="10" title="Number of matches"></div>
       <div class="param-item string-config"><label for="shotsPerMatch" title="Record shots per match">Shots/Match</label><input type="number" id="shotsPerMatch" value="20" step="1" min="1" max="100" title="Record shots per match"></div>
@@ -230,7 +231,9 @@
             - Pixel ratio (rendering resolution multiplier)<br>
             - Object counts (clouds, trees, mountains, flag segments)<br><br>
             
-            <strong>Note:</strong> Changes require restarting the game to take effect. Settings are automatically saved and restored on page reload.
+            <strong>Note:</strong> Changes require restarting the game to take effect. Settings are automatically saved and restored on page reload.<br><br>
+
+            <strong>Game Size:</strong> the game view is always 4:3. <em>Default (Fit Page)</em> sizes it to the page, which is what you want on a normal browser window. The fixed sizes are an override for browsers that report a window the auto&#8209;fit can't use (TV and console browsers, where the view can come out tiny with no way to scroll); pick the largest one that still fits on screen. A larger view renders more pixels, so it costs performance. Applies on Start or Restart.
           </div>
         </div>
         
